@@ -1,0 +1,567 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
+import type {
+  MealSettings,
+  MealRate,
+  MealSelection,
+} from '@/types/database'
+
+// ==============================================================================
+// Types & Interfaces
+// ==============================================================================
+
+export type MealSessionType = 'BREAKFAST' | 'LUNCH' | 'DINNER'
+
+export interface ExtendedMealSelection extends MealSelection {
+  boarder_name?: string
+  flat_name?: string
+  flat_code?: string
+}
+
+export interface ToggleMealInput {
+  mealDate: string // YYYY-MM-DD
+  session: MealSessionType
+  newState: boolean
+  overrideReason?: string | null
+  targetBoarderId?: string
+}
+
+export interface BatchToggleInput {
+  mealDate: string
+  breakfast?: boolean
+  lunch?: boolean
+  dinner?: boolean
+  overrideReason?: string | null
+  targetBoarderId?: string
+}
+
+export interface BoarderOption {
+  id: string
+  user_id?: string | null
+  full_name: string
+  boarder_code: string
+  phone_number: string
+  flat_name?: string
+  room_name?: string
+}
+
+// ==============================================================================
+// Asia/Dhaka Time & Cutoff Utilities
+// ==============================================================================
+
+/**
+ * Returns current Date in Asia/Dhaka timezone (UTC+6)
+ */
+export function getDhakaNow(): Date {
+  const now = new Date()
+  const utc = now.getTime() + now.getTimezoneOffset() * 60000
+  return new Date(utc + 3600000 * 6) // UTC+6
+}
+
+/**
+ * Formats a Date object to YYYY-MM-DD in Asia/Dhaka timezone
+ */
+export function formatDhakaDate(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+/**
+ * Evaluates whether next-day cutoff has expired (10:00:00 PM Dhaka time)
+ */
+export function isDhakaCutoffPassed(cutoffTimeStr: string = '22:00:00'): boolean {
+  const dhakaNow = getDhakaNow()
+  const [cutoffHours, cutoffMinutes] = cutoffTimeStr.split(':').map(Number)
+  const cutoffToday = new Date(dhakaNow)
+  cutoffToday.setHours(cutoffHours, cutoffMinutes, 0, 0)
+  return dhakaNow.getTime() >= cutoffToday.getTime()
+}
+
+/**
+ * Returns remaining seconds until today's 10:00 PM cutoff in Dhaka
+ */
+export function getRemainingCutoffSeconds(cutoffTimeStr: string = '22:00:00'): number {
+  const dhakaNow = getDhakaNow()
+  const [cutoffHours, cutoffMinutes] = cutoffTimeStr.split(':').map(Number)
+  const cutoffToday = new Date(dhakaNow)
+  cutoffToday.setHours(cutoffHours, cutoffMinutes, 0, 0)
+  const diffMs = cutoffToday.getTime() - dhakaNow.getTime()
+  return diffMs > 0 ? Math.floor(diffMs / 1000) : 0
+}
+
+/**
+ * Evaluates date status relative to today in Asia/Dhaka
+ */
+export function getDateMealStatus(targetDateStr: string, cutoffTimeStr: string = '22:00:00') {
+  const dhakaNow = getDhakaNow()
+  const todayStr = formatDhakaDate(dhakaNow)
+
+  const tomorrow = new Date(dhakaNow)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  const tomorrowStr = formatDhakaDate(tomorrow)
+
+  const isToday = targetDateStr === todayStr
+  const isPast = targetDateStr < todayStr
+  const isTomorrow = targetDateStr === tomorrowStr
+  const isFuture = targetDateStr > tomorrowStr
+
+  const cutoffPassed = isDhakaCutoffPassed(cutoffTimeStr)
+
+  // Locked for ordinary boarders if today, past, or tomorrow after 10 PM
+  const isLockedForBoarder = isPast || isToday || (isTomorrow && cutoffPassed)
+
+  return {
+    todayStr,
+    tomorrowStr,
+    isToday,
+    isPast,
+    isTomorrow,
+    isFuture,
+    cutoffPassed,
+    isLockedForBoarder,
+  }
+}
+
+// ==============================================================================
+// Mock Data Baseline (Realistic Hostel Boarders & Meals)
+// ==============================================================================
+
+export const MOCK_MEAL_SETTINGS: MealSettings = {
+  id: '00000000-0000-0000-0000-000000000001',
+  is_meal_module_enabled: true,
+  breakfast_enabled: true,
+  lunch_enabled: true,
+  dinner_enabled: true,
+  cutoff_time: '22:00:00',
+  updated_by: 'usr-admin1',
+  updated_at: new Date().toISOString(),
+}
+
+export const MOCK_ACTIVE_RATE: MealRate = {
+  id: 'rate-active-2026',
+  effective_from: '2026-01-01',
+  effective_to: null,
+  breakfast_rate: 30.0,
+  lunch_rate: 65.0,
+  dinner_rate: 60.0,
+  created_by: 'usr-admin1',
+  created_at: '2026-01-01T00:00:00Z',
+}
+
+export const MOCK_BOARDERS_FOR_MEAL: BoarderOption[] = [
+  {
+    id: 'bdr-101',
+    user_id: 'usr-bdr1',
+    full_name: 'তানভীর আহমেদ',
+    boarder_code: 'BDR-101',
+    phone_number: '01711223344',
+    flat_name: 'ফ্ল্যাট ২-এ',
+    room_name: 'রুম ২০১ (সিট ১)',
+  },
+  {
+    id: 'bdr-102',
+    user_id: 'usr-bdr2',
+    full_name: 'সাকিব আল হাসান',
+    boarder_code: 'BDR-102',
+    phone_number: '01811998877',
+    flat_name: 'ফ্ল্যাট ২-এ',
+    room_name: 'রুম ২০১ (সিট ২)',
+  },
+  {
+    id: 'bdr-103',
+    user_id: 'usr-bdr3',
+    full_name: 'মাহমুদুল্লাহ রিয়াদ',
+    boarder_code: 'BDR-103',
+    phone_number: '01911445566',
+    flat_name: 'ফ্ল্যাট ৩-বি',
+    room_name: 'রুম ৩০১ (সিট ১)',
+  },
+]
+
+// Generate default meal selections for current boarder for this week
+let MOCK_SELECTIONS: MealSelection[] = []
+
+function initializeMockSelections() {
+  if (MOCK_SELECTIONS.length > 0) return
+
+  const dhakaNow = getDhakaNow()
+  // Generate for past 2 days, today, and next 10 days
+  for (let offset = -2; offset <= 10; offset++) {
+    const d = new Date(dhakaNow)
+    d.setDate(d.getDate() + offset)
+    const dateStr = formatDhakaDate(d)
+
+    MOCK_BOARDERS_FOR_MEAL.forEach((bdr) => {
+      // Default: breakfast off on weekends, lunch on, dinner on
+      const dayOfWeek = d.getDay()
+      const isFriday = dayOfWeek === 5
+
+      MOCK_SELECTIONS.push({
+        id: `ms-${bdr.id}-${dateStr}`,
+        boarder_id: bdr.id,
+        flat_id: 'flat-2a',
+        meal_date: dateStr,
+        breakfast: !isFriday,
+        lunch: true,
+        dinner: true,
+        is_locked: offset <= 0,
+        is_override: false,
+        override_reason: null,
+        override_by: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+    })
+  }
+}
+
+initializeMockSelections()
+
+// ==============================================================================
+// React Query Hooks
+// ==============================================================================
+
+// 1. Fetch Meal Settings Singleton
+export function useMealSettings() {
+  return useQuery({
+    queryKey: ['meal-settings'],
+    queryFn: async (): Promise<MealSettings> => {
+      if (!isSupabaseConfigured) {
+        return MOCK_MEAL_SETTINGS
+      }
+
+      const { data, error } = await supabase
+        .from('meal_settings')
+        .select('*')
+        .limit(1)
+        .single()
+
+      if (error) {
+        console.warn('Fallback to mock meal settings:', error.message)
+        return MOCK_MEAL_SETTINGS
+      }
+      return data || MOCK_MEAL_SETTINGS
+    },
+    staleTime: 60000,
+  })
+}
+
+// 2. Fetch Active Meal Rates
+export function useActiveMealRates() {
+  return useQuery({
+    queryKey: ['active-meal-rate'],
+    queryFn: async (): Promise<MealRate> => {
+      if (!isSupabaseConfigured) {
+        return MOCK_ACTIVE_RATE
+      }
+
+      const todayStr = formatDhakaDate(getDhakaNow())
+      const { data, error } = await supabase
+        .from('meal_rates')
+        .select('*')
+        .lte('effective_from', todayStr)
+        .or(`effective_to.is.null,effective_to.gte.${todayStr}`)
+        .order('effective_from', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (error || !data) {
+        return MOCK_ACTIVE_RATE
+      }
+      return data
+    },
+    staleTime: 300000,
+  })
+}
+
+// 3. Fetch Boarder Options (for Admin / Manager Switcher)
+export function useMealBoardersList() {
+  return useQuery({
+    queryKey: ['meal-boarders-list'],
+    queryFn: async (): Promise<BoarderOption[]> => {
+      if (!isSupabaseConfigured) {
+        return MOCK_BOARDERS_FOR_MEAL
+      }
+
+      const { data, error } = await supabase
+        .from('boarders')
+        .select(`
+          id,
+          user_id,
+          full_name,
+          boarder_code,
+          phone_number,
+          allocations!inner(
+            status,
+            seat:seat_id(
+              seat_name,
+              room:room_id(
+                name,
+                flat:flat_id(name)
+              )
+            )
+          )
+        `)
+        .eq('status', 'ACTIVE')
+        .eq('allocations.status', 'ACTIVE')
+        .order('full_name')
+
+      if (error || !data || data.length === 0) {
+        return MOCK_BOARDERS_FOR_MEAL
+      }
+
+      return data.map((b: any) => {
+        const alloc = b.allocations?.[0]
+        const seat = alloc?.seat
+        const room = seat?.room
+        const flat = room?.flat
+
+        return {
+          id: b.id,
+          user_id: b.user_id,
+          full_name: b.full_name,
+          boarder_code: b.boarder_code,
+          phone_number: b.phone_number,
+          flat_name: flat?.name || 'ফ্ল্যাট',
+          room_name: `${room?.name || 'রুম'} (${seat?.seat_name || 'সিট'})`,
+        }
+      })
+    },
+  })
+}
+
+// 4. Fetch Meal Selections for a Boarder over a Date Range
+export function useBoarderMealSelections(
+  boarderId?: string,
+  startDate?: string,
+  endDate?: string
+) {
+  const targetBoarder = boarderId || 'bdr-101'
+  const targetStart = startDate || formatDhakaDate(new Date(Date.now() - 86400000 * 2))
+  const targetEnd = endDate || formatDhakaDate(new Date(Date.now() + 86400000 * 14))
+
+  return useQuery({
+    queryKey: ['boarder-meal-selections', targetBoarder, targetStart, targetEnd],
+    queryFn: async (): Promise<ExtendedMealSelection[]> => {
+      if (!isSupabaseConfigured) {
+        const filtered = MOCK_SELECTIONS.filter(
+          (s) =>
+            s.boarder_id === targetBoarder &&
+            s.meal_date >= targetStart &&
+            s.meal_date <= targetEnd
+        )
+        return filtered
+      }
+
+      const { data, error } = await supabase
+        .from('meal_selections')
+        .select('*')
+        .eq('boarder_id', targetBoarder)
+        .gte('meal_date', targetStart)
+        .lte('meal_date', targetEnd)
+        .order('meal_date', { ascending: true })
+
+      if (error) {
+        console.error('Error fetching meal selections:', error)
+        throw new Error(error.message)
+      }
+
+      return data || []
+    },
+  })
+}
+
+// ==============================================================================
+// Mutations
+// ==============================================================================
+
+// 1. Toggle Single Meal Session (Breakfast / Lunch / Dinner)
+export function useToggleMealMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: ToggleMealInput) => {
+      const targetBoarder = input.targetBoarderId || 'bdr-101'
+      const sessionUpper = input.session.toUpperCase() as MealSessionType
+
+      // Validate Cutoff on Client before sending
+      const status = getDateMealStatus(input.mealDate)
+      if (status.isLockedForBoarder && !input.overrideReason) {
+        throw new Error('কাটঅফ সময় অতিক্রান্ত হয়েছে। আগামীকালের বা পূর্ববর্তী দিনের মিল পরিবর্তন লক করা আছে।')
+      }
+
+      if (!isSupabaseConfigured) {
+        let existing = MOCK_SELECTIONS.find(
+          (s) => s.boarder_id === targetBoarder && s.meal_date === input.mealDate
+        )
+
+        if (!existing) {
+          existing = {
+            id: `ms-${targetBoarder}-${input.mealDate}`,
+            boarder_id: targetBoarder,
+            flat_id: 'flat-2a',
+            meal_date: input.mealDate,
+            breakfast: false,
+            lunch: false,
+            dinner: false,
+            is_locked: false,
+            is_override: !!input.overrideReason,
+            override_reason: input.overrideReason || null,
+            override_by: input.overrideReason ? 'usr-admin1' : null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }
+          MOCK_SELECTIONS.push(existing)
+        }
+
+        if (sessionUpper === 'BREAKFAST') existing.breakfast = input.newState
+        if (sessionUpper === 'LUNCH') existing.lunch = input.newState
+        if (sessionUpper === 'DINNER') existing.dinner = input.newState
+
+        if (input.overrideReason) {
+          existing.is_override = true
+          existing.override_reason = input.overrideReason
+          existing.override_by = 'usr-admin1'
+        }
+        existing.updated_at = new Date().toISOString()
+
+        return {
+          success: true,
+          selection_id: existing.id,
+          meal_date: input.mealDate,
+          session: sessionUpper,
+          state: input.newState,
+        }
+      }
+
+      // Supabase RPC Call
+      const { data, error } = await supabase.rpc('fn_toggle_meal_selection', {
+        p_meal_date: input.mealDate,
+        p_session: sessionUpper,
+        p_new_state: input.newState,
+        p_override_reason: input.overrideReason || null,
+        p_target_boarder_id: input.targetBoarderId || null,
+      })
+
+      if (error) {
+        throw new Error(error.message || 'মিল পরিবর্তন করতে ব্যর্থ হয়েছে।')
+      }
+      return data
+    },
+
+    // Optimistic Update Implementation
+    onMutate: async (input) => {
+      const targetBoarder = input.targetBoarderId || 'bdr-101'
+      await queryClient.cancelQueries({ queryKey: ['boarder-meal-selections', targetBoarder] })
+
+      // Snapshot prior value
+      const queries = queryClient.getQueriesData<ExtendedMealSelection[]>({
+        queryKey: ['boarder-meal-selections', targetBoarder],
+      })
+
+      // Optimistically update matching queries
+      queries.forEach(([queryKey, oldData]) => {
+        if (!oldData) return
+        const updated = oldData.map((item) => {
+          if (item.meal_date === input.mealDate) {
+            const key = input.session.toLowerCase() as 'breakfast' | 'lunch' | 'dinner'
+            return { ...item, [key]: input.newState }
+          }
+          return item
+        })
+        queryClient.setQueryData(queryKey, updated)
+      })
+
+      return { queries }
+    },
+
+    onError: (_err, _input, context) => {
+      // Revert optimistic updates on error
+      if (context?.queries) {
+        context.queries.forEach(([queryKey, oldData]) => {
+          queryClient.setQueryData(queryKey, oldData)
+        })
+      }
+    },
+
+    onSettled: (_data, _error, input) => {
+      const targetBoarder = input.targetBoarderId || 'bdr-101'
+      queryClient.invalidateQueries({ queryKey: ['boarder-meal-selections', targetBoarder] })
+      queryClient.invalidateQueries({ queryKey: ['kitchen-meals-summary'] })
+    },
+  })
+}
+
+// 2. Batch Toggle All Sessions for a Date (Quick All-ON / All-OFF)
+export function useBatchToggleMealsMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: BatchToggleInput) => {
+      const targetBoarder = input.targetBoarderId || 'bdr-101'
+
+      const status = getDateMealStatus(input.mealDate)
+      if (status.isLockedForBoarder && !input.overrideReason) {
+        throw new Error('কাটঅফ সময় অতিক্রান্ত হয়েছে। আগামীকালের বা পূর্ববর্তী দিনের মিল পরিবর্তন লক করা আছে।')
+      }
+
+      if (!isSupabaseConfigured) {
+        let existing = MOCK_SELECTIONS.find(
+          (s) => s.boarder_id === targetBoarder && s.meal_date === input.mealDate
+        )
+
+        if (!existing) {
+          existing = {
+            id: `ms-${targetBoarder}-${input.mealDate}`,
+            boarder_id: targetBoarder,
+            flat_id: 'flat-2a',
+            meal_date: input.mealDate,
+            breakfast: false,
+            lunch: false,
+            dinner: false,
+            is_locked: false,
+            is_override: !!input.overrideReason,
+            override_reason: input.overrideReason || null,
+            override_by: input.overrideReason ? 'usr-admin1' : null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }
+          MOCK_SELECTIONS.push(existing)
+        }
+
+        if (input.breakfast !== undefined) existing.breakfast = input.breakfast
+        if (input.lunch !== undefined) existing.lunch = input.lunch
+        if (input.dinner !== undefined) existing.dinner = input.dinner
+        existing.updated_at = new Date().toISOString()
+
+        return { success: true }
+      }
+
+      // Sequential toggle calls for non-undefined sessions
+      const sessionsToToggle: { session: MealSessionType; state: boolean }[] = []
+      if (input.breakfast !== undefined) sessionsToToggle.push({ session: 'BREAKFAST', state: input.breakfast })
+      if (input.lunch !== undefined) sessionsToToggle.push({ session: 'LUNCH', state: input.lunch })
+      if (input.dinner !== undefined) sessionsToToggle.push({ session: 'DINNER', state: input.dinner })
+
+      for (const item of sessionsToToggle) {
+        const { error } = await supabase.rpc('fn_toggle_meal_selection', {
+          p_meal_date: input.mealDate,
+          p_session: item.session,
+          p_new_state: item.state,
+          p_override_reason: input.overrideReason || null,
+          p_target_boarder_id: input.targetBoarderId || null,
+        })
+        if (error) throw new Error(error.message)
+      }
+
+      return { success: true }
+    },
+    onSuccess: (_data, input) => {
+      const targetBoarder = input.targetBoarderId || 'bdr-101'
+      queryClient.invalidateQueries({ queryKey: ['boarder-meal-selections', targetBoarder] })
+      queryClient.invalidateQueries({ queryKey: ['kitchen-meals-summary'] })
+    },
+  })
+}
