@@ -19,6 +19,7 @@ import {
   ArrowRightLeft,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
+import { useBoarders } from '@/features/boarders/api/useBoarders'
 import { cn } from '@/utils/cn'
 
 interface SidebarProps {
@@ -149,6 +150,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
   ]
 
+  const { data: pendingBoarders = [] } = useBoarders({ status: 'PENDING' })
+
   const filteredItems = navItems.filter((item) => item.roles.includes(userRole))
 
   return (
@@ -197,6 +200,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1.5">
           {filteredItems.map((item) => {
             const label = t(item.titleKey) !== item.titleKey ? t(item.titleKey) : item.defaultTitle
+            const isBoardersLink = item.href === '/boarders'
+            const hasPending = isBoardersLink && pendingBoarders.length > 0
 
             return (
               <NavLink
@@ -205,7 +210,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={onCloseMobile}
                 className={({ isActive }) =>
                   cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all group select-none',
+                    'flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all group select-none relative',
                     isActive
                       ? 'bg-primary-600/20 text-white border border-primary-500/40 shadow-sm shadow-primary-500/10'
                       : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60',
@@ -214,11 +219,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }
                 title={isCollapsed ? label : undefined}
               >
-                <span className="text-primary-400 group-hover:text-primary-300 transition-colors">
+                <div className="relative text-primary-400 group-hover:text-primary-300 transition-colors">
                   {item.icon}
-                </span>
+                  {isCollapsed && hasPending && (
+                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-slate-900 animate-pulse" />
+                  )}
+                </div>
 
-                {!isCollapsed && <span className="truncate">{label}</span>}
+                {!isCollapsed && (
+                  <div className="flex items-center justify-between flex-1 min-w-0">
+                    <span className="truncate">{label}</span>
+                    {hasPending && (
+                      <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-slate-950 animate-pulse shrink-0">
+                        {pendingBoarders.length}
+                      </span>
+                    )}
+                  </div>
+                )}
               </NavLink>
             )
           })}

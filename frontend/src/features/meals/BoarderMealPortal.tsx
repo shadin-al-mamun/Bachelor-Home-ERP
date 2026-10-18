@@ -63,6 +63,23 @@ export const BoarderMealPortal: React.FC = () => {
   const toggleMutation = useToggleMealMutation()
   const batchToggleMutation = useBatchToggleMealsMutation()
 
+  React.useEffect(() => {
+    if (boarders.length > 0 && profile?.role === 'BOARDER') {
+      const matched = boarders.find(
+        (b) =>
+          b.user_id === profile.id ||
+          b.id === profile.id ||
+          b.phone_number === profile.phone_number ||
+          b.full_name === profile.full_name
+      )
+      if (matched) {
+        setSelectedBoarderId(matched.id)
+      } else if (selectedBoarderId === 'bdr-101' && boarders[0]) {
+        setSelectedBoarderId(boarders[0].id)
+      }
+    }
+  }, [profile, boarders, selectedBoarderId])
+
   // Current active boarder info
   const activeBoarder = boarders.find((b) => b.id === selectedBoarderId) || boarders[0]
 

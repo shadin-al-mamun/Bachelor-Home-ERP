@@ -21,6 +21,7 @@ import {
   useMealSettings,
   useBoarderMealSelections,
   useToggleMealMutation,
+  useMealBoardersList,
 } from '@/features/meals/api/useMeals'
 import { formatCurrencyBn } from '@/utils/date'
 
@@ -35,15 +36,26 @@ export const BoarderDashboardPage: React.FC = () => {
   tomorrow.setDate(tomorrow.getDate() + 1)
   const tomorrowStr = formatDhakaDate(tomorrow)
 
+  // Dynamic boarder matching based on logged-in phone or name
+  const { data: boardersList = [] } = useMealBoardersList()
+  const currentBoarder = boardersList.find(
+    (b) =>
+      b.phone_number === profile?.phone_number ||
+      b.full_name === profile?.full_name ||
+      b.id === profile?.id
+  ) || boardersList[0]
+
+  const activeBoarderId = currentBoarder?.id || 'bdr-101'
+
   // Demo / authenticated boarder profile info
   const boarderInfo = {
-    name: profile?.full_name || 'তানভীর আহমেদ',
-    code: 'BDR-101',
-    phone: profile?.phone_number || '01711-000001',
+    name: currentBoarder?.full_name || profile?.full_name || 'তানভীর আহমেদ',
+    code: currentBoarder?.boarder_code || 'BDR-101',
+    phone: currentBoarder?.phone_number || profile?.phone_number || '01711223344',
     building: 'সানফ্লাওয়ার হোস্টেল (মেইন ভবন)',
-    flat: 'ফ্ল্যাট ৪এ (৪র্থ তলা)',
-    room: 'রুম ১০১ (দক্ষিণমুখী)',
-    seat: 'সিট ১০১এ (উইন্ডো সাইড)',
+    flat: currentBoarder?.flat_name || 'ফ্ল্যাট ৪এ (৪র্থ তলা)',
+    room: currentBoarder?.room_name || 'রুম ১০১ (দক্ষিণমুখী)',
+    seat: currentBoarder?.room_name || 'সিট ১০১এ (উইন্ডো সাইড)',
     monthlyRent: 4500,
     admissionDate: '০১ অক্টোবর, ২০২৬',
     status: 'সক্রিয় (Active)',
@@ -85,8 +97,9 @@ export const BoarderDashboardPage: React.FC = () => {
 
   // Meal selections & cutoff status
   const { data: settings } = useMealSettings()
-  const { data: selections = [] } = useBoarderMealSelections('bdr-101')
+  const { data: selections = [] } = useBoarderMealSelections(activeBoarderId)
   const toggleMutation = useToggleMealMutation()
+  const [toastMessage, setToastMessage] = React.useState<string | null>(null)
 
   const todaySelection = selections.find((s) => s.meal_date === todayStr)
   const tomorrowSelection = selections.find((s) => s.meal_date === tomorrowStr)
@@ -95,7 +108,7 @@ export const BoarderDashboardPage: React.FC = () => {
 
   const handleToggleTomorrow = async (session: 'BREAKFAST' | 'LUNCH' | 'DINNER', currentState: boolean) => {
     if (tomorrowDateStatus.isLockedForBoarder) {
-      alert('রাত ১০:০০ টার কাটঅফ সময় শেষ হয়ে যাওয়ায় আগামীকালের খাবার পরিবর্তন লক করা হয়েছে।')
+      alert('রাত ১০:০০ টার কাটঅফ সময় শেষ হয়ে যাওয়ায় আগামীকালের খাবার পরিবর্তন লক করা হয়েছে। নিচে রোল বারে টেস্ট কাটঅফ বাইপাস সক্রিয় করে পরীক্ষা করতে পারেন।')
       return
     }
 
@@ -104,8 +117,11 @@ export const BoarderDashboardPage: React.FC = () => {
         mealDate: tomorrowStr,
         session,
         newState: !currentState,
-        targetBoarderId: 'bdr-101',
+        targetBoarderId: activeBoarderId,
       })
+      const sessionBn = session === 'BREAKFAST' ? 'সকালের নাস্তা' : session === 'LUNCH' ? 'দুপুরের খাবার' : 'রাতের খাবার'
+      setToastMessage(`✅ আগামীকালের ${sessionBn} ${!currentState ? 'চালু (ON)' : 'বন্ধ (OFF)'} হয়েছে! কম্পিউটারের এডমিন ড্যাশবোর্ডে সিঙ্ক হচ্ছে...`)
+      setTimeout(() => setToastMessage(null), 3500)
     } catch (err: any) {
       alert(err.message || 'মিল পরিবর্তন করা সম্ভব হয়নি।')
     }
@@ -303,10 +319,33 @@ export const BoarderDashboardPage: React.FC = () => {
           ) : (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              <span>পরিবর্তন সক্রিয় (সকাল ১০:০০ PM পর্যন্ত)</span>
+              <span>
+                {tomorrowDateStatus.cutoffPassed ? '🧪 টেস্ট মোডে পরিবর্তন সক্রিয়' : 'পরিবর্তন সক্রিয় (রাত ১০:০০ PM পর্যন্ত)'}
+              </span>
             </span>
           )}
         </div>
+
+        {/* Live Toast Confirmation */}
+        {toastMessage && (
+          <div className="p-3.5 rounded-2xl bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 text-xs font-bold flex items-center justify-between shadow-xl shadow-emerald-950/60 animate-fade-in">
+            <span className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              {toastMessage}
+            </span>
+            <span className="text-[10px] text-emerald-400 font-mono">লাইভ সিঙ্ক</span>
+          </div>
+        )}
+
+        {/* Test Mode Note when after 10 PM */}
+        {tomorrowDateStatus.cutoffPassed && !tomorrowDateStatus.isLockedForBoarder && (
+          <div className="p-3 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 flex items-center gap-2.5 text-xs text-indigo-200">
+            <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>
+              রাত ১০:০০ টা অতিক্রান্ত হলেও <strong>টেস্ট বাইপাস সক্রিয়</strong> থাকায় আপনি মোবাইল থেকে মিল অন/অফ পরীক্ষা করতে পারছেন। কম্পিউটারের এডমিন ড্যাশবোর্ডে সাথে সাথে সংখ্যা আপডেট হবে।
+            </span>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {/* Breakfast Toggle */}
@@ -321,10 +360,10 @@ export const BoarderDashboardPage: React.FC = () => {
 
             <button
               onClick={() => handleToggleTomorrow('BREAKFAST', tomorrowSelection?.breakfast ?? true)}
-              disabled={tomorrowDateStatus.isLockedForBoarder}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              disabled={tomorrowDateStatus.isLockedForBoarder || toggleMutation.isPending}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 tomorrowSelection?.breakfast ?? true
-                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 hover:bg-amber-400'
                   : 'bg-slate-900 text-slate-400 border border-slate-700 hover:text-white'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
@@ -344,10 +383,10 @@ export const BoarderDashboardPage: React.FC = () => {
 
             <button
               onClick={() => handleToggleTomorrow('LUNCH', tomorrowSelection?.lunch ?? true)}
-              disabled={tomorrowDateStatus.isLockedForBoarder}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              disabled={tomorrowDateStatus.isLockedForBoarder || toggleMutation.isPending}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 tomorrowSelection?.lunch ?? true
-                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20 hover:bg-emerald-400'
                   : 'bg-slate-900 text-slate-400 border border-slate-700 hover:text-white'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
@@ -367,10 +406,10 @@ export const BoarderDashboardPage: React.FC = () => {
 
             <button
               onClick={() => handleToggleTomorrow('DINNER', tomorrowSelection?.dinner ?? true)}
-              disabled={tomorrowDateStatus.isLockedForBoarder}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              disabled={tomorrowDateStatus.isLockedForBoarder || toggleMutation.isPending}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 tomorrowSelection?.dinner ?? true
-                  ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/20'
+                  ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/20 hover:bg-indigo-400'
                   : 'bg-slate-900 text-slate-400 border border-slate-700 hover:text-white'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >

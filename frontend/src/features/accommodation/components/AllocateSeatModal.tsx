@@ -77,7 +77,7 @@ export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
         if (seat) setMonthlyRent(seat.default_rent)
       }
     }
-  }, [isOpen, preSelectedSeatId, preSelectedBoarderId])
+  }, [isOpen, preSelectedSeatId, preSelectedBoarderId, availableSeats])
 
   const handleSeatChange = (seatId: string) => {
     setSelectedSeatId(seatId)

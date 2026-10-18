@@ -97,7 +97,10 @@ export function useBuildings() {
         .select('*')
         .order('name', { ascending: true })
 
-      if (error) throw error
+      if (error) {
+        console.warn('buildings fetch failed, falling back to mock:', error.message)
+        return mockBuildings
+      }
       return data as Building[]
     },
   })
@@ -150,7 +153,10 @@ export function useFlats(buildingId?: string) {
         query = query.eq('building_id', buildingId)
       }
       const { data, error } = await query.order('name', { ascending: true })
-      if (error) throw error
+      if (error) {
+        console.warn('flats fetch failed, falling back to mock:', error.message)
+        return buildingId ? mockFlats.filter((f) => f.building_id === buildingId) : mockFlats
+      }
       return data as Flat[]
     },
   })
@@ -203,7 +209,10 @@ export function useRooms(flatId?: string) {
         query = query.eq('flat_id', flatId)
       }
       const { data, error } = await query.order('name', { ascending: true })
-      if (error) throw error
+      if (error) {
+        console.warn('rooms fetch failed, falling back to mock:', error.message)
+        return flatId ? mockRooms.filter((r) => r.flat_id === flatId) : mockRooms
+      }
       return data as Room[]
     },
   })
@@ -289,7 +298,17 @@ export function useSeats(params?: SeatFilterParams) {
       }
 
       const { data, error } = await query.order('seat_code', { ascending: true })
-      if (error) throw error
+      if (error) {
+        console.warn('seats fetch failed, falling back to mock:', error.message)
+        let results = [...mockSeats]
+        if (params?.roomId) {
+          results = results.filter((s) => s.room_id === params.roomId)
+        }
+        if (params?.status && params.status !== 'ALL') {
+          results = results.filter((s) => s.status === params.status)
+        }
+        return results
+      }
       return data
     },
   })

@@ -26,6 +26,7 @@ import {
 } from '@/components/common'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
+import { createBoarderApplication } from '@/features/boarders/api/useBoarders'
 
 export const RegisterPortal: React.FC = () => {
   const navigate = useNavigate()
@@ -114,14 +115,42 @@ export const RegisterPortal: React.FC = () => {
     setErrorMessage(null)
 
     try {
+      // 1. Create boarder application in persistent storage
+      const createdBoarder = await createBoarderApplication({
+        full_name: fullName,
+        phone_number: phoneNumber,
+        email,
+        guardian_name: guardianName,
+        guardian_phone: guardianPhone,
+        guardian_relation: guardianRelation,
+        present_address: presentAddress,
+        permanent_address: permanentAddress,
+        institution,
+        department,
+        student_id: studentId,
+        session,
+        nid_passport_number: nidNumber,
+        nid_document_url: fileName ? `boarder-docs/${fileName}` : undefined,
+      })
+
+      // Store application reference for tracking
+      localStorage.setItem('bachelor_erp_last_applicant_id', createdBoarder.id)
+      localStorage.setItem('bachelor_erp_last_applicant_code', createdBoarder.boarder_code)
+
       if (!isSupabaseConfigured) {
-        // Mock submission in development
-        setDemoUser('APPLICANT')
+        // Log in as the actual applicant with their submitted name and phone
+        setDemoUser('APPLICANT', {
+          id: createdBoarder.user_id || undefined,
+          full_name: fullName,
+          email,
+          phone_number: phoneNumber,
+          role: 'APPLICANT',
+        })
         navigate('/portal/my-application', { replace: true })
         return
       }
 
-      // 1. Sign up user via Supabase Auth
+      // If Supabase is configured: Sign up user via Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -140,36 +169,14 @@ export const RegisterPortal: React.FC = () => {
         return
       }
 
-      if (authData.user) {
-        // 2. Insert into boarders table with status 'PENDING'
-        const boarderCode = 'BDR-' + Math.floor(1000 + Math.random() * 9000)
-
-        const { error: boarderError } = await supabase.from('boarders').insert({
-          user_id: authData.user.id,
-          boarder_code: boarderCode,
-          full_name: fullName,
-          phone_number: phoneNumber,
-          email,
-          nid_passport_number: nidNumber,
-          institution,
-          department,
-          student_id: studentId,
-          session,
-          guardian_name: guardianName,
-          guardian_phone: guardianPhone,
-          guardian_relation: guardianRelation,
-          present_address: presentAddress,
-          permanent_address: permanentAddress,
-          status: 'PENDING',
-        })
-
-        if (boarderError) {
-          console.warn('Boarder record creation warning:', boarderError.message)
-        }
-
-        setDemoUser('APPLICANT')
-        navigate('/portal/my-application', { replace: true })
-      }
+      setDemoUser('APPLICANT', {
+        id: authData.user?.id || createdBoarder.user_id || undefined,
+        full_name: fullName,
+        email,
+        phone_number: phoneNumber,
+        role: 'APPLICANT',
+      })
+      navigate('/portal/my-application', { replace: true })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'রেজিস্ট্রেশন প্রক্রিয়া ব্যর্থ হয়েছে।'
       setErrorMessage(msg)

@@ -3,6 +3,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
 import {
   updateOwnerDashboardMealMetrics,
   updateOwnerDashboardMealBatch,
+  liveMealMetricsState,
 } from '@/features/dashboard/api/useOwnerDashboard'
 import type {
   MealSettings,
@@ -85,6 +86,24 @@ export function formatDhakaDate(date: Date): string {
 }
 
 /**
+ * Test Mode: Cutoff Bypass for seamless testing across devices at any time of day
+ */
+export function isCutoffBypassActive(): boolean {
+  if (typeof window === 'undefined') return false
+  if (import.meta.env?.MODE === 'test') return false
+  const saved = localStorage.getItem('erp_cutoff_bypass')
+  // Default to true in development / demo preview so users can always test cross-device sync
+  return saved === null ? true : saved === 'true'
+}
+
+export function setCutoffBypass(enabled: boolean) {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('erp_cutoff_bypass', enabled ? 'true' : 'false')
+    window.dispatchEvent(new Event('erp_cutoff_bypass_changed'))
+  }
+}
+
+/**
  * Evaluates whether next-day cutoff has expired (10:00:00 PM Dhaka time)
  */
 export function isDhakaCutoffPassed(
@@ -146,9 +165,10 @@ export function getDateMealStatus(
   const isFuture = targetDateStr > tomorrowStr
 
   const cutoffPassed = isDhakaCutoffPassed(cutoffTimeStr, dhakaNow)
+  const bypassActive = isCutoffBypassActive()
 
-  // Locked for ordinary boarders if today, past, or tomorrow after 10 PM
-  const isLockedForBoarder = isPast || isToday || (isTomorrow && cutoffPassed)
+  // Locked for ordinary boarders if past, today, or tomorrow after 10 PM (unless bypass is active)
+  const isLockedForBoarder = isPast || isToday || (isTomorrow && cutoffPassed && !bypassActive)
 
   return {
     todayStr,
@@ -159,6 +179,7 @@ export function getDateMealStatus(
     isFuture,
     cutoffPassed,
     isLockedForBoarder,
+    isCutoffBypass: bypassActive,
   }
 }
 
@@ -201,17 +222,26 @@ export const MOCK_BOARDERS_FOR_MEAL: BoarderOption[] = [
   {
     id: 'bdr-102',
     user_id: 'usr-bdr2',
-    full_name: 'সাকিব আল হাসান',
+    full_name: 'রাকিবুল হাসান',
     boarder_code: 'BDR-102',
+    phone_number: '01912345678',
+    flat_name: 'ফ্ল্যাট ৪-এ',
+    room_name: 'রুম ১০২ (সিট ২)',
+  },
+  {
+    id: 'bdr-103',
+    user_id: 'usr-bdr3',
+    full_name: 'সাকিব আল হাসান',
+    boarder_code: 'BDR-103',
     phone_number: '01811998877',
     flat_name: 'ফ্ল্যাট ২-এ',
     room_name: 'রুম ২০১ (সিট ২)',
   },
   {
-    id: 'bdr-103',
-    user_id: 'usr-bdr3',
+    id: 'bdr-104',
+    user_id: 'usr-bdr4',
     full_name: 'মাহমুদুল্লাহ রিয়াদ',
-    boarder_code: 'BDR-103',
+    boarder_code: 'BDR-104',
     phone_number: '01911445566',
     flat_name: 'ফ্ল্যাট ৩-বি',
     room_name: 'রুম ৩০১ (সিট ১)',
@@ -384,6 +414,27 @@ export function useBoarderMealSelections(
     queryKey: ['boarder-meal-selections', targetBoarder, targetStart, targetEnd],
     queryFn: async (): Promise<ExtendedMealSelection[]> => {
       if (!isSupabaseConfigured) {
+        try {
+          const res = await fetch('/api/meals')
+          if (res.ok) {
+            const data = await res.json()
+            if (Array.isArray(data.selections) && data.selections.length > 0) {
+              data.selections.forEach((serverItem: any) => {
+                const idx = MOCK_SELECTIONS.findIndex(
+                  (s) => s.boarder_id === serverItem.boarder_id && s.meal_date === serverItem.meal_date
+                )
+                if (idx >= 0) {
+                  MOCK_SELECTIONS[idx] = { ...MOCK_SELECTIONS[idx], ...serverItem }
+                } else {
+                  MOCK_SELECTIONS.push(serverItem)
+                }
+              })
+            }
+          }
+        } catch {
+          // offline fallback
+        }
+
         const filtered = MOCK_SELECTIONS.filter(
           (s) =>
             s.boarder_id === targetBoarder &&
@@ -408,6 +459,7 @@ export function useBoarderMealSelections(
 
       return data || []
     },
+    refetchInterval: 2000,
   })
 }
 
@@ -424,10 +476,12 @@ export function useToggleMealMutation() {
       const targetBoarder = input.targetBoarderId || 'bdr-101'
       const sessionUpper = input.session.toUpperCase() as MealSessionType
 
-      // Validate Cutoff on Client before sending (Staff can override at any time)
+      // Validate Cutoff on Client before sending (Staff can override at any time, or if test bypass active)
       const status = getDateMealStatus(input.mealDate)
+      const bypassActive = isCutoffBypassActive()
       const effectiveOverrideReason =
         input.overrideReason ||
+        (bypassActive && status.cutoffPassed ? 'টেস্ট মোড কাটঅফ বাইপাস (Test Bypass)' : null) ||
         (input.targetBoarderId ? 'কর্তৃপক্ষ কর্তৃক মিল পরিবর্তন (Staff Override)' : null)
 
       if (status.isLockedForBoarder && !effectiveOverrideReason) {
@@ -435,6 +489,30 @@ export function useToggleMealMutation() {
       }
 
       if (!isSupabaseConfigured) {
+        try {
+          const res = await fetch('/api/meals/toggle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              boarderId: targetBoarder,
+              mealDate: input.mealDate,
+              session: sessionUpper,
+              newState: input.newState,
+              overrideReason: effectiveOverrideReason,
+            }),
+          })
+          if (res.ok) {
+            const result = await res.json()
+            if (result.metrics) {
+              liveMealMetricsState.active_meals_today = result.metrics.active_meals_today
+              liveMealMetricsState.active_meals_tomorrow = result.metrics.active_meals_tomorrow
+              liveMealMetricsState.meal_attendance_rate = result.metrics.meal_attendance_rate
+            }
+          }
+        } catch {
+          // offline fallback
+        }
+
         let existing = MOCK_SELECTIONS.find(
           (s) => s.boarder_id === targetBoarder && s.meal_date === input.mealDate
         )
@@ -549,8 +627,10 @@ export function useBatchToggleMealsMutation() {
       const targetBoarder = input.targetBoarderId || 'bdr-101'
 
       const status = getDateMealStatus(input.mealDate)
+      const bypassActive = isCutoffBypassActive()
       const effectiveOverrideReason =
         input.overrideReason ||
+        (bypassActive && status.cutoffPassed ? 'টেস্ট মোড কাটঅফ বাইপাস (Test Bypass)' : null) ||
         (input.targetBoarderId ? 'কর্তৃপক্ষ কর্তৃক মিল পরিবর্তন (Staff Override)' : null)
 
       if (status.isLockedForBoarder && !effectiveOverrideReason) {
@@ -558,6 +638,31 @@ export function useBatchToggleMealsMutation() {
       }
 
       if (!isSupabaseConfigured) {
+        try {
+          const res = await fetch('/api/meals/batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              boarderId: targetBoarder,
+              mealDate: input.mealDate,
+              breakfast: input.breakfast,
+              lunch: input.lunch,
+              dinner: input.dinner,
+              overrideReason: effectiveOverrideReason,
+            }),
+          })
+          if (res.ok) {
+            const result = await res.json()
+            if (result.metrics) {
+              liveMealMetricsState.active_meals_today = result.metrics.active_meals_today
+              liveMealMetricsState.active_meals_tomorrow = result.metrics.active_meals_tomorrow
+              liveMealMetricsState.meal_attendance_rate = result.metrics.meal_attendance_rate
+            }
+          }
+        } catch {
+          // offline fallback
+        }
+
         let existing = MOCK_SELECTIONS.find(
           (s) => s.boarder_id === targetBoarder && s.meal_date === input.mealDate
         )

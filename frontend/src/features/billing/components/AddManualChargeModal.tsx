@@ -21,6 +21,16 @@ const CHARGE_TYPE_OPTIONS: { value: ChargeType; label: string }[] = [
   { value: 'OTHER', label: 'অন্যান্য সার্ভিস ফি (Other Fee)' },
 ]
 
+function getDefaultBillingDates() {
+  const now = new Date()
+  return {
+    defaultMonth: now.toISOString().slice(0, 7), // 'YYYY-MM'
+    defaultDueDate: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7)
+      .toISOString()
+      .slice(0, 10),
+  }
+}
+
 export const AddManualChargeModal: React.FC<AddManualChargeModalProps> = ({
   isOpen,
   onClose,
@@ -28,11 +38,7 @@ export const AddManualChargeModal: React.FC<AddManualChargeModalProps> = ({
 }) => {
   const { data: boarders = [] } = useBoarders({ status: 'ACTIVE' })
 
-  const now = new Date()
-  const defaultMonth = now.toISOString().slice(0, 7) // 'YYYY-MM'
-  const defaultDueDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7)
-    .toISOString()
-    .slice(0, 10)
+  const { defaultMonth, defaultDueDate } = getDefaultBillingDates()
 
   const [boarderId, setBoarderId] = useState(preSelectedBoarderId || '')
   const [chargeType, setChargeType] = useState<ChargeType>('UTILITY')
@@ -47,14 +53,15 @@ export const AddManualChargeModal: React.FC<AddManualChargeModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      const dates = getDefaultBillingDates()
       setErrorMsg(null)
       setIsSuccess(false)
       setBoarderId(preSelectedBoarderId || '')
       setChargeType('UTILITY')
       setAmount(0)
       setDescription('')
-      setBillingMonth(defaultMonth)
-      setDueDate(defaultDueDate)
+      setBillingMonth(dates.defaultMonth)
+      setDueDate(dates.defaultDueDate)
     }
   }, [isOpen, preSelectedBoarderId])
 

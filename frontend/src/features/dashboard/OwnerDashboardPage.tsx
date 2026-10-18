@@ -21,11 +21,16 @@ import { useAuthStore } from '@/app/store/useAuthStore'
 import { useOwnerDashboard } from './api/useOwnerDashboard'
 import BackupHealthWidget from './components/BackupHealthWidget'
 import { StaffMealControlModal } from '@/features/meals/components/StaffMealControlModal'
+import { useBoarders, type BoarderWithRelations } from '@/features/boarders/api/useBoarders'
+import ApplicantReviewModal from '@/features/boarders/components/ApplicantReviewModal'
+import { formatDateBn } from '@/utils/date'
 
 export const OwnerDashboardPage: React.FC = () => {
   const { profile } = useAuthStore()
   const { data: dashboard, isLoading, refetch, isRefetching } = useOwnerDashboard()
+  const { data: pendingBoarders = [], refetch: refetchPendingBoarders } = useBoarders({ status: 'PENDING' })
 
+  const [reviewApplicant, setReviewApplicant] = useState<BoarderWithRelations | null>(null)
   const [trendMetric, setTrendMetric] = useState<'SURPLUS' | 'ALL'>('ALL')
   const [isStaffMealControlOpen, setIsStaffMealControlOpen] = useState(false)
 
@@ -33,7 +38,22 @@ export const OwnerDashboardPage: React.FC = () => {
   const cashFlowTrend = dashboard?.cash_flow_trend || []
   const flatOccupancy = dashboard?.flat_occupancy || []
   const duesAging = dashboard?.dues_aging || []
-  const recentActivities = dashboard?.recent_activities || []
+  const baseActivities = dashboard?.recent_activities || []
+
+  // Prepend pending boarder applications to recent activity stream
+  const recentActivities = [
+    ...pendingBoarders.map((b) => ({
+      id: 'act-pending-' + b.id,
+      type: 'ADMISSION' as const,
+      title: 'নতুন বর্ডার আবেদন জমা পড়েছে',
+      subtitle: `${b.full_name} (${b.boarder_code}) — ${b.institution || 'অনলাইন আবেদন'}`,
+      amount: undefined,
+      time: 'অপেক্ষমান যাচাই',
+      user_name: b.full_name,
+      status: 'PENDING',
+    })),
+    ...baseActivities,
+  ]
 
   // Max value for SVG/CSS Chart scaling
   const maxRevenue = Math.max(...cashFlowTrend.map((t) => t.revenue), 500000)
@@ -76,6 +96,104 @@ export const OwnerDashboardPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Pending Boarder Applications Section */}
+      {pendingBoarders.length > 0 ? (
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-amber-950/70 via-slate-900 to-amber-950/60 border-2 border-amber-500/50 p-5 sm:p-6 shadow-2xl">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-amber-500/30">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/20">
+                <ShieldAlert className="w-6 h-6 animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base sm:text-lg font-bold text-white">
+                    নতুন বর্ডার ভর্তি আবেদন ({pendingBoarders.length}টি অপেক্ষমান)
+                  </h2>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-slate-950">
+                    যাচাই ও অনুমোদন প্রয়োজন
+                  </span>
+                </div>
+                <p className="text-xs text-amber-200/80 mt-0.5">
+                  অনলাইন পোর্টাল থেকে নতুন আবেদন জমা পড়েছে। অনুগ্রহ করে নথিপত্র ও আবেদনকারীর তথ্য যাচাই করে অনুমোদন করুন।
+                </p>
+              </div>
+            </div>
+
+            <Link
+              to="/boarders"
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-400 hover:text-amber-300 transition-colors self-start md:self-center"
+            >
+              <span>সকল আবেদন দেখুন</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+
+          {/* Cards for each pending applicant */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-4">
+            {pendingBoarders.map((applicant) => (
+              <div
+                key={applicant.id}
+                className="p-4 rounded-2xl bg-slate-950/90 border border-amber-500/30 hover:border-amber-400/60 transition-all space-y-3 shadow-md flex flex-col justify-between"
+              >
+                <div className="space-y-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      {applicant.photo_url ? (
+                        <img
+                          src={applicant.photo_url}
+                          alt={applicant.full_name}
+                          className="w-10 h-10 rounded-xl object-cover ring-1 ring-amber-500/40"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-400 ring-1 ring-slate-700">
+                          <UserPlus className="w-5 h-5 text-amber-400" />
+                        </div>
+                      )}
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-bold text-white truncate max-w-[150px]">
+                          {applicant.full_name}
+                        </h4>
+                        <span className="font-mono text-[10px] font-semibold text-amber-400 block">
+                          {applicant.boarder_code}
+                        </span>
+                      </div>
+                    </div>
+
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {formatDateBn(applicant.admission_date)}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1 text-xs text-slate-300">
+                    <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
+                      <span className="text-amber-400 font-medium">ফোন:</span>
+                      <span>{applicant.phone_number}</span>
+                    </div>
+                    {applicant.institution && (
+                      <div className="flex items-center gap-1.5 text-slate-400 text-[11px] truncate">
+                        <Building2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                        <span className="truncate">{applicant.institution}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setReviewApplicant(applicant)}
+                  className="w-full mt-2 py-2 px-3 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-amber-600/30 transition-all cursor-pointer"
+                >
+                  <ShieldAlert className="w-3.5 h-3.5" />
+                  <span>আবেদন যাচাই ও অনুমোদন</span>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {/* 5 Master Executive KPI Cards */}
       {isLoading || !kpis ? (
@@ -186,9 +304,15 @@ export const OwnerDashboardPage: React.FC = () => {
                 <PieChart className="w-4 h-4 text-amber-400" />
                 মিল প্রস্তুতি ও উপস্থিতি
               </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                {kpis.meal_attendance_rate}%
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800/40">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  লাইভ সিঙ্ক
+                </span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                  {kpis.meal_attendance_rate}%
+                </span>
+              </div>
             </div>
 
             <div className="mt-2.5 grid grid-cols-2 gap-1.5">
@@ -200,8 +324,8 @@ export const OwnerDashboardPage: React.FC = () => {
               </div>
               <div className="p-2 rounded-xl bg-slate-950/70 border border-slate-800">
                 <span className="text-[10px] text-slate-400 block">আগামীকাল প্রস্তুত:</span>
-                <div className="text-xl sm:text-2xl font-extrabold font-mono text-indigo-300 mt-0.5">
-                  {kpis.active_meals_tomorrow || 192} <span className="text-[10px] font-normal text-slate-400">টি</span>
+                <div key={kpis.active_meals_tomorrow} className="text-xl sm:text-2xl font-extrabold font-mono text-indigo-300 mt-0.5 animate-fade-in">
+                  {kpis.active_meals_tomorrow ?? 192} <span className="text-[10px] font-normal text-slate-400">টি</span>
                 </div>
               </div>
             </div>
@@ -265,12 +389,19 @@ export const OwnerDashboardPage: React.FC = () => {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
           <Link
             to="/boarders"
-            className="p-3 rounded-2xl bg-slate-950/80 hover:bg-indigo-600/10 border border-slate-800 hover:border-indigo-500/40 text-left transition-all group flex items-center gap-2.5"
+            className="p-3 rounded-2xl bg-slate-950/80 hover:bg-indigo-600/10 border border-slate-800 hover:border-indigo-500/40 text-left transition-all group flex items-center justify-between gap-2"
           >
-            <UserPlus className="w-4 h-4 text-indigo-400 group-hover:scale-110 transition-transform shrink-0" />
-            <span className="text-xs font-semibold text-slate-300 group-hover:text-white">
-              বর্ডার তালিকা
-            </span>
+            <div className="flex items-center gap-2.5 min-w-0">
+              <UserPlus className="w-4 h-4 text-indigo-400 group-hover:scale-110 transition-transform shrink-0" />
+              <span className="text-xs font-semibold text-slate-300 group-hover:text-white truncate">
+                বর্ডার তালিকা
+              </span>
+            </div>
+            {pendingBoarders.length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-slate-950 shrink-0 animate-pulse">
+                {pendingBoarders.length} অপেক্ষমান
+              </span>
+            )}
           </Link>
 
           <Link
@@ -636,6 +767,17 @@ export const OwnerDashboardPage: React.FC = () => {
           }}
         />
       )}
+
+      {/* Applicant Review Modal */}
+      <ApplicantReviewModal
+        isOpen={Boolean(reviewApplicant)}
+        onClose={() => {
+          setReviewApplicant(null)
+          refetchPendingBoarders()
+          refetch()
+        }}
+        applicant={reviewApplicant}
+      />
     </div>
   )
 }

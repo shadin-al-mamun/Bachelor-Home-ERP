@@ -339,14 +339,38 @@ export function useOwnerDashboard() {
     queryKey: ['owner-executive-dashboard'],
     queryFn: async (): Promise<OwnerDashboardData> => {
       if (!isSupabaseConfigured) {
+        // Fetch from shared dev server API so mobile updates sync to PC instantly
+        let serverMetrics: Partial<LiveMealMetrics> = {}
+        try {
+          const res = await fetch('/api/dashboard/metrics')
+          if (res.ok) {
+            serverMetrics = await res.json()
+          }
+        } catch {
+          // offline fallback
+        }
+
+        const activeToday = serverMetrics.active_meals_today ?? liveMealMetricsState.active_meals_today
+        const activeTomorrow =
+          serverMetrics.active_meals_tomorrow ?? liveMealMetricsState.active_meals_tomorrow
+        const attendanceRate =
+          serverMetrics.meal_attendance_rate ?? liveMealMetricsState.meal_attendance_rate
+        const bill =
+          serverMetrics.estimated_monthly_meal_bill ?? liveMealMetricsState.estimated_monthly_meal_bill
+
+        liveMealMetricsState.active_meals_today = activeToday
+        liveMealMetricsState.active_meals_tomorrow = activeTomorrow
+        liveMealMetricsState.meal_attendance_rate = attendanceRate
+        liveMealMetricsState.estimated_monthly_meal_bill = bill
+
         return {
           ...MOCK_DASHBOARD_DATA,
           kpis: {
             ...MOCK_DASHBOARD_DATA.kpis,
-            active_meals_today: liveMealMetricsState.active_meals_today,
-            active_meals_tomorrow: liveMealMetricsState.active_meals_tomorrow,
-            meal_attendance_rate: liveMealMetricsState.meal_attendance_rate,
-            estimated_monthly_meal_bill: liveMealMetricsState.estimated_monthly_meal_bill,
+            active_meals_today: activeToday,
+            active_meals_tomorrow: activeTomorrow,
+            meal_attendance_rate: attendanceRate,
+            estimated_monthly_meal_bill: bill,
           },
         }
       }
@@ -447,6 +471,7 @@ export function useOwnerDashboard() {
         }
       }
     },
-    refetchInterval: 30000, // 30s refetch
+    refetchInterval: 1000, // 1.0s instant real-time cross-device sync
+    refetchOnWindowFocus: true,
   })
 }

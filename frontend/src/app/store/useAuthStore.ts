@@ -18,7 +18,7 @@ interface AuthState {
   signOut: () => Promise<void>
   hasRole: (roles: UserRole[]) => boolean
   hasFlatAccess: (flatId: string) => boolean
-  setDemoUser: (role: UserRole) => void
+  setDemoUser: (role: UserRole, customProfile?: Partial<Profile>) => void
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -39,9 +39,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return
       }
 
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        await get().setSession(session)
+      // 2.5 second timeout to prevent UI freeze on unresponsive Supabase cloud servers
+      const sessionPromise = supabase.auth.getSession()
+      const timeoutPromise = new Promise<{ data: { session: null }; error: Error }>((_, reject) =>
+        setTimeout(() => reject(new Error('Supabase session timeout')), 2500)
+      )
+
+      const result = (await Promise.race([sessionPromise, timeoutPromise])) as {
+        data: { session: Session | null }
+        error?: unknown
+      }
+
+      if (result?.data?.session) {
+        await get().setSession(result.data.session)
       } else {
         set({ user: null, profile: null, isAuthenticated: false, isLoading: false, isInitialized: true })
       }
@@ -51,7 +61,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         await get().setSession(newSession)
       })
     } catch (err) {
-      console.error('Failed to initialize auth:', err)
+      console.warn('Supabase auth initialization skipped or timed out:', err)
       set({ isLoading: false, isInitialized: true })
     }
   },
@@ -137,22 +147,34 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     return assignedFlats.includes(flatId)
   },
 
-  setDemoUser: (role: UserRole) => {
+  setDemoUser: (role: UserRole, customProfile?: Partial<Profile>) => {
+    const userId = customProfile?.id || '00000000-0000-0000-0000-000000000099'
+    const userEmail = customProfile?.email || `${role.toLowerCase()}@bachelorhome.erp`
+
     const mockUser: Partial<User> = {
-      id: '00000000-0000-0000-0000-000000000099',
-      email: `${role.toLowerCase()}@bachelorhome.erp`,
+      id: userId,
+      email: userEmail,
       created_at: new Date().toISOString(),
     }
 
+    const defaultName =
+      role === 'SUPER_ADMIN'
+        ? 'হোস্টেল এডমিন (মালিক)'
+        : role === 'MANAGER'
+        ? 'ম্যানেজার তানভীর'
+        : role === 'APPLICANT'
+        ? 'নতুন আবেদনকারী'
+        : 'বর্ডার রাকিবুল'
+
     const mockProfile: Profile = {
-      id: '00000000-0000-0000-0000-000000000099',
-      email: `${role.toLowerCase()}@bachelorhome.erp`,
-      full_name: role === 'SUPER_ADMIN' ? 'হোস্টেল এডমিন (মালিক)' : role === 'MANAGER' ? 'ম্যানেজার তানভীর' : 'বর্ডার রাকিবুল',
-      phone_number: '01711000000',
+      id: userId,
+      email: userEmail,
+      full_name: customProfile?.full_name || defaultName,
+      phone_number: customProfile?.phone_number || '01711000000',
       role,
       is_active: true,
       preferred_language: 'bn',
-      avatar_url: null,
+      avatar_url: customProfile?.avatar_url || null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }

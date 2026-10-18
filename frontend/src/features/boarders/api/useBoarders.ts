@@ -348,6 +348,177 @@ export interface BoarderFilters {
 }
 
 // ------------------------------------------------------------------------------
+// Cross-Device Server Synchronization & Local Storage Persistence
+// ------------------------------------------------------------------------------
+
+export const BOARDERS_STORAGE_KEY = 'bachelor_erp_boarders'
+
+export async function fetchRemoteBoarders(): Promise<BoarderWithRelations[] | null> {
+  try {
+    const res = await fetch('/api/boarders')
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data) && data.length > 0) {
+        saveStoredBoarders(data)
+        return data
+      }
+      // If server file is empty, seed it with initial mock boarders
+      if (Array.isArray(data) && data.length === 0) {
+        await fetch('/api/boarders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(INITIAL_MOCK_BOARDERS),
+        })
+        return INITIAL_MOCK_BOARDERS
+      }
+    }
+  } catch {
+    // Network or dev mode fallback
+  }
+  return null
+}
+
+export function getStoredBoarders(): BoarderWithRelations[] {
+  try {
+    const raw = localStorage.getItem(BOARDERS_STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load boarders from localStorage:', err)
+  }
+  // Initialize with default mock boarders if empty
+  try {
+    localStorage.setItem(BOARDERS_STORAGE_KEY, JSON.stringify(INITIAL_MOCK_BOARDERS))
+  } catch (e) {
+    console.error('Failed to set initial boarders in localStorage:', e)
+  }
+  return [...INITIAL_MOCK_BOARDERS]
+}
+
+export function saveStoredBoarders(boarders: BoarderWithRelations[]) {
+  try {
+    localStorage.setItem(BOARDERS_STORAGE_KEY, JSON.stringify(boarders))
+  } catch (err) {
+    console.error('Failed to save boarders to localStorage:', err)
+  }
+}
+
+export interface CreateBoarderInput {
+  full_name: string
+  phone_number: string
+  email: string
+  guardian_name: string
+  guardian_phone: string
+  guardian_relation?: string
+  present_address?: string
+  permanent_address: string
+  institution: string
+  department?: string
+  student_id?: string
+  session?: string
+  nid_passport_number: string
+  photo_url?: string
+  nid_document_url?: string
+  remarks?: string
+}
+
+export async function createBoarderApplication(input: CreateBoarderInput): Promise<BoarderWithRelations> {
+  const newId = 'b-' + Date.now()
+  const newUserId = 'u-' + Date.now()
+  const randomSuffix = Math.floor(1000 + Math.random() * 9000)
+  const boarderCode = `BDR-2026-${randomSuffix}`
+  const nowIso = new Date().toISOString()
+  const todayDate = nowIso.split('T')[0]
+
+  const newBoarder: BoarderWithRelations = {
+    id: newId,
+    user_id: newUserId,
+    boarder_code: boarderCode,
+    full_name: input.full_name,
+    phone_number: input.phone_number,
+    email: input.email,
+    photo_url: input.photo_url || `https://images.unsplash.com/photo-${1535713875000 + (randomSuffix % 500)}?w=150`,
+    nid_passport_number: input.nid_passport_number,
+    nid_document_url: input.nid_document_url || 'boarder-docs/application-nid.jpg',
+    student_id: input.student_id || '',
+    institution: input.institution,
+    department: input.department || '',
+    session: input.session || '',
+    guardian_name: input.guardian_name,
+    guardian_phone: input.guardian_phone,
+    guardian_relation: input.guardian_relation || 'অভিভাবক',
+    present_address: input.present_address || '',
+    permanent_address: input.permanent_address,
+    emergency_contact: `${input.guardian_phone} (${input.guardian_relation || 'অভিভাবক'})`,
+    admission_date: todayDate,
+    status: 'PENDING',
+    remarks: input.remarks || 'অনলাইন রেজিস্ট্রেশন পোর্টাল থেকে নতুন আবেদন জমা পড়েছে। ভেরিফিকেশন সাপেক্ষে সিট বরাদ্দ প্রয়োজন।',
+    created_at: nowIso,
+    updated_at: nowIso,
+    active_allocation: null,
+    total_due: 0,
+    total_paid: 0,
+    charges: [],
+    allocation_history: [],
+  }
+
+  // 1. Sync to shared dev server API so PC immediately receives mobile submissions
+  try {
+    await fetch('/api/boarders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newBoarder),
+    })
+  } catch (e) {
+    console.warn('Could not post to /api/boarders (server offline?):', e)
+  }
+
+  // 2. Also update local storage as instant local cache
+  const existing = getStoredBoarders()
+  const updated = [newBoarder, ...existing]
+  saveStoredBoarders(updated)
+
+  // 3. Also attempt Supabase insert if credentials configured
+  if (isSupabaseConfigured) {
+    try {
+      const { data: authUser } = await supabase.auth.getUser()
+      const { data, error } = await supabase.from('boarders').insert({
+        user_id: authUser?.user?.id || newUserId,
+        boarder_code: boarderCode,
+        full_name: input.full_name,
+        phone_number: input.phone_number,
+        email: input.email,
+        nid_passport_number: input.nid_passport_number,
+        institution: input.institution,
+        department: input.department,
+        student_id: input.student_id,
+        session: input.session,
+        guardian_name: input.guardian_name,
+        guardian_phone: input.guardian_phone,
+        guardian_relation: input.guardian_relation,
+        present_address: input.present_address,
+        permanent_address: input.permanent_address,
+        status: 'PENDING',
+      }).select().single()
+
+      if (error) {
+        console.warn('Supabase boarder insert error (saved to local fallback):', error.message)
+      } else if (data) {
+        return { ...newBoarder, ...data }
+      }
+    } catch (err) {
+      console.warn('Supabase boarder insert exception:', err)
+    }
+  }
+
+  return newBoarder
+}
+
+// ------------------------------------------------------------------------------
 // Hooks
 // ------------------------------------------------------------------------------
 
@@ -356,7 +527,9 @@ export function useBoarders(filters?: BoarderFilters) {
     queryKey: ['boarders', filters],
     queryFn: async (): Promise<BoarderWithRelations[]> => {
       if (!isSupabaseConfigured) {
-        let result = [...INITIAL_MOCK_BOARDERS]
+        const remote = await fetchRemoteBoarders()
+        let result = remote || getStoredBoarders()
+
         if (filters?.status && filters.status !== 'ALL') {
           result = result.filter((b) => b.status === filters.status)
         }
@@ -417,8 +590,13 @@ export function useBoarders(filters?: BoarderFilters) {
 
       const { data, error } = await query
       if (error) {
-        console.warn('Supabase boarders fetch failed, using mock data:', error.message)
-        return INITIAL_MOCK_BOARDERS
+        console.warn('Supabase boarders fetch failed, using remote/stored local data:', error.message)
+        const remote = await fetchRemoteBoarders()
+        let result = remote || getStoredBoarders()
+        if (filters?.status && filters.status !== 'ALL') {
+          result = result.filter((b) => b.status === filters.status)
+        }
+        return result
       }
 
       return (data || []).map((b: any) => ({
@@ -428,6 +606,8 @@ export function useBoarders(filters?: BoarderFilters) {
           : b.active_allocation,
       }))
     },
+    refetchInterval: 3000, // Poll every 3 seconds for instant cross-device updates
+    refetchOnWindowFocus: true,
   })
 }
 
@@ -437,7 +617,8 @@ export function useBoarder(id?: string) {
     enabled: Boolean(id),
     queryFn: async (): Promise<BoarderWithRelations> => {
       if (!isSupabaseConfigured) {
-        const found = INITIAL_MOCK_BOARDERS.find((b) => b.id === id)
+        const list = getStoredBoarders()
+        const found = list.find((b) => b.id === id)
         if (!found) throw new Error('Boarder not found')
         return found
       }
@@ -550,17 +731,34 @@ export function useApproveApplicantMutation() {
 
   return useMutation({
     mutationFn: async ({ boarderId, remarks }: { boarderId: string; remarks?: string }) => {
+      // 1. Sync to shared dev server API so mobile and PC both update instantly
+      try {
+        await fetch('/api/boarders/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            boarderId,
+            status: 'ACTIVE',
+            remarks: remarks || 'অ্যাডমিন কর্তৃক আবেদন অনুমোদিত হয়েছে।',
+          }),
+        })
+      } catch {
+        // ignore offline dev fallback
+      }
+
       if (!isSupabaseConfigured) {
-        const item = INITIAL_MOCK_BOARDERS.find((b) => b.id === boarderId)
+        const list = getStoredBoarders()
+        const item = list.find((b) => b.id === boarderId)
         if (item) {
           item.status = 'ACTIVE'
           item.remarks = remarks || 'অ্যাডমিন কর্তৃক আবেদন অনুমোদিত হয়েছে।'
           item.updated_at = new Date().toISOString()
+          saveStoredBoarders(list)
         }
         return { success: true, boarder: item }
       }
 
-      // 1. Update boarder status to ACTIVE
+      // 2. Update boarder status in Supabase if configured
       const { data: boarder, error: bError } = await supabase
         .from('boarders')
         .update({
@@ -574,7 +772,7 @@ export function useApproveApplicantMutation() {
 
       if (bError) throw bError
 
-      // 2. If boarder has a user_id, upgrade profile role to BOARDER
+      // 3. If boarder has a user_id, upgrade profile role to BOARDER
       if (boarder.user_id) {
         const { error: pError } = await supabase
           .from('profiles')
@@ -584,11 +782,21 @@ export function useApproveApplicantMutation() {
         if (pError) console.warn('Could not upgrade profile role:', pError.message)
       }
 
+      // Also sync to local storage
+      const list = getStoredBoarders()
+      const item = list.find((b) => b.id === boarderId)
+      if (item) {
+        item.status = 'ACTIVE'
+        item.remarks = remarks || 'অ্যাডমিন কর্তৃক আবেদন অনুমোদিত হয়েছে।'
+        saveStoredBoarders(list)
+      }
+
       return { success: true, boarder }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['boarders'] })
       queryClient.invalidateQueries({ queryKey: ['boarder'] })
+      queryClient.invalidateQueries({ queryKey: ['owner-executive-dashboard'] })
     },
   })
 }
@@ -598,12 +806,29 @@ export function useRejectApplicantMutation() {
 
   return useMutation({
     mutationFn: async ({ boarderId, reason }: { boarderId: string; reason: string }) => {
+      // 1. Sync to shared dev server API so mobile and PC both update instantly
+      try {
+        await fetch('/api/boarders/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            boarderId,
+            status: 'REJECTED',
+            remarks: reason,
+          }),
+        })
+      } catch {
+        // ignore offline dev fallback
+      }
+
       if (!isSupabaseConfigured) {
-        const item = INITIAL_MOCK_BOARDERS.find((b) => b.id === boarderId)
+        const list = getStoredBoarders()
+        const item = list.find((b) => b.id === boarderId)
         if (item) {
           item.status = 'REJECTED'
           item.remarks = reason
           item.updated_at = new Date().toISOString()
+          saveStoredBoarders(list)
         }
         return { success: true, boarder: item }
       }
@@ -620,11 +845,23 @@ export function useRejectApplicantMutation() {
         .single()
 
       if (error) throw error
+
+      // Also sync to local storage
+      const list = getStoredBoarders()
+      const item = list.find((b) => b.id === boarderId)
+      if (item) {
+        item.status = 'REJECTED'
+        item.remarks = reason
+        saveStoredBoarders(list)
+      }
+
       return { success: true, boarder: data }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['boarders'] })
       queryClient.invalidateQueries({ queryKey: ['boarder'] })
+      queryClient.invalidateQueries({ queryKey: ['owner-executive-dashboard'] })
     },
   })
 }
+

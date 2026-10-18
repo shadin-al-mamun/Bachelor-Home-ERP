@@ -145,27 +145,39 @@ export const useNotifications = () => {
   useEffect(() => {
     if (!isSupabaseConfigured || !profile?.id) return
 
-    const channel = supabase
-      .channel(`public:system_notifications:${profile.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'system_notifications',
-          filter: `recipient_id=eq.${profile.id}`,
-        },
-        () => {
-          // Trigger visual ping & audio indicator
-          setHasNewPulse(true)
-          setTimeout(() => setHasNewPulse(false), 5000)
-          queryClient.invalidateQueries({ queryKey: ['system_notifications'] })
-        }
-      )
-      .subscribe()
+    let isMounted = true
+    const channelName = `public:system_notifications:${profile.id}-${Math.random().toString(36).slice(2, 7)}`
+    
+    try {
+      const channel = supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'system_notifications',
+            filter: `recipient_id=eq.${profile.id}`,
+          },
+          () => {
+            if (!isMounted) return
+            setHasNewPulse(true)
+            setTimeout(() => setHasNewPulse(false), 5000)
+            queryClient.invalidateQueries({ queryKey: ['system_notifications'] })
+          }
+        )
+        .subscribe()
 
-    return () => {
-      supabase.removeChannel(channel)
+      return () => {
+        isMounted = false
+        try {
+          supabase.removeChannel(channel)
+        } catch {
+          // ignore cleanup errors
+        }
+      }
+    } catch (err) {
+      console.warn('Realtime subscription not supported in current mode:', err)
     }
   }, [profile?.id, queryClient])
 
