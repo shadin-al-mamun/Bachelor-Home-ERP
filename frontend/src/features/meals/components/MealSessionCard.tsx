@@ -143,6 +143,8 @@ export const MealSessionCard: React.FC<MealSessionCardProps> = ({
         <div className="flex items-center gap-2.5">
           <button
             type="button"
+            id={`toggle-${session.toLowerCase()}`}
+            data-testid={`toggle-${session.toLowerCase()}`}
             disabled={isLocked || isPending}
             onClick={onToggle}
             className={`relative inline-flex h-7 w-13 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:cursor-not-allowed ${

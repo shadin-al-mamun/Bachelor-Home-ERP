@@ -11,6 +11,7 @@ import {
 import { useBoarders } from '@/features/boarders/api/useBoarders'
 import { ReceiptPrintView } from './ReceiptPrintView'
 import { formatCurrencyBn } from '@/utils/date'
+import { autoDistributePayment } from '../utils/paymentDistribution'
 import type { PaymentMethod } from '@/types/database'
 import {
   Receipt,
@@ -93,20 +94,7 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
       return
     }
 
-    let remaining = amountReceived
-    const newAlloc: Record<string, number> = {}
-
-    for (const charge of unpaidCharges) {
-      if (remaining <= 0) {
-        newAlloc[charge.id] = 0
-      } else {
-        const chargeDue = Number(charge.due_amount)
-        const toPay = Math.min(remaining, chargeDue)
-        newAlloc[charge.id] = toPay
-        remaining -= toPay
-      }
-    }
-
+    const newAlloc = autoDistributePayment(amountReceived, unpaidCharges)
     setAllocations(newAlloc)
     setErrorMsg(null)
   }
@@ -145,7 +133,7 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
 
     // Format allocation array for RPC
     const allocationPayload = Object.entries(allocations)
-      .filter(([_, amt]) => amt > 0)
+      .filter(([, amt]) => amt > 0)
       .map(([charge_id, amount]) => ({
         charge_id,
         amount,
@@ -422,6 +410,8 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
                 variant="primary"
                 size="sm"
                 type="submit"
+                id="submit-receipt-btn"
+                data-testid="submit-receipt-btn"
                 isLoading={recordReceiptMutation.isPending}
                 disabled={!boarderId || amountReceived <= 0}
                 className="bg-emerald-600 hover:bg-emerald-500 text-white"

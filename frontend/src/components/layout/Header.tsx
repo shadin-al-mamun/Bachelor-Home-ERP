@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import {
   Building2,
   Clock,
-  Globe,
   Sun,
   Moon,
   LogOut,
@@ -14,15 +13,16 @@ import {
   Menu,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
-import { Badge } from '@/components/common'
+import { Badge, LanguageSwitcher } from '@/components/common'
 import { formatDhakaDate } from '@/utils/date'
+import NotificationDropdown from './NotificationDropdown'
 
 interface HeaderProps {
   onToggleSidebar?: () => void
 }
 
 export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const { profile, signOut } = useAuthStore()
   const [dhakaTime, setDhakaTime] = useState(formatDhakaDate(new Date(), 'hh:mm:ss A'))
   const [isOnline, setIsOnline] = useState(navigator.onLine)
@@ -57,11 +57,6 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
       document.documentElement.classList.remove('dark')
     }
   }, [isDarkMode])
-
-  const toggleLanguage = () => {
-    const nextLang = i18n.language.startsWith('bn') ? 'en' : 'bn'
-    i18n.changeLanguage(nextLang)
-  }
 
   return (
     <header className="sticky top-0 z-30 h-16 glass border-b border-slate-800/80 px-4 sm:px-6 flex items-center justify-between">
@@ -118,14 +113,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
         </div>
 
         {/* Language Switcher */}
-        <button
-          onClick={toggleLanguage}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900/70 hover:bg-slate-800/80 border border-slate-700/80 text-xs font-semibold text-slate-200 transition-colors"
-          title="Toggle Language"
-        >
-          <Globe className="w-3.5 h-3.5 text-primary-400" />
-          <span>{i18n.language.startsWith('bn') ? 'বাংলা' : 'EN'}</span>
-        </button>
+        <LanguageSwitcher />
 
         {/* Theme Switcher */}
         <button
@@ -135,6 +123,9 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
         >
           {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-400" />}
         </button>
+
+        {/* Real-Time Notification Bell Dropdown */}
+        <NotificationDropdown />
 
         {/* User Profile Dropdown */}
         <div className="relative">

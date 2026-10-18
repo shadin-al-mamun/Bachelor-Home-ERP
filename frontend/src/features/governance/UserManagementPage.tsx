@@ -32,17 +32,17 @@ const SYSTEM_ROLES: { role: UserRole; label: string; desc: string; badgeColor: s
 export const UserManagementPage: React.FC = () => {
   const { profile: currentUser } = useAuthStore()
 
-  // RBAC: Only SUPER_ADMIN can administer roles and user assignments
-  if (currentUser && currentUser.role !== 'SUPER_ADMIN') {
-    return <Navigate to="/unauthorized" replace />
-  }
-
   const [searchQuery, setSearchQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState('ALL')
   const [selectedUserForFlats, setSelectedUserForFlats] = useState<UserManagementItem | null>(null)
 
   const { data: users, isLoading } = useUsersList(searchQuery, roleFilter)
   const updateRoleMutation = useUpdateUserRoleAndStatus()
+
+  // RBAC: Only SUPER_ADMIN can administer roles and user assignments
+  if (currentUser && currentUser.role !== 'SUPER_ADMIN') {
+    return <Navigate to="/unauthorized" replace />
+  }
 
   const handleRoleChange = async (user: UserManagementItem, newRole: UserRole) => {
     if (user.id === currentUser?.id) {

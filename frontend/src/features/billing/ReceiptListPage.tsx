@@ -105,6 +105,8 @@ export const ReceiptListPage: React.FC = () => {
           <Button
             variant="primary"
             size="sm"
+            id="btn-collect-receipt"
+            data-testid="btn-collect-receipt"
             onClick={() => setIsCollectModalOpen(true)}
             className="text-xs bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-600/20"
           >

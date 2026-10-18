@@ -18,6 +18,7 @@ import {
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import { useOwnerDashboard } from './api/useOwnerDashboard'
+import BackupHealthWidget from './components/BackupHealthWidget'
 
 export const OwnerDashboardPage: React.FC = () => {
   const { profile } = useAuthStore()
@@ -219,6 +220,11 @@ export const OwnerDashboardPage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Database Backup & PITR Health Status Card */}
+      {(profile?.role === 'SUPER_ADMIN' || profile?.role === 'ADMIN' || profile?.role === 'AUDITOR') && (
+        <BackupHealthWidget />
       )}
 
       {/* Fast Action Shortcuts Bar */}

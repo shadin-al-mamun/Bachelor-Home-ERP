@@ -194,7 +194,7 @@ export const KitchenMealSummaryPage: React.FC = () => {
             </span>
             <span className="text-[10px] font-mono text-slate-400 print:text-black">০৭:৩০-০৯:০০</span>
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold font-mono text-amber-300 mt-2 print:text-black">
+          <div id="total-breakfast-count" data-testid="total-breakfast-count" className="text-2xl sm:text-3xl font-extrabold font-mono text-amber-300 mt-2 print:text-black">
             {totals.breakfast_count} <span className="text-xs font-normal text-slate-400 print:text-black">জন</span>
           </div>
           <p className="text-[10px] text-slate-400 mt-1 print:hidden">
@@ -210,7 +210,7 @@ export const KitchenMealSummaryPage: React.FC = () => {
             </span>
             <span className="text-[10px] font-mono text-slate-400 print:text-black">০১:০০-০২:৩০</span>
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold font-mono text-emerald-300 mt-2 print:text-black">
+          <div id="total-lunch-count" data-testid="total-lunch-count" className="text-2xl sm:text-3xl font-extrabold font-mono text-emerald-300 mt-2 print:text-black">
             {totals.lunch_count} <span className="text-xs font-normal text-slate-400 print:text-black">জন</span>
           </div>
           <p className="text-[10px] text-slate-400 mt-1 print:hidden">
@@ -226,7 +226,7 @@ export const KitchenMealSummaryPage: React.FC = () => {
             </span>
             <span className="text-[10px] font-mono text-slate-400 print:text-black">০৮:৩০-১০:০০</span>
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold font-mono text-indigo-300 mt-2 print:text-black">
+          <div id="total-dinner-count" data-testid="total-dinner-count" className="text-2xl sm:text-3xl font-extrabold font-mono text-indigo-300 mt-2 print:text-black">
             {totals.dinner_count} <span className="text-xs font-normal text-slate-400 print:text-black">জন</span>
           </div>
           <p className="text-[10px] text-slate-400 mt-1 print:hidden">
@@ -245,7 +245,7 @@ export const KitchenMealSummaryPage: React.FC = () => {
               মোট
             </span>
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold font-mono text-amber-400 mt-2 print:text-black">
+          <div id="grand-total-meals" data-testid="grand-total-meals" className="text-2xl sm:text-3xl font-extrabold font-mono text-amber-400 mt-2 print:text-black">
             {totals.total_meals} <span className="text-xs font-normal text-slate-300 print:text-black">টি মিল</span>
           </div>
           <p className="text-[10px] text-amber-200/80 mt-1 font-medium print:hidden">

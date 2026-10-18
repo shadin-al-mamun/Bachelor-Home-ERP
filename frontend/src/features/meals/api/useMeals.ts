@@ -71,8 +71,15 @@ export function formatDhakaDate(date: Date): string {
 /**
  * Evaluates whether next-day cutoff has expired (10:00:00 PM Dhaka time)
  */
-export function isDhakaCutoffPassed(cutoffTimeStr: string = '22:00:00'): boolean {
-  const dhakaNow = getDhakaNow()
+export function isDhakaCutoffPassed(
+  cutoffTimeStr: string = '22:00:00',
+  customNow?: Date | string
+): boolean {
+  const dhakaNow = customNow
+    ? typeof customNow === 'string'
+      ? new Date(customNow)
+      : customNow
+    : getDhakaNow()
   const [cutoffHours, cutoffMinutes] = cutoffTimeStr.split(':').map(Number)
   const cutoffToday = new Date(dhakaNow)
   cutoffToday.setHours(cutoffHours, cutoffMinutes, 0, 0)
@@ -82,8 +89,15 @@ export function isDhakaCutoffPassed(cutoffTimeStr: string = '22:00:00'): boolean
 /**
  * Returns remaining seconds until today's 10:00 PM cutoff in Dhaka
  */
-export function getRemainingCutoffSeconds(cutoffTimeStr: string = '22:00:00'): number {
-  const dhakaNow = getDhakaNow()
+export function getRemainingCutoffSeconds(
+  cutoffTimeStr: string = '22:00:00',
+  customNow?: Date | string
+): number {
+  const dhakaNow = customNow
+    ? typeof customNow === 'string'
+      ? new Date(customNow)
+      : customNow
+    : getDhakaNow()
   const [cutoffHours, cutoffMinutes] = cutoffTimeStr.split(':').map(Number)
   const cutoffToday = new Date(dhakaNow)
   cutoffToday.setHours(cutoffHours, cutoffMinutes, 0, 0)
@@ -94,8 +108,16 @@ export function getRemainingCutoffSeconds(cutoffTimeStr: string = '22:00:00'): n
 /**
  * Evaluates date status relative to today in Asia/Dhaka
  */
-export function getDateMealStatus(targetDateStr: string, cutoffTimeStr: string = '22:00:00') {
-  const dhakaNow = getDhakaNow()
+export function getDateMealStatus(
+  targetDateStr: string,
+  cutoffTimeStr: string = '22:00:00',
+  customNow?: Date | string
+) {
+  const dhakaNow = customNow
+    ? typeof customNow === 'string'
+      ? new Date(customNow)
+      : customNow
+    : getDhakaNow()
   const todayStr = formatDhakaDate(dhakaNow)
 
   const tomorrow = new Date(dhakaNow)
@@ -107,7 +129,7 @@ export function getDateMealStatus(targetDateStr: string, cutoffTimeStr: string =
   const isTomorrow = targetDateStr === tomorrowStr
   const isFuture = targetDateStr > tomorrowStr
 
-  const cutoffPassed = isDhakaCutoffPassed(cutoffTimeStr)
+  const cutoffPassed = isDhakaCutoffPassed(cutoffTimeStr, dhakaNow)
 
   // Locked for ordinary boarders if today, past, or tomorrow after 10 PM
   const isLockedForBoarder = isPast || isToday || (isTomorrow && cutoffPassed)

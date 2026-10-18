@@ -19,11 +19,6 @@ import { Navigate, Link } from 'react-router-dom'
 export const AuditLogPage: React.FC = () => {
   const { profile } = useAuthStore()
 
-  // Governance RBAC check: only SUPER_ADMIN and AUDITOR can access immutable system audit logs
-  if (profile && profile.role !== 'SUPER_ADMIN' && profile.role !== 'AUDITOR') {
-    return <Navigate to="/unauthorized" replace />
-  }
-
   const [filters, setFilters] = useState<AuditLogFilters>({
     tableName: 'ALL',
     action: 'ALL',
@@ -38,6 +33,11 @@ export const AuditLogPage: React.FC = () => {
 
   const { data, isLoading } = useAuditLogs(filters)
   const { data: actors } = useAuditActors()
+
+  // Governance RBAC check: only SUPER_ADMIN and AUDITOR can access immutable system audit logs
+  if (profile && profile.role !== 'SUPER_ADMIN' && profile.role !== 'AUDITOR') {
+    return <Navigate to="/unauthorized" replace />
+  }
 
   const totalPages = Math.ceil((data?.totalCount || 0) / (filters.pageSize || 25))
 

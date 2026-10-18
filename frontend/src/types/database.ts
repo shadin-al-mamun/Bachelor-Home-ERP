@@ -457,14 +457,17 @@ export interface AuditLog {
   created_at: string
 }
 
+export type NotificationType = 'INFO' | 'WARNING' | 'ALERT' | 'MEAL' | 'SYSTEM'
+
 export interface SystemNotification {
   id: string
   recipient_id: string
   title: string
   message: string
-  type: 'INFO' | 'WARNING' | 'ALERT' | 'MEAL'
+  type: NotificationType
   is_read: boolean
   action_url?: string | null
+  metadata?: Record<string, any> | null
   created_at: string
 }
 
@@ -565,4 +568,32 @@ export interface ApiResponse<T> {
   data?: T
   message?: string
   error?: string
+}
+
+// ==============================================================================
+// 9. SYSTEM BACKUP & PITR OPERATIONS
+// ==============================================================================
+
+export type BackupHealthStatusLevel = 'HEALTHY' | 'WARNING' | 'FAILED'
+
+export interface SystemBackupLog {
+  id: string
+  backup_name: string
+  backup_type: 'FULL_DB' | 'PITR_WAL' | 'STORAGE_SNAPSHOT'
+  status: BackupHealthStatusLevel
+  file_size_bytes: number
+  storage_location: string
+  completed_at: string
+  details?: Record<string, any> | null
+  created_by?: string | null
+}
+
+export interface BackupHealthStatus {
+  status: BackupHealthStatusLevel
+  last_backup_time: string
+  backup_name: string
+  file_size_formatted: string
+  retention_policy: string
+  storage_provider: string
+  is_automated: boolean
 }

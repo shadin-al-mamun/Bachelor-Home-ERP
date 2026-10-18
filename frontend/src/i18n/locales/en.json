@@ -87,5 +87,19 @@
     "statsOccupied": "Occupied Seats",
     "statsCash": "Manager Cash in Hand",
     "statsCutoff": "Meal Cutoff Countdown"
+  },
+  "notifications": {
+    "title": "Notifications & Alerts",
+    "subtitle": "Real-time Operational Notifications",
+    "all": "All",
+    "unread": "Unread",
+    "alerts": "Alerts",
+    "markAllRead": "Mark All Read",
+    "empty": "No notifications",
+    "review": "Review",
+    "handoverInflow": "Cash Handover Received",
+    "cashVariance": "Cash Variance Alert",
+    "overdueDues": "Overdue Dues Notice",
+    "backupHealth": "Database Backup & PITR Status"
   }
 }
