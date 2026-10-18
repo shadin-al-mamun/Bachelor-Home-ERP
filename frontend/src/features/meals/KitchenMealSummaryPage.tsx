@@ -9,15 +9,19 @@ import {
   Banknote,
   Activity,
   Layers,
+  SlidersHorizontal,
 } from 'lucide-react'
 import {
   formatDhakaDate,
   getDhakaNow,
+  isMealManagerRole,
 } from './api/useMeals'
 import { useKitchenMealSummary } from './api/useKitchenMeals'
 import type { KitchenFlatSummary } from './api/useKitchenMeals'
 import { useRealtimeMeals } from './hooks/useRealtimeMeals'
 import { FlatBoarderBreakdownModal } from './components/FlatBoarderBreakdownModal'
+import { StaffMealControlModal } from './components/StaffMealControlModal'
+import { useAuthStore } from '@/app/store/useAuthStore'
 
 export const KitchenMealSummaryPage: React.FC = () => {
   const dhakaNow = getDhakaNow()
@@ -29,6 +33,10 @@ export const KitchenMealSummaryPage: React.FC = () => {
 
   const [selectedDate, setSelectedDate] = useState<string>(tomorrowStr)
   const [selectedFlat, setSelectedFlat] = useState<KitchenFlatSummary | null>(null)
+  const [isStaffMealControlOpen, setIsStaffMealControlOpen] = useState<boolean>(false)
+
+  const { profile } = useAuthStore()
+  const canManage = isMealManagerRole(profile?.role)
 
   // Realtime WebSocket Subscription
   const { isLive, lastEventTime, changeCount } = useRealtimeMeals()
@@ -103,6 +111,18 @@ export const KitchenMealSummaryPage: React.FC = () => {
               </span>
             )}
           </div>
+
+          {/* Staff Meal Control Override Button */}
+          {canManage && (
+            <button
+              onClick={() => setIsStaffMealControlOpen(true)}
+              className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-indigo-600 hover:from-amber-600 hover:to-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition-all"
+              title="যেকোনো বর্ডারের মিল যেকোনো সময় অন বা অফ করুন"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>বর্ডার মিল অন/অফ (এডমিন ওভাররাইড)</span>
+            </button>
+          )}
 
           {/* Print Button */}
           <button
@@ -419,7 +439,22 @@ export const KitchenMealSummaryPage: React.FC = () => {
           buildingName={selectedFlat.building_name}
           mealDate={selectedDate}
           isOpen={true}
-          onClose={() => setSelectedFlat(null)}
+          onClose={() => {
+            setSelectedFlat(null)
+            refetch()
+          }}
+        />
+      )}
+
+      {/* Staff Meal Control Modal (Admin/Manager Override for ANY boarder at ANY time) */}
+      {isStaffMealControlOpen && (
+        <StaffMealControlModal
+          isOpen={isStaffMealControlOpen}
+          onClose={() => {
+            setIsStaffMealControlOpen(false)
+            refetch()
+          }}
+          initialDate={selectedDate}
         />
       )}
     </div>

@@ -49,8 +49,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // Master Navigation Items
   const navItems: NavItem[] = [
     {
-      titleKey: 'nav.dashboard',
-      defaultTitle: 'ড্যাশবোর্ড',
+      titleKey: userRole === 'BOARDER' ? 'portal.dashboard' : 'nav.dashboard',
+      defaultTitle: userRole === 'BOARDER' ? 'আমার ড্যাশবোর্ড' : 'ড্যাশবোর্ড',
       href: userRole === 'BOARDER' ? '/portal/dashboard' : '/dashboard',
       icon: <LayoutDashboard className="w-5 h-5 shrink-0" />,
       roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'MEAL_OPERATOR', 'AUDITOR', 'BOARDER'],
@@ -71,9 +71,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       titleKey: 'nav.billing',
-      defaultTitle: 'বিলিং ও আদায়',
+      defaultTitle: 'বকেয়া ও বিলিং লেজার',
       href: '/billing',
       icon: <CreditCard className="w-5 h-5 shrink-0" />,
+      roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'AUDITOR'],
+    },
+    {
+      titleKey: 'nav.collections',
+      defaultTitle: 'ভাড়া আদায় ও রিসিপ্ট',
+      href: '/billing/receipts',
+      icon: <Receipt className="w-5 h-5 shrink-0 text-emerald-400" />,
       roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'AUDITOR'],
     },
     {

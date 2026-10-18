@@ -8,6 +8,7 @@ import {
 import { useFlats } from '@/features/accommodation/api/useAccommodation'
 import { GenerateMonthlyChargesModal } from './components/GenerateMonthlyChargesModal'
 import { AddManualChargeModal } from './components/AddManualChargeModal'
+import { CollectReceiptModal } from './components/CollectReceiptModal'
 import { Button } from '@/components/common/Button'
 import { Badge } from '@/components/common/Badge'
 import { formatCurrencyBn, formatDateBn } from '@/utils/date'
@@ -35,6 +36,8 @@ export const BoarderDuesPage: React.FC = () => {
   // Modals state
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false)
   const [isAddChargeModalOpen, setIsAddChargeModalOpen] = useState(false)
+  const [isCollectModalOpen, setIsCollectModalOpen] = useState(false)
+  const [collectBoarderId, setCollectBoarderId] = useState<string | undefined>(undefined)
   const [selectedBoarderForAction, setSelectedBoarderForAction] = useState<BoarderDueSummary | null>(null)
 
   const filters: DuesFilters = {
@@ -104,6 +107,20 @@ export const BoarderDuesPage: React.FC = () => {
           >
             <Zap className="w-3.5 h-3.5 mr-1.5 text-amber-300" />
             মাসিক ভাড়া জেনারেট
+          </Button>
+
+          <Button
+            variant="primary"
+            size="sm"
+            id="btn-collect-dues-page"
+            onClick={() => {
+              setCollectBoarderId(undefined)
+              setIsCollectModalOpen(true)
+            }}
+            className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/30 font-bold border-none"
+          >
+            <DollarSign className="w-4 h-4 mr-1 text-emerald-200" />
+            ভাড়া আদায় / রিসিপ্ট কাটুন
           </Button>
         </div>
       </div>
@@ -375,16 +392,18 @@ export const BoarderDuesPage: React.FC = () => {
                           </Link>
 
                           {hasDue && (
-                            <Link to={`/billing/receipts?boarderId=${row.boarder_id}`}>
-                              <Button
-                                variant="primary"
-                                size="sm"
-                                className="h-8 px-2.5 text-xs shadow-sm bg-emerald-600 hover:bg-emerald-500 border-none"
-                              >
-                                <Receipt className="w-3.5 h-3.5 mr-1" />
-                                টাকা গ্রহণ
-                              </Button>
-                            </Link>
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={() => {
+                                setCollectBoarderId(row.boarder_id)
+                                setIsCollectModalOpen(true)
+                              }}
+                              className="h-8 px-2.5 text-xs shadow-sm bg-emerald-600 hover:bg-emerald-500 border-none font-bold text-white flex items-center gap-1"
+                            >
+                              <Receipt className="w-3.5 h-3.5 mr-1" />
+                              ভাড়া আদায়
+                            </Button>
                           )}
                         </div>
                       </td>
@@ -413,6 +432,15 @@ export const BoarderDuesPage: React.FC = () => {
           refetch()
         }}
         preSelectedBoarderId={selectedBoarderForAction?.boarder_id}
+      />
+
+      <CollectReceiptModal
+        isOpen={isCollectModalOpen}
+        onClose={() => {
+          setIsCollectModalOpen(false)
+          refetch()
+        }}
+        preSelectedBoarderId={collectBoarderId}
       />
     </div>
   )

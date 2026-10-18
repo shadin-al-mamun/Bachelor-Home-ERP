@@ -14,17 +14,20 @@ import {
   UserPlus,
   PlusCircle,
   FileSpreadsheet,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import { useOwnerDashboard } from './api/useOwnerDashboard'
 import BackupHealthWidget from './components/BackupHealthWidget'
+import { StaffMealControlModal } from '@/features/meals/components/StaffMealControlModal'
 
 export const OwnerDashboardPage: React.FC = () => {
   const { profile } = useAuthStore()
   const { data: dashboard, isLoading, refetch, isRefetching } = useOwnerDashboard()
 
   const [trendMetric, setTrendMetric] = useState<'SURPLUS' | 'ALL'>('ALL')
+  const [isStaffMealControlOpen, setIsStaffMealControlOpen] = useState(false)
 
   const kpis = dashboard?.kpis
   const cashFlowTrend = dashboard?.cash_flow_trend || []
@@ -138,6 +141,14 @@ export const OwnerDashboardPage: React.FC = () => {
                 ৳{kpis.total_outstanding_dues.toLocaleString('en-IN')}
               </span>
             </div>
+
+            <Link
+              to="/billing"
+              className="mt-2 pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-[11px] font-bold text-emerald-400 hover:text-emerald-300 transition-colors"
+            >
+              <span>ভাড়া আদায় করুন</span>
+              <span className="text-xs">➔</span>
+            </Link>
           </div>
 
           {/* Card 3: 📉 Expenses & Net Operating Income (NOI) */}
@@ -173,20 +184,27 @@ export const OwnerDashboardPage: React.FC = () => {
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                 <PieChart className="w-4 h-4 text-amber-400" />
-                আজকের মিল ও উপস্থিতি
+                মিল প্রস্তুতি ও উপস্থিতি
               </span>
               <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
                 {kpis.meal_attendance_rate}%
               </span>
             </div>
 
-            <div className="text-2xl sm:text-3xl font-extrabold font-mono text-amber-300 mt-2">
-              {kpis.active_meals_today} <span className="text-xs font-normal text-slate-400">টি মিল</span>
+            <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+              <div className="p-2 rounded-xl bg-slate-950/70 border border-slate-800">
+                <span className="text-[10px] text-slate-400 block">আজকের মিল:</span>
+                <div className="text-xl sm:text-2xl font-extrabold font-mono text-amber-300 mt-0.5">
+                  {kpis.active_meals_today} <span className="text-[10px] font-normal text-slate-400">টি</span>
+                </div>
+              </div>
+              <div className="p-2 rounded-xl bg-slate-950/70 border border-slate-800">
+                <span className="text-[10px] text-slate-400 block">আগামীকাল প্রস্তুত:</span>
+                <div className="text-xl sm:text-2xl font-extrabold font-mono text-indigo-300 mt-0.5">
+                  {kpis.active_meals_tomorrow || 192} <span className="text-[10px] font-normal text-slate-400">টি</span>
+                </div>
+              </div>
             </div>
-
-            <p className="text-[10px] text-slate-400 mt-1">
-              সকাল, দুপুর ও রাতের খাবার চলমান
-            </p>
 
             <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-[10px]">
               <span className="text-slate-400">মাসিক প্রাক্কলন:</span>
@@ -194,6 +212,18 @@ export const OwnerDashboardPage: React.FC = () => {
                 ৳{kpis.estimated_monthly_meal_bill.toLocaleString('en-IN')}
               </span>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setIsStaffMealControlOpen(true)}
+              className="mt-2 pt-1.5 border-t border-slate-800/80 w-full flex items-center justify-between text-[11px] font-bold text-amber-400 hover:text-amber-300 transition-colors"
+            >
+              <span className="flex items-center gap-1">
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                মিল অন/অফ পরিচালনা
+              </span>
+              <span className="text-xs">➔</span>
+            </button>
           </div>
 
           {/* Card 5: 💼 Cash in Custody */}
@@ -595,6 +625,17 @@ export const OwnerDashboardPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Staff Meal Control Modal */}
+      {isStaffMealControlOpen && (
+        <StaffMealControlModal
+          isOpen={isStaffMealControlOpen}
+          onClose={() => {
+            setIsStaffMealControlOpen(false)
+            refetch()
+          }}
+        />
+      )}
     </div>
   )
 }

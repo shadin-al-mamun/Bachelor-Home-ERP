@@ -5,7 +5,21 @@ import { Button, Card, CardHeader, CardTitle, CardContent } from '@/components/c
 import { useAuthStore } from '@/app/store/useAuthStore'
 
 export const UnauthorizedView: React.FC = () => {
-  const { profile } = useAuthStore()
+  const { profile, setDemoUser } = useAuthStore()
+
+  const homePath =
+    profile?.role === 'BOARDER'
+      ? '/portal/my-meals'
+      : profile?.role === 'APPLICANT'
+      ? '/portal/my-application'
+      : '/dashboard'
+
+  const homeLabel =
+    profile?.role === 'BOARDER'
+      ? 'আমার মিল ও বর্ডার পোর্টাল'
+      : profile?.role === 'APPLICANT'
+      ? 'আবেদন স্ট্যাটাস পেজ'
+      : 'মূল ড্যাশবোর্ড'
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
@@ -25,16 +39,27 @@ export const UnauthorizedView: React.FC = () => {
           </p>
 
           <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Link to={homePath} className="w-full sm:w-auto">
+              <Button variant="primary" size="sm" className="w-full" leftIcon={<Home className="w-4 h-4" />}>
+                {homeLabel}
+              </Button>
+            </Link>
             <Link to="/login" className="w-full sm:w-auto">
               <Button variant="outline" size="sm" className="w-full" leftIcon={<ArrowLeft className="w-4 h-4" />}>
                 লগইন পেজে যান
               </Button>
             </Link>
-            <Link to="/dashboard" className="w-full sm:w-auto">
-              <Button variant="primary" size="sm" className="w-full" leftIcon={<Home className="w-4 h-4" />}>
-                মূল ড্যাশবোর্ড
-              </Button>
-            </Link>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setDemoUser('SUPER_ADMIN')
+                window.location.href = '/dashboard'
+              }}
+              className="w-full sm:w-auto border-indigo-500/40 text-indigo-300 hover:text-white"
+            >
+              এডমিন মোডে যান
+            </Button>
           </div>
         </CardContent>
       </Card>

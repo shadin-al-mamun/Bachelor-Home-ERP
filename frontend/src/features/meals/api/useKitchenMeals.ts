@@ -422,3 +422,27 @@ export function useFlatBoarderMeals(flatId?: string, mealDate?: string) {
     enabled: !!flatId,
   })
 }
+
+/**
+ * 3. In-memory Mock sync for Staff Meal Toggles
+ */
+export function updateMockFlatBoarderMeal(
+  boarderId: string,
+  session: 'BREAKFAST' | 'LUNCH' | 'DINNER',
+  newState: boolean,
+  isOverride: boolean = false,
+  reason?: string | null
+) {
+  Object.values(MOCK_FLAT_BOARDERS_DETAIL).forEach((list) => {
+    const item = list.find((b) => b.boarder_id === boarderId)
+    if (item) {
+      if (session === 'BREAKFAST') item.breakfast = newState
+      if (session === 'LUNCH') item.lunch = newState
+      if (session === 'DINNER') item.dinner = newState
+      if (isOverride) {
+        item.is_override = true
+        item.override_reason = reason || 'ম্যানেজার কর্তৃক পরিবর্তন'
+      }
+    }
+  })
+}

@@ -26,6 +26,7 @@ export interface ExecutiveKPIs {
 
   // 4. Meal Metrics
   active_meals_today: number
+  active_meals_tomorrow: number
   meal_attendance_rate: number // %
   estimated_monthly_meal_bill: number
 
@@ -100,6 +101,7 @@ const MOCK_DASHBOARD_DATA: OwnerDashboardData = {
     net_operating_income: 328600, // (442500 + 24500) - 138400 = 328600
 
     active_meals_today: 185,
+    active_meals_tomorrow: 192,
     meal_attendance_rate: 76.5,
     estimated_monthly_meal_bill: 114500,
 
@@ -264,6 +266,71 @@ const MOCK_DASHBOARD_DATA: OwnerDashboardData = {
 }
 
 // ==============================================================================
+// Live Dynamic State for Realtime Executive KPIs
+// ==============================================================================
+
+export interface LiveMealMetrics {
+  active_meals_today: number
+  active_meals_tomorrow: number
+  meal_attendance_rate: number
+  estimated_monthly_meal_bill: number
+}
+
+export const liveMealMetricsState: LiveMealMetrics = {
+  active_meals_today: 185,
+  active_meals_tomorrow: 192,
+  meal_attendance_rate: 76.5,
+  estimated_monthly_meal_bill: 114500,
+}
+
+export function updateOwnerDashboardMealMetrics(
+  dateStr: string,
+  _session: 'BREAKFAST' | 'LUNCH' | 'DINNER',
+  newState: boolean,
+  oldState?: boolean
+) {
+  if (oldState !== undefined && oldState === newState) return
+
+  const dhakaNow = new Date()
+  const utc = dhakaNow.getTime() + dhakaNow.getTimezoneOffset() * 60000
+  const dhaka = new Date(utc + 3600000 * 6)
+  const todayStr = `${dhaka.getFullYear()}-${String(dhaka.getMonth() + 1).padStart(2, '0')}-${String(dhaka.getDate()).padStart(2, '0')}`
+
+  const tomorrow = new Date(dhaka)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`
+
+  const delta = newState ? 1 : -1
+
+  if (dateStr === todayStr) {
+    liveMealMetricsState.active_meals_today = Math.max(0, liveMealMetricsState.active_meals_today + delta)
+    liveMealMetricsState.meal_attendance_rate = Math.round((liveMealMetricsState.active_meals_today / 294) * 1000) / 10
+  } else if (dateStr === tomorrowStr) {
+    liveMealMetricsState.active_meals_tomorrow = Math.max(0, liveMealMetricsState.active_meals_tomorrow + delta)
+  }
+}
+
+export function updateOwnerDashboardMealBatch(dateStr: string, deltaMeals: number) {
+  if (deltaMeals === 0) return
+
+  const dhakaNow = new Date()
+  const utc = dhakaNow.getTime() + dhakaNow.getTimezoneOffset() * 60000
+  const dhaka = new Date(utc + 3600000 * 6)
+  const todayStr = `${dhaka.getFullYear()}-${String(dhaka.getMonth() + 1).padStart(2, '0')}-${String(dhaka.getDate()).padStart(2, '0')}`
+
+  const tomorrow = new Date(dhaka)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`
+
+  if (dateStr === todayStr) {
+    liveMealMetricsState.active_meals_today = Math.max(0, liveMealMetricsState.active_meals_today + deltaMeals)
+    liveMealMetricsState.meal_attendance_rate = Math.round((liveMealMetricsState.active_meals_today / 294) * 1000) / 10
+  } else if (dateStr === tomorrowStr) {
+    liveMealMetricsState.active_meals_tomorrow = Math.max(0, liveMealMetricsState.active_meals_tomorrow + deltaMeals)
+  }
+}
+
+// ==============================================================================
 // React Query Hooks
 // ==============================================================================
 
@@ -272,10 +339,27 @@ export function useOwnerDashboard() {
     queryKey: ['owner-executive-dashboard'],
     queryFn: async (): Promise<OwnerDashboardData> => {
       if (!isSupabaseConfigured) {
-        return MOCK_DASHBOARD_DATA
+        return {
+          ...MOCK_DASHBOARD_DATA,
+          kpis: {
+            ...MOCK_DASHBOARD_DATA.kpis,
+            active_meals_today: liveMealMetricsState.active_meals_today,
+            active_meals_tomorrow: liveMealMetricsState.active_meals_tomorrow,
+            meal_attendance_rate: liveMealMetricsState.meal_attendance_rate,
+            estimated_monthly_meal_bill: liveMealMetricsState.estimated_monthly_meal_bill,
+          },
+        }
       }
 
       try {
+        const dhakaNow = new Date()
+        const utc = dhakaNow.getTime() + dhakaNow.getTimezoneOffset() * 60000
+        const dhaka = new Date(utc + 3600000 * 6)
+        const todayStr = `${dhaka.getFullYear()}-${String(dhaka.getMonth() + 1).padStart(2, '0')}-${String(dhaka.getDate()).padStart(2, '0')}`
+        const tomorrow = new Date(dhaka)
+        tomorrow.setDate(tomorrow.getDate() + 1)
+        const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`
+
         // Query live counts in parallel
         const [
           seatsRes,
@@ -284,6 +368,8 @@ export function useOwnerDashboard() {
           expensesRes,
           incomesRes,
           cashSessionsRes,
+          mealsTodayRes,
+          mealsTomorrowRes,
         ] = await Promise.all([
           supabase.from('seats').select('id, status'),
           supabase.from('boarder_charges').select('amount, paid_amount, status, due_date'),
@@ -291,6 +377,8 @@ export function useOwnerDashboard() {
           supabase.from('expenses').select('amount, approval_status').eq('approval_status', 'APPROVED'),
           supabase.from('incomes').select('amount'),
           supabase.from('manager_cash_sessions').select('expected_closing_cash, status').eq('status', 'OPEN'),
+          supabase.from('meal_selections').select('breakfast, lunch, dinner').eq('meal_date', todayStr),
+          supabase.from('meal_selections').select('breakfast, lunch, dinner').eq('meal_date', tomorrowStr),
         ])
 
         const seats = seatsRes.data || []
@@ -315,6 +403,18 @@ export function useOwnerDashboard() {
           0
         )
 
+        const countToday = (mealsTodayRes.data || []).reduce(
+          (sum, s) => sum + (s.breakfast ? 1 : 0) + (s.lunch ? 1 : 0) + (s.dinner ? 1 : 0),
+          0
+        )
+        const countTomorrow = (mealsTomorrowRes.data || []).reduce(
+          (sum, s) => sum + (s.breakfast ? 1 : 0) + (s.lunch ? 1 : 0) + (s.dinner ? 1 : 0),
+          0
+        )
+
+        const activeMealsToday = mealsTodayRes.data?.length ? countToday : liveMealMetricsState.active_meals_today
+        const activeMealsTomorrow = mealsTomorrowRes.data?.length ? countTomorrow : liveMealMetricsState.active_meals_tomorrow
+
         return {
           ...MOCK_DASHBOARD_DATA,
           kpis: {
@@ -330,11 +430,21 @@ export function useOwnerDashboard() {
             operating_expenses_month: totalExpenses || MOCK_DASHBOARD_DATA.kpis.operating_expenses_month,
             non_rent_incomes_month: totalIncomes || MOCK_DASHBOARD_DATA.kpis.non_rent_incomes_month,
             cash_in_custody: cashCustody || MOCK_DASHBOARD_DATA.kpis.cash_in_custody,
+            active_meals_today: activeMealsToday,
+            active_meals_tomorrow: activeMealsTomorrow,
+            meal_attendance_rate: Math.round((activeMealsToday / (totalSeats * 3 || 294)) * 1000) / 10 || liveMealMetricsState.meal_attendance_rate,
           },
         }
       } catch (err) {
         console.warn('Dashboard live query fallback to mock:', err)
-        return MOCK_DASHBOARD_DATA
+        return {
+          ...MOCK_DASHBOARD_DATA,
+          kpis: {
+            ...MOCK_DASHBOARD_DATA.kpis,
+            active_meals_today: liveMealMetricsState.active_meals_today,
+            active_meals_tomorrow: liveMealMetricsState.active_meals_tomorrow,
+          },
+        }
       }
     },
     refetchInterval: 30000, // 30s refetch

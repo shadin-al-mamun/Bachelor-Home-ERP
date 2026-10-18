@@ -36,6 +36,9 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, ch
 
   // Role validation
   if (allowedRoles && profile && !allowedRoles.includes(profile.role)) {
+    if (profile.role === 'BOARDER') {
+      return <Navigate to="/portal/dashboard" replace />
+    }
     return <Navigate to="/unauthorized" replace />
   }
 
@@ -53,6 +56,7 @@ const PlaceholderView: React.FC<{ title: string; desc: string }> = ({ title, des
 )
 
 import OwnerDashboardPage from '@/features/dashboard/OwnerDashboardPage'
+import BoarderDashboardPage from '@/features/dashboard/BoarderDashboardPage'
 import LoginPage from '@/features/auth/LoginPage'
 import RegisterPortal from '@/features/auth/RegisterPortal'
 import ForgotPasswordPage from '@/features/auth/ForgotPasswordPage'
@@ -104,8 +108,12 @@ export const router = createBrowserRouter([
     ),
     children: [
       {
+        index: true,
+        element: <Navigate to="/portal/dashboard" replace />,
+      },
+      {
         path: 'dashboard',
-        element: <OwnerDashboardPage />,
+        element: <BoarderDashboardPage />,
       },
       {
         path: 'my-meals',

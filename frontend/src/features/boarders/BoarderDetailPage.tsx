@@ -24,15 +24,22 @@ import {
   AlertCircle,
   Receipt,
   Clock,
+  SlidersHorizontal,
 } from 'lucide-react'
+import { StaffMealControlModal } from '@/features/meals/components/StaffMealControlModal'
+import { useAuthStore } from '@/app/store/useAuthStore'
+import { isMealManagerRole } from '@/features/meals/api/useMeals'
 
 export const BoarderDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const { data: boarder, isLoading, error } = useBoarder(id)
+  const { profile } = useAuthStore()
+  const canManageMeals = isMealManagerRole(profile?.role)
   const [activeTab, setActiveTab] = useState<'bio' | 'seat' | 'ledger' | 'meals'>('bio')
   const [docUrl, setDocUrl] = useState<string | null>(null)
   const [isLoadingDoc, setIsLoadingDoc] = useState(false)
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false)
+  const [isMealControlOpen, setIsMealControlOpen] = useState(false)
 
   useEffect(() => {
     if (boarder?.nid_document_url) {
@@ -587,10 +594,23 @@ export const BoarderDetailPage: React.FC = () => {
       {activeTab === 'meals' && (
         <div className="space-y-6">
           <div className="glass-card p-6 rounded-2xl border border-slate-800 bg-slate-900/40">
-            <h3 className="text-sm font-semibold text-white uppercase tracking-wider flex items-center gap-2 mb-4">
-              <Utensils className="w-4 h-4 text-amber-400" />
-              চলতি মাসের মিল অংশগ্রহণ ও সারাংশ
-            </h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <h3 className="text-sm font-semibold text-white uppercase tracking-wider flex items-center gap-2">
+                <Utensils className="w-4 h-4 text-amber-400" />
+                চলতি মাসের মিল অংশগ্রহণ ও সারাংশ
+              </h3>
+
+              {canManageMeals && (
+                <button
+                  type="button"
+                  onClick={() => setIsMealControlOpen(true)}
+                  className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-indigo-600 hover:from-amber-600 hover:to-indigo-700 text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-amber-500/20 transition-all self-start sm:self-auto"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  <span>মিল অন/অফ পরিবর্তন (Staff Override)</span>
+                </button>
+              )}
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs mb-6">
               <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800">
@@ -660,6 +680,15 @@ export const BoarderDetailPage: React.FC = () => {
         onClose={() => setIsReviewModalOpen(false)}
         applicant={boarder}
       />
+
+      {/* Staff Meal Control Modal */}
+      {isMealControlOpen && (
+        <StaffMealControlModal
+          isOpen={isMealControlOpen}
+          onClose={() => setIsMealControlOpen(false)}
+          initialBoarderId={boarder.id}
+        />
+      )}
     </div>
   )
 }

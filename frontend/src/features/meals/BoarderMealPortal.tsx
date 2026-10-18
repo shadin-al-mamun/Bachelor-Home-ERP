@@ -21,6 +21,7 @@ import {
   useBoarderMealSelections,
   useToggleMealMutation,
   useBatchToggleMealsMutation,
+  isMealManagerRole,
 } from './api/useMeals'
 import type { MealSessionType } from './api/useMeals'
 import { CutoffCountdownBanner } from './components/CutoffCountdownBanner'
@@ -29,10 +30,7 @@ import { AdminMealOverrideModal } from './components/AdminMealOverrideModal'
 
 export const BoarderMealPortal: React.FC = () => {
   const { profile } = useAuthStore()
-  const isStaff =
-    profile?.role === 'SUPER_ADMIN' ||
-    profile?.role === 'ADMIN' ||
-    profile?.role === 'MANAGER'
+  const isStaff = isMealManagerRole(profile?.role)
 
   // Current Dhaka Date baseline
   const dhakaNow = getDhakaNow()

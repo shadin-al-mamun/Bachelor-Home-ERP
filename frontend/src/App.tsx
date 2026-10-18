@@ -18,6 +18,25 @@ export const App: React.FC = () => {
     }
   }, [])
 
+  const handleRoleSwitch = (role: UserRole) => {
+    setDemoUser(role)
+    if (role === 'BOARDER') {
+      router.navigate('/portal/dashboard')
+    } else if (role === 'APPLICANT') {
+      router.navigate('/portal/my-application')
+    } else {
+      const currentPath = router.state.location.pathname
+      if (currentPath.startsWith('/portal') || currentPath === '/unauthorized') {
+        router.navigate('/dashboard')
+      }
+    }
+  }
+
+  const handleGuestSwitch = () => {
+    signOut()
+    router.navigate('/login')
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-bengali">
@@ -35,7 +54,7 @@ export const App: React.FC = () => {
           {(['SUPER_ADMIN', 'MANAGER', 'BOARDER', 'APPLICANT'] as UserRole[]).map((role) => (
             <button
               key={role}
-              onClick={() => setDemoUser(role)}
+              onClick={() => handleRoleSwitch(role)}
               className={`px-2 py-1 rounded-xl text-[10px] font-bold transition-all ${
                 profile?.role === role
                   ? 'bg-primary-600 text-white shadow-md shadow-primary-500/30 border border-primary-400/40'
@@ -47,7 +66,7 @@ export const App: React.FC = () => {
           ))}
 
           <button
-            onClick={() => signOut()}
+            onClick={handleGuestSwitch}
             className="px-2 py-1 rounded-xl text-[10px] font-bold bg-rose-950/40 text-rose-300 hover:bg-rose-900/60 border border-rose-800/40 transition-colors"
             title="লগআউট প্রিভিউ"
           >

@@ -3,6 +3,7 @@ import {
   isDhakaCutoffPassed,
   getRemainingCutoffSeconds,
   getDateMealStatus,
+  isMealManagerRole,
 } from '@/features/meals/api/useMeals'
 
 describe('mealCutoffTimer.test.ts - Asia/Dhaka 10:00 PM Meal Cutoff Engine', () => {
@@ -87,6 +88,23 @@ describe('mealCutoffTimer.test.ts - Asia/Dhaka 10:00 PM Meal Cutoff Engine', () 
 
       expect(statusDayAfterTomorrow.isFuture).toBe(true)
       expect(statusDayAfterTomorrow.isLockedForBoarder).toBe(false)
+    })
+  })
+
+  describe('isMealManagerRole - Staff Meal Management Authorization', () => {
+    it('authorizes SUPER_ADMIN, ADMIN, MANAGER, and MEAL_OPERATOR', () => {
+      expect(isMealManagerRole('SUPER_ADMIN')).toBe(true)
+      expect(isMealManagerRole('ADMIN')).toBe(true)
+      expect(isMealManagerRole('MANAGER')).toBe(true)
+      expect(isMealManagerRole('MEAL_OPERATOR')).toBe(true)
+    })
+
+    it('denies BOARDER, APPLICANT, AUDITOR, and undefined/null roles from arbitrary meal overriding', () => {
+      expect(isMealManagerRole('BOARDER')).toBe(false)
+      expect(isMealManagerRole('APPLICANT')).toBe(false)
+      expect(isMealManagerRole('AUDITOR')).toBe(false)
+      expect(isMealManagerRole(undefined)).toBe(false)
+      expect(isMealManagerRole(null)).toBe(false)
     })
   })
 })

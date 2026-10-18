@@ -1,5 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
+import {
+  updateOwnerDashboardMealMetrics,
+  updateOwnerDashboardMealBatch,
+} from '@/features/dashboard/api/useOwnerDashboard'
 import type {
   MealSettings,
   MealRate,
@@ -11,6 +15,18 @@ import type {
 // ==============================================================================
 
 export type MealSessionType = 'BREAKFAST' | 'LUNCH' | 'DINNER'
+
+/**
+ * Checks whether user has permission to manage and override boarder meals at any time
+ */
+export function isMealManagerRole(role?: string | null): boolean {
+  return (
+    role === 'SUPER_ADMIN' ||
+    role === 'ADMIN' ||
+    role === 'MANAGER' ||
+    role === 'MEAL_OPERATOR'
+  )
+}
 
 export interface ExtendedMealSelection extends MealSelection {
   boarder_name?: string
@@ -408,9 +424,13 @@ export function useToggleMealMutation() {
       const targetBoarder = input.targetBoarderId || 'bdr-101'
       const sessionUpper = input.session.toUpperCase() as MealSessionType
 
-      // Validate Cutoff on Client before sending
+      // Validate Cutoff on Client before sending (Staff can override at any time)
       const status = getDateMealStatus(input.mealDate)
-      if (status.isLockedForBoarder && !input.overrideReason) {
+      const effectiveOverrideReason =
+        input.overrideReason ||
+        (input.targetBoarderId ? 'কর্তৃপক্ষ কর্তৃক মিল পরিবর্তন (Staff Override)' : null)
+
+      if (status.isLockedForBoarder && !effectiveOverrideReason) {
         throw new Error('কাটঅফ সময় অতিক্রান্ত হয়েছে। আগামীকালের বা পূর্ববর্তী দিনের মিল পরিবর্তন লক করা আছে।')
       }
 
@@ -429,9 +449,9 @@ export function useToggleMealMutation() {
             lunch: false,
             dinner: false,
             is_locked: false,
-            is_override: !!input.overrideReason,
-            override_reason: input.overrideReason || null,
-            override_by: input.overrideReason ? 'usr-admin1' : null,
+            is_override: !!effectiveOverrideReason,
+            override_reason: effectiveOverrideReason || null,
+            override_by: effectiveOverrideReason ? 'usr-admin1' : null,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }
@@ -442,12 +462,14 @@ export function useToggleMealMutation() {
         if (sessionUpper === 'LUNCH') existing.lunch = input.newState
         if (sessionUpper === 'DINNER') existing.dinner = input.newState
 
-        if (input.overrideReason) {
+        if (effectiveOverrideReason) {
           existing.is_override = true
-          existing.override_reason = input.overrideReason
+          existing.override_reason = effectiveOverrideReason
           existing.override_by = 'usr-admin1'
         }
         existing.updated_at = new Date().toISOString()
+
+        updateOwnerDashboardMealMetrics(input.mealDate, sessionUpper, input.newState)
 
         return {
           success: true,
@@ -463,7 +485,7 @@ export function useToggleMealMutation() {
         p_meal_date: input.mealDate,
         p_session: sessionUpper,
         p_new_state: input.newState,
-        p_override_reason: input.overrideReason || null,
+        p_override_reason: effectiveOverrideReason || null,
         p_target_boarder_id: input.targetBoarderId || null,
       })
 
@@ -510,8 +532,10 @@ export function useToggleMealMutation() {
 
     onSettled: (_data, _error, input) => {
       const targetBoarder = input.targetBoarderId || 'bdr-101'
+      queryClient.invalidateQueries({ queryKey: ['owner-executive-dashboard'] })
       queryClient.invalidateQueries({ queryKey: ['boarder-meal-selections', targetBoarder] })
       queryClient.invalidateQueries({ queryKey: ['kitchen-meals-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['kitchen-flat-boarders'] })
     },
   })
 }
@@ -525,7 +549,11 @@ export function useBatchToggleMealsMutation() {
       const targetBoarder = input.targetBoarderId || 'bdr-101'
 
       const status = getDateMealStatus(input.mealDate)
-      if (status.isLockedForBoarder && !input.overrideReason) {
+      const effectiveOverrideReason =
+        input.overrideReason ||
+        (input.targetBoarderId ? 'কর্তৃপক্ষ কর্তৃক মিল পরিবর্তন (Staff Override)' : null)
+
+      if (status.isLockedForBoarder && !effectiveOverrideReason) {
         throw new Error('কাটঅফ সময় অতিক্রান্ত হয়েছে। আগামীকালের বা পূর্ববর্তী দিনের মিল পরিবর্তন লক করা আছে।')
       }
 
@@ -544,19 +572,31 @@ export function useBatchToggleMealsMutation() {
             lunch: false,
             dinner: false,
             is_locked: false,
-            is_override: !!input.overrideReason,
-            override_reason: input.overrideReason || null,
-            override_by: input.overrideReason ? 'usr-admin1' : null,
+            is_override: !!effectiveOverrideReason,
+            override_reason: effectiveOverrideReason || null,
+            override_by: effectiveOverrideReason ? 'usr-admin1' : null,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }
           MOCK_SELECTIONS.push(existing)
         }
 
+        let deltaMeals = 0
+        if (input.breakfast !== undefined) deltaMeals += (input.breakfast ? 1 : 0) - (existing.breakfast ? 1 : 0)
+        if (input.lunch !== undefined) deltaMeals += (input.lunch ? 1 : 0) - (existing.lunch ? 1 : 0)
+        if (input.dinner !== undefined) deltaMeals += (input.dinner ? 1 : 0) - (existing.dinner ? 1 : 0)
+
         if (input.breakfast !== undefined) existing.breakfast = input.breakfast
         if (input.lunch !== undefined) existing.lunch = input.lunch
         if (input.dinner !== undefined) existing.dinner = input.dinner
+        if (effectiveOverrideReason) {
+          existing.is_override = true
+          existing.override_reason = effectiveOverrideReason
+          existing.override_by = 'usr-admin1'
+        }
         existing.updated_at = new Date().toISOString()
+
+        updateOwnerDashboardMealBatch(input.mealDate, deltaMeals)
 
         return { success: true }
       }
@@ -572,7 +612,7 @@ export function useBatchToggleMealsMutation() {
           p_meal_date: input.mealDate,
           p_session: item.session,
           p_new_state: item.state,
-          p_override_reason: input.overrideReason || null,
+          p_override_reason: effectiveOverrideReason || null,
           p_target_boarder_id: input.targetBoarderId || null,
         })
         if (error) throw new Error(error.message)
@@ -582,8 +622,10 @@ export function useBatchToggleMealsMutation() {
     },
     onSuccess: (_data, input) => {
       const targetBoarder = input.targetBoarderId || 'bdr-101'
+      queryClient.invalidateQueries({ queryKey: ['owner-executive-dashboard'] })
       queryClient.invalidateQueries({ queryKey: ['boarder-meal-selections', targetBoarder] })
       queryClient.invalidateQueries({ queryKey: ['kitchen-meals-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['kitchen-flat-boarders'] })
     },
   })
 }
