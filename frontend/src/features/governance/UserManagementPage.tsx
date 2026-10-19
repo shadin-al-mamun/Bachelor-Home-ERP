@@ -19,15 +19,17 @@ import { Navigate, Link } from 'react-router-dom'
 import type { UserRole } from '../../types/database'
 
 const SYSTEM_ROLES: { role: UserRole; label: string; desc: string; badgeColor: string }[] = [
-  { role: 'SUPER_ADMIN', label: 'সুপার অ্যাডমিন / Super Admin', desc: 'Full System Control', badgeColor: 'bg-purple-950 text-purple-300 border-purple-800' },
-  { role: 'ADMIN', label: 'অ্যাডমিন / Admin', desc: 'Hostel Operations & Management', badgeColor: 'bg-indigo-950 text-indigo-300 border-indigo-800' },
-  { role: 'MANAGER', label: 'ম্যানেজার / Manager', desc: 'Cash Custody & Shift Ops', badgeColor: 'bg-blue-950 text-blue-300 border-blue-800' },
-  { role: 'ACCOUNTANT', label: 'অ্যাকাউন্ট্যান্ট / Accountant', desc: 'Vouchers & Financial Approvals', badgeColor: 'bg-emerald-950 text-emerald-300 border-emerald-800' },
-  { role: 'MEAL_OPERATOR', label: 'মিল অপারেটর / Meal Operator', desc: 'Kitchen & Meal Overrides', badgeColor: 'bg-amber-950 text-amber-300 border-amber-800' },
-  { role: 'BOARDER', label: 'বর্ডার / Resident Boarder', desc: 'Room Allocation & Self Service', badgeColor: 'bg-teal-950 text-teal-300 border-teal-800' },
-  { role: 'APPLICANT', label: 'আবেদনকারী / Applicant', desc: 'Self-Registered Awaiting Approval', badgeColor: 'bg-slate-800 text-slate-300 border-slate-700' },
-  { role: 'AUDITOR', label: 'নিরীক্ষক / Auditor', desc: 'Read-only Audit & Compliance', badgeColor: 'bg-rose-950 text-rose-300 border-rose-800' },
+  { role: 'SUPER_ADMIN', label: 'সুপার অ্যাডমিন (মালিক / প্রধান নির্বাহী)', desc: 'Full System Control', badgeColor: 'bg-purple-950 text-purple-300 border-purple-800' },
+  { role: 'ADMIN', label: 'অ্যাডমিন (হোস্টেল প্রশাসক)', desc: 'Hostel Operations & Management', badgeColor: 'bg-indigo-950 text-indigo-300 border-indigo-800' },
+  { role: 'MANAGER', label: 'ম্যানেজার (হোস্টেল ম্যানেজার)', desc: 'Cash Custody & Shift Ops', badgeColor: 'bg-blue-950 text-blue-300 border-blue-800' },
+  { role: 'ACCOUNTANT', label: 'অ্যাকাউন্ট্যান্ট (হিসাবরক্ষক)', desc: 'Vouchers & Financial Approvals', badgeColor: 'bg-emerald-950 text-emerald-300 border-emerald-800' },
+  { role: 'MEAL_OPERATOR', label: 'মিল অপারেটর (বাবুর্চি / কিচেন ইনচার্জ)', desc: 'Kitchen & Meal Overrides', badgeColor: 'bg-amber-950 text-amber-300 border-amber-800' },
+  { role: 'AUDITOR', label: 'নিরীক্ষক (অডিটর)', desc: 'Read-only Audit & Compliance', badgeColor: 'bg-rose-950 text-rose-300 border-rose-800' },
+  { role: 'BOARDER', label: 'আবাসিক বোর্ডার (শিক্ষার্থী / সদস্য)', desc: 'Room Allocation & Self Service', badgeColor: 'bg-teal-950 text-teal-300 border-teal-800' },
+  { role: 'APPLICANT', label: 'আবেদনকারী (নতুন আবেদন)', desc: 'Self-Registered Awaiting Approval', badgeColor: 'bg-slate-800 text-slate-300 border-slate-700' },
 ]
+
+const STAFF_ROLE_KEYS: UserRole[] = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'MEAL_OPERATOR', 'AUDITOR']
 
 export const UserManagementPage: React.FC = () => {
   const { profile: currentUser } = useAuthStore()
@@ -36,8 +38,17 @@ export const UserManagementPage: React.FC = () => {
   const [roleFilter, setRoleFilter] = useState('ALL')
   const [selectedUserForFlats, setSelectedUserForFlats] = useState<UserManagementItem | null>(null)
 
-  const { data: users, isLoading } = useUsersList(searchQuery, roleFilter)
+  const { data: rawUsers, isLoading } = useUsersList(searchQuery, roleFilter === 'STAFF' ? undefined : roleFilter)
   const updateRoleMutation = useUpdateUserRoleAndStatus()
+
+  // Filter staff roles when 'STAFF' filter is selected
+  const users = React.useMemo(() => {
+    if (!rawUsers) return []
+    if (roleFilter === 'STAFF') {
+      return rawUsers.filter((u) => STAFF_ROLE_KEYS.includes(u.role))
+    }
+    return rawUsers
+  }, [rawUsers, roleFilter])
 
   // RBAC: Only SUPER_ADMIN can administer roles and user assignments
   if (currentUser && currentUser.role !== 'SUPER_ADMIN') {
@@ -81,11 +92,11 @@ export const UserManagementPage: React.FC = () => {
           </div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight flex items-center gap-2.5">
             <Users className="w-8 h-8 text-indigo-400" />
-            <span>ইউজার রোল ও ফ্ল্যাট পারমিশন</span>
-            <span className="text-slate-500 font-light text-xl">| User Management</span>
+            <span>কর্মকর্তা, কর্মচারী ও ইউজার পদবী ব্যবস্থাপনা</span>
+            <span className="text-slate-500 font-light text-xl">| Staff & Role Governance</span>
           </h1>
           <p className="text-xs md:text-sm text-slate-400 mt-1">
-            সিস্টেম ব্যবহারকারীদের রোল আপগ্রেড, সক্রিয়করণ এবং নির্দিষ্ট ফ্ল্যাট ব্যবহারের অধিকার প্রদান
+            সুপার অ্যাডমিন, অ্যাডমিন, ম্যানেজার ও কর্মচারীদের স্ব স্ব পদবী নির্ধারণ এবং আবাসিক বোর্ডারদের প্রশাসনিক নিয়ন্ত্রণ
           </p>
         </div>
 
@@ -104,7 +115,7 @@ export const UserManagementPage: React.FC = () => {
           className="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 flex items-center gap-2"
         >
           <Users className="w-4 h-4" />
-          <span>ইউজার ও রোল পারমিশন (Users & Roles)</span>
+          <span>কর্মকর্তা ও পদবী ব্যবস্থাপনা (Staff & Roles)</span>
         </Link>
         <Link
           to="/settings/audit-logs"
@@ -113,6 +124,54 @@ export const UserManagementPage: React.FC = () => {
           <ShieldAlert className="w-4 h-4 text-rose-400" />
           <span>সিস্টেম অডিট ট্রেইল (Audit Logs)</span>
         </Link>
+      </div>
+
+      {/* Category Filter Pills */}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setRoleFilter('ALL')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+            roleFilter === 'ALL'
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+              : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
+          }`}
+        >
+          সকল পদবী (All Users)
+        </button>
+        <button
+          type="button"
+          onClick={() => setRoleFilter('STAFF')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+            roleFilter === 'STAFF'
+              ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
+              : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
+          }`}
+        >
+          <span>🛡️ কর্মকর্তা ও কর্মচারী (Staff Only)</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setRoleFilter('BOARDER')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+            roleFilter === 'BOARDER'
+              ? 'bg-teal-600 text-white shadow-md shadow-teal-600/20'
+              : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
+          }`}
+        >
+          🎓 আবাসিক বোর্ডার (Boarders)
+        </button>
+        <button
+          type="button"
+          onClick={() => setRoleFilter('APPLICANT')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+            roleFilter === 'APPLICANT'
+              ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20'
+              : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
+          }`}
+        >
+          📋 আবেদনকারী (Applicants)
+        </button>
       </div>
 
       {/* 2. Filter Bar */}
@@ -133,12 +192,13 @@ export const UserManagementPage: React.FC = () => {
           <select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
-            className="w-full sm:w-48 px-3 py-2 text-xs bg-slate-900 border border-slate-700/80 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+            className="w-full sm:w-56 px-3 py-2 text-xs bg-slate-900 border border-slate-700/80 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
           >
-            <option value="ALL">সকল রোল (All Roles)</option>
+            <option value="ALL">সকল পদবী (All Roles)</option>
+            <option value="STAFF">কর্মকর্তা ও কর্মচারী (Staff Only)</option>
             {SYSTEM_ROLES.map((r) => (
               <option key={r.role} value={r.role}>
-                {r.role}
+                {r.label}
               </option>
             ))}
           </select>

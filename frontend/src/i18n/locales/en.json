@@ -7,7 +7,8 @@
   "nav": {
     "dashboard": "Dashboard",
     "accommodations": "Accommodations",
-    "boarders": "Boarders",
+    "boarders": "Resident Boarders",
+    "governance": "Staff & Role Management",
     "allocations": "Seat Allocations",
     "billing": "Billing & Dues",
     "collections": "Rent & Receipts",

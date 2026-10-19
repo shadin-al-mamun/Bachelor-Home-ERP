@@ -65,10 +65,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       titleKey: 'nav.boarders',
-      defaultTitle: 'বর্ডার তালিকা',
+      defaultTitle: 'আবাসিক বোর্ডার তালিকা',
       href: '/boarders',
       icon: <Users className="w-5 h-5 shrink-0" />,
       roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'AUDITOR'],
+    },
+    {
+      titleKey: 'nav.governance',
+      defaultTitle: 'কর্মকর্তা ও পদবী ব্যবস্থাপনা',
+      href: '/settings/users',
+      icon: <ShieldCheck className="w-5 h-5 shrink-0 text-indigo-400" />,
+      roles: ['SUPER_ADMIN', 'ADMIN'],
     },
     {
       titleKey: 'nav.billing',

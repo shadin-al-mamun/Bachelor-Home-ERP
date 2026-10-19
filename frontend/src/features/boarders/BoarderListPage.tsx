@@ -60,13 +60,17 @@ export const BoarderListPage: React.FC = () => {
         <div>
           <div className="flex items-center gap-2 text-xs text-primary-400 font-semibold tracking-wider uppercase mb-1">
             <Users className="w-4 h-4" />
-            বর্ডার ব্যবস্থাপনা ডিরেক্টরি
+            আবাসিক বোর্ডার ব্যবস্থাপনা ডিরেক্টরি
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-            হোস্টেল বর্ডার ও আবেদনকারী তালিকা
+            হোস্টেল আবাসিক বোর্ডার ও আবেদনকারী তালিকা
           </h1>
           <p className="text-sm text-slate-400 mt-1">
-            বর্ডারদের প্রোফাইল, নথিপত্র ভেরিফিকেশন, সিট বরাদ্দ এবং ইতিহাস পর্যবেক্ষণ করুন।
+            হোস্টেলের প্রকৃত আবাসিক সদস্য ও শিক্ষার্থীদের প্রোফাইল, নথিপত্র এবং সিট বরাদ্দ। (কর্মকর্তা ও কর্মচারীদের তালিকা আলাদাভাবে{' '}
+            <Link to="/settings/users" className="text-indigo-400 hover:underline">
+              কর্মকর্তা ও পদবী ব্যবস্থাপনা
+            </Link>{' '}
+            পেইজে সংরক্ষিত)
           </p>
         </div>
 

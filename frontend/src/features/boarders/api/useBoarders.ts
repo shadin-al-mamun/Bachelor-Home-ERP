@@ -579,13 +579,17 @@ export async function createBoarderApplication(input: CreateBoarderInput): Promi
 // Hooks
 // ------------------------------------------------------------------------------
 
+export const STAFF_ROLES = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'MEAL_OPERATOR', 'AUDITOR']
+
 export function useBoarders(filters?: BoarderFilters) {
   return useQuery({
     queryKey: ['boarders', filters],
     queryFn: async (): Promise<BoarderWithRelations[]> => {
       if (!isSupabaseConfigured) {
         const remote = await fetchRemoteBoarders()
-        let result = remote || getStoredBoarders()
+        let result = (remote || getStoredBoarders()).filter(
+          (b) => b.boarder_code !== 'BDR-2026-4071' && b.email !== 'shadin0158@gmail.com'
+        )
 
         if (filters?.status && filters.status !== 'ALL') {
           result = result.filter((b) => b.status === filters.status)
@@ -608,6 +612,7 @@ export function useBoarders(filters?: BoarderFilters) {
         .from('boarders')
         .select(`
           *,
+          user:profiles(id, role, email),
           active_allocation:allocations(
             id,
             boarder_id,
@@ -651,7 +656,7 @@ export function useBoarders(filters?: BoarderFilters) {
         console.warn('Supabase deep boarders fetch error, falling back to simple select:', error.message)
         let simpleQuery = supabase
           .from('boarders')
-          .select('*')
+          .select('*, user:profiles(id, role, email)')
           .order('created_at', { ascending: false })
 
         if (filters?.status && filters.status !== 'ALL') {
@@ -669,13 +674,21 @@ export function useBoarders(filters?: BoarderFilters) {
         data = simpleRes.data
       }
 
-      // In live mode, NEVER fall back to fake mock data
-      return (data || []).map((b: any) => ({
+      // In live mode, strictly filter out any staff roles from boarder listings
+      const rawList = (data || []).map((b: any) => ({
         ...b,
         active_allocation: Array.isArray(b.active_allocation)
           ? b.active_allocation.find((a: any) => a.status === 'ACTIVE') || null
           : b.active_allocation,
       }))
+
+      return rawList.filter((b: any) => {
+        // Superadmin, admin, manager, accountant, meal operator, auditor should NEVER be listed as boarders
+        if (b.user && STAFF_ROLES.includes(b.user.role)) return false
+        if (b.boarder_code === 'BDR-2026-4071') return false
+        if (b.email === 'shadin0158@gmail.com') return false
+        return true
+      })
     },
     refetchInterval: 3000, // Poll every 3 seconds for instant cross-device updates
     refetchOnWindowFocus: true,
@@ -688,7 +701,9 @@ export function useBoarder(id?: string) {
     enabled: Boolean(id),
     queryFn: async (): Promise<BoarderWithRelations> => {
       if (!isSupabaseConfigured) {
-        const list = getStoredBoarders()
+        const list = getStoredBoarders().filter(
+          (b) => b.boarder_code !== 'BDR-2026-4071' && b.email !== 'shadin0158@gmail.com'
+        )
         const found = list.find((b) => b.id === id)
         if (!found) throw new Error('Boarder not found')
         return found
@@ -698,6 +713,7 @@ export function useBoarder(id?: string) {
         .from('boarders')
         .select(`
           *,
+          user:profiles(id, role, email),
           active_allocation:allocations(
             id,
             boarder_id,
@@ -747,6 +763,13 @@ export function useBoarder(id?: string) {
           if (fallback) return fallback
         }
         throw error
+      }
+
+      if (data?.user && STAFF_ROLES.includes(data.user.role)) {
+        throw new Error('এই প্রোফাইলটি একজন প্রশাসনিক কর্মকর্তার। তিনি আবাসিক বোর্ডার নন।')
+      }
+      if (data?.boarder_code === 'BDR-2026-4071' || data?.email === 'shadin0158@gmail.com') {
+        throw new Error('প্রশাসনিক কর্মকর্তা প্রোফাইল বোর্ডার তালিকায় অন্তর্ভুক্ত নয়।')
       }
 
       const activeAlloc = Array.isArray(data.active_allocation)
