@@ -104,6 +104,7 @@ GRANT EXECUTE ON FUNCTION public.fn_generate_monthly_rent_charges(DATE, DATE) TO
 
 -- 2. ENHANCED VIEW: vw_boarder_dues_summary
 -- Provides comprehensive boarder dues, flat/seat information, and overdue aging
+DROP VIEW IF EXISTS public.vw_boarder_dues_summary CASCADE;
 CREATE OR REPLACE VIEW public.vw_boarder_dues_summary AS
 WITH last_payments AS (
     SELECT 

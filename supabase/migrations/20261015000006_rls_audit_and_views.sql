@@ -427,6 +427,7 @@ FOR EACH ROW EXECUTE FUNCTION public.fn_audit_trigger();
 -- 6. REPORTING & ANALYTICAL SQL VIEWS
 
 -- 6.1 MANAGER DAILY RECONCILIATION VIEW
+DROP VIEW IF EXISTS public.vw_manager_daily_reconciliation CASCADE;
 CREATE OR REPLACE VIEW public.vw_manager_daily_reconciliation AS
 SELECT 
     mcs.id AS session_id,
@@ -451,6 +452,7 @@ JOIN public.profiles p ON p.id = mcs.manager_id
 JOIN public.financial_accounts fa ON fa.id = mcs.account_id;
 
 -- 6.2 FLAT-WISE DAILY MEAL SUMMARY VIEW
+DROP VIEW IF EXISTS public.vw_flat_daily_meal_summary CASCADE;
 CREATE OR REPLACE VIEW public.vw_flat_daily_meal_summary AS
 SELECT 
     ms.meal_date,
@@ -470,6 +472,7 @@ LEFT JOIN public.meal_selections ms ON ms.flat_id = f.id
 GROUP BY ms.meal_date, b.name, f.id, f.name, f.flat_code;
 
 -- 6.3 BOARDER DUES & AGING SUMMARY VIEW
+DROP VIEW IF EXISTS public.vw_boarder_dues_summary CASCADE;
 CREATE OR REPLACE VIEW public.vw_boarder_dues_summary AS
 SELECT 
     b.id AS boarder_id,
