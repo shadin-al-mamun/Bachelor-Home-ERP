@@ -320,11 +320,10 @@ export const LoginPage: React.FC = () => {
                   setLoginMethod('phone')
                   setErrorMessage(null)
                 }}
-                className={`flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-lg transition-all ${
-                  loginMethod === 'phone'
+                className={`flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-lg transition-all ${loginMethod === 'phone'
                     ? 'bg-primary-600 text-white shadow-md shadow-primary-500/30'
                     : 'text-slate-400 hover:text-slate-200'
-                }`}
+                  }`}
               >
                 <Phone className="w-3.5 h-3.5" />
                 <span>মোবাইল নম্বর</span>
@@ -335,11 +334,10 @@ export const LoginPage: React.FC = () => {
                   setLoginMethod('email')
                   setErrorMessage(null)
                 }}
-                className={`flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-lg transition-all ${
-                  loginMethod === 'email'
+                className={`flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-lg transition-all ${loginMethod === 'email'
                     ? 'bg-primary-600 text-white shadow-md shadow-primary-500/30'
                     : 'text-slate-400 hover:text-slate-200'
-                }`}
+                  }`}
               >
                 <Mail className="w-3.5 h-3.5" />
                 <span>ইমেইল</span>
