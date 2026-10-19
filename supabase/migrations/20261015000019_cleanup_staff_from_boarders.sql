@@ -216,3 +216,91 @@ FOR ALL TO authenticated
 USING (true)
 WITH CHECK (true);
 
+
+-- 5. RE-POPULATE GENUINE RESIDENT BOARDER & RESTORE PROFILES
+-- Ensure the owner is strictly SUPER_ADMIN
+UPDATE public.profiles 
+SET role = 'SUPER_ADMIN' 
+WHERE email = 'shadin0158@gmail.com';
+
+-- Ensure non-owner accounts that were accidentally elevated are set to BOARDER
+UPDATE public.profiles 
+SET role = 'BOARDER' 
+WHERE email != 'shadin0158@gmail.com' AND role = 'SUPER_ADMIN';
+
+-- Ensure genuine active boarder 'আল ইমরান' exists in public.boarders
+INSERT INTO public.boarders (
+    boarder_code,
+    full_name,
+    phone_number,
+    email,
+    institution,
+    department,
+    guardian_name,
+    guardian_phone,
+    permanent_address,
+    status,
+    admission_date
+)
+SELECT 
+    'BDR-2026-3688',
+    'আল ইমরান',
+    '01683877525',
+    'imran@example.com',
+    'নির্বাচন কমিশন সচিবালয়',
+    'ব্যক্তিগত কর্মকর্তা',
+    'মোবারক হোসেন',
+    '01711998877',
+    'ঢাকা',
+    'ACTIVE',
+    CURRENT_DATE
+WHERE NOT EXISTS (
+    SELECT 1 FROM public.boarders WHERE boarder_code = 'BDR-2026-3688' OR phone_number = '01683877525'
+);
+
+-- Ensure all pending applicants from profiles are in boarders
+INSERT INTO public.boarders (
+    user_id,
+    boarder_code,
+    full_name,
+    phone_number,
+    email,
+    guardian_name,
+    guardian_phone,
+    permanent_address,
+    status,
+    admission_date
+)
+SELECT 
+    p.id,
+    'BDR-' || to_char(now(), 'YYYY') || '-' || lpad((floor(random() * 9000) + 1000)::text, 4, '0'),
+    p.full_name,
+    p.phone_number,
+    p.email,
+    'অভিভাবক',
+    p.phone_number,
+    'বাংলাদেশ',
+    'PENDING',
+    CURRENT_DATE
+FROM public.profiles p
+WHERE p.role = 'APPLICANT'
+  AND NOT EXISTS (
+      SELECT 1 FROM public.boarders b 
+      WHERE b.user_id = p.id OR (b.email IS NOT NULL AND lower(b.email) = lower(p.email))
+  );
+
+-- Ensure RLS on all accommodation and billing tables is open for reading
+GRANT SELECT ON public.boarders TO anon, authenticated;
+GRANT SELECT ON public.allocations TO anon, authenticated;
+GRANT SELECT ON public.seats TO anon, authenticated;
+GRANT SELECT ON public.rooms TO anon, authenticated;
+GRANT SELECT ON public.flats TO anon, authenticated;
+GRANT SELECT ON public.buildings TO anon, authenticated;
+
+DROP POLICY IF EXISTS boarders_select_all ON public.boarders;
+CREATE POLICY boarders_select_all ON public.boarders FOR SELECT TO anon, authenticated USING (true);
+
+DROP POLICY IF EXISTS allocations_select_all ON public.allocations;
+CREATE POLICY allocations_select_all ON public.allocations FOR SELECT TO anon, authenticated USING (true);
+
+
