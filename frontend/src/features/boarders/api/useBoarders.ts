@@ -540,21 +540,34 @@ export async function createBoarderApplication(input: CreateBoarderInput): Promi
         insertData.user_id = validUserId
       }
 
-      const { data, error } = await supabase.from('boarders').insert(insertData).select().single()
+      let { data, error } = await supabase.from('boarders').insert(insertData).select().single()
+
+      // If failed (e.g. foreign key violation on user_id), retry without user_id
+      if (error && validUserId) {
+        console.warn('Direct insert with user_id failed, retrying without user_id:', error.message)
+        const retryData = { ...insertData }
+        delete retryData.user_id
+        const retryRes = await supabase.from('boarders').insert(retryData).select().single()
+        data = retryRes.data
+        error = retryRes.error
+      }
 
       if (error) {
-        console.warn('Supabase boarder insert error (saved to local fallback):', error.message)
+        console.error('CRITICAL: Supabase boarder insert error:', error.message)
+        throw new Error(`আবেদনটি সার্ভারে সংরক্ষণ করা যায়নি: ${error.message}`)
       } else if (data) {
         const merged = { ...newBoarder, ...data }
         saveStoredBoarders([merged, ...getStoredBoarders().filter(b => b.id !== merged.id)])
         return merged
       }
-    } catch (err) {
-      console.warn('Supabase boarder insert exception:', err)
+    } catch (err: unknown) {
+      console.error('Supabase boarder insert exception:', err)
+      const message = err instanceof Error ? err.message : 'ডাটাবেস সংরক্ষণ ব্যর্থ হয়েছে।'
+      throw new Error(message)
     }
   }
 
-  // 3. Update local storage as fallback
+  // 3. Update local storage as fallback (only in offline/demo mode)
   const existing = getStoredBoarders()
   const updated = [newBoarder, ...existing.filter(b => b.id !== newBoarder.id)]
   saveStoredBoarders(updated)
