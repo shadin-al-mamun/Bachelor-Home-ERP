@@ -5,7 +5,7 @@ import { Button, Card, CardHeader, CardTitle, CardContent } from '@/components/c
 import { useAuthStore } from '@/app/store/useAuthStore'
 
 export const UnauthorizedView: React.FC = () => {
-  const { profile, setDemoUser } = useAuthStore()
+  const { profile } = useAuthStore()
 
   const homePath =
     profile?.role === 'BOARDER'
@@ -49,17 +49,6 @@ export const UnauthorizedView: React.FC = () => {
                 লগইন পেজে যান
               </Button>
             </Link>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setDemoUser('SUPER_ADMIN')
-                window.location.href = '/dashboard'
-              }}
-              className="w-full sm:w-auto border-indigo-500/40 text-indigo-300 hover:text-white"
-            >
-              এডমিন মোডে যান
-            </Button>
           </div>
         </CardContent>
       </Card>

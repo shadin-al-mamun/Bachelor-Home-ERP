@@ -13,10 +13,10 @@ import {
   XCircle,
   GraduationCap,
   ArrowRight,
-  Shield,
 } from 'lucide-react'
 import { Button, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, Badge } from '@/components/common'
 import { useAuthStore } from '@/app/store/useAuthStore'
+import { isSupabaseConfigured } from '@/lib/supabaseClient'
 import { useBoarders } from '@/features/boarders/api/useBoarders'
 import { formatDateBn } from '@/utils/date'
 
@@ -52,19 +52,17 @@ export const ApplicationStatusPage: React.FC = () => {
   const applicantCode = currentApplicant?.boarder_code || 'BDR-2026-NEW'
   const applicantDate = currentApplicant?.admission_date ? formatDateBn(currentApplicant.admission_date) : 'আজকে'
 
-  const handleSwitchToAdmin = () => {
-    setDemoUser('SUPER_ADMIN')
-    navigate('/dashboard')
-  }
-
   const handleEnterBoarderPortal = () => {
-    setDemoUser('BOARDER', {
-      id: currentApplicant?.user_id || undefined,
-      full_name: applicantName,
-      email: currentApplicant?.email || `${applicantName}@bachelorhome.erp`,
-      phone_number: applicantPhone,
-      role: 'BOARDER',
-    })
+    if (status !== 'ACTIVE') return
+    if (!isSupabaseConfigured) {
+      setDemoUser('BOARDER', {
+        id: currentApplicant?.user_id || undefined,
+        full_name: applicantName,
+        email: currentApplicant?.email || `${applicantName}@bachelorhome.erp`,
+        phone_number: applicantPhone,
+        role: 'BOARDER',
+      })
+    }
     navigate('/portal/my-meals')
   }
 
@@ -76,22 +74,6 @@ export const ApplicationStatusPage: React.FC = () => {
       </div>
 
       <div className="w-full max-w-xl z-10 space-y-5">
-        {/* Quick Testing Switcher Banner */}
-        <div className="p-3.5 rounded-2xl bg-indigo-950/70 border border-indigo-500/30 flex items-center justify-between gap-3 text-xs shadow-lg">
-          <div className="flex items-center gap-2 text-indigo-300">
-            <Shield className="w-4 h-4 text-indigo-400 shrink-0" />
-            <span>এডমিন প্যানেলে এই আবেদনটি দেখতে ও যাচাই করতে চান?</span>
-          </div>
-          <Button
-            size="sm"
-            variant="primary"
-            onClick={handleSwitchToAdmin}
-            rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
-            className="text-xs py-1 bg-indigo-600 hover:bg-indigo-500 shrink-0"
-          >
-            এডমিন ড্যাশবোর্ডে যান
-          </Button>
-        </div>
 
         {/* Brand Header */}
         <div className="text-center space-y-2">
@@ -253,16 +235,7 @@ export const ApplicationStatusPage: React.FC = () => {
             </div>
           </CardContent>
 
-          <CardFooter className="justify-between pt-4 border-t border-slate-800/80">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSwitchToAdmin}
-              leftIcon={<Shield className="w-4 h-4 text-indigo-400" />}
-            >
-              এডমিন ড্যাশবোর্ডে যান
-            </Button>
-
+          <CardFooter className="justify-end pt-4 border-t border-slate-800/80">
             <Button
               variant="ghost"
               size="sm"

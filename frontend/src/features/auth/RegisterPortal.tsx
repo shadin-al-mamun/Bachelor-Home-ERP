@@ -115,8 +115,38 @@ export const RegisterPortal: React.FC = () => {
     setErrorMessage(null)
 
     try {
-      // 1. Create boarder application in persistent storage
+      let createdUserId: string | undefined = undefined
+
+      // If Supabase is configured: First create the user account in Supabase Auth
+      if (isSupabaseConfigured) {
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName,
+              phone_number: phoneNumber,
+              role: 'APPLICANT',
+            },
+          },
+        })
+
+        if (authError) {
+          setErrorMessage(
+            authError.message.includes('User already registered')
+              ? 'এই ইমেইল দিয়ে ইতোমধ্যে একটি অ্যাকাউন্ট রয়েছে। দয়া করে লগইন করুন।'
+              : authError.message
+          )
+          setIsLoading(false)
+          return
+        }
+
+        createdUserId = authData?.user?.id
+      }
+
+      // 2. Create boarder application in database with the linked user_id
       const createdBoarder = await createBoarderApplication({
+        user_id: createdUserId,
         full_name: fullName,
         phone_number: phoneNumber,
         email,
@@ -137,45 +167,15 @@ export const RegisterPortal: React.FC = () => {
       localStorage.setItem('bachelor_erp_last_applicant_id', createdBoarder.id)
       localStorage.setItem('bachelor_erp_last_applicant_code', createdBoarder.boarder_code)
 
-      if (!isSupabaseConfigured) {
-        // Log in as the actual applicant with their submitted name and phone
-        setDemoUser('APPLICANT', {
-          id: createdBoarder.user_id || undefined,
-          full_name: fullName,
-          email,
-          phone_number: phoneNumber,
-          role: 'APPLICANT',
-        })
-        navigate('/portal/my-application', { replace: true })
-        return
-      }
-
-      // If Supabase is configured: Sign up user via Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            phone_number: phoneNumber,
-            role: 'APPLICANT',
-          },
-        },
-      })
-
-      if (authError) {
-        setErrorMessage(authError.message)
-        setIsLoading(false)
-        return
-      }
-
+      // Set auth state as APPLICANT
       setDemoUser('APPLICANT', {
-        id: authData.user?.id || createdBoarder.user_id || undefined,
+        id: createdUserId || createdBoarder.user_id || undefined,
         full_name: fullName,
         email,
         phone_number: phoneNumber,
         role: 'APPLICANT',
       })
+
       navigate('/portal/my-application', { replace: true })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'রেজিস্ট্রেশন প্রক্রিয়া ব্যর্থ হয়েছে।'

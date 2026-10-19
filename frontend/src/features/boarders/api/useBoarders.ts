@@ -411,6 +411,7 @@ export function saveStoredBoarders(boarders: BoarderWithRelations[]) {
 }
 
 export interface CreateBoarderInput {
+  user_id?: string
   full_name: string
   phone_number: string
   email: string
@@ -431,7 +432,6 @@ export interface CreateBoarderInput {
 
 export async function createBoarderApplication(input: CreateBoarderInput): Promise<BoarderWithRelations> {
   const newId = 'b-' + Date.now()
-  const newUserId = 'u-' + Date.now()
   const randomSuffix = Math.floor(1000 + Math.random() * 9000)
   const boarderCode = `BDR-2026-${randomSuffix}`
   const nowIso = new Date().toISOString()
@@ -439,7 +439,7 @@ export async function createBoarderApplication(input: CreateBoarderInput): Promi
 
   const newBoarder: BoarderWithRelations = {
     id: newId,
-    user_id: newUserId,
+    user_id: input.user_id || undefined,
     boarder_code: boarderCode,
     full_name: input.full_name,
     phone_number: input.phone_number,
@@ -480,21 +480,50 @@ export async function createBoarderApplication(input: CreateBoarderInput): Promi
     console.warn('Could not post to /api/boarders (server offline?):', e)
   }
 
-  // 2. Also update local storage as instant local cache
-  const existing = getStoredBoarders()
-  const updated = [newBoarder, ...existing]
-  saveStoredBoarders(updated)
-
-  // 3. Also attempt Supabase insert if credentials configured
+  // 2. Also attempt Supabase insert / RPC if credentials configured
   if (isSupabaseConfigured) {
     try {
       const { data: authUser } = await supabase.auth.getUser()
-      const { data, error } = await supabase.from('boarders').insert({
-        user_id: authUser?.user?.id || newUserId,
+      const rawUserId = authUser?.user?.id || input.user_id || null
+      const isValidUuid = typeof rawUserId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawUserId)
+      const validUserId = isValidUuid ? rawUserId : null
+
+      // Try RPC first (SECURITY DEFINER, ensures code generation & profile sync)
+      const { data: rpcData, error: rpcError } = await supabase.rpc('submit_boarder_application', {
+        p_user_id: validUserId,
+        p_full_name: input.full_name,
+        p_phone_number: input.phone_number,
+        p_email: input.email || null,
+        p_guardian_name: input.guardian_name,
+        p_guardian_phone: input.guardian_phone,
+        p_guardian_relation: input.guardian_relation || 'অভিভাবক',
+        p_permanent_address: input.permanent_address,
+        p_institution: input.institution || null,
+        p_nid_passport_number: input.nid_passport_number || null,
+        p_present_address: input.present_address || null,
+        p_department: input.department || null,
+        p_student_id: input.student_id || null,
+        p_session: input.session || null,
+        p_nid_document_url: input.nid_document_url || null,
+        p_remarks: input.remarks || 'অনলাইন রেজিস্ট্রেশন পোর্টাল থেকে নতুন আবেদন জমা পড়েছে।',
+      })
+
+      if (!rpcError && rpcData) {
+        const merged = { ...newBoarder, ...rpcData }
+        saveStoredBoarders([merged, ...getStoredBoarders().filter(b => b.id !== merged.id)])
+        return merged
+      }
+
+      if (rpcError) {
+        console.warn('submit_boarder_application RPC error, trying direct insert:', rpcError.message)
+      }
+
+      // Fallback: Direct table insert
+      const insertData: Record<string, any> = {
         boarder_code: boarderCode,
         full_name: input.full_name,
         phone_number: input.phone_number,
-        email: input.email,
+        email: input.email || null,
         nid_passport_number: input.nid_passport_number,
         institution: input.institution,
         department: input.department,
@@ -506,17 +535,29 @@ export async function createBoarderApplication(input: CreateBoarderInput): Promi
         present_address: input.present_address,
         permanent_address: input.permanent_address,
         status: 'PENDING',
-      }).select().single()
+      }
+      if (validUserId) {
+        insertData.user_id = validUserId
+      }
+
+      const { data, error } = await supabase.from('boarders').insert(insertData).select().single()
 
       if (error) {
         console.warn('Supabase boarder insert error (saved to local fallback):', error.message)
       } else if (data) {
-        return { ...newBoarder, ...data }
+        const merged = { ...newBoarder, ...data }
+        saveStoredBoarders([merged, ...getStoredBoarders().filter(b => b.id !== merged.id)])
+        return merged
       }
     } catch (err) {
       console.warn('Supabase boarder insert exception:', err)
     }
   }
+
+  // 3. Update local storage as fallback
+  const existing = getStoredBoarders()
+  const updated = [newBoarder, ...existing.filter(b => b.id !== newBoarder.id)]
+  saveStoredBoarders(updated)
 
   return newBoarder
 }
