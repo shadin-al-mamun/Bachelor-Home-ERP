@@ -172,7 +172,6 @@ export function useReceipts(filters?: ReceiptFilters) {
         .select(`
           *,
           boarder:boarders (full_name, boarder_code, phone_number),
-          received_by_profile:profiles!receipts_received_by_fkey (full_name),
           destination_account:financial_accounts (account_name),
           receipt_allocations (
             allocated_amount,
@@ -195,8 +194,8 @@ export function useReceipts(filters?: ReceiptFilters) {
 
       const { data, error } = await query
       if (error) {
-        console.warn('Failed to fetch receipts from Supabase, using mock:', error.message)
-        return MOCK_RECEIPTS
+        console.warn('Failed to fetch receipts from Supabase:', error.message)
+        return []
       }
 
       return (data || []).map((r: any) => ({
@@ -204,7 +203,7 @@ export function useReceipts(filters?: ReceiptFilters) {
         boarder_name: r.boarder?.full_name || 'অজানা বর্ডার',
         boarder_code: r.boarder?.boarder_code || '',
         boarder_phone: r.boarder?.phone_number || '',
-        collector_name: r.received_by_profile?.full_name || 'ম্যানেজার',
+        collector_name: 'ম্যানেজার',
         account_name: r.destination_account?.account_name || 'ক্যাশ একাউন্ট',
         allocations: (r.receipt_allocations || []).map((ra: any) => ({
           charge_id: ra.charge?.id,
@@ -234,7 +233,7 @@ export function useFinancialAccounts() {
 
       if (error) {
         console.warn('financial_accounts fetch failed:', error.message)
-        return MOCK_ACCOUNTS
+        return []
       }
       return (data || []) as FinancialAccount[]
     },

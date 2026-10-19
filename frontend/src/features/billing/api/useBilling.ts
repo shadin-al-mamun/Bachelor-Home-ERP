@@ -129,7 +129,7 @@ export function useBoarderDuesSummary(filters?: DuesFilters) {
 
       if (error) {
         console.warn('vw_boarder_dues_summary fetch failed:', error.message)
-        return MOCK_DUES_SUMMARY
+        return []
       }
       return (data || []) as BoarderDueSummary[]
     },
@@ -153,7 +153,7 @@ export function useBoarderCharges(boarderId?: string) {
 
       if (error) {
         console.warn('boarder_charges fetch failed:', error.message)
-        return MOCK_CHARGES.filter((c) => c.boarder_id === boarderId)
+        return []
       }
       return (data || []) as BoarderCharge[]
     },

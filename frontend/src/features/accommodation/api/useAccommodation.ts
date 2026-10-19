@@ -98,10 +98,10 @@ export function useBuildings() {
         .order('name', { ascending: true })
 
       if (error) {
-        console.warn('buildings fetch failed, falling back to mock:', error.message)
-        return mockBuildings
+        console.warn('buildings fetch failed:', error.message)
+        return []
       }
-      return data as Building[]
+      return (data || []) as Building[]
     },
   })
 }
@@ -154,10 +154,10 @@ export function useFlats(buildingId?: string) {
       }
       const { data, error } = await query.order('name', { ascending: true })
       if (error) {
-        console.warn('flats fetch failed, falling back to mock:', error.message)
-        return buildingId ? mockFlats.filter((f) => f.building_id === buildingId) : mockFlats
+        console.warn('flats fetch failed:', error.message)
+        return []
       }
-      return data as Flat[]
+      return (data || []) as Flat[]
     },
   })
 }
@@ -210,10 +210,10 @@ export function useRooms(flatId?: string) {
       }
       const { data, error } = await query.order('name', { ascending: true })
       if (error) {
-        console.warn('rooms fetch failed, falling back to mock:', error.message)
-        return flatId ? mockRooms.filter((r) => r.flat_id === flatId) : mockRooms
+        console.warn('rooms fetch failed:', error.message)
+        return []
       }
-      return data as Room[]
+      return (data || []) as Room[]
     },
   })
 }
@@ -299,17 +299,10 @@ export function useSeats(params?: SeatFilterParams) {
 
       const { data, error } = await query.order('seat_code', { ascending: true })
       if (error) {
-        console.warn('seats fetch failed, falling back to mock:', error.message)
-        let results = [...mockSeats]
-        if (params?.roomId) {
-          results = results.filter((s) => s.room_id === params.roomId)
-        }
-        if (params?.status && params.status !== 'ALL') {
-          results = results.filter((s) => s.status === params.status)
-        }
-        return results
+        console.warn('seats fetch failed:', error.message)
+        return []
       }
-      return data
+      return data || []
     },
   })
 }

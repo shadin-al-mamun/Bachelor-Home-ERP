@@ -376,8 +376,12 @@ export function useMealBoardersList() {
         .eq('allocations.status', 'ACTIVE')
         .order('full_name')
 
-      if (error || !data || data.length === 0) {
-        return MOCK_BOARDERS_FOR_MEAL
+      if (error) {
+        console.warn('meal boarders list fetch error:', error.message)
+        return []
+      }
+      if (!data || data.length === 0) {
+        return []
       }
 
       return data.map((b: any) => {
