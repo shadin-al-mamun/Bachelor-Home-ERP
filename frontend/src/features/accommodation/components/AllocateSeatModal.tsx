@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Modal } from '@/components/common/Modal'
 import { Button } from '@/components/common/Button'
 import { Input } from '@/components/common/Input'
@@ -30,7 +30,7 @@ export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
   preSelectedBoarderId,
 }) => {
   const { data: seatMatrix = [] } = useAccommodation()
-  const { data: boarders = [] } = useBoarders({ status: 'ACTIVE' })
+  const { data: allBoarders = [], isLoading: isLoadingBoarders } = useBoarders({ status: 'ALL' })
 
   const [selectedBoarderId, setSelectedBoarderId] = useState(preSelectedBoarderId || '')
   const [selectedSeatId, setSelectedSeatId] = useState(preSelectedSeatId || '')
@@ -43,41 +43,54 @@ export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
 
   const allocateMutation = useAllocateSeatMutation()
 
-  // Build available seats list from hierarchy
-  const availableSeats: AvailableSeat[] = (seatMatrix as BuildingWithFlats[]).flatMap(
-    (b: BuildingWithFlats) =>
-      (b.flats || []).flatMap((f: FlatWithRooms) =>
-        (f.rooms || []).flatMap((r: RoomWithSeats) =>
-          (r.seats || [])
-            .filter((s) => s.status === 'AVAILABLE' || s.id === preSelectedSeatId)
-            .map((s) => ({
-              ...s,
-              buildingName: b.name,
-              flatCode: f.flat_code,
-              roomName: r.name,
-            }))
+  // Build available seats list from hierarchy (memoized to prevent infinite re-render cycles)
+  const availableSeats: AvailableSeat[] = useMemo(() => {
+    return (seatMatrix as BuildingWithFlats[]).flatMap(
+      (b: BuildingWithFlats) =>
+        (b.flats || []).flatMap((f: FlatWithRooms) =>
+          (f.rooms || []).flatMap((r: RoomWithSeats) =>
+            (r.seats || [])
+              .filter((s) => s.status === 'AVAILABLE' || s.id === preSelectedSeatId)
+              .map((s) => ({
+                ...s,
+                buildingName: b.name,
+                flatCode: f.flat_code,
+                roomName: r.name,
+              }))
+          )
         )
-      )
-  )
+    )
+  }, [seatMatrix, preSelectedSeatId])
 
-  // Eligible boarders: ACTIVE without an active allocation
-  const eligibleBoarders = boarders.filter(
-    (b) => !b.active_allocation || b.id === preSelectedBoarderId
-  )
+  // Eligible boarders: Either active boarder without a seat, or pending applicant awaiting allocation
+  const eligibleBoarders = useMemo(() => {
+    return allBoarders.filter(
+      (b) =>
+        b.id === preSelectedBoarderId ||
+        (b.status === 'ACTIVE' && !b.active_allocation) ||
+        b.status === 'PENDING'
+    )
+  }, [allBoarders, preSelectedBoarderId])
 
+  // Form initialization: only execute when modal opens or preSelected props change
   useEffect(() => {
     if (isOpen) {
       setErrorMsg(null)
       setIsSuccess(false)
       setSelectedSeatId(preSelectedSeatId || '')
       setSelectedBoarderId(preSelectedBoarderId || '')
+    }
+  }, [isOpen, preSelectedSeatId, preSelectedBoarderId])
 
-      if (preSelectedSeatId) {
-        const seat = availableSeats.find((s) => s.id === preSelectedSeatId)
-        if (seat) setMonthlyRent(seat.default_rent)
+  // Automatically update default rent when selected seat changes
+  useEffect(() => {
+    if (selectedSeatId && availableSeats.length > 0) {
+      const seat = availableSeats.find((s) => s.id === selectedSeatId)
+      if (seat && seat.default_rent) {
+        setMonthlyRent(seat.default_rent)
       }
     }
-  }, [isOpen, preSelectedSeatId, preSelectedBoarderId, availableSeats])
+  }, [selectedSeatId, availableSeats])
 
   const handleSeatChange = (seatId: string) => {
     setSelectedSeatId(seatId)
@@ -90,7 +103,7 @@ export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
     setErrorMsg(null)
 
     if (!selectedBoarderId) {
-      setErrorMsg('অনুগ্রহ করে একজন সক্রিয় বর্ডার নির্বাচন করুন।')
+      setErrorMsg('অনুগ্রহ করে একজন সক্রিয় বর্ডার বা অপেক্ষমান আবেদনকারী নির্বাচন করুন।')
       return
     }
     if (!selectedSeatId) {
@@ -143,11 +156,12 @@ export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
 
         {/* Boarder Selection */}
         <div className="space-y-1.5">
-          <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+          <label htmlFor="boarder-select" className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
             <User className="w-3.5 h-3.5 text-primary-400" />
             বর্ডার নির্বাচন করুন <span className="text-rose-400">*</span>
           </label>
           <select
+            id="boarder-select"
             value={selectedBoarderId}
             onChange={(e) => setSelectedBoarderId(e.target.value)}
             disabled={Boolean(preSelectedBoarderId)}
@@ -156,13 +170,16 @@ export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
             <option value="">বর্ডার নির্বাচন করুন...</option>
             {eligibleBoarders.map((b) => (
               <option key={b.id} value={b.id}>
-                {b.full_name} ({b.boarder_code}) — {b.phone_number}
+                {b.full_name} ({b.boarder_code}) — {b.status === 'PENDING' ? '⏳ অপেক্ষমান আবেদন' : '✅ সক্রিয় বোর্ডার'} — {b.phone_number}
               </option>
             ))}
           </select>
-          {eligibleBoarders.length === 0 && (
+          {isLoadingBoarders && (
+            <p className="text-[11px] text-slate-400 mt-1">বর্ডার তালিকা লোড হচ্ছে...</p>
+          )}
+          {!isLoadingBoarders && eligibleBoarders.length === 0 && (
             <p className="text-[11px] text-amber-400 mt-1">
-              বর্তমানে বরাদ্দহীন কোনো সক্রিয় বর্ডার নেই।
+              বর্তমানে বরাদ্দহীন কোনো সক্রিয় বর্ডার বা অপেক্ষমান আবেদনকারী নেই।
             </p>
           )}
         </div>
