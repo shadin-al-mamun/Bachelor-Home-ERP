@@ -612,7 +612,6 @@ export function useBoarders(filters?: BoarderFilters) {
         .from('boarders')
         .select(`
           *,
-          user:profiles(id, role, email),
           active_allocation:allocations(
             id,
             boarder_id,
@@ -642,10 +641,6 @@ export function useBoarders(filters?: BoarderFilters) {
         `)
         .order('created_at', { ascending: false })
 
-      if (filters?.status && filters.status !== 'ALL') {
-        query = query.eq('status', filters.status)
-      }
-
       if (filters?.search && filters.search.trim()) {
         const q = filters.search.trim()
         query = query.or(`full_name.ilike.%${q}%,phone_number.ilike.%${q}%,boarder_code.ilike.%${q}%`)
@@ -656,12 +651,9 @@ export function useBoarders(filters?: BoarderFilters) {
         console.warn('Supabase deep boarders fetch error, falling back to simple select:', error.message)
         let simpleQuery = supabase
           .from('boarders')
-          .select('*, user:profiles(id, role, email)')
+          .select('*')
           .order('created_at', { ascending: false })
 
-        if (filters?.status && filters.status !== 'ALL') {
-          simpleQuery = simpleQuery.eq('status', filters.status)
-        }
         if (filters?.search && filters.search.trim()) {
           const q = filters.search.trim()
           simpleQuery = simpleQuery.or(`full_name.ilike.%${q}%,phone_number.ilike.%${q}%,boarder_code.ilike.%${q}%`)
@@ -669,26 +661,89 @@ export function useBoarders(filters?: BoarderFilters) {
         const simpleRes = await simpleQuery
         if (simpleRes.error) {
           console.error('Supabase boarders fetch error:', simpleRes.error.message)
-          return []
+          data = []
+        } else {
+          data = simpleRes.data
         }
-        data = simpleRes.data
       }
 
-      // In live mode, strictly filter out any staff roles from boarder listings
-      const rawList = (data || []).map((b: any) => ({
+      // Fetch staff user IDs separately so administrative staff are NEVER shown as boarders
+      let staffUserIds = new Set<string>()
+      try {
+        const { data: staffProfiles } = await supabase
+          .from('profiles')
+          .select('id')
+          .in('role', STAFF_ROLES)
+        if (staffProfiles) {
+          staffProfiles.forEach((p: any) => staffUserIds.add(p.id))
+        }
+      } catch {
+        // Ignore
+      }
+
+      // Also fetch any newly self-registered applicants from public.profiles so they immediately appear in pending list
+      let pendingFromProfiles: BoarderWithRelations[] = []
+      try {
+        const { data: applicantProfiles } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('role', 'APPLICANT')
+
+        if (applicantProfiles && applicantProfiles.length > 0) {
+          const existingUserIds = new Set((data || []).map((b: any) => b.user_id).filter(Boolean))
+          const existingEmails = new Set((data || []).map((b: any) => b.email?.toLowerCase()).filter(Boolean))
+
+          applicantProfiles.forEach((p: any) => {
+            if (!existingUserIds.has(p.id) && !existingEmails.has(p.email?.toLowerCase())) {
+              pendingFromProfiles.push({
+                id: p.id,
+                user_id: p.id,
+                boarder_code: 'APP-' + p.id.slice(0, 6).toUpperCase(),
+                full_name: p.full_name || 'নতুন আবেদনকারী',
+                phone_number: p.phone_number || '',
+                email: p.email,
+                guardian_name: 'অভিভাবক (প্রোফাইল)',
+                guardian_phone: p.phone_number || '',
+                permanent_address: 'ঠিকানা অপেক্ষমান',
+                admission_date: p.created_at ? p.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+                status: 'PENDING',
+                remarks: 'অনলাইন রেজিস্ট্রেশন পোর্টাল থেকে নতুন আবেদন এসেছে।',
+                created_at: p.created_at,
+                updated_at: p.updated_at,
+                active_allocation: null,
+                charges: [],
+                allocation_history: [],
+              })
+            }
+          })
+        }
+      } catch (err) {
+        console.warn('Could not check applicant profiles:', err)
+      }
+
+      // Merge genuine boarders with any pending applicant profiles
+      const rawList = [...(data || []), ...pendingFromProfiles].map((b: any) => ({
         ...b,
         active_allocation: Array.isArray(b.active_allocation)
           ? b.active_allocation.find((a: any) => a.status === 'ACTIVE') || null
           : b.active_allocation,
       }))
 
-      return rawList.filter((b: any) => {
-        // Superadmin, admin, manager, accountant, meal operator, auditor should NEVER be listed as boarders
-        if (b.user && STAFF_ROLES.includes(b.user.role)) return false
+      // Strictly filter out staff users and super admin test records
+      const filteredList = rawList.filter((b: any) => {
+        if (b.user_id && staffUserIds.has(b.user_id)) return false
         if (b.boarder_code === 'BDR-2026-4071') return false
         if (b.email === 'shadin0158@gmail.com') return false
         return true
       })
+
+      // Apply status filter if set
+      let result = filteredList
+      if (filters?.status && filters.status !== 'ALL') {
+        result = result.filter((b) => b.status === filters.status)
+      }
+
+      return result
     },
     refetchInterval: 3000, // Poll every 3 seconds for instant cross-device updates
     refetchOnWindowFocus: true,
@@ -713,7 +768,6 @@ export function useBoarder(id?: string) {
         .from('boarders')
         .select(`
           *,
-          user:profiles(id, role, email),
           active_allocation:allocations(
             id,
             boarder_id,
@@ -755,19 +809,45 @@ export function useBoarder(id?: string) {
           )
         `)
         .eq('id', id!)
-        .single()
+        .maybeSingle()
 
-      if (error) {
+      if (error || !data) {
+        // Fallback: Check if id is an applicant in public.profiles
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', id!)
+          .maybeSingle()
+
+        if (profileData && profileData.role === 'APPLICANT') {
+          return {
+            id: profileData.id,
+            user_id: profileData.id,
+            boarder_code: 'APP-' + profileData.id.slice(0, 6).toUpperCase(),
+            full_name: profileData.full_name || 'নতুন আবেদনকারী',
+            phone_number: profileData.phone_number || '',
+            email: profileData.email,
+            guardian_name: 'অভিভাবক (প্রোফাইল)',
+            guardian_phone: profileData.phone_number || '',
+            permanent_address: 'ঠিকানা অপেক্ষমান',
+            admission_date: profileData.created_at ? profileData.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+            status: 'PENDING',
+            remarks: 'অনলাইন রেজিস্ট্রেশন পোর্টাল থেকে নতুন আবেদন এসেছে।',
+            created_at: profileData.created_at,
+            updated_at: profileData.updated_at,
+            active_allocation: null,
+            charges: [],
+            allocation_history: [],
+          }
+        }
+
         if (!isSupabaseConfigured) {
           const fallback = INITIAL_MOCK_BOARDERS.find((b) => b.id === id)
           if (fallback) return fallback
         }
-        throw error
+        throw new Error('বোর্ডার প্রোফাইল পাওয়া যায়নি।')
       }
 
-      if (data?.user && STAFF_ROLES.includes(data.user.role)) {
-        throw new Error('এই প্রোফাইলটি একজন প্রশাসনিক কর্মকর্তার। তিনি আবাসিক বোর্ডার নন।')
-      }
       if (data?.boarder_code === 'BDR-2026-4071' || data?.email === 'shadin0158@gmail.com') {
         throw new Error('প্রশাসনিক কর্মকর্তা প্রোফাইল বোর্ডার তালিকায় অন্তর্ভুক্ত নয়।')
       }
