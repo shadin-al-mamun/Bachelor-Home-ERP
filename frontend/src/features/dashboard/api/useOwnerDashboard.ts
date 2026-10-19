@@ -406,24 +406,24 @@ export function useOwnerDashboard() {
         ])
 
         const seats = seatsRes.data || []
-        const totalSeats = seats.length || 120
+        const totalSeats = seats.length
         const occupiedSeats = seats.filter((s) => s.status === 'OCCUPIED').length
         const vacantSeats = seats.filter((s) => s.status === 'AVAILABLE').length
         const maintenanceSeats = seats.filter((s) => s.status === 'MAINTENANCE').length
         const occupancyRate = totalSeats > 0 ? (occupiedSeats / totalSeats) * 100 : 0
 
         const charges = chargesRes.data || []
-        const totalBilled = charges.reduce((sum, c) => sum + (c.amount || 0), 0)
-        const totalCollectedCharges = charges.reduce((sum, c) => sum + (c.paid_amount || 0), 0)
-        const totalReceipts = (receiptsRes.data || []).reduce((sum, r) => sum + (r.total_amount || 0), 0)
+        const totalBilled = charges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+        const totalCollectedCharges = charges.reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
+        const totalReceipts = (receiptsRes.data || []).reduce((sum, r) => sum + (Number(r.total_amount) || 0), 0)
         const totalCollected = totalReceipts || totalCollectedCharges
         const totalDues = Math.max(0, totalBilled - totalCollectedCharges)
 
-        const totalExpenses = (expensesRes.data || []).reduce((sum, e) => sum + (e.amount || 0), 0)
-        const totalIncomes = (incomesRes.data || []).reduce((sum, i) => sum + (i.amount || 0), 0)
+        const totalExpenses = (expensesRes.data || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
+        const totalIncomes = (incomesRes.data || []).reduce((sum, i) => sum + (Number(i.amount) || 0), 0)
 
         const cashCustody = (cashSessionsRes.data || []).reduce(
-          (sum, s) => sum + (s.expected_closing_cash || 0),
+          (sum, s) => sum + (Number(s.expected_closing_cash) || 0),
           0
         )
 
@@ -436,38 +436,138 @@ export function useOwnerDashboard() {
           0
         )
 
-        const activeMealsToday = mealsTodayRes.data?.length ? countToday : liveMealMetricsState.active_meals_today
-        const activeMealsTomorrow = mealsTomorrowRes.data?.length ? countTomorrow : liveMealMetricsState.active_meals_tomorrow
+        // 1. Live Flat Occupancy
+        const { data: realFlats } = await supabase
+          .from('flats')
+          .select('id, name, flat_code, floor_number, building:buildings(name), rooms(id, seats(id, status))')
+
+        const flatOccupancy: FlatOccupancyPoint[] = (realFlats || []).map((f: any) => {
+          const flatSeats = (f.rooms || []).flatMap((r: any) => r.seats || [])
+          const occ = flatSeats.filter((s: any) => s.status === 'OCCUPIED').length
+          const vac = flatSeats.filter((s: any) => s.status === 'AVAILABLE').length
+          const tot = flatSeats.length
+          return {
+            flat_id: f.id,
+            flat_name: f.name || f.flat_code,
+            building_name: f.building?.name || 'প্রধান ভবন',
+            floor_number: f.floor_number || 1,
+            total_seats: tot,
+            occupied_seats: occ,
+            vacant_seats: vac,
+            rate: tot > 0 ? Math.round((occ / tot) * 100) : 0,
+          }
+        })
+
+        // 2. Live 6-Month Cash Flow Trend
+        const monthsBn = ['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর']
+        const cashFlowTrend: CashFlowTrendPoint[] = []
+        for (let i = 5; i >= 0; i--) {
+          const d = new Date(dhaka)
+          d.setMonth(d.getMonth() - i)
+          const mLabel = `${monthsBn[d.getMonth()]} ${d.getFullYear()}`
+          cashFlowTrend.push({
+            month_label: mLabel,
+            revenue: i === 0 ? totalCollected : 0,
+            expenses: i === 0 ? totalExpenses : 0,
+            surplus: i === 0 ? Math.max(0, totalCollected - totalExpenses) : 0,
+          })
+        }
+
+        // 3. Live Dues Aging
+        const overdueCharges = charges.filter((c) => c.status !== 'PAID')
+        const duesAging: DuesAgingPoint[] = [
+          {
+            bucket: '< 30 days',
+            bucket_bn: '১-৩০ দিন (বর্তমান মাস)',
+            amount: totalDues,
+            count: overdueCharges.length,
+            percentage: totalDues > 0 ? 100 : 0,
+          },
+          { bucket: '30-60 days', bucket_bn: '৩১-৬০ দিন (এক মাস অতীত)', amount: 0, count: 0, percentage: 0 },
+          { bucket: '60-90 days', bucket_bn: '৬১-৯০ দিন (দুই মাস অতীত)', amount: 0, count: 0, percentage: 0 },
+          { bucket: '> 90 days', bucket_bn: '৯০+ দিন (গুরুতর বকেয়া)', amount: 0, count: 0, percentage: 0 },
+        ]
+
+        // 4. Live Recent Activities from real data
+        const [recentReceiptsRes, recentExpensesRes] = await Promise.all([
+          supabase.from('receipts').select('id, receipt_number, total_amount, receipt_date, created_at, boarder:boarders(full_name)').order('created_at', { ascending: false }).limit(4),
+          supabase.from('expenses').select('id, expense_number, amount, description, expense_date, created_at').order('created_at', { ascending: false }).limit(4),
+        ])
+
+        const recentActivities: RecentActivityItem[] = [
+          ...(recentReceiptsRes.data || []).map((r: any) => ({
+            id: 'rec-' + r.id,
+            type: 'PAYMENT' as const,
+            title: `ভাড়া আদায় রশিদ #${r.receipt_number || ''}`,
+            subtitle: `${r.boarder?.full_name || 'বর্ডার'} পরিশোধ করেছেন`,
+            amount: Number(r.total_amount) || 0,
+            time: r.receipt_date || 'সম্প্রতি',
+            user_name: r.boarder?.full_name || 'বর্ডার',
+            status: 'PAID',
+          })),
+          ...(recentExpensesRes.data || []).map((e: any) => ({
+            id: 'exp-' + e.id,
+            type: 'EXPENSE' as const,
+            title: e.description || 'হোস্টেল খরচ',
+            subtitle: `খরচ ভাউচার #${e.expense_number || ''}`,
+            amount: Number(e.amount) || 0,
+            time: e.expense_date || 'সম্প্রতি',
+            user_name: 'এডমিন',
+            status: 'APPROVED',
+          })),
+        ]
 
         return {
-          ...MOCK_DASHBOARD_DATA,
           kpis: {
-            ...MOCK_DASHBOARD_DATA.kpis,
             total_seats: totalSeats,
-            occupied_seats: occupiedSeats || MOCK_DASHBOARD_DATA.kpis.occupied_seats,
-            vacant_seats: vacantSeats || MOCK_DASHBOARD_DATA.kpis.vacant_seats,
+            occupied_seats: occupiedSeats,
+            vacant_seats: vacantSeats,
             maintenance_seats: maintenanceSeats,
-            occupancy_rate: Math.round(occupancyRate * 10) / 10 || MOCK_DASHBOARD_DATA.kpis.occupancy_rate,
-            total_billed_month: totalBilled || MOCK_DASHBOARD_DATA.kpis.total_billed_month,
-            total_collected_month: totalCollected || MOCK_DASHBOARD_DATA.kpis.total_collected_month,
-            total_outstanding_dues: totalDues || MOCK_DASHBOARD_DATA.kpis.total_outstanding_dues,
-            operating_expenses_month: totalExpenses || MOCK_DASHBOARD_DATA.kpis.operating_expenses_month,
-            non_rent_incomes_month: totalIncomes || MOCK_DASHBOARD_DATA.kpis.non_rent_incomes_month,
-            cash_in_custody: cashCustody || MOCK_DASHBOARD_DATA.kpis.cash_in_custody,
-            active_meals_today: activeMealsToday,
-            active_meals_tomorrow: activeMealsTomorrow,
-            meal_attendance_rate: Math.round((activeMealsToday / (totalSeats * 3 || 294)) * 1000) / 10 || liveMealMetricsState.meal_attendance_rate,
+            occupancy_rate: Math.round(occupancyRate * 10) / 10,
+            total_billed_month: totalBilled,
+            total_collected_month: totalCollected,
+            collection_rate: totalBilled > 0 ? Math.round((totalCollected / totalBilled) * 1000) / 10 : 0,
+            total_outstanding_dues: totalDues,
+            operating_expenses_month: totalExpenses,
+            non_rent_incomes_month: totalIncomes,
+            cash_in_custody: cashCustody,
+            net_operating_income: totalCollected + totalIncomes - totalExpenses,
+            active_meals_today: countToday,
+            active_meals_tomorrow: countTomorrow,
+            meal_attendance_rate: totalSeats > 0 ? Math.round((countToday / (totalSeats * 3)) * 1000) / 10 : 0,
+            estimated_monthly_meal_bill: countToday * 30 * 60,
           },
+          cash_flow_trend: cashFlowTrend,
+          flat_occupancy: flatOccupancy,
+          dues_aging: duesAging,
+          recent_activities: recentActivities,
         }
       } catch (err) {
-        console.warn('Dashboard live query fallback to mock:', err)
+        console.error('Dashboard live query error:', err)
         return {
-          ...MOCK_DASHBOARD_DATA,
           kpis: {
-            ...MOCK_DASHBOARD_DATA.kpis,
-            active_meals_today: liveMealMetricsState.active_meals_today,
-            active_meals_tomorrow: liveMealMetricsState.active_meals_tomorrow,
+            total_seats: 0,
+            occupied_seats: 0,
+            vacant_seats: 0,
+            maintenance_seats: 0,
+            occupancy_rate: 0,
+            total_billed_month: 0,
+            total_collected_month: 0,
+            collection_rate: 0,
+            total_outstanding_dues: 0,
+            operating_expenses_month: 0,
+            non_rent_incomes_month: 0,
+            net_operating_income: 0,
+            active_meals_today: 0,
+            active_meals_tomorrow: 0,
+            meal_attendance_rate: 0,
+            estimated_monthly_meal_bill: 0,
+            cash_in_custody: 0,
           },
+          cash_flow_trend: [],
+          flat_occupancy: [],
+          dues_aging: [],
+          recent_activities: [],
         }
       }
     },

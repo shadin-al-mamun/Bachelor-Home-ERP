@@ -379,6 +379,9 @@ export async function fetchRemoteBoarders(): Promise<BoarderWithRelations[] | nu
 }
 
 export function getStoredBoarders(): BoarderWithRelations[] {
+  if (isSupabaseConfigured) {
+    return []
+  }
   try {
     const raw = localStorage.getItem(BOARDERS_STORAGE_KEY)
     if (raw) {
@@ -546,11 +549,12 @@ export function useBoarders(filters?: BoarderFilters) {
         return result
       }
 
+      // --- When Supabase is configured: Query Real Supabase Database ---
       let query = supabase
         .from('boarders')
         .select(`
           *,
-          active_allocation:allocations!allocations_boarder_id_fkey(
+          active_allocation:allocations(
             id,
             boarder_id,
             seat_id,
@@ -588,17 +592,30 @@ export function useBoarders(filters?: BoarderFilters) {
         query = query.or(`full_name.ilike.%${q}%,phone_number.ilike.%${q}%,boarder_code.ilike.%${q}%`)
       }
 
-      const { data, error } = await query
+      let { data, error } = await query
       if (error) {
-        console.warn('Supabase boarders fetch failed, using remote/stored local data:', error.message)
-        const remote = await fetchRemoteBoarders()
-        let result = remote || getStoredBoarders()
+        console.warn('Supabase deep boarders fetch error, falling back to simple select:', error.message)
+        let simpleQuery = supabase
+          .from('boarders')
+          .select('*')
+          .order('created_at', { ascending: false })
+
         if (filters?.status && filters.status !== 'ALL') {
-          result = result.filter((b) => b.status === filters.status)
+          simpleQuery = simpleQuery.eq('status', filters.status)
         }
-        return result
+        if (filters?.search && filters.search.trim()) {
+          const q = filters.search.trim()
+          simpleQuery = simpleQuery.or(`full_name.ilike.%${q}%,phone_number.ilike.%${q}%,boarder_code.ilike.%${q}%`)
+        }
+        const simpleRes = await simpleQuery
+        if (simpleRes.error) {
+          console.error('Supabase boarders fetch error:', simpleRes.error.message)
+          return []
+        }
+        data = simpleRes.data
       }
 
+      // In live mode, NEVER fall back to fake mock data
       return (data || []).map((b: any) => ({
         ...b,
         active_allocation: Array.isArray(b.active_allocation)
@@ -627,7 +644,7 @@ export function useBoarder(id?: string) {
         .from('boarders')
         .select(`
           *,
-          active_allocation:allocations!allocations_boarder_id_fkey(
+          active_allocation:allocations(
             id,
             boarder_id,
             seat_id,
@@ -671,8 +688,10 @@ export function useBoarder(id?: string) {
         .single()
 
       if (error) {
-        const fallback = INITIAL_MOCK_BOARDERS.find((b) => b.id === id)
-        if (fallback) return fallback
+        if (!isSupabaseConfigured) {
+          const fallback = INITIAL_MOCK_BOARDERS.find((b) => b.id === id)
+          if (fallback) return fallback
+        }
         throw error
       }
 

@@ -132,11 +132,11 @@ export const useNotifications = () => {
         .limit(50)
 
       if (error) {
-        console.warn('Live notifications fetch failed, falling back to cached state:', error.message)
-        return inMemoryNotifications
+        console.warn('Live notifications fetch failed:', error.message)
+        return []
       }
 
-      return data as SystemNotification[]
+      return (data || []) as SystemNotification[]
     },
     refetchInterval: 15000, // Poll every 15s as fallback
   })
