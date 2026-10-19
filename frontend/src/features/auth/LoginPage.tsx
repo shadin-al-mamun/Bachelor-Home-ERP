@@ -466,68 +466,70 @@ export const LoginPage: React.FC = () => {
           </form>
         </Card>
 
-        {/* Quick Demo Credentials Panel */}
-        <div className="p-4 rounded-2xl glass border border-slate-800 text-xs space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 font-semibold text-slate-300">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>১-ক্লিকে টেস্ট ডেমো লগইন:</span>
+        {/* Quick Demo Credentials Panel (Only shown in offline demo mode) */}
+        {!isSupabaseConfigured && (
+          <div className="p-4 rounded-2xl glass border border-slate-800 text-xs space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 font-semibold text-slate-300">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>১-ক্লিকে টেস্ট ডেমো লগইন:</span>
+              </div>
+              <span className="text-[10px] text-primary-400 bg-primary-950/60 border border-primary-800/40 px-2 py-0.5 rounded-full">
+                মোবাইল ও পাসওয়ার্ড
+              </span>
             </div>
-            <span className="text-[10px] text-primary-400 bg-primary-950/60 border border-primary-800/40 px-2 py-0.5 rounded-full">
-              মোবাইল ও পাসওয়ার্ড
-            </span>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => handleQuickDemo('SUPER_ADMIN', '01711000000', 'admin@bachelorhome.erp')}
+                className="p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-primary-500/40 text-left transition-all group"
+              >
+                <div className="font-semibold text-white group-hover:text-primary-300 text-xs flex items-center justify-between">
+                  <span>এডমিন / মালিক</span>
+                  <span className="text-[10px] text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded">Admin</span>
+                </div>
+                <div className="text-[11px] text-slate-400 font-mono mt-0.5">📱 01711000000</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickDemo('MANAGER', '01800000001', 'manager@bachelorhome.erp')}
+                className="p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-primary-500/40 text-left transition-all group"
+              >
+                <div className="font-semibold text-white group-hover:text-primary-300 text-xs flex items-center justify-between">
+                  <span>ম্যানেজার তানভীর</span>
+                  <span className="text-[10px] text-indigo-400 bg-indigo-950/60 px-1.5 py-0.5 rounded">Manager</span>
+                </div>
+                <div className="text-[11px] text-slate-400 font-mono mt-0.5">📱 01800000001</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickDemo('BOARDER', '01711223344', 'tanvir.ahmed@example.com')}
+                className="p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-primary-500/40 text-left transition-all group"
+              >
+                <div className="font-semibold text-white group-hover:text-primary-300 text-xs flex items-center justify-between">
+                  <span>বর্ডার (তানভীর)</span>
+                  <span className="text-[10px] text-amber-400 bg-amber-950/60 px-1.5 py-0.5 rounded">Boarder</span>
+                </div>
+                <div className="text-[11px] text-slate-400 font-mono mt-0.5">📱 01711223344</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickDemo('BOARDER', '01912345678', 'rakibul.hasan@example.com')}
+                className="p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-primary-500/40 text-left transition-all group"
+              >
+                <div className="font-semibold text-white group-hover:text-primary-300 text-xs flex items-center justify-between">
+                  <span>বর্ডার (রাকিবুল)</span>
+                  <span className="text-[10px] text-amber-400 bg-amber-950/60 px-1.5 py-0.5 rounded">Boarder</span>
+                </div>
+                <div className="text-[11px] text-slate-400 font-mono mt-0.5">📱 01912345678</div>
+              </button>
+            </div>
           </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => handleQuickDemo('SUPER_ADMIN', '01711000000', 'admin@bachelorhome.erp')}
-              className="p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-primary-500/40 text-left transition-all group"
-            >
-              <div className="font-semibold text-white group-hover:text-primary-300 text-xs flex items-center justify-between">
-                <span>এডমিন / মালিক</span>
-                <span className="text-[10px] text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded">Admin</span>
-              </div>
-              <div className="text-[11px] text-slate-400 font-mono mt-0.5">📱 01711000000</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickDemo('MANAGER', '01800000001', 'manager@bachelorhome.erp')}
-              className="p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-primary-500/40 text-left transition-all group"
-            >
-              <div className="font-semibold text-white group-hover:text-primary-300 text-xs flex items-center justify-between">
-                <span>ম্যানেজার তানভীর</span>
-                <span className="text-[10px] text-indigo-400 bg-indigo-950/60 px-1.5 py-0.5 rounded">Manager</span>
-              </div>
-              <div className="text-[11px] text-slate-400 font-mono mt-0.5">📱 01800000001</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickDemo('BOARDER', '01711223344', 'tanvir.ahmed@example.com')}
-              className="p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-primary-500/40 text-left transition-all group"
-            >
-              <div className="font-semibold text-white group-hover:text-primary-300 text-xs flex items-center justify-between">
-                <span>বর্ডার (তানভীর)</span>
-                <span className="text-[10px] text-amber-400 bg-amber-950/60 px-1.5 py-0.5 rounded">Boarder</span>
-              </div>
-              <div className="text-[11px] text-slate-400 font-mono mt-0.5">📱 01711223344</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickDemo('BOARDER', '01912345678', 'rakibul.hasan@example.com')}
-              className="p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-primary-500/40 text-left transition-all group"
-            >
-              <div className="font-semibold text-white group-hover:text-primary-300 text-xs flex items-center justify-between">
-                <span>বর্ডার (রাকিবুল)</span>
-                <span className="text-[10px] text-amber-400 bg-amber-950/60 px-1.5 py-0.5 rounded">Boarder</span>
-              </div>
-              <div className="text-[11px] text-slate-400 font-mono mt-0.5">📱 01912345678</div>
-            </button>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   )

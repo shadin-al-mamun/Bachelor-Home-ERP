@@ -16,6 +16,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { useNotifications } from '@/features/notifications/api/useNotifications'
+import { isSupabaseConfigured } from '@/lib/supabaseClient'
 import type { SystemNotification, NotificationType } from '@/types/database'
 import { formatDhakaDate } from '@/utils/date'
 
@@ -324,15 +325,17 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ clas
               <span>রিয়েল-টাইম সিঙ্ক সক্রিয়</span>
             </div>
 
-            {/* QA Demo trigger for testing in review */}
-            <button
-              onClick={() => triggerDemoNotification('ALERT')}
-              className="flex items-center gap-1 text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors"
-              title="টেস্ট নোটিফিকেশন পুশ করুন"
-            >
-              <Sparkles className="w-3 h-3 text-amber-400" />
-              <span>টেস্ট অ্যালার্ট</span>
-            </button>
+            {/* QA Demo trigger for testing in review (hidden in live mode) */}
+            {!isSupabaseConfigured && (
+              <button
+                onClick={() => triggerDemoNotification('ALERT')}
+                className="flex items-center gap-1 text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors"
+                title="টেস্ট নোটিফিকেশন পুশ করুন"
+              >
+                <Sparkles className="w-3 h-3 text-amber-400" />
+                <span>টেস্ট অ্যালার্ট</span>
+              </button>
+            )}
           </div>
         </div>
       )}
