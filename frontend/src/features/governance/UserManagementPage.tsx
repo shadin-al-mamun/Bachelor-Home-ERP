@@ -38,16 +38,22 @@ export const UserManagementPage: React.FC = () => {
   const [roleFilter, setRoleFilter] = useState('ALL')
   const [selectedUserForFlats, setSelectedUserForFlats] = useState<UserManagementItem | null>(null)
 
-  const { data: rawUsers, isLoading } = useUsersList(searchQuery, roleFilter === 'STAFF' ? undefined : roleFilter)
+  const { data: rawUsers = [], isLoading, isError } = useUsersList(searchQuery)
   const updateRoleMutation = useUpdateUserRoleAndStatus()
 
-  // Filter staff roles when 'STAFF' filter is selected
+  // Calculate live counts for all categories
+  const totalCount = rawUsers.length
+  const staffCount = rawUsers.filter((u) => STAFF_ROLE_KEYS.includes(u.role)).length
+  const boarderCount = rawUsers.filter((u) => u.role === 'BOARDER').length
+  const applicantCount = rawUsers.filter((u) => u.role === 'APPLICANT').length
+
+  // Filter users based on selected role tab
   const users = React.useMemo(() => {
-    if (!rawUsers) return []
+    if (roleFilter === 'ALL') return rawUsers
     if (roleFilter === 'STAFF') {
       return rawUsers.filter((u) => STAFF_ROLE_KEYS.includes(u.role))
     }
-    return rawUsers
+    return rawUsers.filter((u) => u.role === roleFilter)
   }, [rawUsers, roleFilter])
 
   // RBAC: Only SUPER_ADMIN can administer roles and user assignments
@@ -101,9 +107,11 @@ export const UserManagementPage: React.FC = () => {
         </div>
 
         <div className="px-4 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-right">
-          <span className="text-[10px] uppercase font-semibold text-slate-500 block">মোট নিবন্ধিত ইউজার</span>
+          <span className="text-[10px] uppercase font-semibold text-slate-500 block">
+            {roleFilter === 'ALL' ? 'মোট নিবন্ধিত ইউজার' : 'ফিল্টারকৃত ইউজার'}
+          </span>
           <span className="text-lg font-bold text-slate-100 font-mono">
-            {(users ?? []).length} জন
+            {users.length} জন
           </span>
         </div>
       </div>
@@ -131,13 +139,18 @@ export const UserManagementPage: React.FC = () => {
         <button
           type="button"
           onClick={() => setRoleFilter('ALL')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
             roleFilter === 'ALL'
               ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
               : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
           }`}
         >
-          সকল পদবী (All Users)
+          <span>সকল পদবী (All Users)</span>
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+            roleFilter === 'ALL' ? 'bg-indigo-800 text-indigo-100' : 'bg-slate-800 text-slate-400'
+          }`}>
+            {totalCount}
+          </span>
         </button>
         <button
           type="button"
@@ -149,28 +162,43 @@ export const UserManagementPage: React.FC = () => {
           }`}
         >
           <span>🛡️ কর্মকর্তা ও কর্মচারী (Staff Only)</span>
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+            roleFilter === 'STAFF' ? 'bg-purple-800 text-purple-100' : 'bg-slate-800 text-slate-400'
+          }`}>
+            {staffCount}
+          </span>
         </button>
         <button
           type="button"
           onClick={() => setRoleFilter('BOARDER')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
             roleFilter === 'BOARDER'
               ? 'bg-teal-600 text-white shadow-md shadow-teal-600/20'
               : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
           }`}
         >
-          🎓 আবাসিক বোর্ডার (Boarders)
+          <span>🎓 আবাসিক বোর্ডার (Boarders)</span>
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+            roleFilter === 'BOARDER' ? 'bg-teal-800 text-teal-100' : 'bg-slate-800 text-slate-400'
+          }`}>
+            {boarderCount}
+          </span>
         </button>
         <button
           type="button"
           onClick={() => setRoleFilter('APPLICANT')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
             roleFilter === 'APPLICANT'
               ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20'
               : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
           }`}
         >
-          📋 আবেদনকারী (Applicants)
+          <span>📋 আবেদনকারী (Applicants)</span>
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+            roleFilter === 'APPLICANT' ? 'bg-amber-800 text-amber-100' : 'bg-slate-800 text-slate-400'
+          }`}>
+            {applicantCount}
+          </span>
         </button>
       </div>
 
@@ -225,6 +253,13 @@ export const UserManagementPage: React.FC = () => {
                   <td colSpan={6} className="py-12 text-center text-slate-400">
                     <div className="inline-block w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-2" />
                     <p>ইউজার তালিকা লোড হচ্ছে...</p>
+                  </td>
+                </tr>
+              ) : isError ? (
+                <tr>
+                  <td colSpan={6} className="py-10 text-center text-rose-400">
+                    <p className="font-semibold text-sm">ইউজার ডাটাবেস লোড করতে সমস্যা হয়েছে।</p>
+                    <p className="text-xs text-slate-400 mt-1">দয়া করে পেজটি রিফ্রেশ করুন অথবা ডাটাবেস পারমিশন চেক করুন।</p>
                   </td>
                 </tr>
               ) : (users ?? []).length === 0 ? (

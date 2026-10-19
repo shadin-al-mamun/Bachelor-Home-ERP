@@ -186,3 +186,33 @@ BEGIN
     RETURN v_result;
 END;
 $$;
+
+GRANT EXECUTE ON FUNCTION public.submit_boarder_application TO anon, authenticated, service_role;
+
+
+-- 4. UNRESTRICTED RLS POLICIES FOR USER & STAFF MANAGEMENT
+GRANT SELECT, INSERT, UPDATE ON public.profiles TO anon, authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_flat_assignments TO anon, authenticated, service_role;
+
+DROP POLICY IF EXISTS profiles_select_policy ON public.profiles;
+CREATE POLICY profiles_select_policy ON public.profiles
+FOR SELECT TO authenticated, anon
+USING (true);
+
+DROP POLICY IF EXISTS profiles_update_policy ON public.profiles;
+CREATE POLICY profiles_update_policy ON public.profiles
+FOR UPDATE TO authenticated
+USING (true)
+WITH CHECK (true);
+
+DROP POLICY IF EXISTS user_flat_assignments_select ON public.user_flat_assignments;
+CREATE POLICY user_flat_assignments_select ON public.user_flat_assignments
+FOR SELECT TO authenticated, anon
+USING (true);
+
+DROP POLICY IF EXISTS user_flat_assignments_all ON public.user_flat_assignments;
+CREATE POLICY user_flat_assignments_all ON public.user_flat_assignments
+FOR ALL TO authenticated
+USING (true)
+WITH CHECK (true);
+
