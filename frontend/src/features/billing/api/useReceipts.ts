@@ -373,11 +373,11 @@ export function useVoidReceiptMutation() {
         MOCK_RECEIPTS = MOCK_RECEIPTS.map((r) =>
           r.id === params.receiptId
             ? {
-                ...r,
-                is_void: true,
-                void_reason: params.reason,
-                void_at: new Date().toISOString(),
-              }
+              ...r,
+              is_void: true,
+              void_reason: params.reason,
+              void_at: new Date().toISOString(),
+            }
             : r
         )
         return { success: true, message: 'রিসিপ্ট সফলভাবে বাতিল করা হয়েছে।' }
