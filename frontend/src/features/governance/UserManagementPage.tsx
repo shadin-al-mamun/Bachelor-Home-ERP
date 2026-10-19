@@ -131,7 +131,7 @@ export const UserManagementPage: React.FC = () => {
           className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 hover:bg-slate-800 text-amber-400 hover:text-amber-300 border border-amber-500/20 flex items-center gap-2 transition-colors whitespace-nowrap"
         >
           <Sparkles className="w-4 h-4" />
-          <span>হোস্টেল লোগো ও মোবাইল অ্যাপ ব্র্যান্ডিং</span>
+          <span>হোস্টেল লোগো ও ব্র্যান্ডিং ব্যবস্থাপনা</span>
         </Link>
         <Link
           to="/settings/audit-logs"

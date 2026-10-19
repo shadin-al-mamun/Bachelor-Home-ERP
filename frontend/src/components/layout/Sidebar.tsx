@@ -37,6 +37,7 @@ interface NavItem {
   href: string
   icon: React.ReactNode
   roles: string[]
+  badge?: string
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -82,10 +83,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       titleKey: 'nav.branding',
-      defaultTitle: 'লোগো ও ব্র্যান্ডিং',
+      defaultTitle: 'হোস্টেল লোগো ও ব্র্যান্ডিং ব্যবস্থাপনা',
       href: '/settings/branding',
       icon: <Sparkles className="w-5 h-5 shrink-0 text-amber-400" />,
       roles: ['SUPER_ADMIN', 'ADMIN'],
+      badge: 'নতুন',
     },
     {
       titleKey: 'nav.billing',
@@ -255,11 +257,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {!isCollapsed && (
                   <div className="flex items-center justify-between flex-1 min-w-0">
                     <span className="truncate">{label}</span>
-                    {hasPending && (
+                    {hasPending ? (
                       <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-slate-950 animate-pulse shrink-0">
                         {pendingBoarders.length}
                       </span>
-                    )}
+                    ) : item.badge ? (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0">
+                        {item.badge}
+                      </span>
+                    ) : null}
                   </div>
                 )}
               </NavLink>

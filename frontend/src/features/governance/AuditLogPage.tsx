@@ -10,6 +10,7 @@ import {
   User,
   Activity,
   Users,
+  Sparkles,
 } from 'lucide-react'
 import { useAuditLogs, useAuditActors, type AuditLogItem, type AuditLogFilters } from './api/useAuditLogs'
 import { AuditDiffModal } from './components/AuditDiffModal'
@@ -73,20 +74,27 @@ export const AuditLogPage: React.FC = () => {
       </div>
 
       {/* Governance Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+      <div className="flex items-center gap-2 border-b border-slate-800 pb-3 overflow-x-auto scrollbar-none">
         <Link
           to="/settings/users"
-          className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 flex items-center gap-2 transition-colors"
+          className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 flex items-center gap-2 transition-colors whitespace-nowrap"
         >
           <Users className="w-4 h-4 text-indigo-400" />
-          <span>ইউজার ও রোল পারমিশন (Users & Roles)</span>
+          <span>ইউজার ও রোল পারমিশন</span>
+        </Link>
+        <Link
+          to="/settings/branding"
+          className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 hover:bg-slate-800 text-amber-400 hover:text-amber-300 border border-amber-500/20 flex items-center gap-2 transition-colors whitespace-nowrap"
+        >
+          <Sparkles className="w-4 h-4" />
+          <span>হোস্টেল লোগো ও ব্র্যান্ডিং ব্যবস্থাপনা</span>
         </Link>
         <Link
           to="/settings/audit-logs"
-          className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 text-white shadow-lg shadow-rose-600/30 flex items-center gap-2"
+          className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 text-white shadow-lg shadow-rose-600/30 flex items-center gap-2 whitespace-nowrap"
         >
           <ShieldAlert className="w-4 h-4" />
-          <span>সিস্টেম অডিট ট্রেইল (Audit Logs)</span>
+          <span>সিস্টেম অডিট ট্রেইল</span>
         </Link>
       </div>
 

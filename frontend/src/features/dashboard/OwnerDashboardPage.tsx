@@ -97,6 +97,38 @@ export const OwnerDashboardPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Hostel Logo & Mobile App Branding Callout Banner */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-amber-950/20 to-slate-900 border border-amber-500/30 p-4 sm:p-5 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-600/10 border border-amber-500/40 text-amber-400 flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/10">
+            <Sparkles className="w-6 h-6 animate-pulse text-amber-400" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 uppercase tracking-wider">
+                হোস্টেল লোগো ও ব্র্যান্ডিং
+              </span>
+              <span className="text-xs text-slate-400 hidden sm:inline">• মোবাইল অ্যাপ আইকন ও ব্র্যান্ড নাম</span>
+            </div>
+            <h2 className="text-base sm:text-lg font-bold text-white mt-0.5">
+              হোস্টেল লোগো ও ব্র্যান্ডিং ব্যবস্থাপনা
+            </h2>
+            <p className="text-xs text-slate-300 mt-0.5 max-w-2xl">
+              আপনার হোস্টেলের নিজস্ব লোগো ও নাম সেট করুন। এটি সফটওয়্যারের হেডার, সাইডবার, মানি রিসিপ্ট এবং মোবাইলের হোমস্ক্রিন অ্যাপ আইকন হিসেবে প্রদর্শিত হবে।
+            </p>
+          </div>
+        </div>
+
+        <Link
+          to="/settings/branding"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all shrink-0 cursor-pointer self-start md:self-center"
+        >
+          <Sparkles className="w-4 h-4" />
+          <span>লোগো ও ব্র্যান্ডিং পরিবর্তন করুন</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </Link>
+      </div>
+
       {/* Pending Boarder Applications Section */}
       {pendingBoarders.length > 0 ? (
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-amber-950/70 via-slate-900 to-amber-950/60 border-2 border-amber-500/50 p-5 sm:p-6 shadow-2xl">

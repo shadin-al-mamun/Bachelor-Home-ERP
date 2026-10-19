@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
 import {
   Building2,
   Clock,
@@ -11,6 +12,7 @@ import {
   User,
   Shield,
   Menu,
+  Sparkles,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import { useBrandingStore } from '@/app/store/useBrandingStore'
@@ -78,8 +80,12 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
           </button>
         )}
 
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-primary-600 to-indigo-400 p-0.5 shadow-md shadow-primary-500/20 flex items-center justify-center overflow-hidden">
+        <Link
+          to={(profile?.role === 'SUPER_ADMIN' || profile?.role === 'ADMIN' || !profile?.role) ? '/settings/branding' : '/dashboard'}
+          className="flex items-center gap-2.5 group cursor-pointer select-none"
+          title="হোস্টেল লোগো ও ব্র্যান্ডিং ব্যবস্থাপনা"
+        >
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-primary-600 to-indigo-400 p-0.5 shadow-md shadow-primary-500/20 flex items-center justify-center overflow-hidden group-hover:scale-105 transition-transform">
             <div className="w-full h-full bg-slate-900 rounded-[10px] flex items-center justify-center overflow-hidden">
               {logoUrl ? (
                 <img src={logoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
@@ -89,14 +95,14 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
             </div>
           </div>
           <div>
-            <span className="font-bold text-sm sm:text-base text-white tracking-tight block">
+            <span className="font-bold text-sm sm:text-base text-white tracking-tight block group-hover:text-primary-300 transition-colors">
               {orgName || t('app.title')}
             </span>
             <span className="text-[10px] text-slate-400 block -mt-0.5">
               Asia/Dhaka ERP
             </span>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Right: Controls & Profile */}
@@ -177,6 +183,18 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
                 <Shield className="w-3.5 h-3.5 text-indigo-400" />
                 <span>Zero-Trust RLS Active</span>
               </div>
+
+              {/* Branding Link for Admins */}
+              {(profile?.role === 'SUPER_ADMIN' || profile?.role === 'ADMIN' || !profile?.role) && (
+                <Link
+                  to="/settings/branding"
+                  onClick={() => setIsUserMenuOpen(false)}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-amber-300 hover:bg-amber-500/10 hover:text-amber-200 transition-colors border border-amber-500/30 bg-amber-500/10"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span className="truncate">হোস্টেল লোগো ও ব্র্যান্ডিং</span>
+                </Link>
+              )}
 
               <button
                 onClick={() => {
