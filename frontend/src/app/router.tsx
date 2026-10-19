@@ -77,6 +77,7 @@ import MealSettingsPage from '@/features/meals/MealSettingsPage'
 import ReportsHubPage from '@/features/reports/ReportsHubPage'
 import AuditLogPage from '@/features/governance/AuditLogPage'
 import UserManagementPage from '@/features/governance/UserManagementPage'
+import BrandingSettingsPage from '@/features/settings/BrandingSettingsPage'
 
 
 export const router = createBrowserRouter([
@@ -250,6 +251,10 @@ export const router = createBrowserRouter([
       {
         path: 'settings/users',
         element: <UserManagementPage />,
+      },
+      {
+        path: 'settings/branding',
+        element: <BrandingSettingsPage />,
       },
       {
         path: 'settings/audit-logs',

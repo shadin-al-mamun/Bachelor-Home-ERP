@@ -17,8 +17,10 @@ import {
   Receipt,
   DollarSign,
   ArrowRightLeft,
+  Sparkles,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
+import { useBrandingStore } from '@/app/store/useBrandingStore'
 import { useBoarders } from '@/features/boarders/api/useBoarders'
 import { cn } from '@/utils/cn'
 
@@ -45,6 +47,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { t } = useTranslation()
   const { profile } = useAuthStore()
+  const { logoUrl, shortName } = useBrandingStore()
   const userRole = profile?.role || 'SUPER_ADMIN'
 
   // Master Navigation Items
@@ -75,6 +78,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       defaultTitle: 'কর্মকর্তা ও পদবী ব্যবস্থাপনা',
       href: '/settings/users',
       icon: <ShieldCheck className="w-5 h-5 shrink-0 text-indigo-400" />,
+      roles: ['SUPER_ADMIN', 'ADMIN'],
+    },
+    {
+      titleKey: 'nav.branding',
+      defaultTitle: 'লোগো ও ব্র্যান্ডিং',
+      href: '/settings/branding',
+      icon: <Sparkles className="w-5 h-5 shrink-0 text-amber-400" />,
       roles: ['SUPER_ADMIN', 'ADMIN'],
     },
     {
@@ -183,13 +193,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Sidebar Header */}
         <div className="h-16 px-4 flex items-center justify-between border-b border-slate-800/80 shrink-0">
           {!isCollapsed && (
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
-                <ShieldCheck className="w-4 h-4" />
+            <div className="flex items-center gap-2.5 overflow-hidden">
+              <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center overflow-hidden shrink-0">
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Logo" className="w-full h-full object-contain p-0.5" />
+                ) : (
+                  <ShieldCheck className="w-4 h-4 text-indigo-400" />
+                )}
               </div>
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                ERP Navigation
-              </span>
+              <div className="truncate">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-200 block truncate">
+                  {shortName || 'Bachelor Home'}
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono block">
+                  ERP Navigation
+                </span>
+              </div>
             </div>
           )}
 

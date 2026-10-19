@@ -1,18 +1,49 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192" fill="none">
-  <rect width="192" height="192" rx="40" fill="#0f172a"/>
-  <rect x="8" y="8" width="176" height="176" rx="32" stroke="url(#paint0_linear)" stroke-width="2"/>
-  <path d="M96 38L42 82V152C42 155.314 44.6863 158 48 158H82V116H110V158H144C147.314 158 150 155.314 150 152V82L96 38Z" fill="url(#paint1_linear)"/>
-  <circle cx="96" cy="74" r="10" fill="#38bdf8"/>
-  <rect x="62" y="102" width="16" height="20" rx="3" fill="#6366f1" fill-opacity="0.8"/>
-  <rect x="114" y="102" width="16" height="20" rx="3" fill="#6366f1" fill-opacity="0.8"/>
   <defs>
-    <linearGradient id="paint0_linear" x1="16" y1="16" x2="176" y2="176" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#6366f1"/>
-      <stop offset="1" stop-color="#06b6d4"/>
+    <linearGradient id="pwa_bg" x1="0" y1="0" x2="192" y2="192" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#070b14" />
+      <stop offset="50%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e1b4b" />
     </linearGradient>
-    <linearGradient id="paint1_linear" x1="42" y1="38" x2="150" y2="158" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#818cf8"/>
-      <stop offset="1" stop-color="#4f46e5"/>
+    <linearGradient id="pwa_border" x1="0" y1="0" x2="192" y2="192" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.9" />
+      <stop offset="50%" stop-color="#6366f1" stop-opacity="0.6" />
+      <stop offset="100%" stop-color="#a855f7" stop-opacity="0.9" />
+    </linearGradient>
+    <linearGradient id="pwa_primary" x1="30" y1="30" x2="160" y2="160" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#8b5cf6" />
+    </linearGradient>
+    <linearGradient id="pwa_accent" x1="40" y1="35" x2="150" y2="150" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#00f2fe" />
+      <stop offset="100%" stop-color="#4facfe" />
+    </linearGradient>
+    <linearGradient id="pwa_gold" x1="80" y1="40" x2="110" y2="80" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fde047" />
+      <stop offset="100%" stop-color="#f59e0b" />
     </linearGradient>
   </defs>
+
+  <!-- Background Squircle -->
+  <rect width="192" height="192" rx="42" fill="url(#pwa_bg)" />
+  <rect x="3" y="3" width="186" height="186" rx="39" stroke="url(#pwa_border)" stroke-width="2" fill="none" />
+
+  <!-- Architectural Crown / Roofline -->
+  <path d="M96 32 L150 74 L138 84 L96 52 L54 84 L42 74 Z" fill="url(#pwa_accent)" />
+
+  <!-- Monogram Pillars (B & H) -->
+  <rect x="54" y="74" width="14" height="72" rx="7" fill="url(#pwa_primary)" />
+  <rect x="124" y="74" width="14" height="72" rx="7" fill="url(#pwa_primary)" />
+  <rect x="64" y="104" width="64" height="12" rx="6" fill="url(#pwa_accent)" />
+
+  <!-- B Loops -->
+  <path d="M64 74 H88 C100 74 108 81 108 91 C108 101 100 108 88 108 H64" fill="none" stroke="url(#pwa_primary)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M64 106 H92 C104 106 112 113 112 124 C112 135 102 146 88 146 H64" fill="none" stroke="url(#pwa_primary)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Gold Apex Spark -->
+  <circle cx="96" cy="68" r="6" fill="url(#pwa_gold)" />
+
+  <!-- Micro Brand Label -->
+  <text x="96" y="168" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="800" fill="#f8fafc" letter-spacing="2" text-anchor="middle">BACHELOR HOME</text>
 </svg>

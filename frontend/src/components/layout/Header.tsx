@@ -13,6 +13,7 @@ import {
   Menu,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
+import { useBrandingStore } from '@/app/store/useBrandingStore'
 import { Badge, LanguageSwitcher } from '@/components/common'
 import { formatDhakaDate } from '@/utils/date'
 import NotificationDropdown from './NotificationDropdown'
@@ -24,10 +25,15 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
   const { t } = useTranslation()
   const { profile, signOut } = useAuthStore()
+  const { logoUrl, orgName, initializeBranding } = useBrandingStore()
   const [dhakaTime, setDhakaTime] = useState(formatDhakaDate(new Date(), 'hh:mm:ss A'))
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(true)
+
+  useEffect(() => {
+    initializeBranding()
+  }, [initializeBranding])
 
   // Live Dhaka Clock
   useEffect(() => {
@@ -73,14 +79,18 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
         )}
 
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-primary-600 to-indigo-400 p-0.5 shadow-md shadow-primary-500/20 flex items-center justify-center">
-            <div className="w-full h-full bg-slate-900 rounded-[10px] flex items-center justify-center">
-              <Building2 className="w-4 h-4 text-primary-400" />
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-primary-600 to-indigo-400 p-0.5 shadow-md shadow-primary-500/20 flex items-center justify-center overflow-hidden">
+            <div className="w-full h-full bg-slate-900 rounded-[10px] flex items-center justify-center overflow-hidden">
+              {logoUrl ? (
+                <img src={logoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
+              ) : (
+                <Building2 className="w-4 h-4 text-primary-400" />
+              )}
             </div>
           </div>
           <div>
             <span className="font-bold text-sm sm:text-base text-white tracking-tight block">
-              {t('app.title')}
+              {orgName || t('app.title')}
             </span>
             <span className="text-[10px] text-slate-400 block -mt-0.5">
               Asia/Dhaka ERP

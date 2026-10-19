@@ -386,8 +386,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'pwa-192x192.svg', 'pwa-512x512.svg'],
       manifest: {
-        name: 'Bachelor Home ERP',
-        short_name: 'HostelERP',
+        name: 'Bachelor Home',
+        short_name: 'Bachelor Home',
         description: 'Comprehensive Bachelor Home, Mess & Hostel Management ERP',
         theme_color: '#0f172a',
         background_color: '#0b1120',
