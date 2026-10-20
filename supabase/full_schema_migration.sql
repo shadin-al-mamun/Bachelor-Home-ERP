@@ -1631,6 +1631,38 @@ FOR INSERT TO authenticated
 WITH CHECK (public.current_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT'));
 
 -- 4.6 EXPENSES & INCOMES POLICIES
+DROP POLICY IF EXISTS expense_categories_select_policy ON public.expense_categories;
+CREATE POLICY expense_categories_select_policy ON public.expense_categories
+FOR SELECT TO authenticated, anon
+USING (true);
+
+DROP POLICY IF EXISTS expense_categories_insert_policy ON public.expense_categories;
+CREATE POLICY expense_categories_insert_policy ON public.expense_categories
+FOR INSERT TO authenticated
+WITH CHECK (true);
+
+DROP POLICY IF EXISTS expense_categories_update_policy ON public.expense_categories;
+CREATE POLICY expense_categories_update_policy ON public.expense_categories
+FOR UPDATE TO authenticated
+USING (true)
+WITH CHECK (true);
+
+DROP POLICY IF EXISTS income_categories_select_policy ON public.income_categories;
+CREATE POLICY income_categories_select_policy ON public.income_categories
+FOR SELECT TO authenticated, anon
+USING (true);
+
+DROP POLICY IF EXISTS income_categories_insert_policy ON public.income_categories;
+CREATE POLICY income_categories_insert_policy ON public.income_categories
+FOR INSERT TO authenticated
+WITH CHECK (true);
+
+DROP POLICY IF EXISTS income_categories_update_policy ON public.income_categories;
+CREATE POLICY income_categories_update_policy ON public.income_categories
+FOR UPDATE TO authenticated
+USING (true)
+WITH CHECK (true);
+
 DROP POLICY IF EXISTS expenses_select ON public.expenses;
 CREATE POLICY expenses_select ON public.expenses
 FOR SELECT TO authenticated

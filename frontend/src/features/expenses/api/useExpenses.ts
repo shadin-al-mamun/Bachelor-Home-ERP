@@ -55,15 +55,54 @@ export interface ReviewExpenseInput {
 // Mock Data Baseline (Realistic Hostel Operations in Dhaka)
 // ==============================================================================
 
-export const MOCK_EXPENSE_CATEGORIES: ExpenseCategory[] = [
+export const DEFAULT_EXPENSE_CATEGORIES: ExpenseCategory[] = [
   { id: 'cat-1', name: 'Electric Bill', description: 'মাসিক ডেসকো / ডিপিডিসি বিদ্যুৎ বিল', is_active: true, created_at: '2026-01-01T00:00:00Z' },
   { id: 'cat-2', name: 'Water & Gas', description: 'ওয়াসা পানি ও এলপি সিলিন্ডার গ্যাস রিফিল', is_active: true, created_at: '2026-01-01T00:00:00Z' },
   { id: 'cat-3', name: 'Internet & WiFi', description: 'উচ্চগতির ব্রডব্যান্ড ইন্টারনেট সাবস্ক্রিপশন', is_active: true, created_at: '2026-01-01T00:00:00Z' },
   { id: 'cat-4', name: 'Maintenance & Repairs', description: 'প্লাম্বিং, স্যানিটারি, বৈদ্যুতিক মেরামত ও রং কাজ', is_active: true, created_at: '2026-01-01T00:00:00Z' },
   { id: 'cat-5', name: 'Cook & Cleaner Salary', description: 'বাবুর্চি, সহকারী ও ক্লিনিং স্টাফদের বেতন', is_active: true, created_at: '2026-01-01T00:00:00Z' },
   { id: 'cat-6', name: 'Cleaning Supplies', description: 'হারপিক, ব্লিচিং, ফ্লোর ক্লিনার ও ময়লার ব্যাগ', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-  { id: 'cat-7', name: 'Miscellaneous', description: 'হোস্টেল পরিচালনার অন্যান্য আকস্মিক খরচ', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'cat-7', name: 'Dining & Grocery', description: 'হোস্টেল মেসের যৌথ ডাইনিং কাঁচাবাজার ও মুদি সামগ্রী', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'cat-8', name: 'Generator & Fuel', description: 'জরুরি পাওয়ার ব্যাকআপ ও জেনারেটরের ডিজেল খরচ', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'cat-9', name: 'Miscellaneous', description: 'হোস্টেল পরিচালনার অন্যান্য আকস্মিক খরচ', is_active: true, created_at: '2026-01-01T00:00:00Z' },
 ]
+
+export const MOCK_EXPENSE_CATEGORIES = DEFAULT_EXPENSE_CATEGORIES
+
+const EXPENSE_CATEGORIES_STORAGE_KEY = 'erp_custom_expense_categories'
+
+export function getStoredExpenseCategories(): ExpenseCategory[] {
+  let customCategories: ExpenseCategory[] = []
+  try {
+    const raw = typeof window !== 'undefined' ? localStorage.getItem(EXPENSE_CATEGORIES_STORAGE_KEY) : null
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) {
+        customCategories = parsed
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to parse custom expense categories:', err)
+  }
+
+  const existingNames = new Set(DEFAULT_EXPENSE_CATEGORIES.map((c) => c.name.toLowerCase()))
+  const validCustom = customCategories.filter(
+    (c) => c && c.name && !existingNames.has(c.name.toLowerCase())
+  )
+
+  return [...DEFAULT_EXPENSE_CATEGORIES, ...validCustom]
+}
+
+export function saveStoredExpenseCategory(category: ExpenseCategory) {
+  try {
+    const raw = typeof window !== 'undefined' ? localStorage.getItem(EXPENSE_CATEGORIES_STORAGE_KEY) : null
+    const existing: ExpenseCategory[] = raw ? JSON.parse(raw) : []
+    const updated = [...existing.filter((c) => c.id !== category.id), category]
+    localStorage.setItem(EXPENSE_CATEGORIES_STORAGE_KEY, JSON.stringify(updated))
+  } catch (err) {
+    console.error('Failed to save expense category to localStorage:', err)
+  }
+}
 
 export const MOCK_ACCOUNTS: FinancialAccount[] = [
   {
@@ -468,17 +507,27 @@ export function useExpenseCategories() {
     queryKey: ['expense-categories'],
     queryFn: async (): Promise<ExpenseCategory[]> => {
       if (!isSupabaseConfigured) {
-        return MOCK_EXPENSE_CATEGORIES
+        return getStoredExpenseCategories()
       }
 
-      const { data, error } = await supabase
-        .from('expense_categories')
-        .select('*')
-        .eq('is_active', true)
-        .order('name')
+      try {
+        const { data, error } = await supabase
+          .from('expense_categories')
+          .select('*')
+          .eq('is_active', true)
+          .order('name')
 
-      if (error) throw new Error(error.message)
-      return data || []
+        if (!error && data && data.length > 0) {
+          const stored = getStoredExpenseCategories()
+          const dbNames = new Set(data.map((d: any) => d.name.toLowerCase()))
+          const extra = stored.filter((s) => !dbNames.has(s.name.toLowerCase()))
+          return [...(data as ExpenseCategory[]), ...extra]
+        }
+      } catch (err) {
+        console.warn('Expense categories fetch error, falling back:', err)
+      }
+
+      return getStoredExpenseCategories()
     },
   })
 }
@@ -548,7 +597,8 @@ export function useRecordExpenseMutation() {
 
       if (!isSupabaseConfigured) {
         const voucherNo = `EXP-${Math.floor(5000 + MOCK_EXPENSES.length + 1).toString().padStart(6, '0')}`
-        const cat = MOCK_EXPENSE_CATEGORIES.find((c) => c.id === input.categoryId)
+        const categories = getStoredExpenseCategories()
+        const cat = categories.find((c) => c.id === input.categoryId)
         const acc = MOCK_ACCOUNTS.find((a) => a.id === input.sourceAccountId)
         const flat = MOCK_FLATS.find((f) => f.id === input.flatId)
 
@@ -674,3 +724,66 @@ export function useReviewExpenseMutation() {
     },
   })
 }
+
+export interface CreateExpenseCategoryInput {
+  name: string
+  description?: string
+  isActive?: boolean
+}
+
+export function useCreateExpenseCategoryMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: CreateExpenseCategoryInput): Promise<ExpenseCategory> => {
+      const trimmedName = input.name.trim()
+      if (!trimmedName) {
+        throw new Error('ক্যাটাগরির নাম দেওয়া আবশ্যক।')
+      }
+
+      const allCategories = getStoredExpenseCategories()
+      if (allCategories.some((c) => c.name.toLowerCase() === trimmedName.toLowerCase())) {
+        throw new Error(`"${trimmedName}" নামের ব্যয়ের খাত ইতিমধ্যে বিদ্যমান রয়েছে।`)
+      }
+
+      if (isSupabaseConfigured) {
+        try {
+          const { data, error } = await supabase
+            .from('expense_categories')
+            .insert({
+              name: trimmedName,
+              description: input.description?.trim() || null,
+              is_active: input.isActive ?? true,
+            })
+            .select()
+            .single()
+
+          if (!error && data) {
+            saveStoredExpenseCategory(data as ExpenseCategory)
+            return data as ExpenseCategory
+          }
+          if (error) {
+            console.warn('Supabase expense category insert error, fallback to local:', error)
+          }
+        } catch (err) {
+          console.warn('Supabase expense category insert exception:', err)
+        }
+      }
+
+      const newCategory: ExpenseCategory = {
+        id: `cat-${Date.now()}`,
+        name: trimmedName,
+        description: input.description?.trim() || null,
+        is_active: input.isActive ?? true,
+        created_at: new Date().toISOString(),
+      }
+
+      saveStoredExpenseCategory(newCategory)
+      return newCategory
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expense-categories'] })
+    },
+  })
+}
+

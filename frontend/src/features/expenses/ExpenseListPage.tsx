@@ -15,6 +15,7 @@ import {
   X,
   RotateCw,
   Copy,
+  FolderPlus,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import {
@@ -28,6 +29,7 @@ import {
 import AddExpenseModal from './components/AddExpenseModal'
 import VoucherPreviewModal from './components/VoucherPreviewModal'
 import ExpenseRejectModal from './components/ExpenseRejectModal'
+import { ManageCategoriesModal } from '@/features/finance/components/ManageCategoriesModal'
 
 export const ExpenseListPage: React.FC = () => {
   const { profile } = useAuthStore()
@@ -42,6 +44,7 @@ export const ExpenseListPage: React.FC = () => {
 
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
   const [previewExpense, setPreviewExpense] = useState<ExtendedExpense | null>(null)
   const [rejectExpense, setRejectExpense] = useState<ExtendedExpense | null>(null)
   const [copiedVoucher, setCopiedVoucher] = useState<string | null>(null)
@@ -152,6 +155,16 @@ export const ExpenseListPage: React.FC = () => {
             title="রিফ্রেশ করুন"
           >
             <RotateCw className={`w-4 h-4 ${isRefetching ? 'animate-spin text-indigo-400' : ''}`} />
+          </button>
+
+          <button
+            onClick={() => setIsCategoryModalOpen(true)}
+            className="px-3.5 py-2.5 rounded-xl bg-slate-900 border border-indigo-500/30 hover:bg-slate-800 text-indigo-300 font-semibold text-xs flex items-center gap-2 transition-all shadow-sm active:scale-[0.98]"
+            title="ব্যয়ের খাত ব্যবস্থাপনা ও নতুন ক্যাটাগরি তৈরি"
+          >
+            <FolderPlus className="w-4 h-4 text-indigo-400" />
+            <span className="hidden sm:inline">খাত / ক্যাটাগরি তৈরি</span>
+            <span className="sm:hidden">খাত তৈরি</span>
           </button>
 
           <button
@@ -534,6 +547,13 @@ export const ExpenseListPage: React.FC = () => {
         onClose={() => setRejectExpense(null)}
         onConfirmReject={handleConfirmReject}
         isLoading={reviewMutation.isPending}
+      />
+
+      {/* Category Management Modal */}
+      <ManageCategoriesModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        initialType="EXPENSE"
       />
     </div>
   )

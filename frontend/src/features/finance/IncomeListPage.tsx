@@ -12,6 +12,7 @@ import {
   Users,
   Sparkles,
   TrendingUp,
+  FolderPlus,
 } from 'lucide-react'
 import {
   useIncomes,
@@ -20,6 +21,7 @@ import {
 } from './api/useFinance'
 import { useExpenseAccounts, useExpenseFlats } from '@/features/expenses/api/useExpenses'
 import AddIncomeModal from './components/AddIncomeModal'
+import { ManageCategoriesModal } from './components/ManageCategoriesModal'
 
 export const IncomeListPage: React.FC = () => {
   // Filter States
@@ -31,6 +33,7 @@ export const IncomeListPage: React.FC = () => {
 
   // Modals & Copy
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
   const [copiedVoucher, setCopiedVoucher] = useState<string | null>(null)
 
   const filters: IncomeFilters = useMemo(
@@ -114,6 +117,16 @@ export const IncomeListPage: React.FC = () => {
             title="রিফ্রেশ করুন"
           >
             <RotateCw className={`w-4 h-4 ${isRefetching ? 'animate-spin text-emerald-400' : ''}`} />
+          </button>
+
+          <button
+            onClick={() => setIsCategoryModalOpen(true)}
+            className="px-3.5 py-2.5 rounded-xl bg-slate-900 border border-emerald-500/30 hover:bg-slate-800 text-emerald-300 font-semibold text-xs flex items-center gap-2 transition-all shadow-sm active:scale-[0.98]"
+            title="আয়ের খাত ব্যবস্থাপনা ও নতুন ক্যাটাগরি তৈরি"
+          >
+            <FolderPlus className="w-4 h-4 text-emerald-400" />
+            <span className="hidden sm:inline">খাত / ক্যাটাগরি তৈরি</span>
+            <span className="sm:hidden">খাত তৈরি</span>
           </button>
 
           <button
@@ -396,6 +409,13 @@ export const IncomeListPage: React.FC = () => {
       <AddIncomeModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
+      />
+
+      {/* Category Management Modal */}
+      <ManageCategoriesModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        initialType="INCOME"
       />
     </div>
   )

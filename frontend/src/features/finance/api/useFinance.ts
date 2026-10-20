@@ -64,13 +64,52 @@ export interface RecordTransferInput {
 // Mock Data Baseline (Realistic Non-Rent Revenue & Cash Movements)
 // ==============================================================================
 
-export const MOCK_INCOME_CATEGORIES: IncomeCategory[] = [
+export const DEFAULT_INCOME_CATEGORIES: IncomeCategory[] = [
   { id: 'inc-cat-1', name: 'Guest Stay Fee', description: 'মেহমান/অতিথিদের দৈনিক থাকার ফি', is_active: true, created_at: '2026-01-01T00:00:00Z' },
   { id: 'inc-cat-2', name: 'Scrap Sale', description: 'পুরাতন কার্টন, খবরের কাগজ ও লোহালক্কড় বিক্রয়লব্ধ আয়', is_active: true, created_at: '2026-01-01T00:00:00Z' },
   { id: 'inc-cat-3', name: 'Hall & Space Usage', description: 'কমন স্পেস বা রিডিং রুম বিশেষ ইভেন্ট বুকিং ফি', is_active: true, created_at: '2026-01-01T00:00:00Z' },
   { id: 'inc-cat-4', name: 'WiFi Extra Device Fee', description: 'বর্ডারদের অতিরিক্ত ল্যাপটপ/ডিভাইস সংযোগ চার্জ', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-  { id: 'inc-cat-5', name: 'Miscellaneous', description: 'অন্যান্য আনুষঙ্গিক রাজস্ব ও নন-রেন্ট প্রাপ্তি', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'inc-cat-5', name: 'Fridge & Appliance Fee', description: 'ব্যক্তিগত অতিরিক্ত হিটার/ফ্রিজ ব্যবহারের বিশেষ চার্জ', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'inc-cat-6', name: 'Late Payment Fine', description: 'মাসিক ভাড়া নির্ধারিত সময়ের পরে জমার বিলম্ব জরিমানা', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'inc-cat-7', name: 'Miscellaneous', description: 'অন্যান্য আনুষঙ্গিক রাজস্ব ও নন-রেন্ট প্রাপ্তি', is_active: true, created_at: '2026-01-01T00:00:00Z' },
 ]
+
+export const MOCK_INCOME_CATEGORIES = DEFAULT_INCOME_CATEGORIES
+
+const INCOME_CATEGORIES_STORAGE_KEY = 'erp_custom_income_categories'
+
+export function getStoredIncomeCategories(): IncomeCategory[] {
+  let customCategories: IncomeCategory[] = []
+  try {
+    const raw = typeof window !== 'undefined' ? localStorage.getItem(INCOME_CATEGORIES_STORAGE_KEY) : null
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) {
+        customCategories = parsed
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to parse custom income categories:', err)
+  }
+
+  const existingNames = new Set(DEFAULT_INCOME_CATEGORIES.map((c) => c.name.toLowerCase()))
+  const validCustom = customCategories.filter(
+    (c) => c && c.name && !existingNames.has(c.name.toLowerCase())
+  )
+
+  return [...DEFAULT_INCOME_CATEGORIES, ...validCustom]
+}
+
+export function saveStoredIncomeCategory(category: IncomeCategory) {
+  try {
+    const raw = typeof window !== 'undefined' ? localStorage.getItem(INCOME_CATEGORIES_STORAGE_KEY) : null
+    const existing: IncomeCategory[] = raw ? JSON.parse(raw) : []
+    const updated = [...existing.filter((c) => c.id !== category.id), category]
+    localStorage.setItem(INCOME_CATEGORIES_STORAGE_KEY, JSON.stringify(updated))
+  } catch (err) {
+    console.error('Failed to save income category to localStorage:', err)
+  }
+}
 
 let MOCK_INCOMES: ExtendedIncome[] = [
   {
@@ -328,17 +367,27 @@ export function useIncomeCategories() {
     queryKey: ['income-categories'],
     queryFn: async (): Promise<IncomeCategory[]> => {
       if (!isSupabaseConfigured) {
-        return MOCK_INCOME_CATEGORIES
+        return getStoredIncomeCategories()
       }
 
-      const { data, error } = await supabase
-        .from('income_categories')
-        .select('*')
-        .eq('is_active', true)
-        .order('name')
+      try {
+        const { data, error } = await supabase
+          .from('income_categories')
+          .select('*')
+          .eq('is_active', true)
+          .order('name')
 
-      if (error) throw new Error(error.message)
-      return data || []
+        if (!error && data && data.length > 0) {
+          const stored = getStoredIncomeCategories()
+          const dbNames = new Set(data.map((d: any) => d.name.toLowerCase()))
+          const extra = stored.filter((s) => !dbNames.has(s.name.toLowerCase()))
+          return [...(data as IncomeCategory[]), ...extra]
+        }
+      } catch (err) {
+        console.warn('Income categories fetch error, falling back:', err)
+      }
+
+      return getStoredIncomeCategories()
     },
   })
 }
@@ -431,7 +480,8 @@ export function useRecordIncomeMutation() {
     mutationFn: async (input: RecordIncomeInput) => {
       if (!isSupabaseConfigured) {
         const voucherNo = `INC-${Math.floor(2000 + MOCK_INCOMES.length + 1).toString().padStart(6, '0')}`
-        const cat = MOCK_INCOME_CATEGORIES.find((c) => c.id === input.categoryId)
+        const categories = getStoredIncomeCategories()
+        const cat = categories.find((c) => c.id === input.categoryId)
         const acc = MOCK_ACCOUNTS.find((a) => a.id === input.destinationAccountId)
         const flat = MOCK_FLATS.find((f) => f.id === input.flatId)
 
@@ -568,3 +618,66 @@ export function useRecordTransferMutation() {
     },
   })
 }
+
+export interface CreateIncomeCategoryInput {
+  name: string
+  description?: string
+  isActive?: boolean
+}
+
+export function useCreateIncomeCategoryMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: CreateIncomeCategoryInput): Promise<IncomeCategory> => {
+      const trimmedName = input.name.trim()
+      if (!trimmedName) {
+        throw new Error('ক্যাটাগরির নাম দেওয়া আবশ্যক।')
+      }
+
+      const allCategories = getStoredIncomeCategories()
+      if (allCategories.some((c) => c.name.toLowerCase() === trimmedName.toLowerCase())) {
+        throw new Error(`"${trimmedName}" নামের আয়ের খাত ইতিমধ্যে বিদ্যমান রয়েছে।`)
+      }
+
+      if (isSupabaseConfigured) {
+        try {
+          const { data, error } = await supabase
+            .from('income_categories')
+            .insert({
+              name: trimmedName,
+              description: input.description?.trim() || null,
+              is_active: input.isActive ?? true,
+            })
+            .select()
+            .single()
+
+          if (!error && data) {
+            saveStoredIncomeCategory(data as IncomeCategory)
+            return data as IncomeCategory
+          }
+          if (error) {
+            console.warn('Supabase income category insert error, fallback to local:', error)
+          }
+        } catch (err) {
+          console.warn('Supabase income category insert exception:', err)
+        }
+      }
+
+      const newCategory: IncomeCategory = {
+        id: `inc-cat-${Date.now()}`,
+        name: trimmedName,
+        description: input.description?.trim() || null,
+        is_active: input.isActive ?? true,
+        created_at: new Date().toISOString(),
+      }
+
+      saveStoredIncomeCategory(newCategory)
+      return newCategory
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['income-categories'] })
+    },
+  })
+}
+
