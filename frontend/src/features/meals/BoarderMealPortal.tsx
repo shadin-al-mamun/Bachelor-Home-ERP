@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   UtensilsCrossed,
   Calendar,
@@ -11,6 +12,7 @@ import {
   UserCheck,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
+import { isSupabaseConfigured } from '@/lib/supabaseClient'
 import {
   getDhakaNow,
   formatDhakaDate,
@@ -30,6 +32,7 @@ import { AdminMealOverrideModal } from './components/AdminMealOverrideModal'
 
 export const BoarderMealPortal: React.FC = () => {
   const { profile } = useAuthStore()
+  const navigate = useNavigate()
   const isStaff = isMealManagerRole(profile?.role)
 
   // Current Dhaka Date baseline
@@ -75,7 +78,7 @@ export const BoarderMealPortal: React.FC = () => {
         )
         if (matched) {
           setSelectedBoarderId(matched.id)
-        } else if ((!selectedBoarderId || selectedBoarderId === 'bdr-101') && boarders[0]) {
+        } else if (!isSupabaseConfigured && (!selectedBoarderId || selectedBoarderId === 'bdr-101') && boarders[0]) {
           setSelectedBoarderId(boarders[0].id)
         }
       } else {
@@ -87,7 +90,7 @@ export const BoarderMealPortal: React.FC = () => {
   }, [profile, boarders, selectedBoarderId])
 
   // Current active boarder info
-  const activeBoarder = boarders.find((b) => b.id === selectedBoarderId) || boarders[0]
+  const activeBoarder = boarders.find((b) => b.id === selectedBoarderId) || (isStaff || !isSupabaseConfigured ? boarders[0] : null)
 
   // Date status calculation for selected date
   const dateStatus = getDateMealStatus(selectedDate, settings?.cutoff_time || '22:00:00')
@@ -182,6 +185,38 @@ export const BoarderMealPortal: React.FC = () => {
     } catch (err: any) {
       alert(err.message || 'ব্যাচ পরিবর্তন করতে সমস্যা হয়েছে।')
     }
+  }
+
+  if (!isStaff && isSupabaseConfigured && !activeBoarder && !isLoading) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center space-y-4">
+        <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center animate-pulse">
+          <UtensilsCrossed className="w-8 h-8" />
+        </div>
+        <div className="space-y-2 max-w-md">
+          <h2 className="text-xl font-bold text-white tracking-tight">
+            কোনো সক্রিয় সিট বরাদ্দ নেই
+          </h2>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            আপনার অ্যাকাউন্টে বর্তমানে কোনো সক্রিয় সিট বরাদ্দ পাওয়া যায়নি। সিট বরাদ্দ না থাকলে মিল চালু বা বন্ধ করা সম্ভব নয়। সিট বরাদ্দের জন্য হোস্টেল কর্তৃপক্ষের সাথে যোগাযোগ করুন।
+          </p>
+        </div>
+        <div className="flex gap-3 mt-4">
+          <button
+            onClick={() => navigate('/portal/my-application')}
+            className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition-all"
+          >
+            আবেদনের স্ট্যাটাস দেখুন
+          </button>
+          <button
+            onClick={() => navigate('/login')}
+            className="px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold shadow-lg shadow-primary-500/20 transition-all"
+          >
+            লগইন পেজে যান
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (

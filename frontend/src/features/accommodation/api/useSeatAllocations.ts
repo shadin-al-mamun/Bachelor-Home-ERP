@@ -40,7 +40,7 @@ export function useAllocateSeatMutation() {
       try {
         const { data: existingBoarder } = await supabase
           .from('boarders')
-          .select('id, status, user_id')
+          .select('id, status, user_id, email, phone_number')
           .eq('id', effectiveBoarderId)
           .maybeSingle()
 
@@ -74,6 +74,16 @@ export function useAllocateSeatMutation() {
                 .from('profiles')
                 .update({ role: 'BOARDER', updated_at: new Date().toISOString() })
                 .eq('id', profileRow.id)
+
+              // Ensure auth account is confirmed
+              try {
+                await supabase.rpc('confirm_user_account', {
+                  p_email: profileRow.email || null,
+                  p_phone: profileRow.phone_number || null,
+                })
+              } catch {
+                // ignore
+              }
             }
           }
         } else if (existingBoarder.status === 'PENDING') {
@@ -92,6 +102,16 @@ export function useAllocateSeatMutation() {
               .from('profiles')
               .update({ role: 'BOARDER', updated_at: new Date().toISOString() })
               .eq('id', existingBoarder.user_id)
+
+            // Auto-confirm auth user account
+            try {
+              await supabase.rpc('confirm_user_account', {
+                p_email: existingBoarder.email || null,
+                p_phone: existingBoarder.phone_number || null,
+              })
+            } catch {
+              // ignore
+            }
           }
         }
       } catch (prepErr) {

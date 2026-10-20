@@ -200,6 +200,13 @@ export const LoginPage: React.FC = () => {
         })
 
         if (matchedBoarder) {
+          const hasSeat = Boolean(matchedBoarder.active_allocation || matchedBoarder.status === 'ACTIVE')
+          if (!hasSeat) {
+            setErrorMessage('আপনার কোনো সক্রিয় সিট বরাদ্দ নেই। সিট বরাদ্দ না হওয়া পর্যন্ত বোর্ডার আইডিতে প্রবেশ করা যাবে না। অনুগ্রহ করে হোস্টেল ম্যানেজারের সাথে যোগাযোগ করুন।')
+            setIsLoading(false)
+            return
+          }
+
           setDemoUser('BOARDER', {
             id: matchedBoarder.user_id || matchedBoarder.id,
             phone_number: matchedBoarder.phone_number,
@@ -211,13 +218,9 @@ export const LoginPage: React.FC = () => {
           return
         }
 
-        // Default custom boarder session
-        setDemoUser('BOARDER', {
-          phone_number: normalizedPhone || '01711223344',
-          email: looksLikePhone ? `${normalizedPhone}@bachelorhome.erp` : rawInput,
-          full_name: looksLikePhone ? `বর্ডার (${normalizedPhone})` : 'বর্ডার সদস্য',
-        })
-        handleRoleRedirect('BOARDER')
+        // Unallocated custom boarder session check
+        setErrorMessage('আপনার কোনো সক্রিয় সিট বরাদ্দ নেই। সিট বরাদ্দ না হওয়া পর্যন্ত বোর্ডার আইডিতে প্রবেশ করা যাবে না। অনুগ্রহ করে হোস্টেল ম্যানেজারের সাথে যোগাযোগ করুন।')
+        setIsLoading(false)
         return
       }
 
@@ -354,14 +357,36 @@ export const LoginPage: React.FC = () => {
         }
       }
 
+      // Self-healing: if "Email not confirmed", auto-confirm via RPC and retry sign-in immediately
+      if (signInRes.error && signInRes.error.message?.toLowerCase().includes('email not confirmed')) {
+        try {
+          await supabase.rpc('confirm_user_account', {
+            p_email: loginEmail,
+            p_phone: normalizedPhone || null,
+          })
+          const retryConfirmRes = await supabase.auth.signInWithPassword({
+            email: loginEmail,
+            password,
+          })
+          if (!retryConfirmRes.error && retryConfirmRes.data.user) {
+            signInRes = retryConfirmRes
+          }
+        } catch (confirmErr) {
+          console.warn('Auto confirm user account notice:', confirmErr)
+        }
+      }
+
       const { data, error } = signInRes
 
       if (error) {
-        setErrorMessage(
-          error.message === 'Invalid login credentials'
-            ? `${loginMethod === 'phone' ? 'মোবাইল নম্বর' : 'ইমেইল'} বা পাসওয়ার্ড সঠিক নয়।`
-            : error.message
-        )
+        let bengaliError = error.message
+        if (error.message === 'Invalid login credentials') {
+          bengaliError = `${loginMethod === 'phone' ? 'মোবাইল নম্বর' : 'ইমেইল'} বা পাসওয়ার্ড সঠিক নয়।`
+        } else if (error.message.toLowerCase().includes('email not confirmed')) {
+          bengaliError =
+            'আপনার অ্যাকাউন্টটি এখনো নিশ্চিত (confirm) করা হয়নি। অনুগ্রহ করে এডমিনকে যোগাযোগ করুন অথবা Supabase ড্যাশবোর্ডে "Confirm email" বন্ধ করুন।'
+        }
+        setErrorMessage(bengaliError)
         setIsLoading(false)
         return
       }
@@ -403,7 +428,89 @@ export const LoginPage: React.FC = () => {
           .maybeSingle()
 
         const userRole: UserRole = isOwner ? 'SUPER_ADMIN' : ((profile?.role as UserRole) || 'BOARDER')
-        handleRoleRedirect(userRole)
+
+        // Staff Roles (Super Admin, Admin, Manager, Accountant, Auditor) have direct access to Dashboard
+        if (isOwner || ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'AUDITOR'].includes(userRole)) {
+          handleRoleRedirect(userRole)
+          return
+        }
+
+        // ==============================================================================
+        // SEAT ALLOCATION BUSINESS RULE FOR BOARDERS:
+        // "সিট বরাদ্দ না হলে বর্ডাররা তার আইডিতে ঢুকতে পারবেনা, কিন্তু সিট বরাদ্দ থাকা অবস্থায় বর্ডার তার আইডিতে ঢুকতে পারার কথা।"
+        // ==============================================================================
+        let hasActiveSeat = false
+        let boarderStatus = 'PENDING'
+
+        try {
+          // Check 1: Using RPC verify_boarder_seat_status
+          const { data: seatCheck, error: seatErr } = await supabase.rpc('verify_boarder_seat_status', {
+            p_user_id: data.user.id,
+            p_phone: normalizedPhone || null,
+            p_email: loginEmail || null,
+          })
+
+          if (!seatErr && seatCheck && seatCheck.length > 0) {
+            hasActiveSeat = Boolean(seatCheck[0].has_active_seat)
+            boarderStatus = seatCheck[0].boarder_status || 'PENDING'
+          } else {
+            // Check 2: Direct query on boarders and allocations table
+            const { data: bdr } = await supabase
+              .from('boarders')
+              .select('id, status, user_id')
+              .or(`user_id.eq.${data.user.id},phone_number.eq.${normalizedPhone || ''},email.eq.${loginEmail}`)
+              .limit(1)
+              .maybeSingle()
+
+            if (bdr) {
+              boarderStatus = bdr.status
+
+              // Automatically link user_id if not linked yet
+              if (!bdr.user_id) {
+                await supabase.from('boarders').update({ user_id: data.user.id }).eq('id', bdr.id)
+              }
+
+              const { data: alloc } = await supabase
+                .from('allocations')
+                .select('id')
+                .eq('boarder_id', bdr.id)
+                .eq('status', 'ACTIVE')
+                .limit(1)
+                .maybeSingle()
+
+              if (alloc) {
+                hasActiveSeat = true
+              }
+            }
+          }
+        } catch (seatCheckErr) {
+          console.warn('Seat allocation check notice:', seatCheckErr)
+        }
+
+        if (hasActiveSeat) {
+          // Boarder HAS an active seat allocated!
+          // Ensure role is BOARDER and proceed to dashboard
+          try {
+            await supabase
+              .from('profiles')
+              .update({ role: 'BOARDER', updated_at: new Date().toISOString() })
+              .eq('id', data.user.id)
+          } catch {
+            // ignore
+          }
+          handleRoleRedirect('BOARDER')
+        } else {
+          // NO ACTIVE SEAT ALLOCATION!
+          // Enforce rule: "সিট বরাদ্দ না হলে বর্ডাররা তার আইডিতে ঢুকতে পারবেনা"
+          await supabase.auth.signOut()
+          setErrorMessage(
+            boarderStatus === 'REJECTED'
+              ? 'দুঃখিত, আপনার বোর্ডার ভর্তি আবেদনটি বাতিল করা হয়েছে। বিস্তারিত জানতে হোস্টেল অফিসে যোগাযোগ করুন।'
+              : 'আপনার কোনো সক্রিয় সিট বরাদ্দ নেই। সিট বরাদ্দ না হওয়া পর্যন্ত বোর্ডার আইডিতে প্রবেশ করা যাবে না। অনুগ্রহ করে হোস্টেল ম্যানেজারের সাথে যোগাযোগ করুন।'
+          )
+          setIsLoading(false)
+          return
+        }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'লগইন প্রক্রিয়া ব্যর্থ হয়েছে।'

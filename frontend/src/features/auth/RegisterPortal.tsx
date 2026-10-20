@@ -142,6 +142,16 @@ export const RegisterPortal: React.FC = () => {
         }
 
         createdUserId = authData?.user?.id
+
+        // Auto-confirm user account in Supabase to prevent unconfirmed email block
+        try {
+          await supabase.rpc('confirm_user_account', {
+            p_email: email,
+            p_phone: phoneNumber,
+          })
+        } catch {
+          // ignore
+        }
       }
 
       // 2. Create boarder application in database with the linked user_id

@@ -24,6 +24,7 @@ import {
   useMealBoardersList,
 } from '@/features/meals/api/useMeals'
 import { formatCurrencyBn } from '@/utils/date'
+import { isSupabaseConfigured } from '@/lib/supabaseClient'
 
 export const BoarderDashboardPage: React.FC = () => {
   const { profile } = useAuthStore()
@@ -45,7 +46,7 @@ export const BoarderDashboardPage: React.FC = () => {
   const tomorrowStr = formatDhakaDate(tomorrow)
 
   // Dynamic boarder matching based on logged-in phone or name
-  const { data: boardersList = [] } = useMealBoardersList()
+  const { data: boardersList = [], isLoading: isLoadingBoarders } = useMealBoardersList()
   const matchedResident = boardersList.find(
     (b) =>
       (profile?.phone_number && b.phone_number === profile?.phone_number) ||
@@ -53,7 +54,7 @@ export const BoarderDashboardPage: React.FC = () => {
       (profile?.id && b.id === profile?.id)
   )
   const isStaffRole = profile?.role === 'SUPER_ADMIN' || profile?.role === 'ADMIN' || profile?.role === 'MANAGER'
-  const currentBoarder = matchedResident || (!isStaffRole ? boardersList[0] : null)
+  const currentBoarder = matchedResident || (!isStaffRole && !isSupabaseConfigured ? boardersList[0] : null)
 
   const activeBoarderId = currentBoarder?.id || 'bdr-101'
 
@@ -135,6 +136,39 @@ export const BoarderDashboardPage: React.FC = () => {
     } catch (err: any) {
       alert(err.message || 'মিল পরিবর্তন করা সম্ভব হয়নি।')
     }
+  }
+
+  // If authenticated as a resident boarder but no active allocation found
+  if (!isStaffRole && !currentBoarder && isSupabaseConfigured && !isLoadingBoarders) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center space-y-4">
+        <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center animate-pulse">
+          <Building className="w-8 h-8" />
+        </div>
+        <div className="space-y-2 max-w-md">
+          <h2 className="text-xl font-bold text-white tracking-tight">
+            কোনো সক্রিয় সিট বরাদ্দ নেই
+          </h2>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            আপনার অ্যাকাউন্টে বর্তমানে কোনো সক্রিয় সিট বরাদ্দ পাওয়া যায়নি। সিট বরাদ্দ চূড়ান্ত হলে আপনার ব্যক্তিগত ড্যাশবোর্ড ও খাবার নিয়ন্ত্রণ অপশনটি সক্রিয় হবে।
+          </p>
+        </div>
+        <div className="flex gap-3 mt-4">
+          <button
+            onClick={() => navigate('/portal/my-application')}
+            className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition-all"
+          >
+            আবেদনের স্ট্যাটাস দেখুন
+          </button>
+          <button
+            onClick={() => navigate('/login')}
+            className="px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold shadow-lg shadow-primary-500/20 transition-all"
+          >
+            লগইন পেজে যান
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
