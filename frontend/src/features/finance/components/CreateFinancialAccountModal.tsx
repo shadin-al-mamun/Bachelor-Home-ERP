@@ -160,11 +160,10 @@ export const CreateFinancialAccountModal: React.FC<CreateFinancialAccountModalPr
                 setAccountType('CASH_OWNER')
                 if (!accountName) setAccountName('মেইন ক্যাশ বক্স')
               }}
-              className={`p-2.5 rounded-xl border text-left text-xs transition-all flex flex-col gap-1 ${
-                accountType === 'CASH_OWNER'
+              className={`p-2.5 rounded-xl border text-left text-xs transition-all flex flex-col gap-1 ${accountType === 'CASH_OWNER'
                   ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-200'
                   : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-              }`}
+                }`}
             >
               <Banknote className="w-4 h-4 text-emerald-400" />
               <span className="font-bold">মেইন ক্যাশ</span>
@@ -178,11 +177,10 @@ export const CreateFinancialAccountModal: React.FC<CreateFinancialAccountModalPr
                 if (!accountName) setAccountName('বিকাশ মার্চেন্ট একাউন্ট')
                 if (!bankName) setBankName('bKash')
               }}
-              className={`p-2.5 rounded-xl border text-left text-xs transition-all flex flex-col gap-1 ${
-                accountType === 'MFS'
+              className={`p-2.5 rounded-xl border text-left text-xs transition-all flex flex-col gap-1 ${accountType === 'MFS'
                   ? 'bg-pink-950/60 border-pink-500/50 text-pink-200'
                   : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-              }`}
+                }`}
             >
               <Smartphone className="w-4 h-4 text-pink-400" />
               <span className="font-bold">বিকাশ / নগদ</span>
@@ -195,11 +193,10 @@ export const CreateFinancialAccountModal: React.FC<CreateFinancialAccountModalPr
                 setAccountType('BANK')
                 if (!accountName) setAccountName('ব্যাংক চলতি হিসাব')
               }}
-              className={`p-2.5 rounded-xl border text-left text-xs transition-all flex flex-col gap-1 ${
-                accountType === 'BANK'
+              className={`p-2.5 rounded-xl border text-left text-xs transition-all flex flex-col gap-1 ${accountType === 'BANK'
                   ? 'bg-indigo-950/60 border-indigo-500/50 text-indigo-200'
                   : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-              }`}
+                }`}
             >
               <Building2 className="w-4 h-4 text-indigo-400" />
               <span className="font-bold">ব্যাংক হিসাব</span>
@@ -212,11 +209,10 @@ export const CreateFinancialAccountModal: React.FC<CreateFinancialAccountModalPr
                 setAccountType('CASH_MANAGER')
                 if (!accountName) setAccountName('ম্যানেজার ক্যাশ ড্রয়ার')
               }}
-              className={`p-2.5 rounded-xl border text-left text-xs transition-all flex flex-col gap-1 ${
-                accountType === 'CASH_MANAGER'
+              className={`p-2.5 rounded-xl border text-left text-xs transition-all flex flex-col gap-1 ${accountType === 'CASH_MANAGER'
                   ? 'bg-amber-950/60 border-amber-500/50 text-amber-200'
                   : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-              }`}
+                }`}
             >
               <Wallet className="w-4 h-4 text-amber-400" />
               <span className="font-bold">ম্যানেজার ক্যাশ</span>

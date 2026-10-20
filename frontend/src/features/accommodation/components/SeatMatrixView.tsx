@@ -26,7 +26,7 @@ import RoomModal from './RoomModal'
 import AllocateSeatModal from './AllocateSeatModal'
 import TransferSeatModal, { type CurrentAllocationTransferInfo } from './TransferSeatModal'
 import CancelAllocationModal, { type AllocationCancelInfo } from './CancelAllocationModal'
-import type { SeatStatus, Flat, Room } from '@/types/database'
+import type { SeatStatus, Flat, Room, Seat } from '@/types/database'
 
 interface SeatMatrixViewProps {
   onAllocateSeat?: (seatId: string) => void
@@ -41,6 +41,7 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
 
   // Modals
   const [isSeatModalOpen, setIsSeatModalOpen] = useState(false)
+  const [editingSeat, setEditingSeat] = useState<Seat | null>(null)
   const [isRoomModalOpen, setIsRoomModalOpen] = useState(false)
   const [editingRoom, setEditingRoom] = useState<Room | null>(null)
   const [allocatingSeatId, setAllocatingSeatId] = useState<string | null>(null)
@@ -254,7 +255,10 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() => setIsSeatModalOpen(true)}
+                onClick={() => {
+                  setEditingSeat(null)
+                  setIsSeatModalOpen(true)
+                }}
                 leftIcon={<Plus className="w-4 h-4" />}
               >
                 নতুন সিট
@@ -412,7 +416,10 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
             <Button
               variant="primary"
               size="sm"
-              onClick={() => setIsSeatModalOpen(true)}
+              onClick={() => {
+                setEditingSeat(null)
+                setIsSeatModalOpen(true)
+              }}
               leftIcon={<Plus className="w-4 h-4" />}
             >
               নতুন সিট তৈরি করুন
@@ -558,15 +565,28 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
                         </div>
                       </div>
 
-                      <Badge status={seat.status} showDot={true}>
-                        {seat.status === 'AVAILABLE'
-                          ? 'খালি'
-                          : seat.status === 'OCCUPIED'
-                          ? 'বরাদ্দকৃত'
-                          : seat.status === 'MAINTENANCE'
-                          ? 'মেরামত'
-                          : 'নিষ্ক্রিয়'}
-                      </Badge>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingSeat(seat)
+                            setIsSeatModalOpen(true)
+                          }}
+                          className="p-1 rounded-lg text-slate-400 hover:text-primary-300 hover:bg-slate-800 transition-colors"
+                          title="সিটের তথ্য এডিট করুন"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <Badge status={seat.status} showDot={true}>
+                          {seat.status === 'AVAILABLE'
+                            ? 'খালি'
+                            : seat.status === 'OCCUPIED'
+                            ? 'বরাদ্দকৃত'
+                            : seat.status === 'MAINTENANCE'
+                            ? 'মেরামত'
+                            : 'নিষ্ক্রিয়'}
+                        </Badge>
+                      </div>
                     </div>
 
                     {/* Rent and Room Info */}
@@ -853,7 +873,11 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
       {/* ========================================================================= */}
       <SeatModal
         isOpen={isSeatModalOpen}
-        onClose={() => setIsSeatModalOpen(false)}
+        onClose={() => {
+          setIsSeatModalOpen(false)
+          setEditingSeat(null)
+        }}
+        seatToEdit={editingSeat}
       />
 
       <AllocateSeatModal

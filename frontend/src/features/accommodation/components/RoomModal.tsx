@@ -27,8 +27,10 @@ export const RoomModal: React.FC<RoomModalProps> = ({
   const [capacity, setCapacity] = useState(2)
   const [status, setStatus] = useState<RoomStatus>('ACTIVE')
   const [description, setDescription] = useState('')
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   useEffect(() => {
+    setErrorMsg(null)
     if (roomToEdit) {
       setSelectedFlatId(roomToEdit.flat_id)
       setCode(roomToEdit.room_code)
@@ -50,30 +52,39 @@ export const RoomModal: React.FC<RoomModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setErrorMsg(null)
 
-    if (roomToEdit) {
-      await updateRoomMutation.mutateAsync({
-        id: roomToEdit.id,
-        flat_id: selectedFlatId,
-        room_code: code.trim(),
-        name: name.trim(),
-        room_type: roomType,
-        capacity: Number(capacity),
-        status,
-        description: description.trim() || null,
-      })
-    } else {
-      await createRoomMutation.mutateAsync({
-        flat_id: selectedFlatId || flats[0]?.id,
-        room_code: code.trim() || 'ROOM-' + Math.floor(100 + Math.random() * 900),
-        name: name.trim(),
-        room_type: roomType,
-        capacity: Number(capacity),
-        status,
-        description: description.trim() || null,
-      })
+    try {
+      const finalCode = code.trim() || name.trim() || 'R-' + Math.floor(100 + Math.random() * 900)
+      const finalName = name.trim() || finalCode
+
+      if (roomToEdit) {
+        await updateRoomMutation.mutateAsync({
+          id: roomToEdit.id,
+          flat_id: selectedFlatId,
+          room_code: finalCode,
+          name: finalName,
+          room_type: roomType,
+          capacity: Number(capacity),
+          status,
+          description: description.trim() || null,
+        })
+      } else {
+        await createRoomMutation.mutateAsync({
+          flat_id: selectedFlatId || flats[0]?.id,
+          room_code: finalCode,
+          name: finalName,
+          room_type: roomType,
+          capacity: Number(capacity),
+          status,
+          description: description.trim() || null,
+        })
+      }
+      onClose()
+    } catch (err: any) {
+      console.error('Failed to save room:', err)
+      setErrorMsg(err.message || 'রুম সংরক্ষণ করতে সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।')
     }
-    onClose()
   }
 
   const flatOptions = flats.map((f) => ({
@@ -107,6 +118,12 @@ export const RoomModal: React.FC<RoomModalProps> = ({
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4">
+        {errorMsg && (
+          <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300">
+            {errorMsg}
+          </div>
+        )}
+
         {flatOptions.length > 0 && (
           <Select
             label="ফ্ল্যাট নির্বাচন করুন"
@@ -119,11 +136,10 @@ export const RoomModal: React.FC<RoomModalProps> = ({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           <Input
-            label="রুম কোড"
-            placeholder="যেমন: ROOM-202"
+            label="রুম কোড (ঐচ্ছিক)"
+            placeholder="যেমন: ROOM-202 বা A"
             value={code}
             onChange={(e) => setCode(e.target.value)}
-            required
           />
           <Input
             label="রুমের নাম"

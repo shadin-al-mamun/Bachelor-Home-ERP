@@ -332,13 +332,26 @@ export function useCreateRoom() {
         return newRoom
       }
 
+      const insertPayload = { ...room }
       const { data, error } = await supabase
         .from('rooms')
-        .insert(room)
+        .insert(insertPayload)
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        // If unique constraint violation occurs (code 23505), auto-append suffix so save never fails
+        if (error.code === '23505' && insertPayload.room_code) {
+          const fallbackCode = `${insertPayload.room_code}-${Math.floor(10 + Math.random() * 90)}`
+          const retry = await supabase
+            .from('rooms')
+            .insert({ ...insertPayload, room_code: fallbackCode })
+            .select()
+            .single()
+          if (!retry.error && retry.data) return retry.data
+        }
+        throw error
+      }
       return data
     },
     onSuccess: () => {
@@ -366,7 +379,20 @@ export function useUpdateRoom() {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        // If unique constraint violation occurs (code 23505), auto-append suffix
+        if (error.code === '23505' && updates.room_code) {
+          const fallbackCode = `${updates.room_code}-${Math.floor(10 + Math.random() * 90)}`
+          const retry = await supabase
+            .from('rooms')
+            .update({ ...updates, room_code: fallbackCode })
+            .eq('id', id)
+            .select()
+            .single()
+          if (!retry.error && retry.data) return retry.data as Room
+        }
+        throw error
+      }
       return data as Room
     },
     onSuccess: () => {
@@ -468,14 +494,67 @@ export function useCreateSeat() {
         return newSeat
       }
 
+      const insertPayload = { ...seat }
       const { data, error } = await supabase
         .from('seats')
-        .insert(seat)
+        .insert(insertPayload)
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        // If unique constraint violation occurs (code 23505), auto-append suffix so save never fails
+        if (error.code === '23505' && insertPayload.seat_code) {
+          const fallbackCode = `${insertPayload.seat_code}-${Math.floor(10 + Math.random() * 90)}`
+          const retry = await supabase
+            .from('seats')
+            .insert({ ...insertPayload, seat_code: fallbackCode })
+            .select()
+            .single()
+          if (!retry.error && retry.data) return retry.data
+        }
+        throw error
+      }
       return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['seats'] })
+    },
+  })
+}
+
+export function useUpdateSeat() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<Seat> & { id: string }) => {
+      if (!isSupabaseConfigured) {
+        mockSeats = mockSeats.map((s) =>
+          s.id === id ? { ...s, ...updates, updated_at: new Date().toISOString() } : s
+        )
+        const updated = mockSeats.find((s) => s.id === id)
+        return updated as Seat
+      }
+
+      const { data, error } = await supabase
+        .from('seats')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (error) {
+        if (error.code === '23505' && updates.seat_code) {
+          const fallbackCode = `${updates.seat_code}-${Math.floor(10 + Math.random() * 90)}`
+          const retry = await supabase
+            .from('seats')
+            .update({ ...updates, seat_code: fallbackCode })
+            .eq('id', id)
+            .select()
+            .single()
+          if (!retry.error && retry.data) return retry.data as Seat
+        }
+        throw error
+      }
+      return data as Seat
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['seats'] })
