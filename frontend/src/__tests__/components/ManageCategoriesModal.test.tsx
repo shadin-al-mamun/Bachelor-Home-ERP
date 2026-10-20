@@ -5,12 +5,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React from 'react'
 
 const mockExpenseCategories = [
-  { id: 'cat-1', name: 'Electric Bill', description: 'বিদ্যুৎ বিল', is_active: true, created_at: '2026-01-01' },
-  { id: 'cat-2', name: 'Water & Gas', description: 'পানি ও গ্যাস', is_active: true, created_at: '2026-01-01' },
+  { id: 'a1111111-1111-4111-8111-111111111101', name: 'Electric Bill', description: 'বিদ্যুৎ বিল', is_active: true, created_at: '2026-01-01' },
+  { id: 'a1111111-1111-4111-8111-111111111102', name: 'Water & Gas', description: 'পানি ও গ্যাস', is_active: true, created_at: '2026-01-01' },
 ]
 
 const mockIncomeCategories = [
-  { id: 'inc-cat-1', name: 'Guest Stay Fee', description: 'মেহমান থাকার ফি', is_active: true, created_at: '2026-01-01' },
+  { id: 'b2222222-2222-4222-8222-222222222201', name: 'Guest Stay Fee', description: 'মেহমান থাকার ফি', is_active: true, created_at: '2026-01-01' },
 ]
 
 const mutateAsyncExpense = vi.fn()
@@ -85,7 +85,7 @@ describe('ManageCategoriesModal Component', () => {
   it('successfully submits new expense category and invokes callback', async () => {
     const onCreated = vi.fn()
     mutateAsyncExpense.mockResolvedValueOnce({
-      id: 'cat-new-1',
+      id: 'a1111111-1111-4111-8111-111111111199',
       name: 'জেনারেটর ডিজেল',
       description: 'জরুরি ব্যাকআপ ফুয়েল',
       is_active: true,

@@ -55,16 +55,62 @@ export interface ReviewExpenseInput {
 // Mock Data Baseline (Realistic Hostel Operations in Dhaka)
 // ==============================================================================
 
+export function isUUID(str?: string | null): boolean {
+  if (!str) return false
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str)
+}
+
+export function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
+
+export const EXPENSE_CATEGORY_UUIDS = {
+  ELECTRIC_BILL: 'a1111111-1111-4111-8111-111111111101',
+  WATER_GAS: 'a1111111-1111-4111-8111-111111111102',
+  INTERNET_WIFI: 'a1111111-1111-4111-8111-111111111103',
+  MAINTENANCE_REPAIRS: 'a1111111-1111-4111-8111-111111111104',
+  COOK_CLEANER_SALARY: 'a1111111-1111-4111-8111-111111111105',
+  CLEANING_SUPPLIES: 'a1111111-1111-4111-8111-111111111106',
+  DINING_GROCERY: 'a1111111-1111-4111-8111-111111111107',
+  GENERATOR_FUEL: 'a1111111-1111-4111-8111-111111111108',
+  MISCELLANEOUS: 'a1111111-1111-4111-8111-111111111109',
+} as const
+
+export const LEGACY_EXPENSE_MAP: Record<string, string> = {
+  'cat-1': EXPENSE_CATEGORY_UUIDS.ELECTRIC_BILL,
+  'cat-2': EXPENSE_CATEGORY_UUIDS.WATER_GAS,
+  'cat-3': EXPENSE_CATEGORY_UUIDS.INTERNET_WIFI,
+  'cat-4': EXPENSE_CATEGORY_UUIDS.MAINTENANCE_REPAIRS,
+  'cat-5': EXPENSE_CATEGORY_UUIDS.COOK_CLEANER_SALARY,
+  'cat-6': EXPENSE_CATEGORY_UUIDS.CLEANING_SUPPLIES,
+  'cat-7': EXPENSE_CATEGORY_UUIDS.DINING_GROCERY,
+  'cat-8': EXPENSE_CATEGORY_UUIDS.GENERATOR_FUEL,
+  'cat-9': EXPENSE_CATEGORY_UUIDS.MISCELLANEOUS,
+}
+
+export function toValidExpenseUUID(id: string): string {
+  if (LEGACY_EXPENSE_MAP[id]) return LEGACY_EXPENSE_MAP[id]
+  if (isUUID(id)) return id
+  return EXPENSE_CATEGORY_UUIDS.MISCELLANEOUS
+}
+
 export const DEFAULT_EXPENSE_CATEGORIES: ExpenseCategory[] = [
-  { id: 'cat-1', name: 'Electric Bill', description: 'মাসিক ডেসকো / ডিপিডিসি বিদ্যুৎ বিল', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-  { id: 'cat-2', name: 'Water & Gas', description: 'ওয়াসা পানি ও এলপি সিলিন্ডার গ্যাস রিফিল', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-  { id: 'cat-3', name: 'Internet & WiFi', description: 'উচ্চগতির ব্রডব্যান্ড ইন্টারনেট সাবস্ক্রিপশন', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-  { id: 'cat-4', name: 'Maintenance & Repairs', description: 'প্লাম্বিং, স্যানিটারি, বৈদ্যুতিক মেরামত ও রং কাজ', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-  { id: 'cat-5', name: 'Cook & Cleaner Salary', description: 'বাবুর্চি, সহকারী ও ক্লিনিং স্টাফদের বেতন', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-  { id: 'cat-6', name: 'Cleaning Supplies', description: 'হারপিক, ব্লিচিং, ফ্লোর ক্লিনার ও ময়লার ব্যাগ', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-  { id: 'cat-7', name: 'Dining & Grocery', description: 'হোস্টেল মেসের যৌথ ডাইনিং কাঁচাবাজার ও মুদি সামগ্রী', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-  { id: 'cat-8', name: 'Generator & Fuel', description: 'জরুরি পাওয়ার ব্যাকআপ ও জেনারেটরের ডিজেল খরচ', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-  { id: 'cat-9', name: 'Miscellaneous', description: 'হোস্টেল পরিচালনার অন্যান্য আকস্মিক খরচ', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: EXPENSE_CATEGORY_UUIDS.ELECTRIC_BILL, name: 'Electric Bill', description: 'মাসিক ডেসকো / ডিপিডিসি বিদ্যুৎ বিল', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: EXPENSE_CATEGORY_UUIDS.WATER_GAS, name: 'Water & Gas', description: 'ওয়াসা পানি ও এলপি সিলিন্ডার গ্যাস রিফিল', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: EXPENSE_CATEGORY_UUIDS.INTERNET_WIFI, name: 'Internet & WiFi', description: 'উচ্চগতির ব্রডব্যান্ড ইন্টারনেট সাবস্ক্রিপশন', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: EXPENSE_CATEGORY_UUIDS.MAINTENANCE_REPAIRS, name: 'Maintenance & Repairs', description: 'প্লাম্বিং, স্যানিটারি, বৈদ্যুতিক মেরামত ও রং কাজ', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: EXPENSE_CATEGORY_UUIDS.COOK_CLEANER_SALARY, name: 'Cook & Cleaner Salary', description: 'বাবুর্চি, সহকারী ও ক্লিনিং স্টাফদের বেতন', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: EXPENSE_CATEGORY_UUIDS.CLEANING_SUPPLIES, name: 'Cleaning Supplies', description: 'হারপিক, ব্লিচিং, ফ্লোর ক্লিনার ও ময়লার ব্যাগ', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: EXPENSE_CATEGORY_UUIDS.DINING_GROCERY, name: 'Dining & Grocery', description: 'হোস্টেল মেসের যৌথ ডাইনিং কাঁচাবাজার ও মুদি সামগ্রী', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: EXPENSE_CATEGORY_UUIDS.GENERATOR_FUEL, name: 'Generator & Fuel', description: 'জরুরি পাওয়ার ব্যাকআপ ও জেনারেটরের ডিজেল খরচ', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: EXPENSE_CATEGORY_UUIDS.MISCELLANEOUS, name: 'Miscellaneous', description: 'হোস্টেল পরিচালনার অন্যান্য আকস্মিক খরচ', is_active: true, created_at: '2026-01-01T00:00:00Z' },
 ]
 
 export const MOCK_EXPENSE_CATEGORIES = DEFAULT_EXPENSE_CATEGORIES
@@ -79,6 +125,11 @@ export function getStoredExpenseCategories(): ExpenseCategory[] {
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed)) {
         customCategories = parsed
+          .filter((c: any) => c && c.name && !LEGACY_EXPENSE_MAP[c.id])
+          .map((c: any) => ({
+            ...c,
+            id: isUUID(c.id) ? c.id : generateUUID(),
+          }))
       }
     }
   } catch (err) {
@@ -95,9 +146,13 @@ export function getStoredExpenseCategories(): ExpenseCategory[] {
 
 export function saveStoredExpenseCategory(category: ExpenseCategory) {
   try {
+    const validCategory: ExpenseCategory = {
+      ...category,
+      id: isUUID(category.id) ? category.id : generateUUID(),
+    }
     const raw = typeof window !== 'undefined' ? localStorage.getItem(EXPENSE_CATEGORIES_STORAGE_KEY) : null
     const existing: ExpenseCategory[] = raw ? JSON.parse(raw) : []
-    const updated = [...existing.filter((c) => c.id !== category.id), category]
+    const updated = [...existing.filter((c) => c.id !== validCategory.id && c.name.toLowerCase() !== validCategory.name.toLowerCase()), validCategory]
     localStorage.setItem(EXPENSE_CATEGORIES_STORAGE_KEY, JSON.stringify(updated))
   } catch (err) {
     console.error('Failed to save expense category to localStorage:', err)
@@ -204,7 +259,7 @@ let MOCK_EXPENSES: ExtendedExpense[] = [
   {
     id: 'exp-5001',
     expense_voucher_no: 'EXP-005001',
-    category_id: 'cat-1',
+    category_id: EXPENSE_CATEGORY_UUIDS.ELECTRIC_BILL,
     category_name: 'Electric Bill',
     amount: 8750,
     source_account_id: 'fa-2',
@@ -228,7 +283,7 @@ let MOCK_EXPENSES: ExtendedExpense[] = [
   {
     id: 'exp-5002',
     expense_voucher_no: 'EXP-005002',
-    category_id: 'cat-3',
+    category_id: EXPENSE_CATEGORY_UUIDS.INTERNET_WIFI,
     category_name: 'Internet & WiFi',
     amount: 3200,
     source_account_id: 'fa-3',
@@ -252,7 +307,7 @@ let MOCK_EXPENSES: ExtendedExpense[] = [
   {
     id: 'exp-5003',
     expense_voucher_no: 'EXP-005003',
-    category_id: 'cat-4',
+    category_id: EXPENSE_CATEGORY_UUIDS.MAINTENANCE_REPAIRS,
     category_name: 'Maintenance & Repairs',
     amount: 1450,
     source_account_id: 'fa-1',
@@ -277,7 +332,7 @@ let MOCK_EXPENSES: ExtendedExpense[] = [
   {
     id: 'exp-5004',
     expense_voucher_no: 'EXP-005004',
-    category_id: 'cat-6',
+    category_id: EXPENSE_CATEGORY_UUIDS.CLEANING_SUPPLIES,
     category_name: 'Cleaning Supplies',
     amount: 850,
     source_account_id: 'fa-1',
@@ -300,7 +355,7 @@ let MOCK_EXPENSES: ExtendedExpense[] = [
   {
     id: 'exp-5005',
     expense_voucher_no: 'EXP-005005',
-    category_id: 'cat-2',
+    category_id: EXPENSE_CATEGORY_UUIDS.WATER_GAS,
     category_name: 'Water & Gas',
     amount: 1950,
     source_account_id: 'fa-1',
@@ -326,7 +381,7 @@ let MOCK_EXPENSES: ExtendedExpense[] = [
   {
     id: 'exp-5006',
     expense_voucher_no: 'EXP-005006',
-    category_id: 'cat-4',
+    category_id: EXPENSE_CATEGORY_UUIDS.MAINTENANCE_REPAIRS,
     category_name: 'Maintenance & Repairs',
     amount: 950,
     source_account_id: 'fa-1',
@@ -642,22 +697,71 @@ export function useRecordExpenseMutation() {
         }
       }
 
-      const { data, error } = await supabase.rpc('fn_record_expense', {
-        p_category_id: input.categoryId,
-        p_amount: input.amount,
-        p_source_account_id: input.sourceAccountId,
-        p_building_id: input.buildingId || null,
-        p_flat_id: input.flatId || null,
-        p_expense_date: input.expenseDate,
-        p_description: input.description,
-        p_voucher_attachment_url: attachmentUrl,
-      })
+      let resolvedCategoryId = toValidExpenseUUID(input.categoryId)
 
-      if (error) {
-        throw new Error(error.message || 'খরচ এন্ট্রি সম্পন্ন করতে ব্যর্থ হয়েছে।')
+      if (isSupabaseConfigured) {
+        // Reconcile category with Supabase to guarantee foreign key integrity
+        const localCat = getStoredExpenseCategories().find(
+          (c) => c.id === input.categoryId || c.id === resolvedCategoryId
+        )
+        const catName = localCat?.name || 'General Expense'
+
+        try {
+          // If a category with the same name exists in Supabase, use its exact remote UUID
+          const { data: dbCatByName } = await supabase
+            .from('expense_categories')
+            .select('id')
+            .ilike('name', catName)
+            .maybeSingle()
+
+          if (dbCatByName?.id && isUUID(dbCatByName.id)) {
+            resolvedCategoryId = dbCatByName.id
+          } else {
+            // Check if resolvedCategoryId exists by ID in Supabase
+            const { data: dbCatById } = await supabase
+              .from('expense_categories')
+              .select('id')
+              .eq('id', resolvedCategoryId)
+              .maybeSingle()
+
+            if (!dbCatById?.id) {
+              const { data: upserted } = await supabase
+                .from('expense_categories')
+                .upsert({
+                  id: resolvedCategoryId,
+                  name: catName,
+                  description: localCat?.description || null,
+                  is_active: true,
+                }, { onConflict: 'id' })
+                .select('id')
+                .maybeSingle()
+
+              if (upserted?.id && isUUID(upserted.id)) {
+                resolvedCategoryId = upserted.id
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Category reconciliation error, proceeding with resolved UUID:', e)
+        }
+
+        const { data, error } = await supabase.rpc('fn_record_expense', {
+          p_category_id: resolvedCategoryId,
+          p_amount: input.amount,
+          p_source_account_id: input.sourceAccountId,
+          p_building_id: input.buildingId || null,
+          p_flat_id: input.flatId || null,
+          p_expense_date: input.expenseDate,
+          p_description: input.description,
+          p_voucher_attachment_url: attachmentUrl,
+        })
+
+        if (error) {
+          throw new Error(error.message || 'খরচ এন্ট্রি সম্পন্ন করতে ব্যর্থ হয়েছে।')
+        }
+
+        return data
       }
-
-      return data
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] })
@@ -771,7 +875,7 @@ export function useCreateExpenseCategoryMutation() {
       }
 
       const newCategory: ExpenseCategory = {
-        id: `cat-${Date.now()}`,
+        id: generateUUID(),
         name: trimmedName,
         description: input.description?.trim() || null,
         is_active: input.isActive ?? true,

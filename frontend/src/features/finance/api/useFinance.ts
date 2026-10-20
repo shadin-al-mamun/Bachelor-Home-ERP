@@ -5,7 +5,12 @@ import type {
   IncomeCategory,
   AccountTransfer,
 } from '@/types/database'
-import { MOCK_ACCOUNTS, MOCK_FLATS } from '@/features/expenses/api/useExpenses'
+import {
+  MOCK_ACCOUNTS,
+  MOCK_FLATS,
+  isUUID,
+  generateUUID,
+} from '@/features/expenses/api/useExpenses'
 
 // ==============================================================================
 // Types & Interfaces
@@ -64,14 +69,40 @@ export interface RecordTransferInput {
 // Mock Data Baseline (Realistic Non-Rent Revenue & Cash Movements)
 // ==============================================================================
 
+export const INCOME_CATEGORY_UUIDS = {
+  GUEST_STAY_FEE: 'b2222222-2222-4222-8222-222222222201',
+  SCRAP_SALE: 'b2222222-2222-4222-8222-222222222202',
+  HALL_SPACE_USAGE: 'b2222222-2222-4222-8222-222222222203',
+  WIFI_EXTRA_DEVICE_FEE: 'b2222222-2222-4222-8222-222222222204',
+  FRIDGE_APPLIANCE_FEE: 'b2222222-2222-4222-8222-222222222205',
+  LATE_PAYMENT_FINE: 'b2222222-2222-4222-8222-222222222206',
+  MISCELLANEOUS: 'b2222222-2222-4222-8222-222222222207',
+} as const
+
+export const LEGACY_INCOME_MAP: Record<string, string> = {
+  'inc-cat-1': INCOME_CATEGORY_UUIDS.GUEST_STAY_FEE,
+  'inc-cat-2': INCOME_CATEGORY_UUIDS.SCRAP_SALE,
+  'inc-cat-3': INCOME_CATEGORY_UUIDS.HALL_SPACE_USAGE,
+  'inc-cat-4': INCOME_CATEGORY_UUIDS.WIFI_EXTRA_DEVICE_FEE,
+  'inc-cat-5': INCOME_CATEGORY_UUIDS.FRIDGE_APPLIANCE_FEE,
+  'inc-cat-6': INCOME_CATEGORY_UUIDS.LATE_PAYMENT_FINE,
+  'inc-cat-7': INCOME_CATEGORY_UUIDS.MISCELLANEOUS,
+}
+
+export function toValidIncomeUUID(id: string): string {
+  if (LEGACY_INCOME_MAP[id]) return LEGACY_INCOME_MAP[id]
+  if (isUUID(id)) return id
+  return INCOME_CATEGORY_UUIDS.MISCELLANEOUS
+}
+
 export const DEFAULT_INCOME_CATEGORIES: IncomeCategory[] = [
-  { id: 'inc-cat-1', name: 'Guest Stay Fee', description: 'মেহমান/অতিথিদের দৈনিক থাকার ফি', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-  { id: 'inc-cat-2', name: 'Scrap Sale', description: 'পুরাতন কার্টন, খবরের কাগজ ও লোহালক্কড় বিক্রয়লব্ধ আয়', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-  { id: 'inc-cat-3', name: 'Hall & Space Usage', description: 'কমন স্পেস বা রিডিং রুম বিশেষ ইভেন্ট বুকিং ফি', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-  { id: 'inc-cat-4', name: 'WiFi Extra Device Fee', description: 'বর্ডারদের অতিরিক্ত ল্যাপটপ/ডিভাইস সংযোগ চার্জ', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-  { id: 'inc-cat-5', name: 'Fridge & Appliance Fee', description: 'ব্যক্তিগত অতিরিক্ত হিটার/ফ্রিজ ব্যবহারের বিশেষ চার্জ', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-  { id: 'inc-cat-6', name: 'Late Payment Fine', description: 'মাসিক ভাড়া নির্ধারিত সময়ের পরে জমার বিলম্ব জরিমানা', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-  { id: 'inc-cat-7', name: 'Miscellaneous', description: 'অন্যান্য আনুষঙ্গিক রাজস্ব ও নন-রেন্ট প্রাপ্তি', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: INCOME_CATEGORY_UUIDS.GUEST_STAY_FEE, name: 'Guest Stay Fee', description: 'মেহমান/অতিথিদের দৈনিক থাকার ফি', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: INCOME_CATEGORY_UUIDS.SCRAP_SALE, name: 'Scrap Sale', description: 'পুরাতন কার্টন, খবরের কাগজ ও লোহালক্কড় বিক্রয়লব্ধ আয়', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: INCOME_CATEGORY_UUIDS.HALL_SPACE_USAGE, name: 'Hall & Space Usage', description: 'কমন স্পেস বা রিডিং রুম বিশেষ ইভেন্ট বুকিং ফি', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: INCOME_CATEGORY_UUIDS.WIFI_EXTRA_DEVICE_FEE, name: 'WiFi Extra Device Fee', description: 'বর্ডারদের অতিরিক্ত ল্যাপটপ/ডিভাইস সংযোগ চার্জ', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: INCOME_CATEGORY_UUIDS.FRIDGE_APPLIANCE_FEE, name: 'Fridge & Appliance Fee', description: 'ব্যক্তিগত অতিরিক্ত হিটার/ফ্রিজ ব্যবহারের বিশেষ চার্জ', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: INCOME_CATEGORY_UUIDS.LATE_PAYMENT_FINE, name: 'Late Payment Fine', description: 'মাসিক ভাড়া নির্ধারিত সময়ের পরে জমার বিলম্ব জরিমানা', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: INCOME_CATEGORY_UUIDS.MISCELLANEOUS, name: 'Miscellaneous', description: 'অন্যান্য আনুষঙ্গিক রাজস্ব ও নন-রেন্ট প্রাপ্তি', is_active: true, created_at: '2026-01-01T00:00:00Z' },
 ]
 
 export const MOCK_INCOME_CATEGORIES = DEFAULT_INCOME_CATEGORIES
@@ -86,6 +117,11 @@ export function getStoredIncomeCategories(): IncomeCategory[] {
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed)) {
         customCategories = parsed
+          .filter((c: any) => c && c.name && !LEGACY_INCOME_MAP[c.id])
+          .map((c: any) => ({
+            ...c,
+            id: isUUID(c.id) ? c.id : generateUUID(),
+          }))
       }
     }
   } catch (err) {
@@ -102,9 +138,18 @@ export function getStoredIncomeCategories(): IncomeCategory[] {
 
 export function saveStoredIncomeCategory(category: IncomeCategory) {
   try {
+    const validCategory: IncomeCategory = {
+      ...category,
+      id: isUUID(category.id) ? category.id : generateUUID(),
+    }
     const raw = typeof window !== 'undefined' ? localStorage.getItem(INCOME_CATEGORIES_STORAGE_KEY) : null
     const existing: IncomeCategory[] = raw ? JSON.parse(raw) : []
-    const updated = [...existing.filter((c) => c.id !== category.id), category]
+    const updated = [
+      ...existing.filter(
+        (c) => c.id !== validCategory.id && c.name.toLowerCase() !== validCategory.name.toLowerCase()
+      ),
+      validCategory,
+    ]
     localStorage.setItem(INCOME_CATEGORIES_STORAGE_KEY, JSON.stringify(updated))
   } catch (err) {
     console.error('Failed to save income category to localStorage:', err)
@@ -115,7 +160,7 @@ let MOCK_INCOMES: ExtendedIncome[] = [
   {
     id: 'inc-2001',
     income_voucher_no: 'INC-002001',
-    category_id: 'inc-cat-1',
+    category_id: INCOME_CATEGORY_UUIDS.GUEST_STAY_FEE,
     category_name: 'Guest Stay Fee',
     amount: 1500,
     destination_account_id: 'fa-1',
@@ -135,7 +180,7 @@ let MOCK_INCOMES: ExtendedIncome[] = [
   {
     id: 'inc-2002',
     income_voucher_no: 'INC-002002',
-    category_id: 'inc-cat-2',
+    category_id: INCOME_CATEGORY_UUIDS.SCRAP_SALE,
     category_name: 'Scrap Sale',
     amount: 950,
     destination_account_id: 'fa-1',
@@ -153,7 +198,7 @@ let MOCK_INCOMES: ExtendedIncome[] = [
   {
     id: 'inc-2003',
     income_voucher_no: 'INC-002003',
-    category_id: 'inc-cat-1',
+    category_id: INCOME_CATEGORY_UUIDS.GUEST_STAY_FEE,
     category_name: 'Guest Stay Fee',
     amount: 1200,
     destination_account_id: 'fa-3',
@@ -173,7 +218,7 @@ let MOCK_INCOMES: ExtendedIncome[] = [
   {
     id: 'inc-2004',
     income_voucher_no: 'INC-002004',
-    category_id: 'inc-cat-3',
+    category_id: INCOME_CATEGORY_UUIDS.HALL_SPACE_USAGE,
     category_name: 'Hall & Space Usage',
     amount: 2500,
     destination_account_id: 'fa-2',
@@ -191,7 +236,7 @@ let MOCK_INCOMES: ExtendedIncome[] = [
   {
     id: 'inc-2005',
     income_voucher_no: 'INC-002005',
-    category_id: 'inc-cat-4',
+    category_id: INCOME_CATEGORY_UUIDS.WIFI_EXTRA_DEVICE_FEE,
     category_name: 'WiFi Extra Device Fee',
     amount: 600,
     destination_account_id: 'fa-1',
@@ -520,21 +565,70 @@ export function useRecordIncomeMutation() {
         }
       }
 
-      const { data, error } = await supabase.rpc('fn_record_income', {
-        p_category_id: input.categoryId,
-        p_amount: input.amount,
-        p_destination_account_id: input.destinationAccountId,
-        p_building_id: input.buildingId || null,
-        p_flat_id: input.flatId || null,
-        p_income_date: input.incomeDate,
-        p_description: input.description,
-      })
+      let resolvedCategoryId = toValidIncomeUUID(input.categoryId)
 
-      if (error) {
-        throw new Error(error.message || 'নন-রেন্ট আয় এন্ট্রি করতে ব্যর্থ হয়েছে।')
+      if (isSupabaseConfigured) {
+        // Reconcile category with Supabase to guarantee foreign key integrity
+        const localCat = getStoredIncomeCategories().find(
+          (c) => c.id === input.categoryId || c.id === resolvedCategoryId
+        )
+        const catName = localCat?.name || 'General Income'
+
+        try {
+          // If a category with the same name exists in Supabase, use its exact remote UUID
+          const { data: dbCatByName } = await supabase
+            .from('income_categories')
+            .select('id')
+            .ilike('name', catName)
+            .maybeSingle()
+
+          if (dbCatByName?.id && isUUID(dbCatByName.id)) {
+            resolvedCategoryId = dbCatByName.id
+          } else {
+            // Check if resolvedCategoryId exists by ID in Supabase
+            const { data: dbCatById } = await supabase
+              .from('income_categories')
+              .select('id')
+              .eq('id', resolvedCategoryId)
+              .maybeSingle()
+
+            if (!dbCatById?.id) {
+              const { data: upserted } = await supabase
+                .from('income_categories')
+                .upsert({
+                  id: resolvedCategoryId,
+                  name: catName,
+                  description: localCat?.description || null,
+                  is_active: true,
+                }, { onConflict: 'id' })
+                .select('id')
+                .maybeSingle()
+
+              if (upserted?.id && isUUID(upserted.id)) {
+                resolvedCategoryId = upserted.id
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Category reconciliation error, proceeding with resolved UUID:', e)
+        }
+
+        const { data, error } = await supabase.rpc('fn_record_income', {
+          p_category_id: resolvedCategoryId,
+          p_amount: input.amount,
+          p_destination_account_id: input.destinationAccountId,
+          p_building_id: input.buildingId || null,
+          p_flat_id: input.flatId || null,
+          p_income_date: input.incomeDate,
+          p_description: input.description,
+        })
+
+        if (error) {
+          throw new Error(error.message || 'নন-রেন্ট আয় এন্ট্রি করতে ব্যর্থ হয়েছে।')
+        }
+
+        return data
       }
-
-      return data
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['incomes'] })
@@ -665,7 +759,7 @@ export function useCreateIncomeCategoryMutation() {
       }
 
       const newCategory: IncomeCategory = {
-        id: `inc-cat-${Date.now()}`,
+        id: generateUUID(),
         name: trimmedName,
         description: input.description?.trim() || null,
         is_active: input.isActive ?? true,
