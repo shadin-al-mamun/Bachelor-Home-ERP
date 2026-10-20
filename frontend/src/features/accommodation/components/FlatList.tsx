@@ -139,10 +139,11 @@ export const FlatList: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handleEditRoom(room)}
-                              className="p-1 rounded-lg text-slate-400 hover:text-primary-300 hover:bg-slate-800 transition-colors shrink-0"
+                              className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-primary-600/30 border border-slate-700 hover:border-primary-500/50 text-slate-300 hover:text-primary-300 transition-all flex items-center gap-1.5 text-xs font-medium shrink-0 shadow-sm"
                               title="রুম এডিট করুন"
                             >
-                              <Edit3 className="w-3.5 h-3.5" />
+                              <Edit3 className="w-3.5 h-3.5 text-primary-400" />
+                              <span>এডিট</span>
                             </button>
                           </div>
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useCallback } from 'react'
 import {
   BedDouble,
   Plus,
@@ -58,12 +58,15 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
   const updateSeatStatusMutation = useUpdateSeatStatus()
 
   // Helper to resolve which flat a seat belongs to
-  const getSeatFlatId = (seat: any): string => {
-    if (seat.room?.flat?.id) return seat.room.flat.id
-    if (seat.room?.flat_id) return seat.room.flat_id
-    const r = rooms.find((rm) => rm.id === seat.room_id)
-    return r?.flat_id || 'UNASSIGNED'
-  }
+  const getSeatFlatId = useCallback(
+    (seat: any): string => {
+      if (seat.room?.flat?.id) return seat.room.flat.id
+      if (seat.room?.flat_id) return seat.room.flat_id
+      const r = rooms.find((rm) => rm.id === seat.room_id)
+      return r?.flat_id || 'UNASSIGNED'
+    },
+    [rooms]
+  )
 
   // Calculate Flat-wise aggregated stats
   const flatStatsList = useMemo(() => {
@@ -91,13 +94,13 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
         seats: flatSeats,
       }
     })
-  }, [flats, seats, rooms, buildings])
+  }, [flats, seats, buildings, getSeatFlatId])
 
   // Check for any unassigned seats
   const unassignedSeats = useMemo(() => {
     const flatIds = new Set(flats.map((f) => f.id))
     return seats.filter((s) => !flatIds.has(getSeatFlatId(s)))
-  }, [seats, flats, rooms])
+  }, [seats, flats, getSeatFlatId])
 
   // Currently active flat in drill-down mode
   const activeFlatInfo = useMemo(() => {
@@ -379,10 +382,11 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
                           setEditingRoom(room)
                           setIsRoomModalOpen(true)
                         }}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-primary-300 hover:bg-slate-800 transition-colors shrink-0"
+                        className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-primary-600/30 border border-slate-700 hover:border-primary-500/50 text-slate-300 hover:text-primary-300 transition-all flex items-center gap-1.5 text-xs font-medium shrink-0 shadow-sm"
                         title="রুম এডিট করুন"
                       >
-                        <Edit3 className="w-3.5 h-3.5" />
+                        <Edit3 className="w-3.5 h-3.5 text-primary-400" />
+                        <span>এডিট</span>
                       </button>
                     </div>
                   )

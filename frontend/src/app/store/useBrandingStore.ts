@@ -98,7 +98,7 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
           localStorage.setItem(STORAGE_KEY, JSON.stringify(remoteSettings))
           applyFaviconToDOM(remoteSettings.faviconUrl || remoteSettings.logoUrl || '/favicon.svg')
         }
-      } catch (e) {
+      } catch {
         // Table may not yet exist on Supabase, fallback silently
       }
     }

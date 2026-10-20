@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Modal } from '@/components/common/Modal'
 import { Button } from '@/components/common/Button'
 import { Input } from '@/components/common/Input'
@@ -27,8 +27,6 @@ export const CreateFinancialAccountModal: React.FC<CreateFinancialAccountModalPr
   onAccountCreated,
   accountToEdit,
 }) => {
-  if (!isOpen) return null
-
   const [accountName, setAccountName] = useState('')
   const [accountType, setAccountType] = useState<FinancialAccountType>('CASH_OWNER')
   const [accountNumber, setAccountNumber] = useState('')
@@ -36,6 +34,15 @@ export const CreateFinancialAccountModal: React.FC<CreateFinancialAccountModalPr
   const [openingBalance, setOpeningBalance] = useState<number>(0)
   const [isLoading, setIsLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+  const resetForm = useCallback(() => {
+    setAccountName('')
+    setAccountType('CASH_OWNER')
+    setAccountNumber('')
+    setBankName('')
+    setOpeningBalance(0)
+    setErrorMsg(null)
+  }, [])
 
   useEffect(() => {
     if (accountToEdit) {
@@ -48,16 +55,7 @@ export const CreateFinancialAccountModal: React.FC<CreateFinancialAccountModalPr
     } else {
       resetForm()
     }
-  }, [accountToEdit, isOpen])
-
-  const resetForm = () => {
-    setAccountName('')
-    setAccountType('CASH_OWNER')
-    setAccountNumber('')
-    setBankName('')
-    setOpeningBalance(0)
-    setErrorMsg(null)
-  }
+  }, [accountToEdit, isOpen, resetForm])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
