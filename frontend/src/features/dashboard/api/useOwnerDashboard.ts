@@ -393,6 +393,7 @@ export function useOwnerDashboard() {
           incomesRes,
           cashSessionsRes,
           managerAccountsRes,
+          activeBoardersRes,
           mealsTodayRes,
           mealsTomorrowRes,
         ] = await Promise.all([
@@ -411,8 +412,9 @@ export function useOwnerDashboard() {
             .select('id, current_balance, account_type')
             .eq('account_type', 'CASH_MANAGER')
             .eq('is_active', true),
-          supabase.from('meal_selections').select('breakfast, lunch, dinner').eq('meal_date', todayStr),
-          supabase.from('meal_selections').select('breakfast, lunch, dinner').eq('meal_date', tomorrowStr),
+          supabase.from('boarders').select('id').eq('status', 'ACTIVE'),
+          supabase.from('meal_selections').select('boarder_id, breakfast, lunch, dinner').eq('meal_date', todayStr),
+          supabase.from('meal_selections').select('boarder_id, breakfast, lunch, dinner').eq('meal_date', tomorrowStr),
         ])
 
         const seats = seatsRes.data || []
@@ -449,14 +451,61 @@ export function useOwnerDashboard() {
         )
         const cashCustody = latestSessionByManager.size > 0 ? sessionCash : accountCash
 
-        const countToday = (mealsTodayRes.data || []).reduce(
-          (sum, s) => sum + (s.breakfast ? 1 : 0) + (s.lunch ? 1 : 0) + (s.dinner ? 1 : 0),
-          0
+        // Calculate meals using Hostel Mess Opt-Out Policy:
+        // Active residents who have NOT opted out have their meals ON by default (3 meals/day)
+        const activeBoardersList = (activeBoardersRes.data || []) as { id: string }[]
+        const effectiveResidentsCount = activeBoardersList.length || occupiedSeats
+
+        const todaySelMap = new Map<string, any>(
+          (mealsTodayRes.data || []).map((s: any) => [s.boarder_id, s])
         )
-        const countTomorrow = (mealsTomorrowRes.data || []).reduce(
-          (sum, s) => sum + (s.breakfast ? 1 : 0) + (s.lunch ? 1 : 0) + (s.dinner ? 1 : 0),
-          0
+        const tomorrowSelMap = new Map<string, any>(
+          (mealsTomorrowRes.data || []).map((s: any) => [s.boarder_id, s])
         )
+
+        let countToday = 0
+        let countTomorrow = 0
+
+        if (activeBoardersList.length > 0) {
+          for (const b of activeBoardersList) {
+            const todaySel = todaySelMap.get(b.id)
+            if (todaySel) {
+              countToday += (todaySel.breakfast ? 1 : 0) + (todaySel.lunch ? 1 : 0) + (todaySel.dinner ? 1 : 0)
+            } else {
+              // Opt-Out default: active meals
+              countToday += 3
+            }
+
+            const tomorrowSel = tomorrowSelMap.get(b.id)
+            if (tomorrowSel) {
+              countTomorrow += (tomorrowSel.breakfast ? 1 : 0) + (tomorrowSel.lunch ? 1 : 0) + (tomorrowSel.dinner ? 1 : 0)
+            } else {
+              // Opt-Out default: active meals
+              countTomorrow += 3
+            }
+          }
+        } else if (occupiedSeats > 0) {
+          let turnedOffToday = 0
+          for (const s of (mealsTodayRes.data || [])) {
+            if (!s.breakfast) turnedOffToday++
+            if (!s.lunch) turnedOffToday++
+            if (!s.dinner) turnedOffToday++
+          }
+          countToday = Math.max(0, occupiedSeats * 3 - turnedOffToday)
+
+          let turnedOffTomorrow = 0
+          for (const s of (mealsTomorrowRes.data || [])) {
+            if (!s.breakfast) turnedOffTomorrow++
+            if (!s.lunch) turnedOffTomorrow++
+            if (!s.dinner) turnedOffTomorrow++
+          }
+          countTomorrow = Math.max(0, occupiedSeats * 3 - turnedOffTomorrow)
+        }
+
+        const maxPossibleMealsToday = effectiveResidentsCount * 3
+        const mealAttendanceRate = maxPossibleMealsToday > 0
+          ? Math.min(100, Math.round((countToday / maxPossibleMealsToday) * 1000) / 10)
+          : (effectiveResidentsCount > 0 ? 100 : 0)
 
         // 1. Live Flat Occupancy
         const { data: realFlats } = await supabase
@@ -556,7 +605,7 @@ export function useOwnerDashboard() {
             net_operating_income: totalCollected + totalIncomes - totalExpenses,
             active_meals_today: countToday,
             active_meals_tomorrow: countTomorrow,
-            meal_attendance_rate: totalSeats > 0 ? Math.round((countToday / (totalSeats * 3)) * 1000) / 10 : 0,
+            meal_attendance_rate: mealAttendanceRate,
             estimated_monthly_meal_bill: countToday * 30 * 60,
           },
           cash_flow_trend: cashFlowTrend,

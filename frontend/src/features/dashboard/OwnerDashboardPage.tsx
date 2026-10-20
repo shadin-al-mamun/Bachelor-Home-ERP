@@ -372,7 +372,7 @@ export const OwnerDashboardPage: React.FC = () => {
               <div className="p-2 rounded-xl bg-slate-950/70 border border-slate-800">
                 <span className="text-[10px] text-slate-400 block">আগামীকাল প্রস্তুত:</span>
                 <div key={kpis.active_meals_tomorrow} className="text-xl sm:text-2xl font-extrabold font-mono text-indigo-300 mt-0.5 animate-fade-in">
-                  {kpis.active_meals_tomorrow ?? 192} <span className="text-[10px] font-normal text-slate-400">টি</span>
+                  {kpis.active_meals_tomorrow} <span className="text-[10px] font-normal text-slate-400">টি</span>
                 </div>
               </div>
             </div>

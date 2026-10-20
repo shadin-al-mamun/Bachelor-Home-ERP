@@ -263,7 +263,7 @@ export function useKitchenMealSummary(mealDate?: string) {
         }
       }
 
-      // Supabase Query: Join flats with active meal selections on targetDate
+      // Supabase Query: Join flats with rooms, seats, and allocations
       const { data: flatsData, error: flatsErr } = await supabase
         .from('flats')
         .select(`
@@ -271,10 +271,17 @@ export function useKitchenMealSummary(mealDate?: string) {
           name,
           flat_code,
           floor_number,
-          building:building_id ( name ),
-          allocations(
+          building:buildings ( name ),
+          rooms (
             id,
-            boarder_id
+            seats (
+              id,
+              allocations (
+                id,
+                boarder_id,
+                status
+              )
+            )
           )
         `)
         .eq('status', 'ACTIVE')
@@ -299,18 +306,42 @@ export function useKitchenMealSummary(mealDate?: string) {
       let grandBoarders = 0
 
       const flatSummaries: KitchenFlatSummary[] = (flatsData || []).map((flat: any) => {
-        const flatBoarderIds = (flat.allocations || []).map((a: any) => a.boarder_id)
-        const flatSelections = selections.filter((s: any) => s.flat_id === flat.id)
+        const flatBoarderIds: string[] = (flat.rooms || [])
+          .flatMap((r: any) => r.seats || [])
+          .flatMap((s: any) => s.allocations || [])
+          .filter((a: any) => a && (a.status === 'ACTIVE' || !a.status))
+          .map((a: any) => a.boarder_id)
+          .filter(Boolean)
 
-        const bCount = flatSelections.filter((s: any) => s.breakfast).length
-        const lCount = flatSelections.filter((s: any) => s.lunch).length
-        const dCount = flatSelections.filter((s: any) => s.dinner).length
+        const uniqueBoarderIds = Array.from(new Set(flatBoarderIds))
+        const flatSelections = selections.filter((s: any) => s.flat_id === flat.id)
+        const flatSelMap = new Map(flatSelections.map((s: any) => [s.boarder_id, s]))
+
+        // In an Opt-Out mess policy: for every active boarder, if no selection row, default is TRUE!
+        let bCount = 0
+        let lCount = 0
+        let dCount = 0
+
+        for (const bId of uniqueBoarderIds) {
+          const sel: any = flatSelMap.get(bId)
+          if (sel) {
+            if (sel.breakfast) bCount++
+            if (sel.lunch) lCount++
+            if (sel.dinner) dCount++
+          } else {
+            // Opt-out default: meals are active unless turned off!
+            bCount++
+            lCount++
+            dCount++
+          }
+        }
+
         const tMeals = bCount + lCount + dCount
 
         grandBreakfast += bCount
         grandLunch += lCount
         grandDinner += dCount
-        grandBoarders += flatBoarderIds.length
+        grandBoarders += uniqueBoarderIds.length
 
         return {
           flat_id: flat.id,
@@ -318,7 +349,7 @@ export function useKitchenMealSummary(mealDate?: string) {
           flat_code: flat.flat_code,
           building_name: flat.building?.name || 'মেইন হোস্টেল',
           floor_number: flat.floor_number,
-          total_boarders: flatBoarderIds.length,
+          total_boarders: uniqueBoarderIds.length,
           breakfast_count: bCount,
           lunch_count: lCount,
           dinner_count: dCount,
@@ -368,24 +399,31 @@ export function useFlatBoarderMeals(flatId?: string, mealDate?: string) {
       const { data, error } = await supabase
         .from('allocations')
         .select(`
-          boarder:boarder_id (
+          id,
+          status,
+          boarder:boarders (
             id,
             full_name,
             boarder_code,
             phone_number
           ),
-          seat:seat_id (
+          seat:seats (
+            id,
             seat_name,
-            room:room_id (
+            room:rooms (
+              id,
               name,
               flat_id
             )
           )
         `)
         .eq('status', 'ACTIVE')
-        .eq('seat.room.flat_id', flatId)
 
       if (error) throw new Error(error.message)
+
+      const activeInFlat = (data || []).filter(
+        (row: any) => row.seat?.room?.flat_id === flatId
+      )
 
       // Fetch meal selections for this date & flat
       const { data: selData, error: selErr } = await supabase
@@ -398,7 +436,7 @@ export function useFlatBoarderMeals(flatId?: string, mealDate?: string) {
 
       const selectionsMap = new Map((selData || []).map((s: any) => [s.boarder_id, s]))
 
-      return (data || []).map((row: any) => {
+      return (activeInFlat || []).map((row: any) => {
         const b = row.boarder
         const seat = row.seat
         const room = seat?.room
@@ -411,9 +449,9 @@ export function useFlatBoarderMeals(flatId?: string, mealDate?: string) {
           phone_number: b?.phone_number || '',
           room_name: room?.name || 'রুম',
           seat_name: seat?.seat_name || 'সিট',
-          breakfast: sel?.breakfast ?? false,
-          lunch: sel?.lunch ?? false,
-          dinner: sel?.dinner ?? false,
+          breakfast: sel ? sel.breakfast : true, // Opt-Out: active by default
+          lunch: sel ? sel.lunch : true,         // Opt-Out: active by default
+          dinner: sel ? sel.dinner : true,       // Opt-Out: active by default
           is_override: sel?.is_override ?? false,
           override_reason: sel?.override_reason || null,
         }

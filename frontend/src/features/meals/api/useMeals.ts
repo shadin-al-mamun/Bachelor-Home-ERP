@@ -29,6 +29,14 @@ export function isMealManagerRole(role?: string | null): boolean {
   )
 }
 
+/**
+ * Validates whether a string is a standard UUID
+ */
+export function isUUID(str?: string | null): boolean {
+  if (!str) return false
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)
+}
+
 export interface ExtendedMealSelection extends MealSelection {
   boarder_name?: string
   flat_name?: string
@@ -353,7 +361,7 @@ export function useMealBoardersList() {
         return MOCK_BOARDERS_FOR_MEAL
       }
 
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('boarders')
         .select(`
           id,
@@ -361,7 +369,7 @@ export function useMealBoardersList() {
           full_name,
           boarder_code,
           phone_number,
-          allocations!inner(
+          allocations(
             status,
             seat:seat_id(
               seat_name,
@@ -373,20 +381,28 @@ export function useMealBoardersList() {
           )
         `)
         .eq('status', 'ACTIVE')
-        .eq('allocations.status', 'ACTIVE')
         .order('full_name')
 
+      // Fallback query if nested relation has schema naming variance
       if (error) {
-        console.warn('meal boarders list fetch error:', error.message)
-        return []
+        console.warn('meal boarders nested join error, falling back to direct boarders query:', error.message)
+        const simple = await supabase
+          .from('boarders')
+          .select('id, user_id, full_name, boarder_code, phone_number')
+          .eq('status', 'ACTIVE')
+          .order('full_name')
+        data = simple.data as any
       }
+
       if (!data || data.length === 0) {
         return []
       }
 
       return data.map((b: any) => {
-        const alloc = b.allocations?.[0]
-        const seat = alloc?.seat
+        const activeAlloc = Array.isArray(b.allocations)
+          ? b.allocations.find((a: any) => a.status === 'ACTIVE') || b.allocations[0]
+          : null
+        const seat = activeAlloc?.seat
         const room = seat?.room
         const flat = room?.flat
 
@@ -397,7 +413,7 @@ export function useMealBoardersList() {
           boarder_code: b.boarder_code,
           phone_number: b.phone_number,
           flat_name: flat?.name || 'ফ্ল্যাট',
-          room_name: `${room?.name || 'রুম'} (${seat?.seat_name || 'সিট'})`,
+          room_name: room?.name ? `${room.name} (${seat?.seat_name || 'সিট'})` : 'বর্ডার মেস সিট',
         }
       })
     },
@@ -448,10 +464,25 @@ export function useBoarderMealSelections(
         return filtered
       }
 
+      let resolvedId = targetBoarder
+      if (!isUUID(resolvedId)) {
+        const { data: firstBdr } = await supabase
+          .from('boarders')
+          .select('id')
+          .eq('status', 'ACTIVE')
+          .limit(1)
+          .maybeSingle()
+        if (firstBdr?.id) {
+          resolvedId = firstBdr.id
+        } else {
+          return []
+        }
+      }
+
       const { data, error } = await supabase
         .from('meal_selections')
         .select('*')
-        .eq('boarder_id', targetBoarder)
+        .eq('boarder_id', resolvedId)
         .gte('meal_date', targetStart)
         .lte('meal_date', targetEnd)
         .order('meal_date', { ascending: true })
@@ -562,13 +593,29 @@ export function useToggleMealMutation() {
         }
       }
 
+      // Resolve valid target boarder UUID for Supabase RPC
+      let targetBoarderUuid: string | null = null
+      if (isUUID(input.targetBoarderId)) {
+        targetBoarderUuid = input.targetBoarderId!
+      } else {
+        const { data: activeBdr } = await supabase
+          .from('boarders')
+          .select('id')
+          .eq('status', 'ACTIVE')
+          .limit(1)
+          .maybeSingle()
+        if (activeBdr?.id) {
+          targetBoarderUuid = activeBdr.id
+        }
+      }
+
       // Supabase RPC Call
       const { data, error } = await supabase.rpc('fn_toggle_meal_selection', {
         p_meal_date: input.mealDate,
         p_session: sessionUpper,
         p_new_state: input.newState,
         p_override_reason: effectiveOverrideReason || null,
-        p_target_boarder_id: input.targetBoarderId || null,
+        p_target_boarder_id: targetBoarderUuid,
       })
 
       if (error) {
@@ -710,6 +757,22 @@ export function useBatchToggleMealsMutation() {
         return { success: true }
       }
 
+      // Resolve valid target boarder UUID for Supabase RPC
+      let targetBoarderUuid: string | null = null
+      if (isUUID(input.targetBoarderId)) {
+        targetBoarderUuid = input.targetBoarderId!
+      } else {
+        const { data: activeBdr } = await supabase
+          .from('boarders')
+          .select('id')
+          .eq('status', 'ACTIVE')
+          .limit(1)
+          .maybeSingle()
+        if (activeBdr?.id) {
+          targetBoarderUuid = activeBdr.id
+        }
+      }
+
       // Sequential toggle calls for non-undefined sessions
       const sessionsToToggle: { session: MealSessionType; state: boolean }[] = []
       if (input.breakfast !== undefined) sessionsToToggle.push({ session: 'BREAKFAST', state: input.breakfast })
@@ -722,7 +785,7 @@ export function useBatchToggleMealsMutation() {
           p_session: item.session,
           p_new_state: item.state,
           p_override_reason: effectiveOverrideReason || null,
-          p_target_boarder_id: input.targetBoarderId || null,
+          p_target_boarder_id: targetBoarderUuid,
         })
         if (error) throw new Error(error.message)
       }

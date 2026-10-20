@@ -42,7 +42,7 @@ export const BoarderMealPortal: React.FC = () => {
   const tomorrowStr = formatDhakaDate(tomorrow)
 
   const [selectedDate, setSelectedDate] = useState<string>(tomorrowStr)
-  const [selectedBoarderId, setSelectedBoarderId] = useState<string>('bdr-101')
+  const [selectedBoarderId, setSelectedBoarderId] = useState<string>('')
 
   // Override Modal state (for staff)
   const [overrideModal, setOverrideModal] = useState<{
@@ -64,18 +64,24 @@ export const BoarderMealPortal: React.FC = () => {
   const batchToggleMutation = useBatchToggleMealsMutation()
 
   React.useEffect(() => {
-    if (boarders.length > 0 && profile?.role === 'BOARDER') {
-      const matched = boarders.find(
-        (b) =>
-          b.user_id === profile.id ||
-          b.id === profile.id ||
-          b.phone_number === profile.phone_number ||
-          b.full_name === profile.full_name
-      )
-      if (matched) {
-        setSelectedBoarderId(matched.id)
-      } else if (selectedBoarderId === 'bdr-101' && boarders[0]) {
-        setSelectedBoarderId(boarders[0].id)
+    if (boarders.length > 0) {
+      if (profile?.role === 'BOARDER') {
+        const matched = boarders.find(
+          (b) =>
+            b.user_id === profile.id ||
+            b.id === profile.id ||
+            b.phone_number === profile.phone_number ||
+            b.full_name === profile.full_name
+        )
+        if (matched) {
+          setSelectedBoarderId(matched.id)
+        } else if ((!selectedBoarderId || selectedBoarderId === 'bdr-101') && boarders[0]) {
+          setSelectedBoarderId(boarders[0].id)
+        }
+      } else {
+        if ((!selectedBoarderId || selectedBoarderId === 'bdr-101') && boarders[0]) {
+          setSelectedBoarderId(boarders[0].id)
+        }
       }
     }
   }, [profile, boarders, selectedBoarderId])
@@ -111,7 +117,11 @@ export const BoarderMealPortal: React.FC = () => {
     const dStr = formatDhakaDate(d)
 
     const sel = selections.find((s) => s.meal_date === dStr)
-    const mealCount = (sel?.breakfast ? 1 : 0) + (sel?.lunch ? 1 : 0) + (sel?.dinner ? 1 : 0)
+    // In Opt-Out mess policy, unrecorded days are ON by default
+    const bOn = sel ? sel.breakfast : true
+    const lOn = sel ? sel.lunch : true
+    const dOn = sel ? sel.dinner : true
+    const mealCount = (bOn ? 1 : 0) + (lOn ? 1 : 0) + (dOn ? 1 : 0)
 
     const dayNameBn = d.toLocaleDateString('bn-BD', { weekday: 'short' })
     const dayDateBn = d.toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })
@@ -143,12 +153,13 @@ export const BoarderMealPortal: React.FC = () => {
       return
     }
 
+    const targetId = selectedBoarderId || activeBoarder?.id
     try {
       await toggleMutation.mutateAsync({
         mealDate: selectedDate,
         session,
         newState: !currentState,
-        targetBoarderId: selectedBoarderId,
+        targetBoarderId: targetId,
       })
     } catch (err: any) {
       alert(err.message || 'মিল পরিবর্তন করতে সমস্যা হয়েছে।')
@@ -159,13 +170,14 @@ export const BoarderMealPortal: React.FC = () => {
   const handleBatch = async (allOn: boolean) => {
     if (dateStatus.isLockedForBoarder && !isStaff) return
 
+    const targetId = selectedBoarderId || activeBoarder?.id
     try {
       await batchToggleMutation.mutateAsync({
         mealDate: selectedDate,
         breakfast: allOn,
         lunch: allOn,
         dinner: allOn,
-        targetBoarderId: selectedBoarderId,
+        targetBoarderId: targetId,
       })
     } catch (err: any) {
       alert(err.message || 'ব্যাচ পরিবর্তন করতে সমস্যা হয়েছে।')

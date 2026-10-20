@@ -48,7 +48,7 @@ export const StaffMealControlModal: React.FC<StaffMealControlModalProps> = ({
   const dayAfterStr = formatDhakaDate(dayAfter)
 
   // State
-  const [selectedBoarderId, setSelectedBoarderId] = useState<string>(initialBoarderId || 'bdr-101')
+  const [selectedBoarderId, setSelectedBoarderId] = useState<string>(initialBoarderId || '')
   const [selectedDate, setSelectedDate] = useState<string>(initialDate || tomorrowStr)
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [overrideReason, setOverrideReason] = useState<string>('বর্ডারের ফোন অনুরোধ')
@@ -87,8 +87,10 @@ export const StaffMealControlModal: React.FC<StaffMealControlModalProps> = ({
   useEffect(() => {
     if (initialBoarderId) {
       setSelectedBoarderId(initialBoarderId)
+    } else if (boarders.length > 0 && (!selectedBoarderId || selectedBoarderId === 'bdr-101')) {
+      setSelectedBoarderId(boarders[0].id)
     }
-  }, [initialBoarderId])
+  }, [initialBoarderId, boarders, selectedBoarderId])
 
   useEffect(() => {
     if (initialDate) {
@@ -142,20 +144,24 @@ export const StaffMealControlModal: React.FC<StaffMealControlModalProps> = ({
 
     const finalReason = customReason.trim() || overrideReason || 'কর্তৃপক্ষ কর্তৃক মিল পরিবর্তন (Staff Override)'
 
+    const targetBoarder = selectedBoarderId || activeBoarder?.id
+
     try {
       await batchToggleMutation.mutateAsync({
         mealDate: selectedDate,
         breakfast,
         lunch,
         dinner,
-        targetBoarderId: selectedBoarderId,
+        targetBoarderId: targetBoarder,
         overrideReason: finalReason,
       })
 
       // Sync mock detail table if in local/mock mode
-      updateMockFlatBoarderMeal(selectedBoarderId, 'BREAKFAST', breakfast, true, finalReason)
-      updateMockFlatBoarderMeal(selectedBoarderId, 'LUNCH', lunch, true, finalReason)
-      updateMockFlatBoarderMeal(selectedBoarderId, 'DINNER', dinner, true, finalReason)
+      if (targetBoarder) {
+        updateMockFlatBoarderMeal(targetBoarder, 'BREAKFAST', breakfast, true, finalReason)
+        updateMockFlatBoarderMeal(targetBoarder, 'LUNCH', lunch, true, finalReason)
+        updateMockFlatBoarderMeal(targetBoarder, 'DINNER', dinner, true, finalReason)
+      }
 
       setSuccessToast(
         `${activeBoarder?.full_name || 'বর্ডার'} এর ${selectedDate} তারিখের মিল সফলভাবে আপডেট হয়েছে!`
