@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   UtensilsCrossed,
   Clock,
@@ -27,6 +27,14 @@ import { formatCurrencyBn } from '@/utils/date'
 
 export const BoarderDashboardPage: React.FC = () => {
   const { profile } = useAuthStore()
+  const navigate = useNavigate()
+
+  // If a Super Admin or Manager enters the boarder portal, auto-redirect them to the master ERP dashboard
+  React.useEffect(() => {
+    if (profile?.role === 'SUPER_ADMIN' || profile?.role === 'ADMIN' || profile?.role === 'MANAGER') {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [profile?.role, navigate])
 
   // Asia/Dhaka time baseline
   const dhakaNow = getDhakaNow()
@@ -38,27 +46,29 @@ export const BoarderDashboardPage: React.FC = () => {
 
   // Dynamic boarder matching based on logged-in phone or name
   const { data: boardersList = [] } = useMealBoardersList()
-  const currentBoarder = boardersList.find(
+  const matchedResident = boardersList.find(
     (b) =>
-      b.phone_number === profile?.phone_number ||
-      b.full_name === profile?.full_name ||
-      b.id === profile?.id
-  ) || boardersList[0]
+      (profile?.phone_number && b.phone_number === profile?.phone_number) ||
+      (profile?.full_name && b.full_name === profile?.full_name) ||
+      (profile?.id && b.id === profile?.id)
+  )
+  const isStaffRole = profile?.role === 'SUPER_ADMIN' || profile?.role === 'ADMIN' || profile?.role === 'MANAGER'
+  const currentBoarder = matchedResident || (!isStaffRole ? boardersList[0] : null)
 
   const activeBoarderId = currentBoarder?.id || 'bdr-101'
 
-  // Demo / authenticated boarder profile info
+  // Authenticated boarder or staff profile info
   const boarderInfo = {
-    name: currentBoarder?.full_name || profile?.full_name || 'তানভীর আহমেদ',
-    code: currentBoarder?.boarder_code || 'BDR-101',
-    phone: currentBoarder?.phone_number || profile?.phone_number || '01711223344',
-    building: 'সানফ্লাওয়ার হোস্টেল (মেইন ভবন)',
-    flat: currentBoarder?.flat_name || 'ফ্ল্যাট ৪এ (৪র্থ তলা)',
-    room: currentBoarder?.room_name || 'রুম ১০১ (দক্ষিণমুখী)',
-    seat: currentBoarder?.room_name || 'সিট ১০১এ (উইন্ডো সাইড)',
-    monthlyRent: 4500,
-    admissionDate: '০১ অক্টোবর, ২০২৬',
-    status: 'সক্রিয় (Active)',
+    name: currentBoarder?.full_name || profile?.full_name || (isStaffRole ? 'মোঃ আব্দুল্লাহ আল মামুন' : 'তানভীর আহমেদ'),
+    code: currentBoarder?.boarder_code || (isStaffRole ? 'SUPER-ADMIN' : 'BDR-101'),
+    phone: currentBoarder?.phone_number || profile?.phone_number || '01712394767',
+    building: isStaffRole ? 'সুপার এডমিন কন্ট্রোল' : 'সানফ্লাওয়ার হোস্টেল (মেইন ভবন)',
+    flat: currentBoarder?.flat_name || (isStaffRole ? 'সকল ফ্ল্যাট ও ভবন' : 'ফ্ল্যাট ৪এ (৪র্থ তলা)'),
+    room: currentBoarder?.room_name || (isStaffRole ? 'মালিকানা অ্যাক্সেস' : 'রুম ১০১ (দক্ষিণমুখী)'),
+    seat: currentBoarder?.room_name || (isStaffRole ? 'মাস্টার এডমিন' : 'সিট ১০১এ (উইন্ডো সাইড)'),
+    monthlyRent: isStaffRole ? 0 : 4500,
+    admissionDate: isStaffRole ? 'সিস্টেম ওনার' : '০১ অক্টোবর, ২০২৬',
+    status: isStaffRole ? 'সুপার এডমিন (মালিক)' : 'সক্রিয় (Active)',
   }
 
   // Financial summary for this specific boarder

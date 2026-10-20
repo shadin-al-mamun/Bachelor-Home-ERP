@@ -21,7 +21,8 @@ SET
     role = 'SUPER_ADMIN',
     is_active = true,
     updated_at = timezone('Asia/Dhaka', now())
-WHERE email = 'shadin0158@gmail.com';
+WHERE email IN ('shadin0158@gmail.com', 'almamun0158@gmail.com')
+   OR phone_number = '01712394767';
 
 -- 2. CREATE ULTRA-RESILIENT RPC FUNCTION FOR PHONE LOGIN LOOKUP
 CREATE OR REPLACE FUNCTION public.find_user_email_by_phone(p_phone TEXT)

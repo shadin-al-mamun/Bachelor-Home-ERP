@@ -90,6 +90,11 @@ export const LoginPage: React.FC = () => {
 
   const handleRoleRedirect = (role: UserRole) => {
     if (from && from !== '/login') {
+      // If an admin or staff member was about to be sent to /portal, redirect to master /dashboard instead
+      if ((role === 'SUPER_ADMIN' || role === 'ADMIN' || role === 'MANAGER') && from.startsWith('/portal')) {
+        navigate('/dashboard', { replace: true })
+        return
+      }
       navigate(from, { replace: true })
       return
     }
@@ -328,10 +333,28 @@ export const LoginPage: React.FC = () => {
         }
       }
 
-      const { data, error } = await supabase.auth.signInWithPassword({
+      let signInRes = await supabase.auth.signInWithPassword({
         email: loginEmail,
         password,
       })
+
+      // If owner phone was used and first email failed, retry with alternate owner email
+      if (
+        signInRes.error &&
+        (normalizedPhone === '01712394767' || loginEmail === 'shadin0158@gmail.com' || loginEmail === 'almamun0158@gmail.com')
+      ) {
+        const altEmail = loginEmail === 'shadin0158@gmail.com' ? 'almamun0158@gmail.com' : 'shadin0158@gmail.com'
+        const retryRes = await supabase.auth.signInWithPassword({
+          email: altEmail,
+          password,
+        })
+        if (!retryRes.error && retryRes.data.user) {
+          signInRes = retryRes
+          loginEmail = altEmail
+        }
+      }
+
+      const { data, error } = signInRes
 
       if (error) {
         setErrorMessage(
@@ -344,15 +367,32 @@ export const LoginPage: React.FC = () => {
       }
 
       if (data.user) {
-        // Self-healing: if logged in via phone or user has a verified normalized phone, ensure profile is synced
-        if (normalizedPhone && normalizedPhone.length === 11) {
+        const isOwner =
+          normalizedPhone === '01712394767' ||
+          data.user.email === 'shadin0158@gmail.com' ||
+          data.user.email === 'almamun0158@gmail.com' ||
+          loginEmail === 'shadin0158@gmail.com' ||
+          loginEmail === 'almamun0158@gmail.com'
+
+        // Self-healing: if logged in via phone or user is owner, sync profile in database immediately
+        if (isOwner || (normalizedPhone && normalizedPhone.length === 11)) {
           try {
             await supabase
               .from('profiles')
-              .update({ phone_number: normalizedPhone })
-              .eq('id', data.user.id)
-          } catch {
-            // non-blocking self-healing
+              .upsert(
+                {
+                  id: data.user.id,
+                  email: data.user.email || loginEmail,
+                  phone_number: normalizedPhone || '01712394767',
+                  role: isOwner ? 'SUPER_ADMIN' : undefined,
+                  full_name: isOwner ? 'মোঃ আব্দুল্লাহ আল মামুন' : undefined,
+                  is_active: true,
+                  updated_at: new Date().toISOString(),
+                },
+                { onConflict: 'id' }
+              )
+          } catch (syncErr) {
+            console.warn('Profile sync notice:', syncErr)
           }
         }
 
@@ -362,7 +402,7 @@ export const LoginPage: React.FC = () => {
           .eq('id', data.user.id)
           .maybeSingle()
 
-        const userRole = (profile?.role as UserRole) || 'BOARDER'
+        const userRole: UserRole = isOwner ? 'SUPER_ADMIN' : ((profile?.role as UserRole) || 'BOARDER')
         handleRoleRedirect(userRole)
       }
     } catch (err: unknown) {

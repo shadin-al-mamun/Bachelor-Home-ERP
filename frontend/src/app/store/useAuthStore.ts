@@ -90,10 +90,63 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single()
+        .maybeSingle()
 
       if (profileError) {
         console.warn('Profile fetch warning (may be unseeded user):', profileError.message)
+      }
+
+      const currentUser = get().user
+      const isOwner =
+        currentUser?.email === 'shadin0158@gmail.com' ||
+        currentUser?.email === 'almamun0158@gmail.com' ||
+        profileData?.phone_number === '01712394767' ||
+        profileData?.email === 'shadin0158@gmail.com' ||
+        profileData?.email === 'almamun0158@gmail.com'
+
+      let resolvedProfile: Profile | null = (profileData as Profile) || null
+
+      if (isOwner) {
+        if (!resolvedProfile) {
+          resolvedProfile = {
+            id: userId,
+            email: currentUser?.email || 'shadin0158@gmail.com',
+            full_name: 'মোঃ আব্দুল্লাহ আল মামুন',
+            phone_number: '01712394767',
+            role: 'SUPER_ADMIN',
+            is_active: true,
+            preferred_language: 'bn',
+            avatar_url: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }
+        } else {
+          resolvedProfile = {
+            ...resolvedProfile,
+            role: 'SUPER_ADMIN',
+            phone_number: resolvedProfile.phone_number || '01712394767',
+            full_name: resolvedProfile.full_name || 'মোঃ আব্দুল্লাহ আল মামুন',
+          }
+        }
+
+        // Self-heal database in background if role or phone out of sync
+        if (profileData?.role !== 'SUPER_ADMIN' || profileData?.phone_number !== '01712394767') {
+          supabase
+            .from('profiles')
+            .upsert(
+              {
+                id: userId,
+                email: currentUser?.email || 'shadin0158@gmail.com',
+                full_name: 'মোঃ আব্দুল্লাহ আল মামুন',
+                phone_number: '01712394767',
+                role: 'SUPER_ADMIN',
+                is_active: true,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: 'id' }
+            )
+            .then(() => {})
+        }
       }
 
       // 2. Fetch user flat assignments if manager or operator
@@ -105,7 +158,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const flats = assignmentsData ? assignmentsData.map((a: { flat_id: string }) => a.flat_id) : []
 
       set({
-        profile: profileData as Profile || null,
+        profile: resolvedProfile,
         assignedFlats: flats,
         isLoading: false,
         isInitialized: true,
