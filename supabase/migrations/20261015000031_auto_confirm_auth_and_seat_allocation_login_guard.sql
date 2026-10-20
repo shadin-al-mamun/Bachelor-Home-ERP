@@ -3,7 +3,8 @@
 -- File: supabase/migrations/20261015000031_auto_confirm_auth_and_seat_allocation_login_guard.sql
 -- Engine: PostgreSQL 15+ (Supabase Managed Platform)
 -- Description:
---   1. Auto-confirms all existing unconfirmed accounts in auth.users to resolve "Email not confirmed".
+--   1. Auto-confirms all existing unconfirmed accounts in auth.users by updating email_confirmed_at.
+--      (Note: confirmed_at is a GENERATED ALWAYS column in Supabase and auto-updates).
 --   2. Adds an auth.users trigger to automatically confirm all new user accounts upon creation.
 --   3. Provides a public SECURITY DEFINER RPC confirm_user_account for seamless self-healing login.
 --   4. Provides verify_boarder_seat_status RPC to enforce the business rule:
@@ -13,10 +14,8 @@
 
 -- 1. AUTO-CONFIRM ALL EXISTING UNCONFIRMED USERS IN auth.users
 UPDATE auth.users
-SET 
-    email_confirmed_at = COALESCE(email_confirmed_at, now()),
-    confirmed_at = COALESCE(confirmed_at, now())
-WHERE email_confirmed_at IS NULL OR confirmed_at IS NULL;
+SET email_confirmed_at = COALESCE(email_confirmed_at, now())
+WHERE email_confirmed_at IS NULL;
 
 -- 2. CREATE TRIGGER FUNCTION TO AUTO-CONFIRM FUTURE USER SIGNUPS
 CREATE OR REPLACE FUNCTION public.handle_auto_confirm_user()
@@ -27,7 +26,6 @@ SET search_path = public, auth, pg_temp
 AS $$
 BEGIN
     NEW.email_confirmed_at := COALESCE(NEW.email_confirmed_at, now());
-    NEW.confirmed_at := COALESCE(NEW.confirmed_at, now());
     RETURN NEW;
 END;
 $$;
@@ -55,11 +53,9 @@ BEGIN
     -- Confirm by direct email match
     IF p_email IS NOT NULL AND p_email <> '' THEN
         UPDATE auth.users
-        SET 
-            email_confirmed_at = COALESCE(email_confirmed_at, now()),
-            confirmed_at = COALESCE(confirmed_at, now())
+        SET email_confirmed_at = COALESCE(email_confirmed_at, now())
         WHERE LOWER(email) = LOWER(p_email)
-          AND (email_confirmed_at IS NULL OR confirmed_at IS NULL);
+          AND email_confirmed_at IS NULL;
         GET DIAGNOSTICS v_affected = ROW_COUNT;
     END IF;
 
@@ -71,16 +67,14 @@ BEGIN
         END IF;
 
         UPDATE auth.users
-        SET 
-            email_confirmed_at = COALESCE(email_confirmed_at, now()),
-            confirmed_at = COALESCE(confirmed_at, now())
+        SET email_confirmed_at = COALESCE(email_confirmed_at, now())
         WHERE (
             email ILIKE '%' || v_clean_phone || '%'
             OR phone = p_phone
             OR phone = '+88' || p_phone
             OR phone = '88' || p_phone
         )
-        AND (email_confirmed_at IS NULL OR confirmed_at IS NULL);
+        AND email_confirmed_at IS NULL;
         GET DIAGNOSTICS v_affected = ROW_COUNT;
     END IF;
 
@@ -305,10 +299,8 @@ BEGIN
     -- Ensure auth user email is confirmed upon seat allocation so login is instantaneous
     IF v_user_id IS NOT NULL THEN
         UPDATE auth.users
-        SET 
-            email_confirmed_at = COALESCE(email_confirmed_at, now()),
-            confirmed_at = COALESCE(confirmed_at, now())
-        WHERE id = v_user_id AND (email_confirmed_at IS NULL OR confirmed_at IS NULL);
+        SET email_confirmed_at = COALESCE(email_confirmed_at, now())
+        WHERE id = v_user_id AND email_confirmed_at IS NULL;
     END IF;
 
     IF v_boarder_status <> 'ACTIVE' THEN
