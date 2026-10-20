@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import {
   TrendingUp,
+  TrendingDown,
   DollarSign,
   Receipt,
   RotateCw,
@@ -302,18 +303,32 @@ export const OwnerDashboardPage: React.FC = () => {
           </div>
 
           {/* Card 3: 📉 Expenses & Net Operating Income (NOI) */}
-          <div className="p-4 sm:p-5 rounded-3xl bg-slate-900/70 border border-cyan-500/30 backdrop-blur-sm relative overflow-hidden group">
+          <div className={`p-4 sm:p-5 rounded-3xl bg-slate-900/70 border ${
+            kpis.net_operating_income >= 0 ? 'border-cyan-500/30' : 'border-rose-500/30'
+          } backdrop-blur-sm relative overflow-hidden group`}>
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
-                <TrendingUp className="w-4 h-4 text-cyan-400" />
+              <span className={`text-[11px] font-bold ${
+                kpis.net_operating_income >= 0 ? 'text-cyan-400' : 'text-rose-400'
+              } uppercase tracking-wider flex items-center gap-1.5`}>
+                {kpis.net_operating_income >= 0 ? (
+                  <TrendingUp className="w-4 h-4 text-cyan-400" />
+                ) : (
+                  <TrendingDown className="w-4 h-4 text-rose-400" />
+                )}
                 নিট পরিচালন উদ্বৃত্ত (NOI)
               </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
-                মুনাফা
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                kpis.net_operating_income >= 0
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                  : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+              }`}>
+                {kpis.net_operating_income >= 0 ? 'মুনাফা' : 'ঘাটতি'}
               </span>
             </div>
 
-            <div className="text-2xl sm:text-3xl font-extrabold font-mono text-cyan-300 mt-2">
+            <div className={`text-2xl sm:text-3xl font-extrabold font-mono ${
+              kpis.net_operating_income >= 0 ? 'text-cyan-300' : 'text-rose-400'
+            } mt-2`}>
               ৳{(kpis.net_operating_income / 1000).toFixed(1)}k
             </div>
 

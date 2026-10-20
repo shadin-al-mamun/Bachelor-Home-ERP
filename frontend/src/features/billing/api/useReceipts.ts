@@ -408,6 +408,8 @@ export function useRecordReceiptMutation() {
       queryClient.invalidateQueries({ queryKey: ['boarder-charges'] })
       queryClient.invalidateQueries({ queryKey: ['unpaid-charges'] })
       queryClient.invalidateQueries({ queryKey: ['financial-accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['owner-executive-dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['cash-sessions'] })
     },
   })
 }
@@ -447,7 +449,10 @@ export function useVoidReceiptMutation() {
       queryClient.invalidateQueries({ queryKey: ['receipts'] })
       queryClient.invalidateQueries({ queryKey: ['boarder-dues'] })
       queryClient.invalidateQueries({ queryKey: ['boarder-charges'] })
+      queryClient.invalidateQueries({ queryKey: ['unpaid-charges'] })
       queryClient.invalidateQueries({ queryKey: ['financial-accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['owner-executive-dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['cash-sessions'] })
     },
   })
 }

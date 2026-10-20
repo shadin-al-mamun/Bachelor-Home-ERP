@@ -131,7 +131,24 @@ export function useBoarderDuesSummary(filters?: DuesFilters) {
         console.warn('vw_boarder_dues_summary fetch failed:', error.message)
         return []
       }
-      return (data || []) as BoarderDueSummary[]
+
+      let list = (data || []) as BoarderDueSummary[]
+      if (filters?.search?.trim()) {
+        const q = filters.search.toLowerCase()
+        list = list.filter(
+          (d) =>
+            d.full_name?.toLowerCase().includes(q) ||
+            d.phone_number?.includes(q) ||
+            d.boarder_code?.toLowerCase().includes(q)
+        )
+      }
+      if (filters?.flatCode && filters.flatCode !== 'ALL') {
+        list = list.filter((d) => d.flat_code === filters.flatCode)
+      }
+      if (filters?.overdueOnly) {
+        list = list.filter((d) => Number(d.overdue_amount) > 0)
+      }
+      return list
     },
   })
 }

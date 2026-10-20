@@ -866,6 +866,7 @@ CREATE OR REPLACE FUNCTION public.fn_record_receipt(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, auth
 AS $$
 DECLARE
     v_current_user UUID := auth.uid();
@@ -874,6 +875,9 @@ DECLARE
     v_today DATE := (timezone('Asia/Dhaka', now()))::DATE;
     v_alloc RECORD;
     v_allocated_sum NUMERIC(12,2) := 0.00;
+    v_remaining_amount NUMERIC(12,2);
+    v_charge RECORD;
+    v_alloc_amount NUMERIC(12,2);
 BEGIN
     IF p_amount <= 0 THEN
         RAISE EXCEPTION 'Receipt amount must be strictly positive.';
@@ -923,19 +927,45 @@ BEGIN
         WHERE manager_id = v_current_user AND session_date = v_today;
     END IF;
 
-    -- Process bill allocations if provided
-    IF jsonb_array_length(p_allocations) > 0 THEN
+    -- Process explicit bill allocations if provided
+    IF p_allocations IS NOT NULL AND jsonb_array_length(p_allocations) > 0 THEN
         FOR v_alloc IN SELECT * FROM jsonb_to_recordset(p_allocations) AS x(charge_id UUID, amount NUMERIC(12,2))
         LOOP
-            INSERT INTO public.receipt_allocations (receipt_id, charge_id, allocated_amount)
-            VALUES (v_receipt_id, v_alloc.charge_id, v_alloc.amount);
+            IF v_alloc.amount > 0 THEN
+                INSERT INTO public.receipt_allocations (receipt_id, charge_id, allocated_amount)
+                VALUES (v_receipt_id, v_alloc.charge_id, v_alloc.amount);
 
-            v_allocated_sum := v_allocated_sum + v_alloc.amount;
+                v_allocated_sum := v_allocated_sum + v_alloc.amount;
+            END IF;
         END LOOP;
 
         IF v_allocated_sum > p_amount THEN
             RAISE EXCEPTION 'Total allocated charges (%) exceeds total receipt amount (%).', v_allocated_sum, p_amount;
         END IF;
+    END IF;
+
+    -- Auto-allocate remaining unallocated receipt amount to oldest unpaid charges (FIFO)
+    v_remaining_amount := p_amount - v_allocated_sum;
+    IF v_remaining_amount > 0 THEN
+        FOR v_charge IN
+            SELECT id, due_amount
+            FROM public.boarder_charges
+            WHERE boarder_id = p_boarder_id
+              AND status IN ('UNPAID', 'PARTIALLY_PAID')
+              AND due_amount > 0
+            ORDER BY due_date ASC, created_at ASC
+        LOOP
+            EXIT WHEN v_remaining_amount <= 0;
+
+            v_alloc_amount := LEAST(v_remaining_amount, v_charge.due_amount);
+
+            IF v_alloc_amount > 0 THEN
+                INSERT INTO public.receipt_allocations (receipt_id, charge_id, allocated_amount)
+                VALUES (v_receipt_id, v_charge.id, v_alloc_amount);
+
+                v_remaining_amount := v_remaining_amount - v_alloc_amount;
+            END IF;
+        END LOOP;
     END IF;
 
     RETURN jsonb_build_object(
@@ -2382,7 +2412,7 @@ LEFT JOIN public.allocations a ON a.boarder_id = b.id AND a.status = 'ACTIVE'
 LEFT JOIN public.seats s ON s.id = a.seat_id
 LEFT JOIN public.rooms r ON r.id = s.room_id
 LEFT JOIN public.flats f ON f.id = r.flat_id
-LEFT JOIN public.boarder_charges bc ON bc.boarder_id = b.id AND bc.status IN ('UNPAID', 'PARTIALLY_PAID')
+LEFT JOIN public.boarder_charges bc ON bc.boarder_id = b.id
 LEFT JOIN last_payments lp ON lp.boarder_id = b.id
 GROUP BY 
     b.id, 

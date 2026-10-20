@@ -92,16 +92,21 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
     }
   }, [accounts, destinationAccountId, paymentMethod])
 
-  // Reset allocations when unpaidCharges change
+  // Automatically distribute allocations when unpaidCharges or amountReceived change
   useEffect(() => {
     if (unpaidCharges.length > 0) {
-      const initial: Record<string, number> = {}
-      unpaidCharges.forEach((c) => {
-        initial[c.id] = 0
-      })
-      setAllocations(initial)
+      if (amountReceived > 0) {
+        const newAlloc = autoDistributePayment(amountReceived, unpaidCharges)
+        setAllocations(newAlloc)
+      } else {
+        const initial: Record<string, number> = {}
+        unpaidCharges.forEach((c) => {
+          initial[c.id] = 0
+        })
+        setAllocations(initial)
+      }
     }
-  }, [unpaidCharges])
+  }, [unpaidCharges, amountReceived])
 
   // Total amount currently allocated across charges
   const totalAllocated = Object.values(allocations).reduce((sum, val) => sum + (val || 0), 0)
@@ -141,22 +146,37 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
       setErrorMsg('অনুগ্রহ করে জমার একাউন্ট বা ক্যাশ বক্স নির্বাচন করুন।')
       return
     }
-    if (totalAllocated > amountReceived) {
-      setErrorMsg(
-        `চার্জে বণ্টনকৃত টাকার পরিমাণ (${formatCurrencyBn(
-          totalAllocated
-        )}) মোট গৃহীত টাকার (${formatCurrencyBn(amountReceived)}) চেয়ে বেশি হতে পারবে না।`
-      )
-      return
-    }
 
-    // Format allocation array for RPC
-    const allocationPayload = Object.entries(allocations)
+    // Auto-allocate if not yet allocated
+    let currentAllocations = allocations
+    let allocationPayload = Object.entries(currentAllocations)
       .filter(([, amt]) => amt > 0)
       .map(([charge_id, amount]) => ({
         charge_id,
         amount,
       }))
+
+    if (allocationPayload.length === 0 && unpaidCharges.length > 0 && amountReceived > 0) {
+      const autoAlloc = autoDistributePayment(amountReceived, unpaidCharges)
+      currentAllocations = autoAlloc
+      setAllocations(autoAlloc)
+      allocationPayload = Object.entries(autoAlloc)
+        .filter(([, amt]) => amt > 0)
+        .map(([charge_id, amount]) => ({
+          charge_id,
+          amount,
+        }))
+    }
+
+    const currentTotalAllocated = Object.values(currentAllocations).reduce((sum, val) => sum + (val || 0), 0)
+    if (currentTotalAllocated > amountReceived) {
+      setErrorMsg(
+        `চার্জে বণ্টনকৃত টাকার পরিমাণ (${formatCurrencyBn(
+          currentTotalAllocated
+        )}) মোট গৃহীত টাকার (${formatCurrencyBn(amountReceived)}) চেয়ে বেশি হতে পারবে না।`
+      )
+      return
+    }
 
     try {
       const result = await recordReceiptMutation.mutateAsync({

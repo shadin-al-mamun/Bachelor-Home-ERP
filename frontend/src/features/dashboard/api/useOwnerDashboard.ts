@@ -397,10 +397,19 @@ export function useOwnerDashboard() {
         ] = await Promise.all([
           supabase.from('seats').select('id, status'),
           supabase.from('boarder_charges').select('amount, paid_amount, status, due_date'),
-          supabase.from('receipts').select('total_amount, status').eq('status', 'VALID'),
+          supabase.from('receipts').select('amount, is_void').eq('is_void', false),
           supabase.from('expenses').select('amount, approval_status').eq('approval_status', 'APPROVED'),
           supabase.from('incomes').select('amount'),
-          supabase.from('manager_cash_sessions').select('expected_closing_cash, status').eq('status', 'OPEN'),
+          supabase
+            .from('manager_cash_sessions')
+            .select('manager_id, session_date, expected_closing_cash, status')
+            .eq('status', 'OPEN')
+            .order('session_date', { ascending: false }),
+          supabase
+            .from('financial_accounts')
+            .select('id, current_balance, account_type')
+            .eq('account_type', 'CASH_MANAGER')
+            .eq('is_active', true),
           supabase.from('meal_selections').select('breakfast, lunch, dinner').eq('meal_date', todayStr),
           supabase.from('meal_selections').select('breakfast, lunch, dinner').eq('meal_date', tomorrowStr),
         ])
@@ -415,17 +424,29 @@ export function useOwnerDashboard() {
         const charges = chargesRes.data || []
         const totalBilled = charges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
         const totalCollectedCharges = charges.reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
-        const totalReceipts = (receiptsRes.data || []).reduce((sum, r) => sum + (Number(r.total_amount) || 0), 0)
+        const totalReceipts = (receiptsRes.data || []).reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
         const totalCollected = totalReceipts || totalCollectedCharges
         const totalDues = Math.max(0, totalBilled - totalCollectedCharges)
 
         const totalExpenses = (expensesRes.data || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
         const totalIncomes = (incomesRes.data || []).reduce((sum, i) => sum + (Number(i.amount) || 0), 0)
 
-        const cashCustody = (cashSessionsRes.data || []).reduce(
-          (sum, s) => sum + (Number(s.expected_closing_cash) || 0),
+        // Prevent multi-counting across unclosed historical sessions:
+        // Take only the latest active session per manager. If no session exists, fall back to financial_accounts
+        const latestSessionByManager = new Map<string, number>()
+        for (const s of (cashSessionsRes.data || [])) {
+          const mgrId = s.manager_id || 'default'
+          if (!latestSessionByManager.has(mgrId)) {
+            latestSessionByManager.set(mgrId, Number(s.expected_closing_cash) || 0)
+          }
+        }
+
+        const sessionCash = Array.from(latestSessionByManager.values()).reduce((sum, v) => sum + v, 0)
+        const accountCash = (managerAccountsRes.data || []).reduce(
+          (sum, a) => sum + (Number(a.current_balance) || 0),
           0
         )
+        const cashCustody = latestSessionByManager.size > 0 ? sessionCash : accountCash
 
         const countToday = (mealsTodayRes.data || []).reduce(
           (sum, s) => sum + (s.breakfast ? 1 : 0) + (s.lunch ? 1 : 0) + (s.dinner ? 1 : 0),
@@ -490,8 +511,8 @@ export function useOwnerDashboard() {
 
         // 4. Live Recent Activities from real data
         const [recentReceiptsRes, recentExpensesRes] = await Promise.all([
-          supabase.from('receipts').select('id, receipt_number, total_amount, receipt_date, created_at, boarder:boarders(full_name)').order('created_at', { ascending: false }).limit(4),
-          supabase.from('expenses').select('id, expense_number, amount, description, expense_date, created_at').order('created_at', { ascending: false }).limit(4),
+          supabase.from('receipts').select('id, receipt_number, amount, receipt_date, created_at, boarder:boarders(full_name)').order('created_at', { ascending: false }).limit(4),
+          supabase.from('expenses').select('id, expense_voucher_no, amount, description, expense_date, created_at').order('created_at', { ascending: false }).limit(4),
         ])
 
         const recentActivities: RecentActivityItem[] = [
@@ -500,7 +521,7 @@ export function useOwnerDashboard() {
             type: 'PAYMENT' as const,
             title: `ভাড়া আদায় রশিদ #${r.receipt_number || ''}`,
             subtitle: `${r.boarder?.full_name || 'বর্ডার'} পরিশোধ করেছেন`,
-            amount: Number(r.total_amount) || 0,
+            amount: Number(r.amount) || 0,
             time: r.receipt_date || 'সম্প্রতি',
             user_name: r.boarder?.full_name || 'বর্ডার',
             status: 'PAID',
@@ -509,7 +530,7 @@ export function useOwnerDashboard() {
             id: 'exp-' + e.id,
             type: 'EXPENSE' as const,
             title: e.description || 'হোস্টেল খরচ',
-            subtitle: `খরচ ভাউচার #${e.expense_number || ''}`,
+            subtitle: `খরচ ভাউচার #${e.expense_voucher_no || ''}`,
             amount: Number(e.amount) || 0,
             time: e.expense_date || 'সম্প্রতি',
             user_name: 'এডমিন',
