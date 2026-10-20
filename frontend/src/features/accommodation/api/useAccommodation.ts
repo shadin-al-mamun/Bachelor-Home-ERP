@@ -347,6 +347,35 @@ export function useCreateRoom() {
   })
 }
 
+export function useUpdateRoom() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<Room> & { id: string }) => {
+      if (!isSupabaseConfigured) {
+        mockRooms = mockRooms.map((r) =>
+          r.id === id ? { ...r, ...updates, updated_at: new Date().toISOString() } : r
+        )
+        const updated = mockRooms.find((r) => r.id === id)
+        return updated as Room
+      }
+
+      const { data, error } = await supabase
+        .from('rooms')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (error) throw error
+      return data as Room
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rooms'] })
+      queryClient.invalidateQueries({ queryKey: ['seats'] })
+    },
+  })
+}
+
 // 4. SEATS
 export interface SeatFilterParams {
   buildingId?: string

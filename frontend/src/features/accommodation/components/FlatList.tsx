@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
-import { DoorOpen, Plus, BedDouble, Layers } from 'lucide-react'
+import { DoorOpen, Plus, BedDouble, Layers, Edit3 } from 'lucide-react'
 import { Button, Card, Badge } from '@/components/common'
 import { useFlats, useRooms } from '../api/useAccommodation'
+import type { Room } from '@/types/database'
 import FlatModal from './FlatModal'
 import RoomModal from './RoomModal'
 
@@ -11,10 +12,24 @@ export const FlatList: React.FC = () => {
 
   const [isFlatModalOpen, setIsFlatModalOpen] = useState(false)
   const [isRoomModalOpen, setIsRoomModalOpen] = useState(false)
+  const [editingRoom, setEditingRoom] = useState<Room | null>(null)
   const [activeFlatIdForRoom, setActiveFlatIdForRoom] = useState<string | undefined>(undefined)
 
   const handleOpenRoomModal = (flatId: string) => {
+    setEditingRoom(null)
     setActiveFlatIdForRoom(flatId)
+    setIsRoomModalOpen(true)
+  }
+
+  const handleOpenNewRoomModal = () => {
+    setEditingRoom(null)
+    setActiveFlatIdForRoom(undefined)
+    setIsRoomModalOpen(true)
+  }
+
+  const handleEditRoom = (room: Room) => {
+    setEditingRoom(room)
+    setActiveFlatIdForRoom(room.flat_id)
     setIsRoomModalOpen(true)
   }
 
@@ -35,7 +50,7 @@ export const FlatList: React.FC = () => {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => setIsRoomModalOpen(true)}
+            onClick={handleOpenNewRoomModal}
             leftIcon={<Plus className="w-3.5 h-3.5" />}
           >
             নতুন রুম
@@ -111,13 +126,24 @@ export const FlatList: React.FC = () => {
                           key={room.id}
                           className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700 space-y-2.5 transition-colors"
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="font-semibold text-white text-xs truncate">
-                              {room.name}
-                            </span>
-                            <span className="text-[10px] font-mono text-primary-400 bg-primary-950/40 px-1.5 py-0.5 rounded border border-primary-800/40">
-                              {room.room_code}
-                            </span>
+                          <div className="flex items-center justify-between gap-1">
+                            <div className="flex items-center gap-1.5 truncate">
+                              <span className="font-semibold text-white text-xs truncate">
+                                {room.name}
+                              </span>
+                              <span className="text-[10px] font-mono text-primary-400 bg-primary-950/40 px-1.5 py-0.5 rounded border border-primary-800/40 shrink-0">
+                                {room.room_code}
+                              </span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleEditRoom(room)}
+                              className="p-1 rounded-lg text-slate-400 hover:text-primary-300 hover:bg-slate-800 transition-colors shrink-0"
+                              title="রুম এডিট করুন"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
 
                           <div className="flex items-center justify-between text-[11px] text-slate-400">
@@ -150,8 +176,12 @@ export const FlatList: React.FC = () => {
       <FlatModal isOpen={isFlatModalOpen} onClose={() => setIsFlatModalOpen(false)} />
       <RoomModal
         isOpen={isRoomModalOpen}
-        onClose={() => setIsRoomModalOpen(false)}
+        onClose={() => {
+          setIsRoomModalOpen(false)
+          setEditingRoom(null)
+        }}
         flatId={activeFlatIdForRoom}
+        roomToEdit={editingRoom}
       />
     </div>
   )

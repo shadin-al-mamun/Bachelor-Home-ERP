@@ -16,15 +16,17 @@ import {
   ArrowRight,
   Layers,
   Building,
+  Edit3,
 } from 'lucide-react'
 import { Button, Card, Badge } from '@/components/common'
 import { useSeats, useBuildings, useFlats, useRooms, useUpdateSeatStatus } from '../api/useAccommodation'
 import { formatBDT } from '@/utils/date'
 import SeatModal from './SeatModal'
+import RoomModal from './RoomModal'
 import AllocateSeatModal from './AllocateSeatModal'
 import TransferSeatModal, { type CurrentAllocationTransferInfo } from './TransferSeatModal'
 import CancelAllocationModal, { type AllocationCancelInfo } from './CancelAllocationModal'
-import type { SeatStatus, Flat } from '@/types/database'
+import type { SeatStatus, Flat, Room } from '@/types/database'
 
 interface SeatMatrixViewProps {
   onAllocateSeat?: (seatId: string) => void
@@ -39,6 +41,8 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
 
   // Modals
   const [isSeatModalOpen, setIsSeatModalOpen] = useState(false)
+  const [isRoomModalOpen, setIsRoomModalOpen] = useState(false)
+  const [editingRoom, setEditingRoom] = useState<Room | null>(null)
   const [allocatingSeatId, setAllocatingSeatId] = useState<string | null>(null)
   const [transferringAllocation, setTransferringAllocation] = useState<CurrentAllocationTransferInfo | null>(null)
   const [cancellingAllocation, setCancellingAllocation] = useState<AllocationCancelInfo | null>(null)
@@ -134,6 +138,12 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
         f.buildingName.toLowerCase().includes(q)
     )
   }, [flatStatsList, searchQuery])
+
+  // Rooms belonging to the active flat
+  const activeFlatRooms = useMemo(() => {
+    if (!selectedFlatId || selectedFlatId === 'UNASSIGNED') return []
+    return rooms.filter((r) => r.flat_id === selectedFlatId)
+  }, [rooms, selectedFlatId])
 
   // Filtered seats inside the selected flat
   const seatsInActiveFlat = useMemo(() => {
@@ -315,6 +325,71 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
               className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-900/80 border border-slate-700/80 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
+
+          {/* Rooms in this Flat with Edit Option */}
+          {activeFlatRooms.length > 0 && (
+            <div className="pt-2 border-t border-slate-800/80 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <DoorOpen className="w-3.5 h-3.5 text-primary-400" />
+                  এই ফ্ল্যাটের রুমসমূহ ({activeFlatRooms.length}টি রুম)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingRoom(null)
+                    setIsRoomModalOpen(true)
+                  }}
+                  className="text-[11px] font-medium text-primary-400 hover:text-primary-300 transition-colors flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" /> নতুন রুম যোগ
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                {activeFlatRooms.map((room) => {
+                  const roomSeats = activeFlatInfo.seats.filter((s) => s.room_id === room.id)
+                  const roomAvailable = roomSeats.filter((s) => s.status === 'AVAILABLE').length
+                  const roomOccupied = roomSeats.filter((s) => s.status === 'OCCUPIED').length
+
+                  return (
+                    <div
+                      key={room.id}
+                      className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 transition-all flex items-center justify-between gap-2"
+                    >
+                      <div className="truncate">
+                        <div className="flex items-center gap-1.5 truncate">
+                          <span className="text-xs font-bold text-white truncate">{room.name}</span>
+                          <span className="text-[10px] font-mono text-primary-400 bg-primary-950/40 px-1.5 py-0.5 rounded border border-primary-800/40 shrink-0">
+                            {room.room_code}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 flex items-center gap-2 mt-0.5">
+                          <span>ক্যাপাসিটি: {room.capacity} সিট</span>
+                          <span>•</span>
+                          <span className="text-emerald-400">{roomAvailable} খালি</span>
+                          <span>•</span>
+                          <span className="text-indigo-400">{roomOccupied} বুকড</span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingRoom(room)
+                          setIsRoomModalOpen(true)
+                        }}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-primary-300 hover:bg-slate-800 transition-colors shrink-0"
+                        title="রুম এডিট করুন"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         /* Top Level Flats Overview Filter Bar */
@@ -793,6 +868,16 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
         isOpen={Boolean(cancellingAllocation)}
         onClose={() => setCancellingAllocation(null)}
         allocation={cancellingAllocation}
+      />
+
+      <RoomModal
+        isOpen={isRoomModalOpen}
+        onClose={() => {
+          setIsRoomModalOpen(false)
+          setEditingRoom(null)
+        }}
+        flatId={selectedFlatId !== 'UNASSIGNED' ? selectedFlatId || undefined : undefined}
+        roomToEdit={editingRoom}
       />
     </div>
   )
