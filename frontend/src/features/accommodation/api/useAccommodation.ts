@@ -27,6 +27,26 @@ let mockFlats: Flat[] = [
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   },
+  {
+    id: '22222222-2222-2222-2222-222222222223',
+    building_id: '11111111-1111-1111-1111-111111111111',
+    flat_code: 'FLAT-3B',
+    name: 'Flat 3B (ফ্ল্যাট ৩-বি)',
+    floor_number: 3,
+    status: 'ACTIVE',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: '22222222-2222-2222-2222-222222222224',
+    building_id: '11111111-1111-1111-1111-111111111111',
+    flat_code: 'FLAT-4C',
+    name: 'Flat 4C (ফ্ল্যাট ৪-সি)',
+    floor_number: 4,
+    status: 'ACTIVE',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
 ]
 
 let mockRooms: Room[] = [
@@ -42,9 +62,33 @@ let mockRooms: Room[] = [
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   },
+  {
+    id: '33333333-3333-3333-3333-333333333334',
+    flat_id: '22222222-2222-2222-2222-222222222223',
+    room_code: 'ROOM-201',
+    name: 'Room 201 (স্ট্যান্ডার্ড রুম)',
+    room_type: 'STANDARD',
+    capacity: 2,
+    status: 'ACTIVE',
+    description: 'Cozy standard room with study tables and wardrobe.',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: '33333333-3333-3333-3333-333333333335',
+    flat_id: '22222222-2222-2222-2222-222222222224',
+    room_code: 'ROOM-301',
+    name: 'Room 301 (প্রিমিয়াম ব্যালকনি রুম)',
+    room_type: 'DELUXE',
+    capacity: 2,
+    status: 'ACTIVE',
+    description: 'Premium room with scenic road view balcony and air conditioning.',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
 ]
 
-let mockSeats: (Seat & { room_name?: string; flat_name?: string; occupant_name?: string })[] = [
+let mockSeats: (Seat & { room_name?: string; flat_name?: string; occupant_name?: string; room?: Room })[] = [
   {
     id: '44444444-4444-4444-4444-444444444441',
     room_id: '33333333-3333-3333-3333-333333333333',
@@ -79,6 +123,55 @@ let mockSeats: (Seat & { room_name?: string; flat_name?: string; occupant_name?:
     default_rent: 4200,
     status: 'MAINTENANCE',
     description: 'Wall side single bed under maintenance.',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: '44444444-4444-4444-4444-444444444444',
+    room_id: '33333333-3333-3333-3333-333333333334',
+    seat_code: 'S-201-A',
+    seat_name: 'Seat S-201-A (উইন্ডো সিট)',
+    seat_type: 'SINGLE_BED',
+    default_rent: 4000,
+    status: 'AVAILABLE',
+    description: 'South facing bright window single bed.',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: '44444444-4444-4444-4444-444444444445',
+    room_id: '33333333-3333-3333-3333-333333333334',
+    seat_code: 'S-201-B',
+    seat_name: 'Seat S-201-B (ডোর সাইড সিট)',
+    seat_type: 'SINGLE_BED',
+    default_rent: 3800,
+    status: 'OCCUPIED',
+    occupant_name: 'রাকিবুল হাসান',
+    description: 'Standard single bed with locker.',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: '44444444-4444-4444-4444-444444444446',
+    room_id: '33333333-3333-3333-3333-333333333335',
+    seat_code: 'S-301-A',
+    seat_name: 'Seat S-301-A (ব্যালকনি সিট)',
+    seat_type: 'SINGLE_BED',
+    default_rent: 4800,
+    status: 'AVAILABLE',
+    description: 'Deluxe single bed right beside balcony access.',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: '44444444-4444-4444-4444-444444444447',
+    room_id: '33333333-3333-3333-3333-333333333335',
+    seat_code: 'S-301-B',
+    seat_name: 'Seat S-301-B (মাস্টার সিট)',
+    seat_type: 'SINGLE_BED',
+    default_rent: 4800,
+    status: 'AVAILABLE',
+    description: 'Corner spacious single bed.',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   },
@@ -267,7 +360,15 @@ export function useSeats(params?: SeatFilterParams) {
     queryKey: ['seats', params],
     queryFn: async () => {
       if (!isSupabaseConfigured) {
-        let results = [...mockSeats]
+        let results = mockSeats.map((s) => {
+          const r = mockRooms.find((rm) => rm.id === s.room_id)
+          const f = mockFlats.find((fl) => fl.id === r?.flat_id)
+          const b = mockBuildings.find((bl) => bl.id === f?.building_id)
+          return {
+            ...s,
+            room: r ? { ...r, flat: f ? { ...f, building: b } : undefined } : undefined,
+          }
+        })
         if (params?.roomId) {
           results = results.filter((s) => s.room_id === params.roomId)
         }
@@ -282,11 +383,15 @@ export function useSeats(params?: SeatFilterParams) {
         .select(`
           *,
           room:rooms (
-            id, name, room_code,
+            id, name, room_code, flat_id,
             flat:flats (
-              id, name, flat_code,
+              id, name, flat_code, floor_number,
               building:buildings (id, name)
             )
+          ),
+          allocations (
+            id, status,
+            boarder:boarders (id, full_name, boarder_code)
           )
         `)
 
@@ -302,7 +407,13 @@ export function useSeats(params?: SeatFilterParams) {
         console.warn('seats fetch failed:', error.message)
         return []
       }
-      return data || []
+      return (data || []).map((s: any) => {
+        const activeAlloc = s.allocations?.find((a: any) => a.status === 'ACTIVE')
+        return {
+          ...s,
+          occupant_name: activeAlloc?.boarder?.full_name || s.occupant_name || null,
+        }
+      })
     },
   })
 }
