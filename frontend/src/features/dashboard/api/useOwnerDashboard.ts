@@ -392,6 +392,7 @@ export function useOwnerDashboard() {
           expensesRes,
           incomesRes,
           cashSessionsRes,
+          managerAccountsRes,
           mealsTodayRes,
           mealsTomorrowRes,
         ] = await Promise.all([

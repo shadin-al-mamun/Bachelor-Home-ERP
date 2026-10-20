@@ -133,10 +133,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       titleKey: 'nav.meals',
-      defaultTitle: 'খাবার ইঞ্জিন',
+      defaultTitle: 'খাবার ইঞ্জিন (কিচেন)',
       href: '/meals',
       icon: <UtensilsCrossed className="w-5 h-5 shrink-0" />,
       roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'MEAL_OPERATOR', 'AUDITOR'],
+    },
+    {
+      titleKey: 'nav.meal_settings',
+      defaultTitle: 'মিল রেট ও বিলিং সেটিংস',
+      href: '/meals/settings',
+      icon: <DollarSign className="w-5 h-5 shrink-0 text-amber-400" />,
+      roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
     },
     // Boarder specific nav items
     {

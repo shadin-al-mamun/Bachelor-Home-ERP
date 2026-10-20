@@ -3,25 +3,21 @@ import {
   Utensils,
   Calendar,
   RotateCw,
-  Printer,
   Users,
-  ChefHat,
   Banknote,
-  Activity,
   Layers,
-  SlidersHorizontal,
+  ChefHat,
 } from 'lucide-react'
 import {
   formatDhakaDate,
   getDhakaNow,
-  isMealManagerRole,
 } from './api/useMeals'
 import { useKitchenMealSummary } from './api/useKitchenMeals'
 import type { KitchenFlatSummary } from './api/useKitchenMeals'
 import { useRealtimeMeals } from './hooks/useRealtimeMeals'
+import { MealEngineTabs } from './components/MealEngineTabs'
 import { FlatBoarderBreakdownModal } from './components/FlatBoarderBreakdownModal'
 import { StaffMealControlModal } from './components/StaffMealControlModal'
-import { useAuthStore } from '@/app/store/useAuthStore'
 
 export const KitchenMealSummaryPage: React.FC = () => {
   const dhakaNow = getDhakaNow()
@@ -34,9 +30,6 @@ export const KitchenMealSummaryPage: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<string>(tomorrowStr)
   const [selectedFlat, setSelectedFlat] = useState<KitchenFlatSummary | null>(null)
   const [isStaffMealControlOpen, setIsStaffMealControlOpen] = useState<boolean>(false)
-
-  const { profile } = useAuthStore()
-  const canManage = isMealManagerRole(profile?.role)
 
   // Realtime WebSocket Subscription
   const { isLive, lastEventTime, changeCount } = useRealtimeMeals()
@@ -69,72 +62,12 @@ export const KitchenMealSummaryPage: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fade-in print:p-0 print:space-y-4">
-      {/* Top Header (Hidden on Print) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-800/80 print:hidden">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-600 to-rose-500 p-0.5 shadow-lg shadow-amber-600/30 flex items-center justify-center text-white">
-              <ChefHat className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-                কিচেন মিল মনিটর ও প্রিপারেশন লিস্ট
-              </h1>
-              <p className="text-xs text-slate-400">
-                বাবুর্চি ও কিচেন অপারেটরদের জন্য রিয়েল-টাইম হেডকাউন্ট ও ফ্ল্যাট-ভিত্তিক তালিকা
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Realtime Live Pulse Indicator */}
-        <div className="flex items-center gap-2.5">
-          <div
-            className={`px-3 py-1.5 rounded-2xl border flex items-center gap-2 text-xs font-semibold ${
-              isLive
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
-            }`}
-          >
-            <span
-              className={`w-2 h-2 rounded-full ${
-                isLive ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'
-              }`}
-            />
-            <Activity className="w-3.5 h-3.5" />
-            <span>
-              {isLive ? 'রিয়েলটাইম সিঙ্ক সক্রিয় (Live Realtime)' : 'কানেক্টিং...'}
-            </span>
-            {lastEventTime && (
-              <span className="text-[10px] text-slate-400 font-mono">
-                ({lastEventTime})
-              </span>
-            )}
-          </div>
-
-          {/* Staff Meal Control Override Button */}
-          {canManage && (
-            <button
-              onClick={() => setIsStaffMealControlOpen(true)}
-              className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-indigo-600 hover:from-amber-600 hover:to-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition-all"
-              title="যেকোনো বর্ডারের মিল যেকোনো সময় অন বা অফ করুন"
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span>বর্ডার মিল অন/অফ (এডমিন ওভাররাইড)</span>
-            </button>
-          )}
-
-          {/* Print Button */}
-          <button
-            onClick={handlePrint}
-            className="px-3.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors"
-            title="রান্নাঘরের বোর্ডে টাঙানোর জন্য প্রিন্ট করুন"
-          >
-            <Printer className="w-4 h-4 text-amber-400" />
-            <span>প্রিন্ট শীট</span>
-          </button>
-        </div>
-      </div>
+      {/* Unified Master Meal Engine Header & Navigation Tabs */}
+      <MealEngineTabs
+        onPrint={handlePrint}
+        isLive={isLive}
+        lastEventTime={lastEventTime}
+      />
 
       {/* Date Switcher & Action Controls (Hidden on Print) */}
       <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-3xl bg-slate-900/60 border border-slate-800 print:hidden">
