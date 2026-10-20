@@ -34,6 +34,8 @@ USING (true)
 WITH CHECK (true);
 
 -- 3. PERMISSIVE & DETERMINISTIC fn_create_meal_rate
+DROP FUNCTION IF EXISTS public.fn_create_meal_rate(DATE, NUMERIC, NUMERIC, NUMERIC);
+
 CREATE OR REPLACE FUNCTION public.fn_create_meal_rate(
     p_effective_from DATE,
     p_breakfast_rate NUMERIC(8,2),
@@ -118,12 +120,14 @@ END;
 $$;
 
 -- 4. UPDATE fn_save_meal_settings PERMISSIONS
+DROP FUNCTION IF EXISTS public.fn_save_meal_settings(BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN, TIME);
+
 CREATE OR REPLACE FUNCTION public.fn_save_meal_settings(
     p_is_meal_module_enabled BOOLEAN,
     p_breakfast_enabled BOOLEAN,
     p_lunch_enabled BOOLEAN,
     p_dinner_enabled BOOLEAN,
-    p_cutoff_time TIME
+    p_cutoff_time TIME DEFAULT '22:00:00'
 )
 RETURNS JSONB
 LANGUAGE plpgsql
