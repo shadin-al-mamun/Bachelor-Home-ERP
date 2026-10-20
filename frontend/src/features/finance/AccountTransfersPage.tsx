@@ -13,13 +13,16 @@ import {
   Building2,
   Smartphone,
   Banknote,
+  Edit3,
 } from 'lucide-react'
+import type { FinancialAccount } from '@/types/database'
 import {
   useAccountTransfers,
   type TransferFilters,
 } from './api/useFinance'
 import { useExpenseAccounts } from '@/features/expenses/api/useExpenses'
 import AddTransferModal from './components/AddTransferModal'
+import { CreateFinancialAccountModal } from './components/CreateFinancialAccountModal'
 
 export const AccountTransfersPage: React.FC = () => {
   // Filter States
@@ -30,6 +33,8 @@ export const AccountTransfersPage: React.FC = () => {
 
   // Modals & Copy
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [isCreateAccountModalOpen, setIsCreateAccountModalOpen] = useState(false)
+  const [editingAccount, setEditingAccount] = useState<FinancialAccount | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
   const filters: TransferFilters = useMemo(
@@ -133,18 +138,42 @@ export const AccountTransfersPage: React.FC = () => {
 
       {/* Live Financial Accounts Balance Matrix */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between px-1">
-          <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
-            <Wallet className="w-3.5 h-3.5 text-cyan-400" />
-            সক্রিয় আর্থিক একাউন্টগুলোর লাইভ ব্যালেন্স
-          </span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-1 gap-2">
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
+              <Wallet className="w-3.5 h-3.5 text-cyan-400" />
+              সক্রিয় আর্থিক একাউন্টগুলোর লাইভ ব্যালেন্স
+            </span>
+            <button
+              onClick={() => {
+                setEditingAccount(null)
+                setIsCreateAccountModalOpen(true)
+              }}
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-cyan-400 hover:text-cyan-300 transition-colors bg-cyan-950/40 border border-cyan-800/50 px-2 py-0.5 rounded-lg"
+            >
+              <Plus className="w-3 h-3" />
+              নতুন অ্যাকাউন্ট
+            </button>
+          </div>
           <span className="text-xs text-slate-400 font-mono">
             সর্বমোট তারল্য: <span className="text-emerald-400 font-bold">৳{metrics.totalLiquidBalance.toLocaleString('en-IN')}</span>
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {accounts.map((acc) => (
+        {accounts.length === 0 ? (
+          <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 text-center space-y-3">
+            <p className="text-xs text-slate-400">কোনো সক্রিয় আর্থিক একাউন্ট পাওয়া যায়নি। নগদ ক্যাশ বা ব্যাংক একাউন্ট তৈরি করুন।</p>
+            <button
+              onClick={() => setIsCreateAccountModalOpen(true)}
+              className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs inline-flex items-center gap-1.5"
+            >
+              <Plus className="w-4 h-4" />
+              অ্যাকাউন্ট তৈরি করুন
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {accounts.map((acc) => (
             <div
               key={acc.id}
               className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-all space-y-2"
@@ -163,9 +192,21 @@ export const AccountTransfersPage: React.FC = () => {
                     </p>
                   </div>
                 </div>
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-800 text-slate-300">
-                  {acc.account_type === 'CASH_MANAGER' ? 'ক্যাশ' : acc.account_type === 'BANK' ? 'ব্যাংক' : 'MFS'}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-800 text-slate-300">
+                    {acc.account_type === 'CASH_MANAGER' ? 'ক্যাশ' : acc.account_type === 'BANK' ? 'ব্যাংক' : 'MFS'}
+                  </span>
+                  <button
+                    onClick={() => {
+                      setEditingAccount(acc)
+                      setIsCreateAccountModalOpen(true)
+                    }}
+                    className="p-1 rounded-md text-slate-400 hover:text-cyan-300 hover:bg-slate-800 transition-colors"
+                    title="একাউন্টের নাম বা ব্যালেন্স পরিবর্তন করুন"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
               <div className="pt-1 flex items-baseline justify-between border-t border-slate-800/60">
                 <span className="text-[11px] text-slate-400">বর্তমান ব্যালেন্স:</span>
@@ -175,7 +216,8 @@ export const AccountTransfersPage: React.FC = () => {
               </div>
             </div>
           ))}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* KPI Cards */}
@@ -428,6 +470,18 @@ export const AccountTransfersPage: React.FC = () => {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
       />
+
+      {/* Create / Edit Financial Account Modal */}
+      {isCreateAccountModalOpen && (
+        <CreateFinancialAccountModal
+          isOpen={isCreateAccountModalOpen}
+          accountToEdit={editingAccount}
+          onClose={() => {
+            setIsCreateAccountModalOpen(false)
+            setEditingAccount(null)
+          }}
+        />
+      )}
     </div>
   )
 }

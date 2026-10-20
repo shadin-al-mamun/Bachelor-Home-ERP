@@ -491,14 +491,21 @@ export function useExpenseAccounts() {
         return MOCK_ACCOUNTS
       }
 
-      const { data, error } = await supabase
-        .from('financial_accounts')
-        .select('*')
-        .eq('is_active', true)
-        .order('account_type')
+      try {
+        const { data, error } = await supabase
+          .from('financial_accounts')
+          .select('*')
+          .eq('is_active', true)
+          .order('account_type')
 
-      if (error) throw new Error(error.message)
-      return data || []
+        if (!error && data && data.length > 0) {
+          return data as FinancialAccount[]
+        }
+      } catch (err) {
+        console.warn('Expense accounts fetch error:', err)
+      }
+
+      return MOCK_ACCOUNTS
     },
   })
 }

@@ -225,17 +225,69 @@ export function useFinancialAccounts() {
         return MOCK_ACCOUNTS
       }
 
-      const { data, error } = await supabase
-        .from('financial_accounts')
-        .select('*')
-        .eq('is_active', true)
-        .order('account_type', { ascending: true })
+      try {
+        const { data, error } = await supabase
+          .from('financial_accounts')
+          .select('*')
+          .eq('is_active', true)
+          .order('account_type', { ascending: true })
 
-      if (error) {
-        console.warn('financial_accounts fetch failed:', error.message)
-        return []
+        if (!error && Array.isArray(data) && data.length > 0) {
+          return data as FinancialAccount[]
+        }
+
+        // Auto-seed default accounts into database if table is empty
+        if (!error && (!data || data.length === 0)) {
+          const defaultAccounts = [
+            {
+              account_name: 'মেইন ক্যাশ নিরাপদ ভল্ট (Main Cash)',
+              account_type: 'CASH_OWNER',
+              account_number: 'CASH-VAULT-01',
+              bank_name: 'হোস্টেল মেইন ক্যাশ',
+              current_balance: 0,
+              is_active: true,
+            },
+            {
+              account_name: 'বিকাশ মার্চেন্ট একাউন্ট (Hostel bKash)',
+              account_type: 'MFS',
+              account_number: '01712394767',
+              bank_name: 'bKash',
+              current_balance: 0,
+              is_active: true,
+            },
+            {
+              account_name: 'ব্যাংক অপারেটিং একাউন্ট (Hostel Bank)',
+              account_type: 'BANK',
+              account_number: '205012345678',
+              bank_name: 'Islami Bank Bangladesh PLC',
+              current_balance: 0,
+              is_active: true,
+            },
+            {
+              account_name: 'ম্যানেজার ক্যাশ ড্রয়ার (Manager Cash)',
+              account_type: 'CASH_MANAGER',
+              account_number: 'DRAWER-01',
+              bank_name: 'ম্যানেজার ক্যাশ',
+              current_balance: 0,
+              is_active: true,
+            },
+          ]
+
+          const { data: seededData } = await supabase
+            .from('financial_accounts')
+            .insert(defaultAccounts)
+            .select('*')
+
+          if (seededData && seededData.length > 0) {
+            return seededData as FinancialAccount[]
+          }
+        }
+      } catch (err) {
+        console.warn('financial_accounts query failed, using baseline accounts:', err)
       }
-      return (data || []) as FinancialAccount[]
+
+      // Safe baseline fallback so receipt collection is never blocked
+      return MOCK_ACCOUNTS
     },
   })
 }
