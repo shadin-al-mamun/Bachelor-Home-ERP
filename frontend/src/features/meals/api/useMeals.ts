@@ -340,15 +340,15 @@ export function useActiveMealRates() {
         .lte('effective_from', todayStr)
         .or(`effective_to.is.null,effective_to.gte.${todayStr}`)
         .order('effective_from', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(1)
-        .maybeSingle()
 
-      if (error || !data) {
+      if (error || !data || data.length === 0) {
         return MOCK_ACTIVE_RATE
       }
-      return data
+      return data[0]
     },
-    staleTime: 300000,
+    staleTime: 5000,
   })
 }
 

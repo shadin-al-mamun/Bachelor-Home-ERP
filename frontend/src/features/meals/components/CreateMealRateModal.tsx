@@ -38,6 +38,15 @@ export const CreateMealRateModal: React.FC<CreateMealRateModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
+  // Keep inputs synchronized with active rate whenever modal is opened
+  React.useEffect(() => {
+    if (activeRate) {
+      setBreakfastRate(String(activeRate.breakfast_rate))
+      setLunchRate(String(activeRate.lunch_rate))
+      setDinnerRate(String(activeRate.dinner_rate))
+    }
+  }, [activeRate, isOpen])
+
   const createRateMutation = useCreateMealRateMutation()
 
   if (!isOpen) return null

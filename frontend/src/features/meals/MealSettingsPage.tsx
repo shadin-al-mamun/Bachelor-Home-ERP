@@ -72,7 +72,7 @@ export const MealSettingsPage: React.FC = () => {
   const [rateErrorMsg, setRateErrorMsg] = useState<string | null>(null)
 
   const createRateMutation = useCreateMealRateMutation()
-  const { data: rateHistory = [] } = useMealRateHistory()
+  const { data: rateHistory = [], refetch: refetchRateHistory } = useMealRateHistory()
   const activeRate = rateHistory.find((r) => !r.effective_to) || rateHistory[0]
 
   // Prepopulate rate inputs from active rate
@@ -158,6 +158,7 @@ export const MealSettingsPage: React.FC = () => {
         dinnerRate: dRate,
       })
       setRateSuccessMsg(res?.message || 'নতুন মিল রেট সফলভাবে কার্যকর হয়েছে!')
+      refetchRateHistory()
       setTimeout(() => setRateSuccessMsg(null), 4000)
     } catch (err: any) {
       setRateErrorMsg(err.message || 'নতুন রেট তৈরিতে ব্যর্থ হয়েছে।')
