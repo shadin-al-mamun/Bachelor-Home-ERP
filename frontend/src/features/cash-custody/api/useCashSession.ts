@@ -343,7 +343,7 @@ export function useManagerCashSession(managerId?: string, sessionDate?: string) 
         .from('manager_cash_sessions')
         .select(`
           *,
-          account:account_id ( id, account_name ),
+          account:account_id ( id, account_name, opening_balance, current_balance ),
           manager:manager_id ( full_name )
         `)
         .eq('manager_id', targetManager)
@@ -354,8 +354,23 @@ export function useManagerCashSession(managerId?: string, sessionDate?: string) 
         throw new Error(sessionErr.message)
       }
 
+      const accountOpening = Number(sessionData.account?.opening_balance) || 0
+      const sessionOpening = Number(sessionData.opening_cash) || 0
+
+      // Auto-heal in background if open session has zero opening cash but account has opening balance
+      if (sessionOpening === 0 && accountOpening > 0 && sessionData.status === 'OPEN') {
+        supabase
+          .from('manager_cash_sessions')
+          .update({ opening_cash: accountOpening })
+          .eq('id', sessionData.id)
+          .then()
+      }
+
+      const effectiveOpening = sessionOpening > 0 ? sessionOpening : accountOpening
+
       const extendedSession: ExtendedCashSession = {
         ...sessionData,
+        opening_cash: effectiveOpening,
         manager_name: sessionData.manager?.full_name || 'ম্যানেজার',
         account_name: sessionData.account?.account_name || 'ম্যানেজার ক্যাশ',
       }
