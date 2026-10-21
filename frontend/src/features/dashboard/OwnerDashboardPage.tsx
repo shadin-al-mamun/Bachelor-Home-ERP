@@ -417,7 +417,7 @@ export const OwnerDashboardPage: React.FC = () => {
 
             <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-[10px]">
               <span className="text-slate-400">হেফাজতকারী:</span>
-              <span className="text-slate-300 font-semibold">সক্রিয় সেশনসমূহ</span>
+              <span className="text-slate-300 font-semibold">{kpis.cash_in_custody_source || 'ম্যানেজার ক্যাশ ড্রয়ার'}</span>
             </div>
           </div>
         </div>

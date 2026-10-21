@@ -68,6 +68,12 @@ export interface BoarderOption {
   phone_number: string
   flat_name?: string
   room_name?: string
+  seat_name?: string
+  seat_code?: string
+  building_name?: string
+  monthly_rent?: number
+  admission_date?: string
+  status?: string
 }
 
 // ==============================================================================
@@ -369,13 +375,30 @@ export function useMealBoardersList() {
           full_name,
           boarder_code,
           phone_number,
+          admission_date,
+          status,
           allocations(
             status,
-            seat:seat_id(
+            monthly_rent,
+            start_date,
+            seat:seats(
+              id,
               seat_name,
-              room:room_id(
+              seat_code,
+              default_rent,
+              room:rooms(
+                id,
                 name,
-                flat:flat_id(name)
+                room_code,
+                flat:flats(
+                  id,
+                  name,
+                  flat_code,
+                  building:buildings(
+                    id,
+                    name
+                  )
+                )
               )
             )
           )
@@ -388,7 +411,7 @@ export function useMealBoardersList() {
         console.warn('meal boarders nested join error, falling back to direct boarders query:', error.message)
         const simple = await supabase
           .from('boarders')
-          .select('id, user_id, full_name, boarder_code, phone_number')
+          .select('id, user_id, full_name, boarder_code, phone_number, admission_date, status')
           .eq('status', 'ACTIVE')
           .order('full_name')
         data = simple.data as any
@@ -401,10 +424,11 @@ export function useMealBoardersList() {
       return data.map((b: any) => {
         const activeAlloc = Array.isArray(b.allocations)
           ? b.allocations.find((a: any) => a.status === 'ACTIVE') || b.allocations[0]
-          : null
+          : b.allocations
         const seat = activeAlloc?.seat
         const room = seat?.room
         const flat = room?.flat
+        const building = flat?.building
 
         return {
           id: b.id,
@@ -412,8 +436,14 @@ export function useMealBoardersList() {
           full_name: b.full_name,
           boarder_code: b.boarder_code,
           phone_number: b.phone_number,
-          flat_name: flat?.name || 'ফ্ল্যাট',
-          room_name: room?.name ? `${room.name} (${seat?.seat_name || 'সিট'})` : 'বর্ডার মেস সিট',
+          monthly_rent: Number(activeAlloc?.monthly_rent ?? seat?.default_rent ?? 0),
+          seat_name: seat?.seat_name || seat?.seat_code || '',
+          seat_code: seat?.seat_code || '',
+          room_name: room?.name || '',
+          flat_name: flat?.name || '',
+          building_name: building?.name || '',
+          admission_date: b.admission_date || activeAlloc?.start_date || '',
+          status: b.status,
         }
       })
     },

@@ -32,6 +32,7 @@ export interface ExecutiveKPIs {
 
   // 5. Cash in Custody
   cash_in_custody: number // Physical cash held in active manager drawers
+  cash_in_custody_source?: string
 }
 
 export interface CashFlowTrendPoint {
@@ -602,6 +603,7 @@ export function useOwnerDashboard() {
             operating_expenses_month: totalExpenses,
             non_rent_incomes_month: totalIncomes,
             cash_in_custody: cashCustody,
+            cash_in_custody_source: latestSessionByManager.size > 0 ? 'সক্রিয় সেশনসমূহ' : 'ম্যানেজার ক্যাশ ড্রয়ার',
             net_operating_income: totalCollected + totalIncomes - totalExpenses,
             active_meals_today: countToday,
             active_meals_tomorrow: countTomorrow,

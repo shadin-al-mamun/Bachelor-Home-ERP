@@ -1,5 +1,6 @@
 import React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import {
   UtensilsCrossed,
   Clock,
@@ -14,6 +15,7 @@ import {
   Info,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
+import { useBrandingStore } from '@/app/store/useBrandingStore'
 import {
   getDhakaNow,
   formatDhakaDate,
@@ -22,12 +24,14 @@ import {
   useBoarderMealSelections,
   useToggleMealMutation,
   useMealBoardersList,
+  useActiveMealRates,
 } from '@/features/meals/api/useMeals'
-import { formatCurrencyBn } from '@/utils/date'
-import { isSupabaseConfigured } from '@/lib/supabaseClient'
+import { formatCurrencyBn, formatDateBn } from '@/utils/date'
+import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
 
 export const BoarderDashboardPage: React.FC = () => {
   const { profile } = useAuthStore()
+  const branding = useBrandingStore()
   const navigate = useNavigate()
 
   // If a Super Admin or Manager enters the boarder portal, auto-redirect them to the master ERP dashboard
@@ -45,77 +49,137 @@ export const BoarderDashboardPage: React.FC = () => {
   tomorrow.setDate(tomorrow.getDate() + 1)
   const tomorrowStr = formatDhakaDate(tomorrow)
 
-  // Dynamic boarder matching based on logged-in phone or name
+  // Dynamic boarder matching based on logged-in user profile
   const { data: boardersList = [], isLoading: isLoadingBoarders } = useMealBoardersList()
+  const isStaffRole = profile?.role === 'SUPER_ADMIN' || profile?.role === 'ADMIN' || profile?.role === 'MANAGER'
+
   const matchedResident = boardersList.find(
     (b) =>
-      (profile?.phone_number && b.phone_number === profile?.phone_number) ||
-      (profile?.full_name && b.full_name === profile?.full_name) ||
-      (profile?.id && b.id === profile?.id)
+      (profile?.id && (b.user_id === profile.id || b.id === profile.id)) ||
+      (profile?.phone_number && b.phone_number === profile.phone_number) ||
+      (profile?.full_name && b.full_name === profile.full_name)
   )
-  const isStaffRole = profile?.role === 'SUPER_ADMIN' || profile?.role === 'ADMIN' || profile?.role === 'MANAGER'
+
   const currentBoarder = matchedResident || (!isStaffRole && !isSupabaseConfigured ? boardersList[0] : null)
+  const activeBoarderId = currentBoarder?.id
 
-  const activeBoarderId = currentBoarder?.id || 'bdr-101'
+  // Authenticated boarder or dynamic profile info (strictly from real data, zero hardcoded placeholders)
+  const boarderName = currentBoarder?.full_name || profile?.full_name || (isStaffRole ? 'অ্যাডমিন ইউজার' : 'বর্ডার')
+  const boarderCode = currentBoarder?.boarder_code || (isStaffRole ? 'STAFF' : 'BDR')
+  const boarderBuilding = currentBoarder?.building_name || branding?.orgName || 'প্রধান ভবন'
+  const boarderFlat = currentBoarder?.flat_name || ''
+  const boarderRoom = currentBoarder?.room_name || ''
+  const boarderSeat = currentBoarder?.seat_name || currentBoarder?.seat_code || 'সিট বরাদ্দ নেই'
+  const monthlySeatRent = currentBoarder?.monthly_rent ?? 0
+  const boarderStatus = currentBoarder?.status === 'ACTIVE' ? 'সক্রিয় (Active)' : (currentBoarder?.status || 'সক্রিয় (Active)')
 
-  // Authenticated boarder or staff profile info
-  const boarderInfo = {
-    name: currentBoarder?.full_name || profile?.full_name || (isStaffRole ? 'মোঃ আব্দুল্লাহ আল মামুন' : 'তানভীর আহমেদ'),
-    code: currentBoarder?.boarder_code || (isStaffRole ? 'SUPER-ADMIN' : 'BDR-101'),
-    phone: currentBoarder?.phone_number || profile?.phone_number || '01712394767',
-    building: isStaffRole ? 'সুপার এডমিন কন্ট্রোল' : 'সানফ্লাওয়ার হোস্টেল (মেইন ভবন)',
-    flat: currentBoarder?.flat_name || (isStaffRole ? 'সকল ফ্ল্যাট ও ভবন' : 'ফ্ল্যাট ৪এ (৪র্থ তলা)'),
-    room: currentBoarder?.room_name || (isStaffRole ? 'মালিকানা অ্যাক্সেস' : 'রুম ১০১ (দক্ষিণমুখী)'),
-    seat: currentBoarder?.room_name || (isStaffRole ? 'মাস্টার এডমিন' : 'সিট ১০১এ (উইন্ডো সাইড)'),
-    monthlyRent: isStaffRole ? 0 : 4500,
-    admissionDate: isStaffRole ? 'সিস্টেম ওনার' : '০১ অক্টোবর, ২০২৬',
-    status: isStaffRole ? 'সুপার এডমিন (মালিক)' : 'সক্রিয় (Active)',
-  }
-
-  // Financial summary for this specific boarder
-  const personalFinance = {
-    seatRent: 4500,
-    mealBill: 2520,
-    utilityBill: 300,
-    totalBilled: 7320,
-    totalPaid: 5000,
-    outstandingDue: 2320,
-    lastPaymentDate: '০৫ অক্টোবর, ২০২৬',
-    lastReceiptNo: 'REC-2026-10-012',
-  }
-
-  // Recent payment receipts for this boarder
-  const recentReceipts = [
-    {
-      id: 'r-1',
-      receipt_number: 'REC-2026-10-012',
-      payment_date: '০৫ অক্টোবর, ২০২৬',
-      amount: 5000,
-      payment_method: 'নগদ ক্যাশ (Cash)',
-      collector: 'হোস্টেল ম্যানেজার',
-      status: 'পরিশোধিত',
+  // 1. Fetch live financial charges for this boarder from database
+  const { data: boarderCharges = [] } = useQuery({
+    queryKey: ['boarder-charges', activeBoarderId],
+    enabled: Boolean(activeBoarderId && isSupabaseConfigured),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('boarder_charges')
+        .select('id, charge_type, amount, paid_amount, due_amount, status, billing_month')
+        .eq('boarder_id', activeBoarderId!)
+        .neq('status', 'VOID')
+      if (error) {
+        console.warn('boarder charges query error:', error.message)
+        return []
+      }
+      return data || []
     },
-    {
-      id: 'r-2',
-      receipt_number: 'REC-2026-09-088',
-      payment_date: '০৩ সেপ্টেম্বর, ২০২৬',
-      amount: 6800,
-      payment_method: 'বিকাশ (bKash)',
-      collector: 'হোস্টেল ম্যানেজার',
-      status: 'পরিশোধিত',
-    },
-  ]
+  })
 
-  // Meal selections & cutoff status
+  // 2. Fetch live receipts for this boarder from database
+  const { data: boarderReceipts = [] } = useQuery({
+    queryKey: ['boarder-receipts', activeBoarderId],
+    enabled: Boolean(activeBoarderId && isSupabaseConfigured),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('receipts')
+        .select('id, receipt_number, receipt_date, amount, payment_method, status, is_void')
+        .eq('boarder_id', activeBoarderId!)
+        .eq('is_void', false)
+        .order('receipt_date', { ascending: false })
+        .limit(10)
+      if (error) {
+        console.warn('boarder receipts query error:', error.message)
+        return []
+      }
+      return data || []
+    },
+  })
+
+  // Calculate live financial summary (zero if clean/no charges in DB)
+  const totalBilled = boarderCharges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+  const totalPaidCharges = boarderCharges.reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
+  const totalReceipts = boarderReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
+  const totalPaid = totalReceipts || totalPaidCharges
+  const outstandingDue = Math.max(0, totalBilled - totalPaidCharges)
+
+  const mealBillCharges = boarderCharges
+    .filter((c) => c.charge_type === 'MEAL')
+    .reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+
+  // 3. Meal selections & cutoff status
   const { data: settings } = useMealSettings()
+  const { data: rates } = useActiveMealRates()
   const { data: selections = [] } = useBoarderMealSelections(activeBoarderId)
   const toggleMutation = useToggleMealMutation()
   const [toastMessage, setToastMessage] = React.useState<string | null>(null)
 
   const todaySelection = selections.find((s) => s.meal_date === todayStr)
   const tomorrowSelection = selections.find((s) => s.meal_date === tomorrowStr)
-
   const tomorrowDateStatus = getDateMealStatus(tomorrowStr, settings?.cutoff_time || '22:00:00')
+
+  // Calculate month meal count & cost from live selections
+  const breakfastRate = rates?.breakfast_rate ?? 30.0
+  const lunchRate = rates?.lunch_rate ?? 65.0
+  const dinnerRate = rates?.dinner_rate ?? 60.0
+
+  const currentMonthStr = todayStr.slice(0, 7)
+  const monthSelections = selections.filter(
+    (s) => s.meal_date.startsWith(currentMonthStr) && s.meal_date <= todayStr
+  )
+
+  let completedMealsCount = 0
+  let calculatedMealCost = 0
+  monthSelections.forEach((s) => {
+    if (s.breakfast) {
+      completedMealsCount += 1
+      calculatedMealCost += breakfastRate
+    }
+    if (s.lunch) {
+      completedMealsCount += 1
+      calculatedMealCost += lunchRate
+    }
+    if (s.dinner) {
+      completedMealsCount += 1
+      calculatedMealCost += dinnerRate
+    }
+  })
+
+  const bengaliMonthName = dhakaNow.toLocaleDateString('bn-BD', { month: 'long' })
+
+  // 4. Dynamic Manager / Hostel Helpline Lookup from system profiles
+  const { data: managerContact } = useQuery({
+    queryKey: ['manager-helpline'],
+    enabled: isSupabaseConfigured,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('full_name, phone_number, role')
+        .in('role', ['MANAGER', 'SUPER_ADMIN'])
+        .order('role', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      return data
+    },
+  })
+
+  const helplineName = managerContact?.full_name || branding?.orgName || 'হোস্টেল এডমিন'
+  const helplinePhone = managerContact?.phone_number || '০১৭১১-০০০০০০'
 
   const handleToggleTomorrow = async (session: 'BREAKFAST' | 'LUNCH' | 'DINNER', currentState: boolean) => {
     if (tomorrowDateStatus.isLockedForBoarder) {
@@ -181,33 +245,41 @@ export const BoarderDashboardPage: React.FC = () => {
           <div className="flex items-start gap-4">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 to-teal-400 p-0.5 shadow-xl shadow-indigo-600/30 shrink-0 flex items-center justify-center">
               <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center text-indigo-400 font-extrabold text-xl">
-                {boarderInfo.name.slice(0, 1)}
+                {boarderName.slice(0, 1)}
               </div>
             </div>
 
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                  স্বাগতম, {boarderInfo.name}
+                  স্বাগতম, {boarderName}
                 </h1>
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/10 text-teal-300 border border-teal-500/30 font-mono">
-                  {boarderInfo.code}
+                  {boarderCode}
                 </span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  {boarderInfo.status}
+                  {boarderStatus}
                 </span>
               </div>
 
               <p className="text-xs text-slate-300 flex flex-wrap items-center gap-2 pt-0.5">
                 <span className="flex items-center gap-1 text-slate-300 font-medium">
                   <Building className="w-3.5 h-3.5 text-indigo-400" />
-                  {boarderInfo.building}
+                  {boarderBuilding}
                 </span>
-                <span className="text-slate-600">•</span>
-                <span className="text-indigo-300 font-semibold">{boarderInfo.flat}</span>
-                <span className="text-slate-600">•</span>
-                <span className="text-amber-300 font-semibold">{boarderInfo.room}</span>
+                {boarderFlat && (
+                  <>
+                    <span className="text-slate-600">•</span>
+                    <span className="text-indigo-300 font-semibold">{boarderFlat}</span>
+                  </>
+                )}
+                {boarderRoom && (
+                  <>
+                    <span className="text-slate-600">•</span>
+                    <span className="text-amber-300 font-semibold">{boarderRoom}</span>
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -217,13 +289,13 @@ export const BoarderDashboardPage: React.FC = () => {
             <div className="space-y-0.5 pr-3 border-r border-slate-800">
               <span className="text-[10px] text-slate-400 block font-medium">বরাদ্দকৃত সিট:</span>
               <span className="text-sm font-extrabold font-mono text-amber-400">
-                {boarderInfo.seat}
+                {boarderSeat}
               </span>
             </div>
             <div className="space-y-0.5 pl-1">
               <span className="text-[10px] text-slate-400 block font-medium">মাসিক সিট ভাড়া:</span>
               <span className="text-sm font-extrabold font-mono text-emerald-400">
-                {formatCurrencyBn(boarderInfo.monthlyRent)}
+                {formatCurrencyBn(monthlySeatRent)}
               </span>
             </div>
           </div>
@@ -302,18 +374,24 @@ export const BoarderDashboardPage: React.FC = () => {
               <DollarSign className="w-4 h-4 text-rose-400" />
               চলতি মাসের বকেয়া
             </span>
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">
-              Due
+            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+              outstandingDue > 0
+                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+            }`}>
+              {outstandingDue > 0 ? 'Due' : 'পরিশোধিত'}
             </span>
           </div>
 
-          <div className="text-2xl sm:text-3xl font-extrabold font-mono text-rose-400 mt-2">
-            {formatCurrencyBn(personalFinance.outstandingDue)}
+          <div className={`text-2xl sm:text-3xl font-extrabold font-mono mt-2 ${
+            outstandingDue > 0 ? 'text-rose-400' : 'text-emerald-400'
+          }`}>
+            {formatCurrencyBn(outstandingDue)}
           </div>
 
           <div className="flex items-center justify-between text-[10px] text-slate-400 mt-2 pt-2 border-t border-slate-800">
-            <span>পরিশোধিত: <strong className="text-emerald-400 font-mono">{formatCurrencyBn(personalFinance.totalPaid)}</strong></span>
-            <span>মোট বিল: <strong className="text-slate-300 font-mono">{formatCurrencyBn(personalFinance.totalBilled)}</strong></span>
+            <span>পরিশোধিত: <strong className="text-emerald-400 font-mono">{formatCurrencyBn(totalPaid)}</strong></span>
+            <span>মোট বিল: <strong className="text-slate-300 font-mono">{formatCurrencyBn(totalBilled)}</strong></span>
           </div>
         </div>
 
@@ -325,18 +403,18 @@ export const BoarderDashboardPage: React.FC = () => {
               মিলের সারসংক্ষেপ
             </span>
             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40">
-              অক্টোবর
+              {bengaliMonthName}
             </span>
           </div>
 
           <div className="text-2xl sm:text-3xl font-extrabold font-mono text-teal-300 mt-2">
-            ৪২ <span className="text-xs font-normal text-slate-400">টি মিল সম্পন্ন</span>
+            {completedMealsCount} <span className="text-xs font-normal text-slate-400">টি মিল সম্পন্ন</span>
           </div>
 
           <div className="flex items-center justify-between text-[10px] text-slate-400 mt-2 pt-2 border-t border-slate-800">
             <span>মিল বাবদ খরচ:</span>
             <span className="text-teal-400 font-bold font-mono">
-              {formatCurrencyBn(personalFinance.mealBill)}
+              {formatCurrencyBn(mealBillCharges || calculatedMealCost)}
             </span>
           </div>
         </div>
@@ -463,7 +541,7 @@ export const BoarderDashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 4. Bottom Grid: Recent Payment Receipts + Hostel Contact & Rules */}
+      {/* 4. Bottom Grid: Real Payment Receipts + Hostel Contact & Rules */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column (2 Cols): My Official Payment Receipts */}
         <div className="lg:col-span-2 p-5 sm:p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-4">
@@ -475,7 +553,7 @@ export const BoarderDashboardPage: React.FC = () => {
               </h3>
             </div>
             <span className="text-[11px] text-slate-400">
-              সর্বশেষ ২ মাসের পরিশোধিত রশিদ
+              ডাটাবেসের সর্বশেষ মানি রিসিপ্ট
             </span>
           </div>
 
@@ -491,33 +569,45 @@ export const BoarderDashboardPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
-                {recentReceipts.map((rec) => (
-                  <tr key={rec.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-3 px-3 font-mono font-bold text-emerald-400">
-                      {rec.receipt_number}
-                    </td>
-                    <td className="py-3 px-3 text-slate-300">
-                      {rec.payment_date}
-                    </td>
-                    <td className="py-3 px-3 text-right font-mono font-bold text-white">
-                      {formatCurrencyBn(rec.amount)}
-                    </td>
-                    <td className="py-3 px-3 text-center text-slate-400">
-                      {rec.payment_method}
-                    </td>
-                    <td className="py-3 px-3 text-right">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                        {rec.status}
-                      </span>
+                {boarderReceipts.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-slate-500">
+                      কোনো পরিশোধিত মানি রিসিপ্ট পাওয়া যায়নি।
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  boarderReceipts.map((rec: any) => (
+                    <tr key={rec.id} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="py-3 px-3 font-mono font-bold text-emerald-400">
+                        {rec.receipt_number}
+                      </td>
+                      <td className="py-3 px-3 text-slate-300">
+                        {formatDateBn(rec.receipt_date)}
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono font-bold text-white">
+                        {formatCurrencyBn(rec.amount)}
+                      </td>
+                      <td className="py-3 px-3 text-center text-slate-400">
+                        {rec.payment_method === 'CASH'
+                          ? 'নগদ ক্যাশ (Cash)'
+                          : rec.payment_method === 'MFS'
+                          ? 'মোবাইল ব্যাংকিং (MFS)'
+                          : 'ব্যাংক ট্রান্সফার'}
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                          {rec.is_void ? 'বাতিল' : 'পরিশোধিত'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
         </div>
 
-        {/* Right Column (1 Col): Hostel Rules & Manager Contact */}
+        {/* Right Column (1 Col): Hostel Rules & Dynamic Manager Contact */}
         <div className="p-5 sm:p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-4">
           <div className="flex items-center gap-2 pb-3 border-b border-slate-800">
             <Info className="w-4 h-4 text-indigo-400" />
@@ -527,15 +617,15 @@ export const BoarderDashboardPage: React.FC = () => {
           </div>
 
           <div className="space-y-3 text-xs">
-            {/* Manager Helpline */}
+            {/* Dynamic Manager Helpline */}
             <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 space-y-1">
               <span className="text-[10px] text-indigo-300 font-bold uppercase tracking-wider block">
                 জরুরি যোগাযোগ ও ম্যানেজার:
               </span>
-              <div className="font-bold text-white text-sm">মো. রফিকুল ইসলাম</div>
+              <div className="font-bold text-white text-sm">{helplineName}</div>
               <div className="flex items-center gap-1.5 text-indigo-300 font-mono text-xs pt-0.5">
                 <PhoneCall className="w-3.5 h-3.5" />
-                <span>+৮৮০ ১৭১১-২৩৪৫৬৭</span>
+                <span>{helplinePhone}</span>
               </div>
             </div>
 
@@ -544,7 +634,7 @@ export const BoarderDashboardPage: React.FC = () => {
               <div className="font-semibold text-slate-200">আবাসিক নিয়মাবলি:</div>
               <ul className="space-y-1.5 list-disc list-inside text-slate-400">
                 <li>খাবার অন/অফ প্রতিদিন রাত <strong className="text-amber-300">১০:০০ টার মধ্যে</strong> সম্পন্ন করতে হবে।</li>
-                <li>মাসের ১০ তারিখের মধ্যে মাসিক সিট ভাড়া ও মেস বিল পরিশোধ বাধ্যতামূলক।</li>
+                <li>মাসের ১০ তারিখের মধ্যে মাসিক সিট ভাড়া ও মেস বিল পরিশোধ করতে হবে।</li>
                 <li>হোস্টেলের মূল গেট রাত <strong className="text-rose-300">১১:০০ টায়</strong> বন্ধ হয়ে যায়।</li>
                 <li>বহিরাগত মেহমান নিয়ে আসার ক্ষেত্রে পূর্বানুমতি প্রযোজ্য।</li>
               </ul>
