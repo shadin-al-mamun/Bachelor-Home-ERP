@@ -70,6 +70,7 @@ import ReceiptListPage from '@/features/billing/ReceiptListPage'
 import ExpenseListPage from '@/features/expenses/ExpenseListPage'
 import IncomeListPage from '@/features/finance/IncomeListPage'
 import AccountTransfersPage from '@/features/finance/AccountTransfersPage'
+import FinancialAccountsPage from '@/features/finance/FinancialAccountsPage'
 import ManagerCashDashboard from '@/features/cash-custody/ManagerCashDashboard'
 import BoarderMealPortal from '@/features/meals/BoarderMealPortal'
 import KitchenMealSummaryPage from '@/features/meals/KitchenMealSummaryPage'
@@ -186,16 +187,24 @@ export const router = createBrowserRouter([
         element: <ExpenseListPage />,
       },
       {
-        path: 'finance/income',
-        element: <IncomeListPage />,
+        path: 'finance/accounts',
+        element: <FinancialAccountsPage />,
+      },
+      {
+        path: 'accounts',
+        element: <FinancialAccountsPage />,
       },
       {
         path: 'finance/transfers',
         element: <AccountTransfersPage />,
       },
       {
-        path: 'finance/*',
+        path: 'finance/income',
         element: <IncomeListPage />,
+      },
+      {
+        path: 'finance/*',
+        element: <FinancialAccountsPage />,
       },
       {
         path: 'incomes',

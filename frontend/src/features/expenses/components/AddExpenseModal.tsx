@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useMemo, useEffect } from 'react'
 import {
   X,
   Receipt,
@@ -12,6 +12,9 @@ import {
   CheckCircle,
   Info,
   Plus,
+  ShoppingCart,
+  Layers,
+  Store,
 } from 'lucide-react'
 import { ManageCategoriesModal } from '@/features/finance/components/ManageCategoriesModal'
 import {
@@ -21,11 +24,42 @@ import {
   useRecordExpenseMutation,
   type RecordExpenseInput,
 } from '../api/useExpenses'
+import type { ExpenseScope } from '@/types/database'
 
 interface AddExpenseModalProps {
   isOpen: boolean
   onClose: () => void
 }
+
+const SCOPE_CONFIG: {
+  scope: ExpenseScope
+  title: string
+  subtitle: string
+  icon: React.ComponentType<{ className?: string }>
+  activeClass: string
+}[] = [
+  {
+    scope: 'HOSTEL_MARKET',
+    title: '১. হোস্টেলের বাজার খরচ',
+    subtitle: 'মেস মিল বাজার, মাছ, মাংস ও কাঁচাবাজার',
+    icon: ShoppingCart,
+    activeClass: 'border-emerald-500 bg-emerald-500/10 text-emerald-300 ring-2 ring-emerald-500/30',
+  },
+  {
+    scope: 'HOSTEL_MISC',
+    title: '২. হোস্টেলের বিবিধ খরচ',
+    subtitle: 'বাবুর্চি বেতন, স্টাফ, অফিস ও কেন্দ্রীয় মেরামত',
+    icon: Layers,
+    activeClass: 'border-indigo-500 bg-indigo-500/10 text-indigo-300 ring-2 ring-indigo-500/30',
+  },
+  {
+    scope: 'FLAT_MISC',
+    title: '৩. ফ্ল্যাটওয়ারী বিবিধ খরচ',
+    subtitle: 'বিদ্যুৎ, পানি, গ্যাস ও ফ্ল্যাট মেরামত (সিটভিত্তিক বণ্টন)',
+    icon: Building2,
+    activeClass: 'border-amber-500 bg-amber-500/10 text-amber-300 ring-2 ring-amber-500/30',
+  },
+]
 
 export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   isOpen,
@@ -37,14 +71,18 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const recordMutation = useRecordExpenseMutation()
 
   // Form State
+  const [selectedScope, setSelectedScope] = useState<ExpenseScope>('HOSTEL_MARKET')
   const [expenseDate, setExpenseDate] = useState<string>(
     new Date().toISOString().slice(0, 10)
+  )
+  const [billingMonth, setBillingMonth] = useState<string>(
+    new Date().toISOString().slice(0, 7)
   )
   const [categoryId, setCategoryId] = useState<string>('')
   const [amount, setAmount] = useState<string>('')
   const [sourceAccountId, setSourceAccountId] = useState<string>('')
-  const [isFlatWise, setIsFlatWise] = useState<boolean>(false)
   const [flatId, setFlatId] = useState<string>('')
+  const [vendorName, setVendorName] = useState<string>('')
   const [description, setDescription] = useState<string>('')
 
   // Voucher File & Preview State
@@ -57,20 +95,42 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
 
-  // Default selection initialization
-  React.useEffect(() => {
-    if (categories.length > 0) {
-      if (!categoryId || !categories.some((c) => c.id === categoryId)) {
-        setCategoryId(categories[0].id)
+  // Filter categories by selected scope
+  const filteredCategories = useMemo(() => {
+    return categories.filter((c) => {
+      if (c.category_scope) {
+        return c.category_scope === selectedScope
       }
-    }
-  }, [categories, categoryId])
+      // If legacy or untagged, keep under general or misc
+      return selectedScope === 'HOSTEL_MISC'
+    })
+  }, [categories, selectedScope])
 
-  React.useEffect(() => {
+  // Select first available category when scope changes
+  useEffect(() => {
+    if (filteredCategories.length > 0) {
+      if (!categoryId || !filteredCategories.some((c) => c.id === categoryId)) {
+        setCategoryId(filteredCategories[0].id)
+      }
+    } else {
+      setCategoryId('')
+    }
+  }, [filteredCategories, categoryId])
+
+  // Default account selection
+  useEffect(() => {
     if (accounts.length > 0 && !sourceAccountId) {
-      setSourceAccountId(accounts[0].id)
+      const defaultAcc = accounts.find((a) => a.account_type === 'CASH_MANAGER' || a.account_type === 'CASH_OWNER')
+      setSourceAccountId(defaultAcc ? defaultAcc.id : accounts[0].id)
     }
   }, [accounts, sourceAccountId])
+
+  // Default flat selection when FLAT_MISC is selected
+  useEffect(() => {
+    if (selectedScope === 'FLAT_MISC' && flats.length > 0 && !flatId) {
+      setFlatId(flats[0].id)
+    }
+  }, [selectedScope, flats, flatId])
 
   if (!isOpen) return null
 
@@ -109,6 +169,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const parsedAmount = parseFloat(amount) || 0
   const remainingBalance = selectedAccount ? selectedAccount.current_balance - parsedAmount : 0
 
+  const selectedFlat = flats.find((f: any) => f.id === flatId)
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMsg(null)
@@ -128,6 +190,11 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       return
     }
 
+    if (selectedScope === 'FLAT_MISC' && !flatId) {
+      setErrorMsg('ফ্ল্যাটওয়ারী বিবিধ খরচের ক্ষেত্রে ফ্ল্যাট নির্বাচন করা আবশ্যক।')
+      return
+    }
+
     if (!description.trim()) {
       setErrorMsg('খরচের সুনির্দিষ্ট বিবরণ উল্লেখ করুন।')
       return
@@ -135,12 +202,15 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
     try {
       const payload: RecordExpenseInput = {
+        expenseScope: selectedScope,
         categoryId,
         amount: parsedAmount,
         sourceAccountId,
-        buildingId: isFlatWise && flatId ? flats.find((f: any) => f.id === flatId)?.building_id : null,
-        flatId: isFlatWise && flatId ? flatId : null,
+        buildingId: selectedScope === 'FLAT_MISC' && selectedFlat ? selectedFlat.building_id : null,
+        flatId: selectedScope === 'FLAT_MISC' ? flatId : null,
         expenseDate,
+        billingMonth: selectedScope === 'FLAT_MISC' ? `${billingMonth}-01` : null,
+        vendorName: vendorName.trim() || null,
         description: description.trim(),
         voucherFile: selectedFile,
       }
@@ -163,15 +233,15 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-slate-800 bg-slate-900/90 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-indigo-400 p-0.5 shadow-lg shadow-indigo-600/30 flex items-center justify-center text-white">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-rose-600 to-indigo-600 p-0.5 shadow-lg shadow-rose-600/30 flex items-center justify-center text-white">
               <Receipt className="w-5 h-5" />
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-bold text-white tracking-wide">
-                দৈনিক খরচ এন্ট্রি ও ভাউচার আপলোড
+                খরচ ভাউচার এন্ট্রি (Simplified Expense Entry)
               </h3>
               <p className="text-xs text-slate-400">
-                হোস্টেলের যেকোনো খরচ, ক্যাশ মেমো এবং অনুমোদন ওয়ার্কফ্লো
+                ৩টি নির্ধারিত ক্যাটাগরিতে হোস্টেলের সকল খরচের নির্ভুল এন্ট্রি
               </p>
             </div>
           </div>
@@ -191,10 +261,10 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               <CheckCircle className="w-6 h-6 text-emerald-400 shrink-0" />
               <div>
                 <p className="text-sm font-bold text-emerald-300">
-                  খরচ সফলভাবে এন্ট্রি হয়েছে!
+                  খরচ সফলভাবে এন্ট্রি ও একাউন্ট সমন্বয় হয়েছে!
                 </p>
                 <p className="text-xs text-emerald-400/80">
-                  ভাউচার নম্বর: <span className="font-mono font-bold text-white">{successInfo.voucherNo}</span>। এটি অনুমোদনের অপেক্ষায় রয়েছে।
+                  ভাউচার নম্বর: <span className="font-mono font-bold text-white">{successInfo.voucherNo}</span>
                 </p>
               </div>
             </div>
@@ -207,8 +277,75 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             </div>
           )}
 
-          {/* Grid row 1: Date & Category */}
+          {/* 3-Tier Expense Category Scope Selector */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-200 block">
+              খরচের মূল ক্যাটাগরি নির্বাচন করুন <span className="text-rose-400">*</span>
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {SCOPE_CONFIG.map((item) => {
+                const IconComponent = item.icon
+                const isSelected = selectedScope === item.scope
+                return (
+                  <button
+                    key={item.scope}
+                    type="button"
+                    onClick={() => setSelectedScope(item.scope)}
+                    className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                      isSelected
+                        ? item.activeClass
+                        : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <IconComponent className="w-4 h-4 shrink-0" />
+                      <span className="text-xs font-bold">{item.title}</span>
+                    </div>
+                    <span className="text-[10px] leading-tight text-slate-400">
+                      {item.subtitle}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Sub-category & Date */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Sub-Category */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                  <Receipt className="w-3.5 h-3.5 text-indigo-400" />
+                  খরচের খাত / সাব-ক্যাটাগরি <span className="text-rose-400">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsCategoryModalOpen(true)}
+                  className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>নতুন খাত</span>
+                </button>
+              </div>
+              <select
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                required
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700/80 text-white text-xs focus:outline-none focus:border-indigo-500 transition-all cursor-pointer"
+              >
+                {filteredCategories.length === 0 ? (
+                  <option value="" disabled>এই ক্যাটাগরিতে কোনো খাত তৈরি করা নেই</option>
+                ) : (
+                  filteredCategories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
             {/* Expense Date */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
@@ -220,59 +357,66 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                 value={expenseDate}
                 onChange={(e) => setExpenseDate(e.target.value)}
                 required
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700/80 text-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700/80 text-white text-xs focus:outline-none focus:border-indigo-500 transition-all font-mono"
               />
-            </div>
-
-            {/* Expense Category */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                  <Receipt className="w-3.5 h-3.5 text-indigo-400" />
-                  ব্যয়ের খাত / ক্যাটাগরি <span className="text-rose-400">*</span>
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setIsCategoryModalOpen(true)}
-                  className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors"
-                  title="নতুন ব্যয়ের খাত তৈরি করুন"
-                >
-                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>নতুন খাত তৈরি</span>
-                </button>
-              </div>
-              <select
-                id="expense-category-select"
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                required
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700/80 text-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all cursor-pointer"
-              >
-                {categories.length === 0 ? (
-                  <option value="" disabled>ক্যাটাগরি লোড হচ্ছে...</option>
-                ) : (
-                  <>
-                    {!categoryId && (
-                      <option value="" disabled>-- ব্যয়ের খাত নির্বাচন করুন --</option>
-                    )}
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id} className="bg-slate-900 text-white py-1">
-                        {c.name} {c.description ? `(${c.description})` : ''}
-                      </option>
-                    ))}
-                  </>
-                )}
-              </select>
             </div>
           </div>
 
-          {/* Grid row 2: Amount & Source Account */}
+          {/* Conditional Flat-Wise Section */}
+          {selectedScope === 'FLAT_MISC' && (
+            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-3 animate-fade-in">
+              <div className="flex items-start gap-2.5 text-amber-300 text-xs">
+                <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold">ফ্ল্যাটওয়ারী বিবিধ খরচের হিসাব নীতি:</p>
+                  <p className="text-[11px] text-amber-200/80">
+                    এই খরচটি সংশ্লিষ্ট ফ্ল্যাটের <strong>মোট সিট সংখ্যা (Total Seats)</strong> দিয়ে সমভাবে ভাগ হবে (বর্ডারের সংখ্যা দিয়ে নয়)।
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-amber-500/20">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-200">
+                    সংশ্লিষ্ট ফ্ল্যাট নির্বাচন করুন <span className="text-rose-400">*</span>
+                  </label>
+                  <select
+                    value={flatId}
+                    onChange={(e) => setFlatId(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="">ফ্ল্যাট নির্বাচন করুন...</option>
+                    {flats.map((f: any) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name} ({f.flat_code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-200">
+                    বণ্টনের বিলিং মাস <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="month"
+                    value={billingMonth}
+                    onChange={(e) => setBillingMonth(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs font-mono focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Amount & Source Account */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Amount */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-                <span>ব্যয়ের পরিমাণ (BDT) <span className="text-rose-400">*</span></span>
-                <span className="text-[10px] text-slate-500">বাংলা বা ইংরেজি সংখ্যা</span>
+                <span>মোট ব্যয়ের পরিমাণ (BDT) <span className="text-rose-400">*</span></span>
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 font-bold">
@@ -286,7 +430,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="০.০০"
                   required
-                  className="w-full pl-8 pr-4 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700/80 text-white font-mono text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all placeholder-slate-600"
+                  className="w-full pl-8 pr-4 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700/80 text-white font-mono text-sm font-semibold focus:outline-none focus:border-indigo-500 transition-all placeholder-slate-600"
                 />
               </div>
             </div>
@@ -296,7 +440,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
                 <span className="flex items-center gap-1.5">
                   <Wallet className="w-3.5 h-3.5 text-indigo-400" />
-                  যে একাউন্ট থেকে প্রদান করা হয়েছে <span className="text-rose-400">*</span>
+                  যে অ্যাকাউন্ট থেকে প্রদান করা হয়েছে <span className="text-rose-400">*</span>
                 </span>
                 {selectedAccount && (
                   <span className="text-[10px] text-emerald-400 font-mono">
@@ -308,10 +452,10 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                 value={sourceAccountId}
                 onChange={(e) => setSourceAccountId(e.target.value)}
                 required
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700/80 text-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700/80 text-white text-xs focus:outline-none focus:border-indigo-500 transition-all"
               >
                 {accounts.map((a) => (
-                  <option key={a.id} value={a.id} className="bg-slate-900 text-white">
+                  <option key={a.id} value={a.id}>
                     {a.account_name} — ৳{a.current_balance.toLocaleString('en-IN')}
                   </option>
                 ))}
@@ -319,7 +463,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             </div>
           </div>
 
-          {/* Account Balance Live Deduction Indicator */}
+          {/* Live Balance Deduction Snippet */}
           {selectedAccount && parsedAmount > 0 && (
             <div className={`p-3 rounded-2xl border text-xs flex items-center justify-between ${
               remainingBalance < 0
@@ -341,69 +485,33 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             </div>
           )}
 
-          {/* Flat-wise Scope Selection */}
-          <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-cyan-400" />
-                <div>
-                  <span className="text-xs font-semibold text-slate-200">
-                    ফ্ল্যাট-ভিত্তিক খরচ ট্র্যাকিং
-                  </span>
-                  <p className="text-[11px] text-slate-400">
-                    খরচটি কি কোনো নির্দিষ্ট ফ্ল্যাটের সাথে সম্পর্কিত? (যেমন: ফ্ল্যাট মেরামত বা এসি বিল)
-                  </p>
-                </div>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isFlatWise}
-                  onChange={(e) => {
-                    setIsFlatWise(e.target.checked)
-                    if (e.target.checked && flats.length > 0 && !flatId) {
-                      setFlatId(flats[0].id)
-                    }
-                  }}
-                  className="sr-only peer"
-                />
-                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500" />
-              </label>
-            </div>
-
-            {isFlatWise && (
-              <div className="pt-2 border-t border-slate-800 animate-fade-in space-y-1.5">
-                <label className="text-xs font-medium text-slate-300">
-                  নির্দিষ্ট ফ্ল্যাট নির্বাচন করুন:
-                </label>
-                <select
-                  value={flatId}
-                  onChange={(e) => setFlatId(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
-                >
-                  {flats.map((f: any) => (
-                    <option key={f.id} value={f.id} className="bg-slate-900 text-white">
-                      {f.name} ({f.flat_code}) — {f.building?.name || 'হোস্টেল বিল্ডিং'}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+          {/* Vendor Name */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+              <Store className="w-3.5 h-3.5 text-slate-400" />
+              ভেন্ডার / দোকানের নাম (যদি থাকে)
+            </label>
+            <input
+              type="text"
+              value={vendorName}
+              onChange={(e) => setVendorName(e.target.value)}
+              placeholder="যেমন: কারওয়ান বাজার আড়ত, ভাই ভাই হার্ডওয়্যার, ডেসকো"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700/80 text-white text-xs focus:outline-none focus:border-indigo-500 transition-all"
+            />
           </div>
 
           {/* Description */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-              <span>খরচের বিস্তারিত বিবরণ / খাতের বিবরণ <span className="text-rose-400">*</span></span>
-              <span className="text-[10px] text-slate-500">দোকানের নাম, মেমো নম্বর ইত্যাদি</span>
+            <label className="text-xs font-semibold text-slate-300">
+              খরচের বিস্তারিত বিবরণ <span className="text-rose-400">*</span>
             </label>
             <textarea
               rows={2}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="উদাঃ ৫ম তলার বাথরুমের বেসিন পাইপ ক্রয় ও মেকানিক মজুরি..."
+              placeholder="উদাঃ মেস মিলের জন্য চাল ২ বস্তা ও তেল ১০ লিটার ক্রয়..."
               required
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700/80 text-white placeholder-slate-500 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all resize-none"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700/80 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-indigo-500 transition-all resize-none"
             />
           </div>
 
@@ -411,10 +519,9 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           <div className="space-y-2">
             <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
               <span>ক্যাশ মেমো / ভাউচার সংযুক্তি (ছবি বা পিডিএফ)</span>
-              <span className="text-[10px] text-slate-500">অনুমোদনের জন্য সুপারিশকৃত</span>
+              <span className="text-[10px] text-slate-500">ঐচ্ছিক</span>
             </label>
 
-            {/* Hidden native inputs */}
             <input
               type="file"
               ref={fileInputRef}
@@ -450,7 +557,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                       {selectedFile.name}
                     </p>
                     <p className="text-[11px] text-slate-400">
-                      {(selectedFile.size / 1024).toFixed(1)} KB • {selectedFile.type || 'ডকুমেন্ট'}
+                      {(selectedFile.size / 1024).toFixed(1)} KB
                     </p>
                   </div>
                 </div>
@@ -466,24 +573,22 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Camera Capture Button */}
                 <button
                   type="button"
                   onClick={() => cameraInputRef.current?.click()}
-                  className="p-4 rounded-2xl border border-dashed border-indigo-500/40 hover:border-indigo-400 bg-indigo-950/20 hover:bg-indigo-950/30 flex items-center justify-center gap-2.5 text-indigo-300 transition-all text-xs font-semibold group"
+                  className="p-3.5 rounded-2xl border border-dashed border-indigo-500/40 hover:border-indigo-400 bg-indigo-950/20 hover:bg-indigo-950/30 flex items-center justify-center gap-2 text-indigo-300 transition-all text-xs font-semibold"
                 >
-                  <Camera className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                  <Camera className="w-4 h-4" />
                   <span>ক্যামেরা দিয়ে ছবি তুলুন</span>
                 </button>
 
-                {/* File Upload Picker */}
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="p-4 rounded-2xl border border-dashed border-slate-700 hover:border-slate-500 bg-slate-950/60 hover:bg-slate-900 flex items-center justify-center gap-2.5 text-slate-300 transition-all text-xs font-semibold group"
+                  className="p-3.5 rounded-2xl border border-dashed border-slate-700 hover:border-slate-500 bg-slate-950/60 hover:bg-slate-900 flex items-center justify-center gap-2 text-slate-300 transition-all text-xs font-semibold"
                 >
-                  <Upload className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                  <span>গ্যালারি বা পিডিএফ সিলেক্ট করুন</span>
+                  <Upload className="w-4 h-4" />
+                  <span>ছবি বা পিডিএফ ফাইল সিলেক্ট করুন</span>
                 </button>
               </div>
             )}
@@ -502,7 +607,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             <button
               type="submit"
               disabled={recordMutation.isPending || !!successInfo}
-              className="px-6 py-2.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="px-6 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/30 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {recordMutation.isPending ? (
                 <>

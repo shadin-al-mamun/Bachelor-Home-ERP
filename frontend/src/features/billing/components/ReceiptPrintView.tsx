@@ -119,7 +119,27 @@ export const ReceiptPrintView: React.FC<ReceiptPrintViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {receipt.allocations && receipt.allocations.length > 0 ? (
+                {receipt.items && receipt.items.length > 0 ? (
+                  receipt.items.map((item, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50/50">
+                      <td className="py-2.5 px-3 text-slate-500 font-mono">{idx + 1}</td>
+                      <td className="py-2.5 px-3 font-medium text-slate-800">
+                        {item.head_name}
+                        {item.description ? (
+                          <span className="text-[11px] text-slate-500 font-normal block">
+                            {item.description}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-slate-600">
+                        {item.billing_month || '—'}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-bold text-slate-900">
+                        {formatCurrencyBn(item.amount)}
+                      </td>
+                    </tr>
+                  ))
+                ) : receipt.allocations && receipt.allocations.length > 0 ? (
                   receipt.allocations.map((alloc, idx) => (
                     <tr key={idx} className="hover:bg-slate-50/50">
                       <td className="py-2.5 px-3 text-slate-500 font-mono">{idx + 1}</td>

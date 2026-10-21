@@ -1,26 +1,27 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Modal } from '@/components/common/Modal'
 import { Button } from '@/components/common/Button'
 import { Input } from '@/components/common/Input'
 import {
   useFinancialAccounts,
-  useUnpaidCharges,
   useRecordReceiptMutation,
   type ExtendedReceipt,
+  type UnifiedCollectionItem,
 } from '../api/useReceipts'
 import { useBoarders } from '@/features/boarders/api/useBoarders'
 import { ReceiptPrintView } from './ReceiptPrintView'
 import { formatCurrencyBn } from '@/utils/date'
-import { autoDistributePayment } from '../utils/paymentDistribution'
 import type { PaymentMethod } from '@/types/database'
 import {
   Receipt,
   User,
   AlertCircle,
   Wallet,
-  Sparkles,
   CreditCard,
   Plus,
+  Trash2,
+  Calendar,
+  Building,
 } from 'lucide-react'
 import { CreateFinancialAccountModal } from '@/features/finance/components/CreateFinancialAccountModal'
 
@@ -29,6 +30,22 @@ interface CollectReceiptModalProps {
   onClose: () => void
   preSelectedBoarderId?: string
 }
+
+interface ItemRow {
+  head_code: string
+  head_name: string
+  amount: number
+  description: string
+}
+
+const DEFAULT_HEADS: { code: string; name: string }[] = [
+  { code: 'SEAT_RENT', name: 'সিট ভাড়া (Seat Rent)' },
+  { code: 'MEAL_BILL', name: 'মিল বিল (Meal Bill)' },
+  { code: 'MISC_BILL', name: 'ফ্ল্যাট বিবিধ বিল (Misc Bill)' },
+  { code: 'ADVANCE', name: 'অগ্রিম জমা (Advance)' },
+  { code: 'FINE', name: 'জরিমানা / বিলম্ব ফি (Fine)' },
+  { code: 'OTHER', name: 'অন্যান্য সার্ভিস চার্জ (Other)' },
+]
 
 export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
   isOpen,
@@ -39,14 +56,20 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
   const { data: accounts = [] } = useFinancialAccounts()
 
   const [boarderId, setBoarderId] = useState(preSelectedBoarderId || '')
-  const { data: unpaidCharges = [], isLoading: isLoadingCharges } = useUnpaidCharges(boarderId)
+  const currentMonthStr = useMemo(() => new Date().toISOString().slice(0, 7), [])
+  const [billingMonth, setBillingMonth] = useState(currentMonthStr)
+  const [collectionDate, setCollectionDate] = useState(new Date().toISOString().slice(0, 10))
 
-  const [amountReceived, setAmountReceived] = useState<number>(0)
+  const [items, setItems] = useState<ItemRow[]>([
+    { head_code: 'SEAT_RENT', head_name: 'সিট ভাড়া', amount: 0, description: '' },
+    { head_code: 'MEAL_BILL', head_name: 'মিল বিল', amount: 0, description: '' },
+    { head_code: 'MISC_BILL', head_name: 'বিবিধ বিল', amount: 0, description: '' },
+  ])
+
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH')
   const [destinationAccountId, setDestinationAccountId] = useState('')
   const [reference, setReference] = useState('')
   const [remarks, setRemarks] = useState('')
-  const [allocations, setAllocations] = useState<Record<string, number>>({})
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [createdReceipt, setCreatedReceipt] = useState<ExtendedReceipt | null>(null)
@@ -61,13 +84,17 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
       setErrorMsg(null)
       setCreatedReceipt(null)
       setBoarderId(preSelectedBoarderId || '')
-      setAmountReceived(0)
+      setBillingMonth(new Date().toISOString().slice(0, 7))
+      setCollectionDate(new Date().toISOString().slice(0, 10))
+      setItems([
+        { head_code: 'SEAT_RENT', head_name: 'সিট ভাড়া', amount: 0, description: '' },
+        { head_code: 'MEAL_BILL', head_name: 'মিল বিল', amount: 0, description: '' },
+        { head_code: 'MISC_BILL', head_name: 'বিবিধ বিল', amount: 0, description: '' },
+      ])
       setPaymentMethod('CASH')
       setReference('')
       setRemarks('')
-      setAllocations({})
 
-      // Set default cash account
       if (accounts.length > 0) {
         const cashAcc = accounts.find((a) => a.account_type === 'CASH_MANAGER' || a.account_type === 'CASH_OWNER')
         setDestinationAccountId(cashAcc ? cashAcc.id : accounts[0].id)
@@ -75,7 +102,7 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
     }
   }, [isOpen, preSelectedBoarderId, accounts])
 
-  // Automatically select matching account when payment method or accounts list changes
+  // Select account on payment method change
   useEffect(() => {
     if (accounts.length > 0) {
       const currentValid = accounts.some((a) => a.id === destinationAccountId)
@@ -92,42 +119,32 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
     }
   }, [accounts, destinationAccountId, paymentMethod])
 
-  // Automatically distribute allocations when unpaidCharges or amountReceived change
-  useEffect(() => {
-    if (unpaidCharges.length > 0) {
-      if (amountReceived > 0) {
-        const newAlloc = autoDistributePayment(amountReceived, unpaidCharges)
-        setAllocations(newAlloc)
-      } else {
-        const initial: Record<string, number> = {}
-        unpaidCharges.forEach((c) => {
-          initial[c.id] = 0
-        })
-        setAllocations(initial)
-      }
-    }
-  }, [unpaidCharges, amountReceived])
+  // Calculate live total amount
+  const totalAmount = useMemo(() => {
+    return items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
+  }, [items])
 
-  // Total amount currently allocated across charges
-  const totalAllocated = Object.values(allocations).reduce((sum, val) => sum + (val || 0), 0)
+  const selectedBoarder = useMemo(() => {
+    return boarders.find((b) => b.id === boarderId)
+  }, [boarders, boarderId])
 
-  // Auto-distribute payment across oldest unpaid charges first
-  const handleAutoDistribute = () => {
-    if (amountReceived <= 0) {
-      setErrorMsg('প্রথমে মোট গৃহীত টাকার পরিমাণ (Amount Received) ইনপুট করুন।')
-      return
-    }
-
-    const newAlloc = autoDistributePayment(amountReceived, unpaidCharges)
-    setAllocations(newAlloc)
-    setErrorMsg(null)
+  const handleItemChange = (index: number, field: keyof ItemRow, value: any) => {
+    setItems((prev) => {
+      const copy = [...prev]
+      copy[index] = { ...copy[index], [field]: value }
+      return copy
+    })
   }
 
-  const handleAllocationChange = (chargeId: string, val: number) => {
-    setAllocations((prev) => ({
+  const handleAddItem = (headCode = 'OTHER', headName = 'অন্যান্য') => {
+    setItems((prev) => [
       ...prev,
-      [chargeId]: Math.max(0, val),
-    }))
+      { head_code: headCode, head_name: headName, amount: 0, description: '' },
+    ])
+  }
+
+  const handleRemoveItem = (index: number) => {
+    setItems((prev) => prev.filter((_, i) => i !== index))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -138,61 +155,48 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
       setErrorMsg('অনুগ্রহ করে একজন বর্ডার নির্বাচন করুন।')
       return
     }
-    if (amountReceived <= 0) {
-      setErrorMsg('গৃহীত টাকার পরিমাণ অবশ্যই ০ এর বেশি হতে হবে।')
-      return
-    }
-    if (!destinationAccountId) {
-      setErrorMsg('অনুগ্রহ করে জমার একাউন্ট বা ক্যাশ বক্স নির্বাচন করুন।')
+
+    if (totalAmount <= 0) {
+      setErrorMsg('কমপক্ষে একটি খাতে টাকার পরিমাণ ইনপুট করুন (মোট আদায় ০ টাকার বেশি হতে হবে)।')
       return
     }
 
-    // Auto-allocate if not yet allocated
-    let currentAllocations = allocations
-    let allocationPayload = Object.entries(currentAllocations)
-      .filter(([, amt]) => amt > 0)
-      .map(([charge_id, amount]) => ({
-        charge_id,
-        amount,
+    if (!destinationAccountId) {
+      setErrorMsg('অনুগ্রহ করে জমার অ্যাকাউন্ট নির্বাচন করুন।')
+      return
+    }
+
+    // Filter active items > 0
+    const activeItems: UnifiedCollectionItem[] = items
+      .filter((i) => Number(i.amount) > 0)
+      .map((i) => ({
+        head_code: i.head_code,
+        head_name: i.head_name,
+        amount: Number(i.amount),
+        billing_month: `${billingMonth}-01`,
+        description: i.description.trim() || undefined,
       }))
 
-    if (allocationPayload.length === 0 && unpaidCharges.length > 0 && amountReceived > 0) {
-      const autoAlloc = autoDistributePayment(amountReceived, unpaidCharges)
-      currentAllocations = autoAlloc
-      setAllocations(autoAlloc)
-      allocationPayload = Object.entries(autoAlloc)
-        .filter(([, amt]) => amt > 0)
-        .map(([charge_id, amount]) => ({
-          charge_id,
-          amount,
-        }))
-    }
-
-    const currentTotalAllocated = Object.values(currentAllocations).reduce((sum, val) => sum + (val || 0), 0)
-    if (currentTotalAllocated > amountReceived) {
-      setErrorMsg(
-        `চার্জে বণ্টনকৃত টাকার পরিমাণ (${formatCurrencyBn(
-          currentTotalAllocated
-        )}) মোট গৃহীত টাকার (${formatCurrencyBn(amountReceived)}) চেয়ে বেশি হতে পারবে না।`
-      )
+    if (activeItems.length === 0) {
+      setErrorMsg('কোনো বৈধ খাতের টাকা পাওয়া যায়নি।')
       return
     }
 
     try {
-      const result = await recordReceiptMutation.mutateAsync({
-        boarderId,
-        amount: amountReceived,
-        paymentMethod,
-        destinationAccountId,
-        reference: reference.trim() || undefined,
-        remarks: remarks.trim() || undefined,
-        allocations: allocationPayload,
-      })
-
-      const selectedBoarder = boarders.find((b) => b.id === boarderId)
       const selectedAccount = accounts.find((a) => a.id === destinationAccountId)
 
-      const receiptObject: ExtendedReceipt = {
+      const result = await recordReceiptMutation.mutateAsync({
+        boarderId,
+        destinationAccountId,
+        paymentMethod,
+        amount: totalAmount,
+        collectionDate: new Date(collectionDate).toISOString(),
+        reference: reference.trim() || undefined,
+        remarks: remarks.trim() || undefined,
+        items: activeItems,
+      })
+
+      const receiptObj: ExtendedReceipt = {
         id: result?.receipt_id || `rc-${Date.now()}`,
         receipt_number: result?.receipt_number || 'RCT-AUTO',
         boarder_id: boarderId,
@@ -202,30 +206,37 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
         received_by: 'current-manager',
         collector_name: 'দায়িত্বপ্রাপ্ত ম্যানেজার',
         destination_account_id: destinationAccountId,
-        account_name: selectedAccount?.account_name || 'ক্যাশ হিসাব',
-        amount: amountReceived,
+        account_name: selectedAccount?.account_name || 'ক্যাশ অ্যাকাউন্ট',
+        amount: totalAmount,
         payment_method: paymentMethod,
         transaction_reference: reference.trim() || undefined,
-        receipt_date: new Date().toISOString(),
+        receipt_date: new Date(collectionDate).toISOString(),
         is_void: false,
         remarks: remarks.trim() || undefined,
         created_at: new Date().toISOString(),
-        allocations: allocationPayload.map((a) => {
-          const ch = unpaidCharges.find((c) => c.id === a.charge_id)
-          return {
-            charge_id: a.charge_id,
-            charge_type: ch?.charge_type || 'RENT',
-            billing_month: ch?.billing_month || '2026-10-01',
-            description: ch?.description || 'সিট ভাড়া',
-            amount: a.amount,
-          }
-        }),
+        items: activeItems.map((item, idx) => ({
+          id: `item-${idx}`,
+          receipt_id: result?.receipt_id || '',
+          head_code: item.head_code,
+          head_name: item.head_name,
+          amount: item.amount,
+          billing_month: item.billing_month,
+          description: item.description,
+          created_at: new Date().toISOString(),
+        })),
+        allocations: activeItems.map((item, idx) => ({
+          charge_id: `ch-alloc-${idx}`,
+          charge_type: item.head_code,
+          billing_month: item.billing_month || `${billingMonth}-01`,
+          description: item.head_name,
+          amount: item.amount,
+        })),
       }
 
-      setCreatedReceipt(receiptObject)
+      setCreatedReceipt(receiptObj)
       setIsPrintModalOpen(true)
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'মানি রিসিপ্ট সংগ্রহে ব্যর্থ হয়েছে।'
+      const msg = err instanceof Error ? err.message : 'বিল সংগ্রহে ব্যর্থ হয়েছে।'
       setErrorMsg(msg)
     }
   }
@@ -235,8 +246,8 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
       <Modal
         isOpen={isOpen && !isPrintModalOpen}
         onClose={onClose}
-        title="মানি রিসিপ্ট সংগ্রহ (Collect Money Receipt)"
-        maxWidth="xl"
+        title="বিল আদায় ও মানি রিসিপ্ট সংগ্রহ (Unified Bill Collection)"
+        maxWidth="2xl"
       >
         <form onSubmit={handleSubmit} className="space-y-5">
           {errorMsg && (
@@ -246,9 +257,9 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
             </div>
           )}
 
-          {/* Top Row: Boarder Selection & Total Amount Received */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
+          {/* Top Row: Boarder, Month & Collection Date */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-slate-900/60 border border-slate-800 rounded-xl">
+            <div className="space-y-1.5 sm:col-span-1">
               <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5 text-primary-400" />
                 বর্ডার নির্বাচন করুন <span className="text-rose-400">*</span>
@@ -257,33 +268,165 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
                 value={boarderId}
                 onChange={(e) => setBoarderId(e.target.value)}
                 disabled={Boolean(preSelectedBoarderId)}
-                className="w-full px-3 py-2 bg-slate-900/80 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-primary-500"
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-primary-500"
                 required
               >
                 <option value="">বর্ডার নির্বাচন করুন...</option>
                 {boarders.map((b) => (
                   <option key={b.id} value={b.id}>
-                    {b.full_name} ({b.boarder_code}) — {b.phone_number}
+                    {b.full_name} ({b.boarder_code})
                   </option>
                 ))}
               </select>
             </div>
 
-            <Input
-              type="number"
-              label="মোট প্রাপ্ত টাকার পরিমাণ (৳)"
-              value={amountReceived || ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setAmountReceived(Number(e.target.value))
-              }
-              placeholder="যেমন: ৪২০০"
-              required
-              className="text-xs font-bold text-emerald-400"
-            />
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+                বিলিং মাস <span className="text-rose-400">*</span>
+              </label>
+              <input
+                type="month"
+                value={billingMonth}
+                onChange={(e) => setBillingMonth(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs font-mono focus:outline-none focus:border-indigo-500"
+                required
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+                আদায়ের তারিখ <span className="text-rose-400">*</span>
+              </label>
+              <input
+                type="date"
+                value={collectionDate}
+                onChange={(e) => setCollectionDate(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs font-mono focus:outline-none focus:border-emerald-500"
+                required
+              />
+            </div>
+          </div>
+
+          {/* Boarder Info Snippet if selected */}
+          {selectedBoarder && (
+            <div className="px-3.5 py-2.5 bg-primary-500/5 border border-primary-500/20 rounded-xl flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2 text-slate-300">
+                <Building className="w-4 h-4 text-primary-400" />
+                <span>
+                  বর্ডার: <strong className="text-white">{selectedBoarder.full_name}</strong> | ফোন: {selectedBoarder.phone_number || 'নেই'}
+                </span>
+              </div>
+              <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-md font-mono text-[11px] font-semibold">
+                আইডি: {selectedBoarder.boarder_code}
+              </span>
+            </div>
+          )}
+
+          {/* Multi-head Breakdown Matrix */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-white block">
+                  আদায়ের খাতসমূহ ও টাকার পরিমাণ (Billing Breakdown)
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  যেসব খাতের বিল গ্রহণ করছেন তাতে টাকার অংক দিন। স্বয়ংক্রিয়ভাবে মোট হিসাব হবে।
+                </span>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleAddItem()}
+                className="text-xs border-slate-700 hover:bg-slate-800 text-slate-200"
+              >
+                <Plus className="w-3.5 h-3.5 mr-1" />
+                খাত যোগ করুন
+              </Button>
+            </div>
+
+            <div className="rounded-xl border border-slate-800 overflow-hidden bg-slate-900/40">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-950/80 text-slate-400 font-semibold border-b border-slate-800">
+                  <tr>
+                    <th className="py-2.5 px-3 w-48">বিলিং খাত</th>
+                    <th className="py-2.5 px-3">বিবরণ / নোট (ঐচ্ছিক)</th>
+                    <th className="py-2.5 px-3 text-right w-36">টাকার পরিমাণ (৳)</th>
+                    <th className="py-2.5 px-2 text-center w-10"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {items.map((item, idx) => (
+                    <tr key={idx} className="hover:bg-slate-800/30">
+                      <td className="py-2 px-3">
+                        <select
+                          value={item.head_code}
+                          onChange={(e) => {
+                            const found = DEFAULT_HEADS.find((h) => h.code === e.target.value)
+                            handleItemChange(idx, 'head_code', e.target.value)
+                            handleItemChange(idx, 'head_name', found ? found.name.split(' (')[0] : e.target.value)
+                          }}
+                          className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-white text-xs font-medium focus:outline-none focus:border-primary-500"
+                        >
+                          {DEFAULT_HEADS.map((head) => (
+                            <option key={head.code} value={head.code}>
+                              {head.name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="py-2 px-3">
+                        <input
+                          type="text"
+                          value={item.description}
+                          onChange={(e) => handleItemChange(idx, 'description', e.target.value)}
+                          placeholder="যেমন: অক্টোবর মাসের নিয়মিত বিল"
+                          className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-300 text-xs focus:outline-none focus:border-slate-600"
+                        />
+                      </td>
+                      <td className="py-2 px-3 text-right">
+                        <input
+                          type="number"
+                          value={item.amount || ''}
+                          onChange={(e) => handleItemChange(idx, 'amount', Math.max(0, Number(e.target.value)))}
+                          placeholder="0"
+                          className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-right text-xs text-emerald-400 font-mono font-bold focus:outline-none focus:border-emerald-500"
+                        />
+                      </td>
+                      <td className="py-2 px-2 text-center">
+                        {items.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveItem(idx)}
+                            className="p-1 text-slate-500 hover:text-rose-400 rounded-lg transition-colors"
+                            title="খাত সরান"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-slate-950/60 font-bold border-t border-slate-800 text-xs">
+                  <tr>
+                    <td colSpan={2} className="py-3 px-3 text-right text-slate-300">
+                      মোট আদায় (Total Collection):
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono text-emerald-400 font-black text-sm">
+                      {formatCurrencyBn(totalAmount)}
+                    </td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           </div>
 
           {/* Payment Method & Destination Account */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-800">
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                 <CreditCard className="w-3.5 h-3.5 text-indigo-400" />
@@ -292,15 +435,15 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
               <select
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-                className="w-full px-3 py-2 bg-slate-900/80 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
               >
                 <option value="CASH">নগদ ক্যাশ (Cash)</option>
                 <option value="MFS">বিকাশ / নগদ (MFS)</option>
-                <option value="BANK_TRANSFER">ব্যাংক ট্রান্সফার (Bank)</option>
+                <option value="BANK_TRANSFER">ব্যাংক ট্রান্সফার (Bank Transfer)</option>
               </select>
             </div>
 
-            <div className="space-y-1.5 sm:col-span-2">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                   <Wallet className="w-3.5 h-3.5 text-emerald-400" />
@@ -312,7 +455,7 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
                   className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-400 hover:text-emerald-300 transition-colors"
                 >
                   <Plus className="w-3 h-3" />
-                  নতুন অ্যাকাউন্ট তৈরি
+                  নতুন অ্যাকাউন্ট
                 </button>
               </div>
 
@@ -324,14 +467,14 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
                     onClick={() => setIsCreateAccountModalOpen(true)}
                     className="px-2.5 py-1 text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg inline-flex items-center gap-1"
                   >
-                    <Plus className="w-3 h-3" /> অ্যাকাউন্ট তৈরি করুন
+                    <Plus className="w-3 h-3" /> তৈরি করুন
                   </button>
                 </div>
               ) : (
                 <select
                   value={destinationAccountId}
                   onChange={(e) => setDestinationAccountId(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-900/80 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-emerald-500"
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-emerald-500"
                   required
                 >
                   {accounts.map((acc) => (
@@ -344,119 +487,31 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
             </div>
           </div>
 
-          {/* Transaction Reference & Remarks */}
+          {/* Reference & Remarks */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="ট্রানজ্যাকশন আইডি / চেক নং (ঐচ্ছিক)"
               value={reference}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setReference(e.target.value)}
-              placeholder="যেমন: TRX9281729 বা ডাচ বাংলা স্লিপ"
+              placeholder="যেমন: TRX9281729 বা ব্যাংকের স্লিপ নং"
               className="text-xs font-mono"
             />
             <Input
-              label="মন্তব্য / বিবরণী"
+              label="মন্তব্য / বিশেষ বিবরণী"
               value={remarks}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRemarks(e.target.value)}
-              placeholder="যেমন: আংশিক পরিশোধ"
+              placeholder="যেমন: মাসিক বিল পরিশোধ বাবদ"
               className="text-xs"
             />
           </div>
 
-          {/* Payment Allocation Matrix */}
-          <div className="space-y-2 pt-2 border-t border-slate-800">
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="text-xs font-bold text-white block">
-                  বকেয়া চার্জ সমন্বয় ম্যাট্রিক্স (Charge Allocation)
-                </span>
-                <span className="text-[11px] text-slate-400">
-                  টাকা কোন কোন মাসের বিলের বিপরীতে জমা হবে তা বণ্টন করুন।
-                </span>
-              </div>
-
-              {unpaidCharges.length > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  type="button"
-                  onClick={handleAutoDistribute}
-                  className="text-xs border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10"
-                >
-                  <Sparkles className="w-3.5 h-3.5 mr-1" />
-                  অটো-অ্যালোকেট (পুরাতন বিল আগে)
-                </Button>
-              )}
-            </div>
-
-            {isLoadingCharges ? (
-              <div className="py-6 text-center text-xs text-slate-500">
-                বকেয়া চার্জ তালিকা লোড হচ্ছে...
-              </div>
-            ) : unpaidCharges.length === 0 ? (
-              <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800 text-center text-xs text-slate-400">
-                এই বর্ডারের বর্তমানে কোনো অমীমাংসিত বকেয়া চার্জ নেই। টাকা জমা দিলে অ্যাডভান্স হিসেবে গণ্য হবে।
-              </div>
-            ) : (
-              <div className="rounded-xl border border-slate-800 overflow-hidden bg-slate-900/40">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-950/60 text-slate-400 font-semibold border-b border-slate-800">
-                    <tr>
-                      <th className="py-2.5 px-3">চার্জের ধরন ও মাস</th>
-                      <th className="py-2.5 px-3 text-right">মোট পাওনা</th>
-                      <th className="py-2.5 px-3 text-right">বকেয়া বাকি</th>
-                      <th className="py-2.5 px-3 text-right w-36">জমার পরিমাণ (৳)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60">
-                    {unpaidCharges.map((ch) => (
-                      <tr key={ch.id} className="hover:bg-slate-800/30">
-                        <td className="py-2 px-3">
-                          <span className="font-semibold text-white block">
-                            {ch.description || `${ch.charge_type} চার্জ`}
-                          </span>
-                          <span className="text-[10px] text-slate-500 font-mono">
-                            বিলিং মাস: {ch.billing_month}
-                          </span>
-                        </td>
-                        <td className="py-2 px-3 text-right text-slate-400">
-                          {formatCurrencyBn(ch.amount)}
-                        </td>
-                        <td className="py-2 px-3 text-right font-bold text-rose-400">
-                          {formatCurrencyBn(ch.due_amount)}
-                        </td>
-                        <td className="py-2 px-3 text-right">
-                          <input
-                            type="number"
-                            value={allocations[ch.id] || ''}
-                            onChange={(e) =>
-                              handleAllocationChange(ch.id, Number(e.target.value))
-                            }
-                            placeholder="0"
-                            className="w-28 px-2 py-1 bg-slate-950 border border-slate-700 rounded-lg text-right text-xs text-emerald-400 font-mono font-bold focus:outline-none focus:border-emerald-500"
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot className="bg-slate-950/40 font-bold border-t border-slate-800 text-xs">
-                    <tr>
-                      <td colSpan={3} className="py-2 px-3 text-right text-slate-300">
-                        মোট বণ্টনকৃত টাকা:
-                      </td>
-                      <td className="py-2 px-3 text-right font-mono text-emerald-400 font-bold">
-                        {formatCurrencyBn(totalAllocated)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {/* Action Buttons */}
+          {/* Action Footer */}
           <div className="flex items-center justify-between pt-4 border-t border-slate-800">
-            <div className="text-xs text-slate-400">
-              মোট প্রাপ্ত: <span className="text-white font-bold">{formatCurrencyBn(amountReceived)}</span>
+            <div className="text-xs text-slate-300 flex items-center gap-2">
+              <span>মোট আদায়:</span>
+              <span className="text-base font-black text-emerald-400 font-mono">
+                {formatCurrencyBn(totalAmount)}
+              </span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -476,8 +531,8 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
                 id="submit-receipt-btn"
                 data-testid="submit-receipt-btn"
                 isLoading={recordReceiptMutation.isPending}
-                disabled={!boarderId || amountReceived <= 0}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white"
+                disabled={!boarderId || totalAmount <= 0}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4"
               >
                 <Receipt className="w-3.5 h-3.5 mr-1.5" />
                 রিসিপ্ট নিশ্চিত ও সেভ করুন

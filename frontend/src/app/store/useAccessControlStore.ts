@@ -132,6 +132,19 @@ export const ERP_MENU_DEFINITIONS: MenuDefinition[] = [
     ],
   },
   {
+    id: 'accounts',
+    name: 'অ্যাকাউন্ট ও খতিয়ান',
+    nameEn: 'Financial Accounts & Ledger',
+    category: 'finance',
+    iconName: 'CreditCard',
+    path: '/finance/accounts',
+    options: [
+      { id: 'view_accounts', label: 'সকল অ্যাকাউন্ট ও লাইভ ব্যালেন্স দেখা', desc: 'মেইন, ম্যানেজার ও ওনার অ্যাকাউন্টের স্থিতি দেখা' },
+      { id: 'manage_opening_balance', label: 'প্রারম্ভিক ব্যালেন্স সেট/আপডেট', desc: 'অ্যাকাউন্টের প্রারম্ভিক ব্যালেন্স কনফিগার করা' },
+      { id: 'view_ledger', label: 'অ্যাকাউন্ট রানিং বিবরণী দেখা', desc: 'তারিখভিত্তিক জমা, খরচ ও ব্যালেন্স বিবরণী দেখা' },
+    ],
+  },
+  {
     id: 'cashbook',
     name: 'ম্যানেজার ক্যাশবুক ও নগদ ক্লোজিং',
     nameEn: 'Cash Custody & Daily Closing',
@@ -249,6 +262,7 @@ function buildDefaultPermissions(): AllRolesPermissions {
     expenses: makeMenu('expenses', true),
     incomes: makeMenu('incomes', true),
     transfers: makeMenu('transfers', true),
+    accounts: makeMenu('accounts', true),
     cashbook: makeMenu('cashbook', true),
     meals: makeMenu('meals', true),
     meal_settings: makeMenu('meal_settings', true),
@@ -266,7 +280,8 @@ function buildDefaultPermissions(): AllRolesPermissions {
     collections: makeMenu('collections', true, ['view_receipts', 'collect_rent', 'print_receipt']),
     expenses: makeMenu('expenses', true, ['view_expenses', 'create_expense']),
     incomes: makeMenu('incomes', true, ['view_incomes', 'create_income']),
-    transfers: makeMenu('transfers', true, ['view_transfers']),
+    transfers: makeMenu('transfers', true, ['view_transfers', 'create_transfer']),
+    accounts: makeMenu('accounts', true),
     cashbook: makeMenu('cashbook', true),
     meals: makeMenu('meals', true),
     meal_settings: makeMenu('meal_settings', true, ['view_settings']),
@@ -285,6 +300,7 @@ function buildDefaultPermissions(): AllRolesPermissions {
     expenses: makeMenu('expenses', true),
     incomes: makeMenu('incomes', true),
     transfers: makeMenu('transfers', true),
+    accounts: makeMenu('accounts', true),
     cashbook: makeMenu('cashbook', true, ['view_cashbook']),
     meals: makeMenu('meals', false),
     meal_settings: makeMenu('meal_settings', true, ['view_settings']),
@@ -303,6 +319,7 @@ function buildDefaultPermissions(): AllRolesPermissions {
     expenses: makeMenu('expenses', false),
     incomes: makeMenu('incomes', false),
     transfers: makeMenu('transfers', false),
+    accounts: makeMenu('accounts', false),
     cashbook: makeMenu('cashbook', false),
     meals: makeMenu('meals', true),
     meal_settings: makeMenu('meal_settings', true, ['view_settings']),
@@ -321,6 +338,7 @@ function buildDefaultPermissions(): AllRolesPermissions {
     expenses: makeMenu('expenses', true, ['view_expenses']),
     incomes: makeMenu('incomes', true, ['view_incomes']),
     transfers: makeMenu('transfers', true, ['view_transfers']),
+    accounts: makeMenu('accounts', true, ['view_accounts', 'view_ledger']),
     cashbook: makeMenu('cashbook', true, ['view_cashbook']),
     meals: makeMenu('meals', true, ['kitchen_board']),
     meal_settings: makeMenu('meal_settings', true, ['view_settings']),
@@ -525,11 +543,21 @@ export const useAccessControlStore = create<AccessControlState>((set, get) => ({
   },
 
   initializePermissions: async () => {
+    const mergePermissions = (base: AllRolesPermissions, override: Partial<AllRolesPermissions>): AllRolesPermissions => {
+      const result: AllRolesPermissions = { ...base }
+      ;(Object.keys(base) as ConfigurableRole[]).forEach((role) => {
+        if (override[role]) {
+          result[role] = { ...base[role], ...override[role] }
+        }
+      })
+      return result
+    }
+
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
       if (stored) {
         const parsed = JSON.parse(stored)
-        set({ rolePermissions: { ...DEFAULT_ROLE_PERMISSIONS, ...parsed } })
+        set((state) => ({ rolePermissions: mergePermissions(state.rolePermissions, parsed) }))
       }
     } catch (e) {
       console.warn('Failed to parse local permissions:', e)
@@ -544,7 +572,7 @@ export const useAccessControlStore = create<AccessControlState>((set, get) => ({
 
         if (!error && data?.access_control_permissions) {
           const remotePerms = data.access_control_permissions as AllRolesPermissions
-          set({ rolePermissions: { ...DEFAULT_ROLE_PERMISSIONS, ...remotePerms } })
+          set((state) => ({ rolePermissions: mergePermissions(state.rolePermissions, remotePerms) }))
           localStorage.setItem(STORAGE_KEY, JSON.stringify(remotePerms))
         }
       } catch {

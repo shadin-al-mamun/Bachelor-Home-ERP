@@ -29,15 +29,21 @@ import {
 import AddExpenseModal from './components/AddExpenseModal'
 import VoucherPreviewModal from './components/VoucherPreviewModal'
 import ExpenseRejectModal from './components/ExpenseRejectModal'
+import { FlatMonthlyDistributionView } from './components/FlatMonthlyDistributionView'
 import { ManageCategoriesModal } from '@/features/finance/components/ManageCategoriesModal'
+import type { ExpenseScope } from '@/types/database'
 
 export const ExpenseListPage: React.FC = () => {
   const { profile } = useAuthStore()
   const isAdmin = profile?.role === 'SUPER_ADMIN' || profile?.role === 'ADMIN'
 
+  // Main Page View Mode
+  const [activeTab, setActiveTab] = useState<'LIST' | 'FLAT_DISTRIBUTION'>('LIST')
+
   // Filter States
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL')
+  const [scopeFilter, setScopeFilter] = useState<ExpenseScope | 'ALL'>('ALL')
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL')
   const [flatFilter, setFlatFilter] = useState<string>('ALL')
   const [dateFilter, setDateFilter] = useState<'ALL' | 'TODAY' | 'THIS_MONTH'>('THIS_MONTH')
@@ -61,7 +67,13 @@ export const ExpenseListPage: React.FC = () => {
     [searchQuery, statusFilter, categoryFilter, flatFilter, dateFilter]
   )
 
-  const { data: expenses = [], isLoading, refetch, isRefetching } = useExpenses(filters)
+  const { data: rawExpenses = [], isLoading, refetch, isRefetching } = useExpenses(filters)
+  
+  // Filter by Scope
+  const expenses = useMemo(() => {
+    if (scopeFilter === 'ALL') return rawExpenses
+    return rawExpenses.filter((e) => e.expense_scope === scopeFilter)
+  }, [rawExpenses, scopeFilter])
   const { data: categories = [] } = useExpenseCategories()
   const { data: flats = [] } = useExpenseFlats()
   const reviewMutation = useReviewExpenseMutation()
@@ -177,92 +189,145 @@ export const ExpenseListPage: React.FC = () => {
         </div>
       </div>
 
-      {/* KPI Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* Card 1: Total Approved Outflow */}
-        <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 backdrop-blur-sm relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition-all pointer-events-none" />
-          <span className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            অনুমোদিত খরচ (পরিশোধিত)
-          </span>
-          <div className="text-xl sm:text-2xl font-bold font-mono text-white mt-1">
-            ৳{metrics.totalApproved.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-          </div>
-          <p className="text-[10px] text-slate-400 mt-0.5">
-            সুপার এডমিন কর্তৃক ভেরিফাইড
-          </p>
-        </div>
-
-        {/* Card 2: Pending Outflow */}
-        <div className="p-4 rounded-2xl bg-slate-900/70 border border-amber-500/30 backdrop-blur-sm relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl group-hover:bg-amber-500/20 transition-all pointer-events-none" />
-          <span className="text-[11px] font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5" />
-            অপেক্ষমান ভাউচার ({metrics.pendingCount}টি)
-          </span>
-          <div className="text-xl sm:text-2xl font-bold font-mono text-amber-300 mt-1">
-            ৳{metrics.totalPending.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-          </div>
-          <p className="text-[10px] text-slate-400 mt-0.5">
-            ওনার অনুমোদনের জন্য অপেক্ষমান
-          </p>
-        </div>
-
-        {/* Card 3: Flat-wise Expense */}
-        <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 backdrop-blur-sm relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 rounded-full blur-2xl group-hover:bg-cyan-500/20 transition-all pointer-events-none" />
-          <span className="text-[11px] font-semibold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
-            <Building2 className="w-3.5 h-3.5" />
-            ফ্ল্যাট-ভিত্তিক খরচ
-          </span>
-          <div className="text-xl sm:text-2xl font-bold font-mono text-white mt-1">
-            ৳{metrics.totalFlatWise.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-          </div>
-          <p className="text-[10px] text-slate-400 mt-0.5">
-            নির্দিষ্ট ফ্ল্যাটে ট্যাগকৃত মেরামত ও বিল
-          </p>
-        </div>
-
-        {/* Card 4: General Hostel Outflow */}
-        <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 backdrop-blur-sm relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl group-hover:bg-indigo-500/20 transition-all pointer-events-none" />
-          <span className="text-[11px] font-semibold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
-            <Wallet className="w-3.5 h-3.5" />
-            সার্বিক মেস খরচ
-          </span>
-          <div className="text-xl sm:text-2xl font-bold font-mono text-white mt-1">
-            ৳{metrics.totalGeneral.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-          </div>
-          <p className="text-[10px] text-slate-400 mt-0.5">
-            ইন্টারনেট, সাপ্লাই ও সাধারণ ইউটিলিটি
-          </p>
-        </div>
+      {/* Top View Mode Switcher */}
+      <div className="flex items-center gap-2 p-1.5 bg-slate-900/90 border border-slate-800 rounded-2xl w-fit">
+        <button
+          onClick={() => setActiveTab('LIST')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            activeTab === 'LIST'
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+          }`}
+        >
+          <Receipt className="w-4 h-4" />
+          <span>খরচের তালিকা ও ভাউচার</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('FLAT_DISTRIBUTION')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            activeTab === 'FLAT_DISTRIBUTION'
+              ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+          }`}
+        >
+          <Building2 className="w-4 h-4" />
+          <span>ফ্ল্যাটওয়ারী মাসিক বিবিধ বণ্টন (সিটভিত্তিক হিসাব)</span>
+        </button>
       </div>
 
-      {/* Filter Toolbar */}
-      <div className="glass-card p-4 rounded-3xl border border-slate-800/80 space-y-3.5">
-        {/* Status Navigation Tabs */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-          {[
-            { id: 'ALL', label: 'সব ভাউচার' },
-            { id: 'PENDING', label: 'অপেক্ষমান (Pending)' },
-            { id: 'APPROVED', label: 'অনুমোদিত (Approved)' },
-            { id: 'REJECTED', label: 'প্রত্যাখ্যাত (Rejected)' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setStatusFilter(tab.id as any)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
-                statusFilter === tab.id
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'bg-slate-900/70 text-slate-400 hover:text-white hover:bg-slate-800'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+      {activeTab === 'FLAT_DISTRIBUTION' ? (
+        <FlatMonthlyDistributionView />
+      ) : (
+        <>
+          {/* KPI Summary Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            {/* Card 1: Total Approved Outflow */}
+            <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 backdrop-blur-sm relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition-all pointer-events-none" />
+              <span className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                অনুমোদিত খরচ (পরিশোধিত)
+              </span>
+              <div className="text-xl sm:text-2xl font-bold font-mono text-white mt-1">
+                ৳{metrics.totalApproved.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </div>
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                সুপার এডমিন কর্তৃক ভেরিফাইড
+              </p>
+            </div>
+
+            {/* Card 2: Pending Outflow */}
+            <div className="p-4 rounded-2xl bg-slate-900/70 border border-amber-500/30 backdrop-blur-sm relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl group-hover:bg-amber-500/20 transition-all pointer-events-none" />
+              <span className="text-[11px] font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" />
+                অপেক্ষমান ভাউচার ({metrics.pendingCount}টি)
+              </span>
+              <div className="text-xl sm:text-2xl font-bold font-mono text-amber-300 mt-1">
+                ৳{metrics.totalPending.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </div>
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                ওনার অনুমোদনের জন্য অপেক্ষমান
+              </p>
+            </div>
+
+            {/* Card 3: Flat-wise Expense */}
+            <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 backdrop-blur-sm relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 rounded-full blur-2xl group-hover:bg-cyan-500/20 transition-all pointer-events-none" />
+              <span className="text-[11px] font-semibold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5" />
+                ফ্ল্যাট-ভিত্তিক খরচ
+              </span>
+              <div className="text-xl sm:text-2xl font-bold font-mono text-white mt-1">
+                ৳{metrics.totalFlatWise.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </div>
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                নির্দিষ্ট ফ্ল্যাটে ট্যাগকৃত মেরামত ও বিল
+              </p>
+            </div>
+
+            {/* Card 4: General Hostel Outflow */}
+            <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 backdrop-blur-sm relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl group-hover:bg-indigo-500/20 transition-all pointer-events-none" />
+              <span className="text-[11px] font-semibold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Wallet className="w-3.5 h-3.5" />
+                সার্বিক মেস খরচ
+              </span>
+              <div className="text-xl sm:text-2xl font-bold font-mono text-white mt-1">
+                ৳{metrics.totalGeneral.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </div>
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                ইন্টারনেট, সাপ্লাই ও সাধারণ ইউটিলিটি
+              </p>
+            </div>
+          </div>
+
+          {/* Filter Toolbar */}
+          <div className="glass-card p-4 rounded-3xl border border-slate-800/80 space-y-3.5">
+            {/* Status Navigation Tabs */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+              {[
+                { id: 'ALL', label: 'সব ভাউচার' },
+                { id: 'PENDING', label: 'অপেক্ষমান (Pending)' },
+                { id: 'APPROVED', label: 'অনুমোদিত (Approved)' },
+                { id: 'REJECTED', label: 'প্রত্যাখ্যাত (Rejected)' },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setStatusFilter(tab.id as any)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                    statusFilter === tab.id
+                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                      : 'bg-slate-900/70 text-slate-400 hover:text-white hover:bg-slate-800'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* 3-Tier Expense Scope Filter */}
+            <div className="flex items-center gap-2 pt-2 border-t border-slate-800/60 overflow-x-auto pb-1 scrollbar-none">
+              <span className="text-[11px] font-semibold text-slate-400 shrink-0">খরচের ক্যাটাগরি:</span>
+              {[
+                { id: 'ALL', label: 'সকল খরচ' },
+                { id: 'HOSTEL_MARKET', label: '১. হোস্টেলের বাজার খরচ' },
+                { id: 'HOSTEL_MISC', label: '২. হোস্টেলের বিবিধ খরচ' },
+                { id: 'FLAT_MISC', label: '৩. ফ্ল্যাটওয়ারী বিবিধ খরচ' },
+              ].map((pill) => (
+                <button
+                  key={pill.id}
+                  onClick={() => setScopeFilter(pill.id as any)}
+                  className={`px-3 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                    scopeFilter === pill.id
+                      ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/40 font-bold'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`}
+                >
+                  {pill.label}
+                </button>
+              ))}
+            </div>
 
         {/* Row 2: Search, Category, Flat, Date Filters */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-center">
@@ -525,6 +590,8 @@ export const ExpenseListPage: React.FC = () => {
             </table>
           </div>
         </div>
+      )}
+      </>
       )}
 
       {/* Add Expense Modal */}

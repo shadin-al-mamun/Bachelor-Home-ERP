@@ -156,152 +156,10 @@ export function saveStoredIncomeCategory(category: IncomeCategory) {
   }
 }
 
-let MOCK_INCOMES: ExtendedIncome[] = [
-  {
-    id: 'inc-2001',
-    income_voucher_no: 'INC-002001',
-    category_id: INCOME_CATEGORY_UUIDS.GUEST_STAY_FEE,
-    category_name: 'Guest Stay Fee',
-    amount: 1500,
-    destination_account_id: 'fa-1',
-    destination_account_name: 'ম্যানেজার ক্যাশ বক্স (Manager Cash)',
-    building_id: 'bld-1',
-    building_name: 'সানফ্লাওয়ার হোস্টেল (মেইন ক্যাম্পাস)',
-    flat_id: 'flat-2a',
-    flat_name: 'ফ্ল্যাট ২-এ (২য় তলা)',
-    flat_code: 'FLAT-2A',
-    income_date: '2026-10-04',
-    description: 'বর্ডার তানভীরের ভাইয়ের ৩ দিন রাত্রিযাপন ও খাবার চার্জ বাবদ নগদ গ্রহণ',
-    received_by: 'usr-mgr1',
-    receiver_name: 'হোস্টেল ম্যানেজার',
-    created_at: '2026-10-04T12:00:00Z',
-    updated_at: '2026-10-04T12:00:00Z',
-  },
-  {
-    id: 'inc-2002',
-    income_voucher_no: 'INC-002002',
-    category_id: INCOME_CATEGORY_UUIDS.SCRAP_SALE,
-    category_name: 'Scrap Sale',
-    amount: 950,
-    destination_account_id: 'fa-1',
-    destination_account_name: 'ম্যানেজার ক্যাশ বক্স (Manager Cash)',
-    building_id: 'bld-1',
-    building_name: 'সানফ্লাওয়ার হোস্টেল (মেইন ক্যাম্পাস)',
-    flat_id: null,
-    income_date: '2026-10-08',
-    description: 'স্টোর রুমের পুরাতন খবরের কাগজ, তেল ক্যান ও ভাঙা প্লাস্টিক ভাংগারি বিক্রয়',
-    received_by: 'usr-mgr1',
-    receiver_name: 'হোস্টেল ম্যানেজার',
-    created_at: '2026-10-08T15:30:00Z',
-    updated_at: '2026-10-08T15:30:00Z',
-  },
-  {
-    id: 'inc-2003',
-    income_voucher_no: 'INC-002003',
-    category_id: INCOME_CATEGORY_UUIDS.GUEST_STAY_FEE,
-    category_name: 'Guest Stay Fee',
-    amount: 1200,
-    destination_account_id: 'fa-3',
-    destination_account_name: 'বিকাশ মার্চেন্ট একাউন্ট (Hostel bKash)',
-    building_id: 'bld-1',
-    building_name: 'সানফ্লাওয়ার হোস্টেল (মেইন ক্যাম্পাস)',
-    flat_id: 'flat-3b',
-    flat_name: 'ফ্ল্যাট ৩-বি (৩য় তলা)',
-    flat_code: 'FLAT-3B',
-    income_date: '2026-10-11',
-    description: 'ফ্ল্যাট ৩-বি এর গেস্ট থাকার ফি বিকাশ পেমেন্টে গ্রহণ (TrxID: 9BK4582)',
-    received_by: 'usr-mgr1',
-    receiver_name: 'হোস্টেল ম্যানেজার',
-    created_at: '2026-10-11T19:40:00Z',
-    updated_at: '2026-10-11T19:40:00Z',
-  },
-  {
-    id: 'inc-2004',
-    income_voucher_no: 'INC-002004',
-    category_id: INCOME_CATEGORY_UUIDS.HALL_SPACE_USAGE,
-    category_name: 'Hall & Space Usage',
-    amount: 2500,
-    destination_account_id: 'fa-2',
-    destination_account_name: 'ডাচ বাংলা ব্যাংক (Hostel Bank)',
-    building_id: 'bld-1',
-    building_name: 'সানফ্লাওয়ার হোস্টেল (মেইন ক্যাম্পাস)',
-    flat_id: null,
-    income_date: '2026-10-13',
-    description: 'ইউনিভার্সিটি স্টাডি গ্রুপের বিশেষ সেমিনার রুম ব্যবহার ফি ব্যাংক ট্রান্সফারে জমা',
-    received_by: 'usr-admin1',
-    receiver_name: 'সুপার এডমিন (ওনার)',
-    created_at: '2026-10-13T11:00:00Z',
-    updated_at: '2026-10-13T11:00:00Z',
-  },
-  {
-    id: 'inc-2005',
-    income_voucher_no: 'INC-002005',
-    category_id: INCOME_CATEGORY_UUIDS.WIFI_EXTRA_DEVICE_FEE,
-    category_name: 'WiFi Extra Device Fee',
-    amount: 600,
-    destination_account_id: 'fa-1',
-    destination_account_name: 'ম্যানেজার ক্যাশ বক্স (Manager Cash)',
-    building_id: 'bld-1',
-    building_name: 'সানফ্লাওয়ার হোস্টেল (মেইন ক্যাম্পাস)',
-    flat_id: 'flat-4a',
-    flat_name: 'ফ্ল্যাট ৪-এ (৪র্থ তলা)',
-    flat_code: 'FLAT-4A',
-    income_date: '2026-10-15',
-    description: '২ জন বর্ডারের অতিরিক্ত ল্যাপটপ ডিভাইসের ওয়াইফাই ইন্টারনেট ফি ক্যাশ গ্রহণ',
-    received_by: 'usr-mgr1',
-    receiver_name: 'হোস্টেল ম্যানেজার',
-    created_at: '2026-10-15T14:20:00Z',
-    updated_at: '2026-10-15T14:20:00Z',
-  },
-]
+let MOCK_INCOMES: ExtendedIncome[] = []
 
-let MOCK_TRANSFERS: ExtendedAccountTransfer[] = [
-  {
-    id: 'trf-1001',
-    transfer_number: 'TRF-001001',
-    from_account_id: 'fa-1',
-    from_account_name: 'ম্যানেজার ক্যাশ বক্স (Manager Cash)',
-    to_account_id: 'fa-2',
-    to_account_name: 'ডাচ বাংলা ব্যাংক (Hostel Bank)',
-    amount: 25000,
-    transfer_date: '2026-10-06T11:30:00Z',
-    reference: 'DEP-SLIP-45892',
-    remarks: 'ম্যানেজারের হাতে থাকা মাসিক কালেকশন উদ্বৃত্ত ব্যাংকে জমা প্রদান',
-    created_by: 'usr-mgr1',
-    creator_name: 'হোস্টেল ম্যানেজার',
-    created_at: '2026-10-06T11:30:00Z',
-  },
-  {
-    id: 'trf-1002',
-    transfer_number: 'TRF-001002',
-    from_account_id: 'fa-3',
-    from_account_name: 'বিকাশ মার্চেন্ট একাউন্ট (Hostel bKash)',
-    to_account_id: 'fa-2',
-    to_account_name: 'ডাচ বাংলা ব্যাংক (Hostel Bank)',
-    amount: 18000,
-    transfer_date: '2026-10-09T16:00:00Z',
-    reference: 'B2B-SETTLE-8891',
-    remarks: 'বিকাশ মার্চেন্ট একাউন্টের ফান্ড ব্যাংক একাউন্টে অটো-সেটেলমেন্ট ট্রান্সফার',
-    created_by: 'usr-admin1',
-    creator_name: 'সুপার এডমিন (ওনার)',
-    created_at: '2026-10-09T16:00:00Z',
-  },
-  {
-    id: 'trf-1003',
-    transfer_number: 'TRF-001003',
-    from_account_id: 'fa-2',
-    from_account_name: 'ডাচ বাংলা ব্যাংক (Hostel Bank)',
-    to_account_id: 'fa-1',
-    to_account_name: 'ম্যানেজার ক্যাশ বক্স (Manager Cash)',
-    amount: 10000,
-    transfer_date: '2026-10-12T10:15:00Z',
-    reference: 'ATM-WDL-9921',
-    remarks: 'হোস্টেলের দৈনন্দিন বাজার ও পেটি ক্যাশ খরচের জন্য ব্যাংক থেকে নগদ উত্তোলন',
-    created_by: 'usr-mgr1',
-    creator_name: 'হোস্টেল ম্যানেজার',
-    created_at: '2026-10-12T10:15:00Z',
-  },
-]
+let MOCK_TRANSFERS: ExtendedAccountTransfer[] = []
+
 
 // ==============================================================================
 // React Query Hooks
@@ -774,4 +632,72 @@ export function useCreateIncomeCategoryMutation() {
     },
   })
 }
+
+export interface UpdateFinancialAccountInput {
+  id: string
+  account_name?: string
+  account_type?: any
+  account_number?: string | null
+  bank_name?: string | null
+  opening_balance?: number
+  opening_balance_date?: string
+  opening_balance_source?: string | null
+  current_balance?: number
+}
+
+export function useUpdateFinancialAccountMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: UpdateFinancialAccountInput) => {
+      if (!isSupabaseConfigured) {
+        const acc = MOCK_ACCOUNTS.find((a) => a.id === input.id)
+        if (!acc) throw new Error('অ্যাকাউন্ট খুঁজে পাওয়া যায়নি।')
+
+        if (input.account_name !== undefined) acc.account_name = input.account_name
+        if (input.account_type !== undefined) acc.account_type = input.account_type
+        if (input.account_number !== undefined) acc.account_number = input.account_number
+        if (input.bank_name !== undefined) acc.bank_name = input.bank_name
+        if (input.opening_balance !== undefined) {
+          const diff = input.opening_balance - (acc.opening_balance || 0)
+          acc.opening_balance = input.opening_balance
+          acc.current_balance = Math.max(0, (acc.current_balance || 0) + diff)
+        }
+        if (input.opening_balance_date !== undefined) acc.opening_balance_date = input.opening_balance_date
+        if (input.opening_balance_source !== undefined) acc.opening_balance_source = input.opening_balance_source || undefined
+        if (input.current_balance !== undefined) acc.current_balance = input.current_balance
+
+        return acc
+      }
+
+      const updatePayload: Record<string, any> = {}
+      if (input.account_name !== undefined) updatePayload.account_name = input.account_name
+      if (input.account_type !== undefined) updatePayload.account_type = input.account_type
+      if (input.account_number !== undefined) updatePayload.account_number = input.account_number
+      if (input.bank_name !== undefined) updatePayload.bank_name = input.bank_name
+      if (input.opening_balance !== undefined) updatePayload.opening_balance = input.opening_balance
+      if (input.opening_balance_date !== undefined) updatePayload.opening_balance_date = input.opening_balance_date
+      if (input.opening_balance_source !== undefined) updatePayload.opening_balance_source = input.opening_balance_source
+      if (input.current_balance !== undefined) updatePayload.current_balance = input.current_balance
+
+      const { data, error } = await supabase
+        .from('financial_accounts')
+        .update(updatePayload)
+        .eq('id', input.id)
+        .select('*')
+        .single()
+
+      if (error) {
+        throw new Error(error.message || 'অ্যাকাউন্ট আপডেট করতে ব্যর্থ হয়েছে।')
+      }
+
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['financial-accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['cash-sessions'] })
+    },
+  })
+}
+
 

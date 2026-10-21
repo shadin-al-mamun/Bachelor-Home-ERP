@@ -190,11 +190,39 @@ export interface FinancialAccount {
   account_type: FinancialAccountType
   account_number?: string | null
   bank_name?: string | null
+  opening_balance?: number
+  opening_balance_date?: string
+  opening_balance_source?: string
   current_balance: number
   assigned_manager_id?: string | null
   is_active: boolean
   created_at: string
   updated_at: string
+}
+
+export interface BillingHead {
+  id: string
+  code: string
+  name_bn: string
+  name_en: string
+  category: 'RENT' | 'MEAL' | 'MISC' | 'ADVANCE' | 'SERVICE_CHARGE' | 'OTHER'
+  description?: string | null
+  is_active: boolean
+  display_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ReceiptItem {
+  id: string
+  receipt_id: string
+  head_code: string
+  head_name: string
+  amount: number
+  billing_month?: string | null
+  description?: string | null
+  charge_id?: string | null
+  created_at: string
 }
 
 export interface AccountTransfer {
@@ -252,6 +280,7 @@ export interface Receipt {
   // Optional expanded relations
   boarder?: Boarder
   destination_account?: FinancialAccount
+  items?: ReceiptItem[]
 }
 
 export interface ReceiptAllocation {
@@ -263,10 +292,13 @@ export interface ReceiptAllocation {
   charge?: BoarderCharge
 }
 
+export type ExpenseScope = 'HOSTEL_MARKET' | 'HOSTEL_MISC' | 'FLAT_MISC'
+
 export interface ExpenseCategory {
   id: string
   name: string
   description?: string | null
+  category_scope?: ExpenseScope
   is_active: boolean
   created_at: string
 }
@@ -280,6 +312,9 @@ export interface Expense {
   building_id?: string | null
   flat_id?: string | null
   expense_date: string
+  billing_month?: string | null
+  expense_scope?: ExpenseScope
+  vendor_name?: string | null
   description: string
   voucher_attachment_url?: string | null
   paid_by: string
@@ -295,6 +330,22 @@ export interface Expense {
   flat?: Flat
   payer?: Profile
   approver?: Profile
+}
+
+export interface FlatMonthlyDistribution {
+  id: string
+  flat_id: string
+  billing_month: string // '2026-10-01'
+  total_expense: number
+  total_seats: number
+  per_seat_amount: number
+  is_billed: boolean
+  billed_at?: string | null
+  billed_by?: string | null
+  breakdown?: any[]
+  created_at: string
+  updated_at: string
+  flat?: Flat
 }
 
 export interface IncomeCategory {

@@ -34,12 +34,15 @@ export interface ExpenseFilters {
 }
 
 export interface RecordExpenseInput {
+  expenseScope?: import('@/types/database').ExpenseScope
   categoryId: string
   amount: number
   sourceAccountId: string
   buildingId?: string | null
   flatId?: string | null
   expenseDate: string
+  billingMonth?: string | null
+  vendorName?: string | null
   description: string
   voucherFile?: File | null
   voucherAttachmentUrl?: string | null
@@ -102,15 +105,26 @@ export function toValidExpenseUUID(id: string): string {
 }
 
 export const DEFAULT_EXPENSE_CATEGORIES: ExpenseCategory[] = [
-  { id: EXPENSE_CATEGORY_UUIDS.ELECTRIC_BILL, name: 'Electric Bill', description: 'মাসিক ডেসকো / ডিপিডিসি বিদ্যুৎ বিল', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-  { id: EXPENSE_CATEGORY_UUIDS.WATER_GAS, name: 'Water & Gas', description: 'ওয়াসা পানি ও এলপি সিলিন্ডার গ্যাস রিফিল', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-  { id: EXPENSE_CATEGORY_UUIDS.INTERNET_WIFI, name: 'Internet & WiFi', description: 'উচ্চগতির ব্রডব্যান্ড ইন্টারনেট সাবস্ক্রিপশন', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-  { id: EXPENSE_CATEGORY_UUIDS.MAINTENANCE_REPAIRS, name: 'Maintenance & Repairs', description: 'প্লাম্বিং, স্যানিটারি, বৈদ্যুতিক মেরামত ও রং কাজ', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-  { id: EXPENSE_CATEGORY_UUIDS.COOK_CLEANER_SALARY, name: 'Cook & Cleaner Salary', description: 'বাবুর্চি, সহকারী ও ক্লিনিং স্টাফদের বেতন', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-  { id: EXPENSE_CATEGORY_UUIDS.CLEANING_SUPPLIES, name: 'Cleaning Supplies', description: 'হারপিক, ব্লিচিং, ফ্লোর ক্লিনার ও ময়লার ব্যাগ', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-  { id: EXPENSE_CATEGORY_UUIDS.DINING_GROCERY, name: 'Dining & Grocery', description: 'হোস্টেল মেসের যৌথ ডাইনিং কাঁচাবাজার ও মুদি সামগ্রী', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-  { id: EXPENSE_CATEGORY_UUIDS.GENERATOR_FUEL, name: 'Generator & Fuel', description: 'জরুরি পাওয়ার ব্যাকআপ ও জেনারেটরের ডিজেল খরচ', is_active: true, created_at: '2026-01-01T00:00:00Z' },
-  { id: EXPENSE_CATEGORY_UUIDS.MISCELLANEOUS, name: 'Miscellaneous', description: 'হোস্টেল পরিচালনার অন্যান্য আকস্মিক খরচ', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  // 1. Hostel Market Expense
+  { id: 'a1111111-1111-4111-8111-111111111107', name: 'চাল, ডাল ও তেল (Rice, Pulses, Oil)', description: 'হোস্টেল মেসের কেন্দ্রীয় বাজার: চাল, ডাল ও তেল', category_scope: 'HOSTEL_MARKET', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'a1111111-1111-4111-8111-111111111110', name: 'মাছ, মাংস ও ডিম (Fish, Meat, Eggs)', description: 'হোস্টেল মেসের কেন্দ্রীয় বাজার: মাছ, মাংস ও ডিম', category_scope: 'HOSTEL_MARKET', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'a1111111-1111-4111-8111-111111111111', name: 'শাকসবজি ও কাঁচাবাজার (Vegetables & Groceries)', description: 'দৈনিক কাঁচাবাজার ও শাকসবজি', category_scope: 'HOSTEL_MARKET', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'a1111111-1111-4111-8111-111111111112', name: 'মসলাপাতি ও ড্রাই বাজার (Spices & Dry Food)', description: 'রান্নার তেল, মসলা, পেঁয়াজ, রসুন ইত্যাদি', category_scope: 'HOSTEL_MARKET', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+
+  // 2. Hostel Miscellaneous Expense
+  { id: 'a1111111-1111-4111-8111-111111111105', name: 'বাবুর্চির বেতন (Cook Salary)', description: 'বাবুর্চি ও কিচেন সহকারীর মাসিক বেতন', category_scope: 'HOSTEL_MISC', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'a1111111-1111-4111-8111-111111111113', name: 'ম্যানেজারের বেতন (Manager Salary)', description: 'হোস্টেল ম্যানেজার ও সহকারী পরিচালকের বেতন', category_scope: 'HOSTEL_MISC', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'a1111111-1111-4111-8111-111111111114', name: 'ক্লিনার ও স্টাফ বেতন (Staff Salary)', description: 'ক্লিনার, দারোয়ান ও সাপোর্ট স্টাফদের বেতন', category_scope: 'HOSTEL_MISC', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'a1111111-1111-4111-8111-111111111104', name: 'মেরামত ও রক্ষণাবেক্ষণ (Repairs & Maintenance)', description: 'হোস্টেলের সাধারণ প্লাম্বিং, বৈদ্যুতিক ও মেরামত', category_scope: 'HOSTEL_MISC', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'a1111111-1111-4111-8111-111111111109', name: 'হোস্টেলের সাধারণ খরচ (Hostel General Misc)', description: 'হোস্টেলের সাধারণ আকস্মিক ও অফিস খরচ', category_scope: 'HOSTEL_MISC', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+
+  // 3. Flat-wise Miscellaneous Expense
+  { id: 'a1111111-1111-4111-8111-111111111101', name: 'বিদ্যুৎ বিল (Electricity Bill)', description: 'নির্দিষ্ট ফ্ল্যাটের মাসিক ডেসকো/ডিপিডিসি বিদ্যুৎ বিল', category_scope: 'FLAT_MISC', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'a1111111-1111-4111-8111-111111111102', name: 'পানির বিল (Water Bill)', description: 'নির্দিষ্ট ফ্ল্যাটের মাসিক ওয়াসা পানির বিল', category_scope: 'FLAT_MISC', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'a1111111-1111-4111-8111-111111111115', name: 'গ্যাস বিল (Gas Bill)', description: 'নির্দিষ্ট ফ্ল্যাটের মাসিক গ্যাস বিল বা এলপিজি সিলিন্ডার খরচ', category_scope: 'FLAT_MISC', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'a1111111-1111-4111-8111-111111111116', name: 'ময়লা বিল (Garbage Bill)', description: 'নির্দিষ্ট ফ্ল্যাটের মাসিক বর্জ্য ব্যবস্থাপনা ও ময়লা বিল', category_scope: 'FLAT_MISC', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'a1111111-1111-4111-8111-111111111103', name: 'ওয়াইফাই বিল (Wi-Fi Bill)', description: 'নির্দিষ্ট ফ্ল্যাটের মাসিক ইন্টারনেট ও ওয়াইফাই বিল', category_scope: 'FLAT_MISC', is_active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'a1111111-1111-4111-8111-111111111117', name: 'অন্যান্য ফ্ল্যাটওয়ারী বিবিধ খরচ (Other Flat Misc)', description: 'নির্দিষ্ট ফ্ল্যাটের অন্যান্য আনুষঙ্গিক খরচ', category_scope: 'FLAT_MISC', is_active: true, created_at: '2026-01-01T00:00:00Z' },
 ]
 
 export const MOCK_EXPENSE_CATEGORIES = DEFAULT_EXPENSE_CATEGORIES
@@ -162,33 +176,36 @@ export function saveStoredExpenseCategory(category: ExpenseCategory) {
 export const MOCK_ACCOUNTS: FinancialAccount[] = [
   {
     id: 'fa-1',
-    account_name: 'ম্যানেজার ক্যাশ বক্স (Manager Cash)',
-    account_type: 'CASH_MANAGER',
-    account_number: 'CASH-01',
-    bank_name: 'হোস্টেল ক্যাশ ড্রয়ার',
-    current_balance: 18500,
+    account_name: 'Hostel Main Account (মেইন একাউন্ট)',
+    account_type: 'CASH_OWNER',
+    account_number: 'MAIN-VAULT-01',
+    bank_name: 'হোস্টেল সেন্ট্রাল ক্যাশ ভল্ট',
+    opening_balance: 0,
+    current_balance: 0,
     is_active: true,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-10-15T00:00:00Z',
   },
   {
     id: 'fa-2',
-    account_name: 'ডাচ বাংলা ব্যাংক (Hostel Bank)',
-    account_type: 'BANK',
-    account_number: '105.120.4568',
-    bank_name: 'Dutch-Bangla Bank PLC',
-    current_balance: 145000,
+    account_name: 'Manager Account (ম্যানেজার ক্যাশ)',
+    account_type: 'CASH_MANAGER',
+    account_number: 'MGR-CASH-01',
+    bank_name: 'ম্যানেজার শিফট ড্রয়ার',
+    opening_balance: 0,
+    current_balance: 0,
     is_active: true,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-10-15T00:00:00Z',
   },
   {
     id: 'fa-3',
-    account_name: 'বিকাশ মার্চেন্ট একাউন্ট (Hostel bKash)',
-    account_type: 'MFS',
-    account_number: '01800000000',
-    bank_name: 'bKash Merchant',
-    current_balance: 32400,
+    account_name: 'Admin Account (এডমিন একাউন্ট)',
+    account_type: 'BANK',
+    account_number: 'ADM-BANK-01',
+    bank_name: 'Dutch-Bangla Bank PLC',
+    opening_balance: 0,
+    current_balance: 0,
     is_active: true,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-10-15T00:00:00Z',
@@ -255,156 +272,8 @@ export const MOCK_FLATS: (Flat & { building: Building })[] = [
   },
 ]
 
-let MOCK_EXPENSES: ExtendedExpense[] = [
-  {
-    id: 'exp-5001',
-    expense_voucher_no: 'EXP-005001',
-    category_id: EXPENSE_CATEGORY_UUIDS.ELECTRIC_BILL,
-    category_name: 'Electric Bill',
-    amount: 8750,
-    source_account_id: 'fa-2',
-    source_account_name: 'ডাচ বাংলা ব্যাংক (Hostel Bank)',
-    building_id: 'bld-1',
-    building_name: 'সানফ্লাওয়ার হোস্টেল (মেইন ক্যাম্পাস)',
-    flat_id: null,
-    expense_date: '2026-10-02',
-    description: 'সেপ্টেম্বর ২০২৬ ডেসকো বিদ্যুৎ বিল ব্যাংক অনলাইন ট্রান্সফারের মাধ্যমে পরিশোধ',
-    voucher_attachment_url: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=800&auto=format&fit=crop&q=80',
-    paid_by: 'usr-mgr1',
-    payer_name: 'হোস্টেল ম্যানেজার',
-    approval_status: 'APPROVED',
-    approved_by: 'usr-admin1',
-    approved_at: '2026-10-03T10:00:00Z',
-    approver_name: 'সুপার এডমিন (ওনার)',
-    rejection_reason: null,
-    created_at: '2026-10-02T11:20:00Z',
-    updated_at: '2026-10-03T10:00:00Z',
-  },
-  {
-    id: 'exp-5002',
-    expense_voucher_no: 'EXP-005002',
-    category_id: EXPENSE_CATEGORY_UUIDS.INTERNET_WIFI,
-    category_name: 'Internet & WiFi',
-    amount: 3200,
-    source_account_id: 'fa-3',
-    source_account_name: 'বিকাশ মার্চেন্ট একাউন্ট (Hostel bKash)',
-    building_id: 'bld-1',
-    building_name: 'সানফ্লাওয়ার হোস্টেল (মেইন ক্যাম্পাস)',
-    flat_id: null,
-    expense_date: '2026-10-05',
-    description: 'কার্নিভাল ইন্টারনেট ৫০ এমবিপিএস ব্রডব্যান্ড অক্টোবর মাসের বিল',
-    voucher_attachment_url: 'https://images.unsplash.com/photo-1607344645866-009c320c5ab8?w=800&auto=format&fit=crop&q=80',
-    paid_by: 'usr-mgr1',
-    payer_name: 'হোস্টেল ম্যানেজার',
-    approval_status: 'APPROVED',
-    approved_by: 'usr-admin1',
-    approved_at: '2026-10-05T14:30:00Z',
-    approver_name: 'সুপার এডমিন (ওনার)',
-    rejection_reason: null,
-    created_at: '2026-10-05T12:00:00Z',
-    updated_at: '2026-10-05T14:30:00Z',
-  },
-  {
-    id: 'exp-5003',
-    expense_voucher_no: 'EXP-005003',
-    category_id: EXPENSE_CATEGORY_UUIDS.MAINTENANCE_REPAIRS,
-    category_name: 'Maintenance & Repairs',
-    amount: 1450,
-    source_account_id: 'fa-1',
-    source_account_name: 'ম্যানেজার ক্যাশ বক্স (Manager Cash)',
-    building_id: 'bld-1',
-    building_name: 'সানফ্লাওয়ার হোস্টেল (মেইন ক্যাম্পাস)',
-    flat_id: 'flat-4a',
-    flat_name: 'ফ্ল্যাট ৪-এ (৪র্থ তলা)',
-    flat_code: 'FLAT-4A',
-    expense_date: '2026-10-10',
-    description: '৪র্থ তলার ওয়াশরুমের বেসিন পাইপ পরিবর্তন, নতুন গ্রেস পিভিসি ট্যাপ ও প্লাম্বার মজুরি',
-    voucher_attachment_url: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&auto=format&fit=crop&q=80',
-    paid_by: 'usr-mgr1',
-    payer_name: 'হোস্টেল ম্যানেজার',
-    approval_status: 'PENDING',
-    approved_by: null,
-    approved_at: null,
-    rejection_reason: null,
-    created_at: '2026-10-10T16:15:00Z',
-    updated_at: '2026-10-10T16:15:00Z',
-  },
-  {
-    id: 'exp-5004',
-    expense_voucher_no: 'EXP-005004',
-    category_id: EXPENSE_CATEGORY_UUIDS.CLEANING_SUPPLIES,
-    category_name: 'Cleaning Supplies',
-    amount: 850,
-    source_account_id: 'fa-1',
-    source_account_name: 'ম্যানেজার ক্যাশ বক্স (Manager Cash)',
-    building_id: 'bld-1',
-    building_name: 'সানফ্লাওয়ার হোস্টেল (মেইন ক্যাম্পাস)',
-    flat_id: null,
-    expense_date: '2026-10-12',
-    description: '২ বোতল হারপিক, ১ কেজি ব্লিচিং পাউডার ও বড় সাইজের ডাস্টবিন পলিথিন ব্যাগ ক্রয়',
-    voucher_attachment_url: 'https://images.unsplash.com/photo-1583947215259-38e31be8751f?w=800&auto=format&fit=crop&q=80',
-    paid_by: 'usr-mgr1',
-    payer_name: 'হোস্টেল ম্যানেজার',
-    approval_status: 'PENDING',
-    approved_by: null,
-    approved_at: null,
-    rejection_reason: null,
-    created_at: '2026-10-12T09:40:00Z',
-    updated_at: '2026-10-12T09:40:00Z',
-  },
-  {
-    id: 'exp-5005',
-    expense_voucher_no: 'EXP-005005',
-    category_id: EXPENSE_CATEGORY_UUIDS.WATER_GAS,
-    category_name: 'Water & Gas',
-    amount: 1950,
-    source_account_id: 'fa-1',
-    source_account_name: 'ম্যানেজার ক্যাশ বক্স (Manager Cash)',
-    building_id: 'bld-1',
-    building_name: 'সানফ্লাওয়ার হোস্টেল (মেইন ক্যাম্পাস)',
-    flat_id: 'flat-2a',
-    flat_name: 'ফ্ল্যাট ২-এ (২য় তলা)',
-    flat_code: 'FLAT-2A',
-    expense_date: '2026-10-14',
-    description: 'রান্নাঘরের ওমেরা ১২ কেজি এলপি গ্যাস সিলিন্ডার রিফিল ক্যাশ পেমেন্টে',
-    voucher_attachment_url: 'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=800&auto=format&fit=crop&q=80',
-    paid_by: 'usr-mgr1',
-    payer_name: 'হোস্টেল ম্যানেজার',
-    approval_status: 'APPROVED',
-    approved_by: 'usr-admin1',
-    approved_at: '2026-10-14T18:00:00Z',
-    approver_name: 'সুপার এডমিন (ওনার)',
-    rejection_reason: null,
-    created_at: '2026-10-14T15:20:00Z',
-    updated_at: '2026-10-14T18:00:00Z',
-  },
-  {
-    id: 'exp-5006',
-    expense_voucher_no: 'EXP-005006',
-    category_id: EXPENSE_CATEGORY_UUIDS.MAINTENANCE_REPAIRS,
-    category_name: 'Maintenance & Repairs',
-    amount: 950,
-    source_account_id: 'fa-1',
-    source_account_name: 'ম্যানেজার ক্যাশ বক্স (Manager Cash)',
-    building_id: 'bld-1',
-    building_name: 'সানফ্লাওয়ার হোস্টেল (মেইন ক্যাম্পাস)',
-    flat_id: 'flat-3b',
-    flat_name: 'ফ্ল্যাট ৩-বি (৩য় তলা)',
-    flat_code: 'FLAT-3B',
-    expense_date: '2026-10-15',
-    description: 'রুম ২০২ এর অতিরিক্ত ফ্যান রেগুলেটর ক্রয় ও ইলেকট্রিশিয়ান খরচ',
-    voucher_attachment_url: 'https://images.unsplash.com/photo-1581092335397-9583fe92d232?w=800&auto=format&fit=crop&q=80',
-    paid_by: 'usr-mgr1',
-    payer_name: 'হোস্টেল ম্যানেজার',
-    approval_status: 'REJECTED',
-    approved_by: 'usr-admin1',
-    approved_at: '2026-10-15T19:00:00Z',
-    approver_name: 'সুপার এডমিন (ওনার)',
-    rejection_reason: 'অনুমোদনহীন কেনাকাটা ও ক্যাশ মেমোতে কোনো শপের সিল বা স্বাক্ষর নেই। সংশোধিত রশিদ সহ পুনরায় আবেদন করুন।',
-    created_at: '2026-10-15T16:30:00Z',
-    updated_at: '2026-10-15T19:00:00Z',
-  },
-]
+// Test financial transaction data reset for fresh baseline as instructed by user
+let MOCK_EXPENSES: ExtendedExpense[] = []
 
 // ==============================================================================
 // Storage Helper: Upload Voucher Receipt
@@ -745,6 +614,28 @@ export function useRecordExpenseMutation() {
           console.warn('Category reconciliation error, proceeding with resolved UUID:', e)
         }
 
+        // Try simplified expense RPC first
+        try {
+          const { data, error } = await supabase.rpc('fn_record_simplified_expense', {
+            p_expense_scope: input.expenseScope || 'HOSTEL_MISC',
+            p_category_id: resolvedCategoryId,
+            p_amount: input.amount,
+            p_source_account_id: input.sourceAccountId,
+            p_building_id: input.buildingId || null,
+            p_flat_id: input.flatId || null,
+            p_expense_date: input.expenseDate,
+            p_billing_month: input.billingMonth || null,
+            p_vendor_name: input.vendorName || null,
+            p_description: input.description,
+            p_voucher_attachment_url: attachmentUrl,
+          })
+
+          if (!error && data) return data
+        } catch (err) {
+          console.warn('fn_record_simplified_expense not yet present, falling back:', err)
+        }
+
+        // Fallback to fn_record_expense
         const { data, error } = await supabase.rpc('fn_record_expense', {
           p_category_id: resolvedCategoryId,
           p_amount: input.amount,
@@ -890,4 +781,80 @@ export function useCreateExpenseCategoryMutation() {
     },
   })
 }
+
+// ==============================================================================
+// Flat-wise Miscellaneous Expense Seat Distribution Hooks
+// ==============================================================================
+
+export function useFlatMonthlyDistribution(flatId?: string, billingMonth?: string) {
+  return useQuery({
+    queryKey: ['flat-monthly-distribution', flatId, billingMonth],
+    enabled: Boolean(flatId && billingMonth),
+    queryFn: async () => {
+      if (!isSupabaseConfigured || !flatId || !billingMonth) {
+        return null
+      }
+      const normMonth = `${billingMonth.slice(0, 7)}-01`
+      const { data, error } = await supabase
+        .from('flat_monthly_distributions')
+        .select('*')
+        .eq('flat_id', flatId)
+        .eq('billing_month', normMonth)
+        .maybeSingle()
+
+      if (error) return null
+      return data
+    },
+  })
+}
+
+export function useCalculateFlatDistributionMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ flatId, billingMonth }: { flatId: string; billingMonth: string }) => {
+      const normMonth = `${billingMonth.slice(0, 7)}-01`
+      if (!isSupabaseConfigured) {
+        return {
+          success: true,
+          total_expense: 4500,
+          total_seats: 10,
+          per_seat_amount: 450,
+          message: 'ডেমো মোডে হিসাব সম্পন্ন: ৪,৫০০ ÷ ১০ = ৪৫০ টাকা।',
+        }
+      }
+      const { data, error } = await supabase.rpc('fn_calculate_flat_monthly_distribution', {
+        p_flat_id: flatId,
+        p_billing_month: normMonth,
+      })
+      if (error) throw new Error(error.message || 'ফ্ল্যাট বিবিধ খরচ গণনা করতে ব্যর্থ।')
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['flat-monthly-distribution'] })
+    },
+  })
+}
+
+export function useApplyFlatChargesMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ distributionId, dueDate }: { distributionId: string; dueDate?: string }) => {
+      if (!isSupabaseConfigured) {
+        return { success: true, message: 'ডেমো মোডে বর্ডার বিলে যোগ সম্পন্ন হয়েছে।' }
+      }
+      const { data, error } = await supabase.rpc('fn_apply_flat_monthly_charges', {
+        p_distribution_id: distributionId,
+        p_due_date: dueDate || null,
+      })
+      if (error) throw new Error(error.message || 'বর্ডার বিলে যোগ করতে ব্যর্থ।')
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['flat-monthly-distribution'] })
+      queryClient.invalidateQueries({ queryKey: ['boarder-dues'] })
+      queryClient.invalidateQueries({ queryKey: ['boarder-charges'] })
+    },
+  })
+}
+
 

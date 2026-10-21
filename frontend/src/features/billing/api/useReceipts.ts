@@ -28,103 +28,81 @@ export interface ExtendedReceipt extends Receipt {
   }[]
 }
 
+export const DEFAULT_BILLING_HEADS: import('@/types/database').BillingHead[] = [
+  { id: 'bh-1', code: 'SEAT_RENT', name_bn: 'সিট ভাড়া', name_en: 'Seat Rent', category: 'RENT', description: 'মাসিক নির্ধারিত রুম ও সিট ভাড়া', is_active: true, display_order: 1, created_at: '', updated_at: '' },
+  { id: 'bh-2', code: 'MEAL_BILL', name_bn: 'খাবার বিল', name_en: 'Meal Bill', category: 'MEAL', description: 'মাসিক খাবার চার্জ', is_active: true, display_order: 2, created_at: '', updated_at: '' },
+  { id: 'bh-3', code: 'MISC_BILL', name_bn: 'বিবিধ বিল', name_en: 'Miscellaneous Bill', category: 'MISC', description: 'ফ্ল্যাটভিত্তিক আনুপাতিক বিল', is_active: true, display_order: 3, created_at: '', updated_at: '' },
+  { id: 'bh-4', code: 'ADVANCE', name_bn: 'অগ্রিম', name_en: 'Advance', category: 'ADVANCE', description: 'ভবিষ্যত মাসের জন্য অগ্রিম জমা', is_active: true, display_order: 4, created_at: '', updated_at: '' },
+  { id: 'bh-5', code: 'SERVICE_CHARGE', name_bn: 'এককালীন সার্ভিস চার্জ', name_en: 'One-time Service Charge', category: 'SERVICE_CHARGE', description: 'হোস্টেল ভর্তি বা সিট বরাদ্দকালীন এককালীন ফি', is_active: true, display_order: 5, created_at: '', updated_at: '' },
+  { id: 'bh-6', code: 'OTHER_BILL', name_bn: 'অন্যান্য বোর্ডার বিল', name_en: 'Other Border Bill', category: 'OTHER', description: 'বিলম্ব জরিমানা বা অন্যান্য বোর্ডার সার্ভিস বিল', is_active: true, display_order: 6, created_at: '', updated_at: '' },
+]
+
+export function useBillingHeads() {
+  return useQuery({
+    queryKey: ['billing-heads'],
+    queryFn: async (): Promise<import('@/types/database').BillingHead[]> => {
+      if (!isSupabaseConfigured) {
+        return DEFAULT_BILLING_HEADS
+      }
+      try {
+        const { data, error } = await supabase
+          .from('billing_heads')
+          .select('*')
+          .eq('is_active', true)
+          .order('display_order', { ascending: true })
+
+        if (error || !data || data.length === 0) {
+          return DEFAULT_BILLING_HEADS
+        }
+        return data as import('@/types/database').BillingHead[]
+      } catch {
+        return DEFAULT_BILLING_HEADS
+      }
+    },
+  })
+}
+
 const MOCK_ACCOUNTS: FinancialAccount[] = [
   {
     id: 'fa-1',
-    account_name: 'ম্যানেজার ক্যাশ বক্স (Manager Cash)',
-    account_type: 'CASH_MANAGER',
-    account_number: 'CASH-01',
-    bank_name: 'হোস্টেল ক্যাশ',
-    current_balance: 18500,
+    account_name: 'Hostel Main Account (মেইন একাউন্ট)',
+    account_type: 'CASH_OWNER',
+    account_number: 'MAIN-VAULT-01',
+    bank_name: 'হোস্টেল সেন্ট্রাল ক্যাশ ভল্ট',
+    opening_balance: 0,
+    current_balance: 0,
     is_active: true,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-10-15T00:00:00Z',
   },
   {
     id: 'fa-2',
-    account_name: 'ডাচ বাংলা ব্যাংক (Hostel Bank)',
-    account_type: 'BANK',
-    account_number: '105.120.4568',
-    bank_name: 'Dutch-Bangla Bank PLC',
-    current_balance: 145000,
+    account_name: 'Manager Account (ম্যানেজার ক্যাশ)',
+    account_type: 'CASH_MANAGER',
+    account_number: 'MGR-CASH-01',
+    bank_name: 'ম্যানেজার শিফট ড্রয়ার',
+    opening_balance: 0,
+    current_balance: 0,
     is_active: true,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-10-15T00:00:00Z',
   },
   {
     id: 'fa-3',
-    account_name: 'বিকাশ মার্চেন্ট একাউন্ট (Hostel bKash)',
-    account_type: 'MFS',
-    account_number: '01800000000',
-    bank_name: 'bKash Merchant',
-    current_balance: 32400,
+    account_name: 'Admin Account (এডমিন একাউন্ট)',
+    account_type: 'BANK',
+    account_number: 'ADM-BANK-01',
+    bank_name: 'Dutch-Bangla Bank PLC',
+    opening_balance: 0,
+    current_balance: 0,
     is_active: true,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-10-15T00:00:00Z',
   },
 ]
 
-let MOCK_RECEIPTS: ExtendedReceipt[] = [
-  {
-    id: 'rc-1001',
-    receipt_number: 'RCT-001001',
-    boarder_id: 'b-101',
-    boarder_name: 'তানভীর আহমেদ',
-    boarder_code: 'BDR-2026-001',
-    boarder_phone: '01711223344',
-    seat_code: '4A-101A',
-    flat_name: 'ফ্ল্যাট ৪এ',
-    received_by: 'mgr-1',
-    collector_name: 'হোস্টেল ম্যানেজার',
-    destination_account_id: 'fa-1',
-    account_name: 'ম্যানেজার ক্যাশ বক্স (Manager Cash)',
-    amount: 4500,
-    payment_method: 'CASH',
-    receipt_date: '2026-10-05T11:30:00Z',
-    is_void: false,
-    remarks: 'নিয়মিত ভাড়া পরিশোধ',
-    created_at: '2026-10-05T11:30:00Z',
-    allocations: [
-      {
-        charge_id: 'ch-1',
-        charge_type: 'RENT',
-        billing_month: '2026-10-01',
-        description: 'অক্টোবর ২০২৬ মাসিক সিট ভাড়া',
-        amount: 4500,
-      },
-    ],
-  },
-  {
-    id: 'rc-1002',
-    receipt_number: 'RCT-001002',
-    boarder_id: 'b-102',
-    boarder_name: 'রাকিবুল হাসান',
-    boarder_code: 'BDR-2026-002',
-    boarder_phone: '01912345678',
-    seat_code: '4A-101B',
-    flat_name: 'ফ্ল্যাট ৪এ',
-    received_by: 'mgr-1',
-    collector_name: 'হোস্টেল ম্যানেজার',
-    destination_account_id: 'fa-3',
-    account_name: 'বিকাশ মার্চেন্ট একাউন্ট (Hostel bKash)',
-    amount: 4200,
-    payment_method: 'MFS',
-    transaction_reference: 'TRX-BKASH-89942',
-    receipt_date: '2026-09-08T14:15:00Z',
-    is_void: false,
-    remarks: 'সেপ্টেম্বর ভাড়া',
-    created_at: '2026-09-08T14:15:00Z',
-    allocations: [
-      {
-        charge_id: 'ch-2',
-        charge_type: 'RENT',
-        billing_month: '2026-09-01',
-        description: 'সেপ্টেম্বর ২০২৬ মাসিক সিট ভাড়া',
-        amount: 4200,
-      },
-    ],
-  },
-]
+// Test financial transaction data reset for fresh baseline as instructed by user
+let MOCK_RECEIPTS: ExtendedReceipt[] = []
 
 // ==============================================================================
 // Hooks
@@ -336,14 +314,24 @@ export function useUnpaidCharges(boarderId?: string) {
 // Mutations
 // ==============================================================================
 
+export interface UnifiedCollectionItem {
+  head_code: string
+  head_name: string
+  amount: number
+  billing_month?: string
+  description?: string
+}
+
 export interface RecordReceiptParams {
   boarderId: string
-  amount: number
-  paymentMethod: PaymentMethod
   destinationAccountId: string
+  paymentMethod: PaymentMethod
+  amount?: number
+  collectionDate?: string
   reference?: string
   remarks?: string
-  allocations: {
+  items?: UnifiedCollectionItem[]
+  allocations?: {
     charge_id: string
     amount: number
   }[]
@@ -353,29 +341,44 @@ export function useRecordReceiptMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (params: RecordReceiptParams) => {
+      const items = params.items && params.items.length > 0 ? params.items : [
+        {
+          head_code: 'SEAT_RENT',
+          head_name: 'সিট ভাড়া',
+          amount: params.amount || 0,
+          billing_month: new Date().toISOString().slice(0, 7) + '-01',
+          description: params.remarks || 'নিয়মিত ভাড়া',
+        }
+      ]
+      const totalAmount = params.amount || items.reduce((sum, i) => sum + (Number(i.amount) || 0), 0)
+
+      if (totalAmount <= 0) {
+        throw new Error('মোট আদায়ের পরিমাণ অবশ্যই ০ টাকার বেশি হতে হবে।')
+      }
+
       if (!isSupabaseConfigured) {
         const receiptNo = `RCT-${Math.floor(100000 + Math.random() * 900000)}`
         const newReceipt: ExtendedReceipt = {
           id: `rc-${Date.now()}`,
           receipt_number: receiptNo,
           boarder_id: params.boarderId,
-          boarder_name: 'বর্ডার গ্রাহক',
+          boarder_name: 'বোর্ডার',
           boarder_code: 'BDR-2026-XXX',
           received_by: 'mgr-current',
           collector_name: 'দায়িত্বপ্রাপ্ত ম্যানেজার',
           destination_account_id: params.destinationAccountId,
-          account_name: 'ক্যাশ একাউন্ট',
-          amount: params.amount,
+          account_name: 'ক্যাশ অ্যাকাউন্ট',
+          amount: totalAmount,
           payment_method: params.paymentMethod,
           transaction_reference: params.reference,
-          receipt_date: new Date().toISOString(),
+          receipt_date: params.collectionDate || new Date().toISOString(),
           is_void: false,
           remarks: params.remarks,
           created_at: new Date().toISOString(),
-          allocations: params.allocations.map((a) => ({
+          allocations: (params.allocations || []).map((a) => ({
             charge_id: a.charge_id,
             charge_type: 'RENT',
-            billing_month: '2026-10-01',
+            billing_month: new Date().toISOString().slice(0, 7) + '-01',
             description: 'সিট ভাড়া',
             amount: a.amount,
           })),
@@ -389,13 +392,31 @@ export function useRecordReceiptMutation() {
         }
       }
 
+      // Try unified multi-head collection RPC first
+      try {
+        const { data, error } = await supabase.rpc('fn_record_unified_collection', {
+          p_boarder_id: params.boarderId,
+          p_destination_account_id: params.destinationAccountId,
+          p_payment_method: params.paymentMethod,
+          p_items: items,
+          p_collection_date: params.collectionDate || new Date().toISOString(),
+          p_reference: params.reference || null,
+          p_remarks: params.remarks || null,
+        })
+
+        if (!error && data) return data
+      } catch (err) {
+        console.warn('fn_record_unified_collection not yet available, falling back to fn_record_receipt:', err)
+      }
+
+      // Fallback to fn_record_receipt
       const { data, error } = await supabase.rpc('fn_record_receipt', {
         p_boarder_id: params.boarderId,
-        p_amount: params.amount,
+        p_amount: totalAmount,
         p_payment_method: params.paymentMethod,
         p_destination_account_id: params.destinationAccountId,
         p_reference: params.reference || null,
-        p_allocations: params.allocations,
+        p_allocations: params.allocations || [],
         p_remarks: params.remarks || null,
       })
 
