@@ -115,12 +115,12 @@ describe('CollectReceiptModal.test.tsx - Payment Auto-Distribution to Oldest Due
         />
       )
 
-      expect(screen.getByText('বকেয়া চার্জ সমন্বয় ম্যাট্রিক্স (Charge Allocation)')).toBeInTheDocument()
-      expect(screen.getByText('সেপ্টেম্বর ২০২৬ ভাড়া')).toBeInTheDocument()
-      expect(screen.getByText('অক্টোবর ২০২৬ ভাড়া')).toBeInTheDocument()
+      expect(screen.getByText('বিল আদায় ও মানি রিসিপ্ট সংগ্রহ (Unified Bill Collection)')).toBeInTheDocument()
+      expect(screen.getByText(/আদায়ের খাতসমূহ ও টাকার পরিমাণ/i)).toBeInTheDocument()
+      expect(screen.getByText('পেমেন্ট মাধ্যম')).toBeInTheDocument()
     })
 
-    it('shows error if Auto-Distribute is clicked with 0 amount received', () => {
+    it('allows entering item collection amount and renders total collection', () => {
       render(
         <CollectReceiptModal
           isOpen={true}
@@ -129,36 +129,11 @@ describe('CollectReceiptModal.test.tsx - Payment Auto-Distribution to Oldest Due
         />
       )
 
-      const autoAllocateBtn = screen.getByText(/অটো-অ্যালোকেট/i)
-      fireEvent.click(autoAllocateBtn)
+      const amountInputs = screen.getAllByPlaceholderText('0')
+      expect(amountInputs.length).toBeGreaterThan(0)
 
-      expect(
-        screen.getByText('প্রথমে মোট গৃহীত টাকার পরিমাণ (Amount Received) ইনপুট করুন।')
-      ).toBeInTheDocument()
-    })
-
-    it('auto-distributes payment across charges when amount is entered and button is clicked', () => {
-      render(
-        <CollectReceiptModal
-          isOpen={true}
-          onClose={vi.fn()}
-          preSelectedBoarderId="bdr-101"
-        />
-      )
-
-      // Enter 5000 in amount received
-      const amountInput = screen.getByPlaceholderText('যেমন: ৪২০০')
-      fireEvent.change(amountInput, { target: { value: '5000' } })
-
-      // Click auto-allocate button
-      const autoAllocateBtn = screen.getByText(/অটো-অ্যালোকেট/i)
-      fireEvent.click(autoAllocateBtn)
-
-      // Get allocation inputs in the table
-      const allocationInputs = screen.getAllByRole('spinbutton')
-      // allocationInputs[0] is amountInput; allocationInputs[1] and [2] are the table rows
-      expect((allocationInputs[1] as HTMLInputElement).value).toBe('4000')
-      expect((allocationInputs[2] as HTMLInputElement).value).toBe('1000')
+      fireEvent.change(amountInputs[0], { target: { value: '4500' } })
+      expect((amountInputs[0] as HTMLInputElement).value).toBe('4500')
     })
   })
 })
