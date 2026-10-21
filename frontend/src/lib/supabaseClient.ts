@@ -50,3 +50,14 @@ export const supabase = createClient(config.url, config.key, {
   },
 })
 
+export const createTempAuthClient = () => {
+  return createClient(config.url, config.key, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  })
+}
+
+

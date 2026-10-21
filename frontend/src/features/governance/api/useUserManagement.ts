@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '../../../lib/supabaseClient'
+import { supabase, isSupabaseConfigured, createTempAuthClient } from '../../../lib/supabaseClient'
+import { useAuthStore } from '../../../app/store/useAuthStore'
 import type { UserRole, Profile } from '../../../types/database'
 
 export interface UserManagementItem extends Profile {
@@ -221,3 +222,143 @@ export function useUpdateUserFlatAssignments() {
     },
   })
 }
+
+export interface CreateStaffParams {
+  fullName: string
+  email: string
+  phoneNumber: string
+  password: string
+  role: UserRole
+  flatIds?: string[]
+}
+
+export function useCreateStaffUser() {
+  const queryClient = useQueryClient()
+  const { profile: currentUser } = useAuthStore()
+
+  return useMutation({
+    mutationFn: async (params: CreateStaffParams) => {
+      const cleanPhone = params.phoneNumber.trim()
+      const cleanEmail = params.email.trim().toLowerCase()
+      const cleanName = params.fullName.trim()
+      const cleanPassword = params.password.trim()
+
+      if (!cleanName) throw new Error('অনুগ্রহ করে কর্মকর্তার পুরো নাম লিখুন।')
+      if (!cleanPhone) throw new Error('অনুগ্রহ করে মোবাইল নম্বর লিখুন।')
+      if (!cleanPassword || cleanPassword.length < 6) {
+        throw new Error('পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।')
+      }
+
+      if (!isSupabaseConfigured) {
+        const newMockUser: UserManagementItem = {
+          id: `mock-staff-${Date.now()}`,
+          email: cleanEmail,
+          full_name: cleanName,
+          phone_number: cleanPhone,
+          role: params.role,
+          is_active: true,
+          preferred_language: 'bn',
+          avatar_url: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          assigned_flats: (params.flatIds || []).map((fId) => ({
+            id: `assign-${Date.now()}-${fId}`,
+            flat_id: fId,
+          })),
+        }
+        FALLBACK_MOCK_PROFILES.unshift(newMockUser)
+        return { success: true, userId: newMockUser.id }
+      }
+
+      // Check if email or phone is already registered in profiles
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id, email, phone_number')
+        .or(`email.eq.${cleanEmail},phone_number.eq.${cleanPhone}`)
+        .maybeSingle()
+
+      if (existingProfile) {
+        if (existingProfile.email?.toLowerCase() === cleanEmail) {
+          throw new Error('এই ইমেইল দিয়ে ইতোমধ্যে একটি অ্যাকাউন্ট রয়েছে। ভিন্ন ইমেইল ব্যবহার করুন।')
+        }
+        if (existingProfile.phone_number === cleanPhone) {
+          throw new Error('এই মোবাইল নম্বর দিয়ে ইতোমধ্যে একটি অ্যাকাউন্ট রয়েছে। ভিন্ন নম্বর ব্যবহার করুন।')
+        }
+      }
+
+      // 1. Create user account using non-session persisting client
+      const tempAuthClient = createTempAuthClient()
+      const { data: authData, error: authError } = await tempAuthClient.auth.signUp({
+        email: cleanEmail,
+        password: cleanPassword,
+        options: {
+          data: {
+            full_name: cleanName,
+            phone_number: cleanPhone,
+            role: params.role,
+          },
+        },
+      })
+
+      if (authError) {
+        if (authError.message.includes('User already registered')) {
+          throw new Error('এই ইমেইল দিয়ে ইতোমধ্যে অথেনটিকেশন সিস্টেমে অ্যাকাউন্ট রয়েছে।')
+        }
+        throw new Error(authError.message || 'কর্মকর্তা আইডি তৈরি করতে সমস্যা হয়েছে।')
+      }
+
+      const createdUserId = authData?.user?.id
+      if (!createdUserId) {
+        throw new Error('ইউজার আইডি তৈরি করা সম্ভব হয়নি।')
+      }
+
+      // 2. Ensure auth account is auto-confirmed in Supabase
+      try {
+        await supabase.rpc('confirm_user_account', {
+          p_email: cleanEmail,
+          p_phone: cleanPhone,
+        })
+      } catch (confErr) {
+        console.warn('Auto-confirm RPC warning:', confErr)
+      }
+
+      // 3. Upsert profile with designated role and active status
+      try {
+        await supabase
+          .from('profiles')
+          .upsert({
+            id: createdUserId,
+            email: cleanEmail,
+            full_name: cleanName,
+            phone_number: cleanPhone,
+            role: params.role,
+            is_active: true,
+            updated_at: new Date().toISOString(),
+          })
+      } catch (profErr) {
+        console.warn('Profile sync warning:', profErr)
+      }
+
+      // 4. Assign flats if provided
+      if (params.flatIds && params.flatIds.length > 0) {
+        try {
+          const rowsToInsert = params.flatIds.map((flatId) => ({
+            user_id: createdUserId,
+            flat_id: flatId,
+            assigned_by: currentUser?.id || null,
+          }))
+
+          await supabase.from('user_flat_assignments').insert(rowsToInsert)
+        } catch (flatErr) {
+          console.warn('Flat assignment on staff creation warning:', flatErr)
+        }
+      }
+
+      return { success: true, userId: createdUserId }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users-management-list'] })
+    },
+  })
+}
+

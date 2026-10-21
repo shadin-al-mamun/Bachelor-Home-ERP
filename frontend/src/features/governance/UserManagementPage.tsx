@@ -8,6 +8,7 @@ import {
   XCircle,
   ShieldAlert,
   Sparkles,
+  UserPlus,
 } from 'lucide-react'
 import {
   useUsersList,
@@ -15,6 +16,7 @@ import {
   type UserManagementItem,
 } from './api/useUserManagement'
 import { FlatAssignmentModal } from './components/FlatAssignmentModal'
+import { CreateStaffModal } from './components/CreateStaffModal'
 import { useAuthStore } from '../../app/store/useAuthStore'
 import { Navigate, Link } from 'react-router-dom'
 import type { UserRole } from '../../types/database'
@@ -38,6 +40,7 @@ export const UserManagementPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState('ALL')
   const [selectedUserForFlats, setSelectedUserForFlats] = useState<UserManagementItem | null>(null)
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
   const { data: rawUsers = [], isLoading, isError } = useUsersList(searchQuery)
   const updateRoleMutation = useUpdateUserRoleAndStatus()
@@ -57,8 +60,8 @@ export const UserManagementPage: React.FC = () => {
     return rawUsers.filter((u) => u.role === roleFilter)
   }, [rawUsers, roleFilter])
 
-  // RBAC: Only SUPER_ADMIN can administer roles and user assignments
-  if (currentUser && currentUser.role !== 'SUPER_ADMIN') {
+  // RBAC: SUPER_ADMIN and ADMIN can administer roles and user assignments
+  if (currentUser && !['SUPER_ADMIN', 'ADMIN'].includes(currentUser.role)) {
     return <Navigate to="/unauthorized" replace />
   }
 
@@ -107,13 +110,24 @@ export const UserManagementPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="px-4 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-right">
-          <span className="text-[10px] uppercase font-semibold text-slate-500 block">
-            {roleFilter === 'ALL' ? 'মোট নিবন্ধিত ইউজার' : 'ফিল্টারকৃত ইউজার'}
-          </span>
-          <span className="text-lg font-bold text-slate-100 font-mono">
-            {users.length} জন
-          </span>
+        <div className="flex items-center gap-3 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={() => setIsCreateModalOpen(true)}
+            className="px-4 py-2.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 flex items-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>নতুন কর্মকর্তা আইডি তৈরি করুন</span>
+          </button>
+
+          <div className="px-4 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-right">
+            <span className="text-[10px] uppercase font-semibold text-slate-500 block">
+              {roleFilter === 'ALL' ? 'মোট নিবন্ধিত ইউজার' : 'ফিল্টারকৃত ইউজার'}
+            </span>
+            <span className="text-lg font-bold text-slate-100 font-mono">
+              {users.length} জন
+            </span>
+          </div>
         </div>
       </div>
 
@@ -399,6 +413,12 @@ export const UserManagementPage: React.FC = () => {
           onClose={() => setSelectedUserForFlats(null)}
         />
       )}
+
+      {/* 5. Create Staff Modal */}
+      <CreateStaffModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+      />
     </div>
   )
 }
