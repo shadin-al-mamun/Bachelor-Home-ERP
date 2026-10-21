@@ -450,7 +450,7 @@ export function useOwnerDashboard() {
           (sum, a) => sum + (Number(a.current_balance) || 0),
           0
         )
-        const cashCustody = latestSessionByManager.size > 0 ? sessionCash : accountCash
+        const cashCustody = accountCash > 0 ? accountCash : sessionCash
 
         // Calculate meals using Hostel Mess Opt-Out Policy:
         // Active residents who have NOT opted out have their meals ON by default (3 meals/day)
