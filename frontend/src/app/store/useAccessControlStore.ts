@@ -545,11 +545,11 @@ export const useAccessControlStore = create<AccessControlState>((set, get) => ({
   initializePermissions: async () => {
     const mergePermissions = (base: AllRolesPermissions, override: Partial<AllRolesPermissions>): AllRolesPermissions => {
       const result: AllRolesPermissions = { ...base }
-      ;(Object.keys(base) as ConfigurableRole[]).forEach((role) => {
-        if (override[role]) {
-          result[role] = { ...base[role], ...override[role] }
-        }
-      })
+        ; (Object.keys(base) as ConfigurableRole[]).forEach((role) => {
+          if (override[role]) {
+            result[role] = { ...base[role], ...override[role] }
+          }
+        })
       return result
     }
 

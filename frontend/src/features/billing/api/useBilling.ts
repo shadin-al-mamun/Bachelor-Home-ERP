@@ -24,69 +24,8 @@ export interface BoarderDueSummary {
 }
 
 
-const MOCK_DUES_SUMMARY: BoarderDueSummary[] = [
-  {
-    boarder_id: 'b-101',
-    boarder_code: 'BDR-2026-001',
-    full_name: 'তানভীর আহমেদ',
-    phone_number: '01711223344',
-    photo_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-    flat_code: 'FLAT-4A',
-    flat_name: 'ফ্ল্যাট ৪এ',
-    seat_code: '4A-101A',
-    total_billed: 13500,
-    total_paid: 13500,
-    outstanding_due: 0,
-    overdue_amount: 0,
-    last_payment_date: '2026-10-05',
-  },
-  {
-    boarder_id: 'b-102',
-    boarder_code: 'BDR-2026-002',
-    full_name: 'রাকিবুল হাসান',
-    phone_number: '01912345678',
-    photo_url: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150',
-    flat_code: 'FLAT-4A',
-    flat_name: 'ফ্ল্যাট ৪এ',
-    seat_code: '4A-101B',
-    total_billed: 12600,
-    total_paid: 8400,
-    outstanding_due: 4200,
-    overdue_amount: 4200,
-    last_payment_date: '2026-09-08',
-  },
-]
-
-const MOCK_CHARGES: BoarderCharge[] = [
-  {
-    id: 'ch-1',
-    boarder_id: 'b-101',
-    charge_type: 'RENT',
-    billing_month: '2026-10-01',
-    amount: 4500,
-    paid_amount: 4500,
-    due_amount: 0,
-    status: 'PAID',
-    due_date: '2026-10-10',
-    description: 'অক্টোবর ২০২৬ মাসিক সিট ভাড়া',
-    created_at: '2026-10-01T00:00:00Z',
-    updated_at: '2026-10-05T10:00:00Z',
-  },
-  {
-    id: 'ch-3',
-    boarder_id: 'b-102',
-    charge_type: 'RENT',
-    billing_month: '2026-10-01',
-    amount: 4200,
-    paid_amount: 0,
-    due_amount: 4200,
-    status: 'UNPAID',
-    due_date: '2026-10-10',
-    description: 'অক্টোবর ২০২৬ মাসিক সিট ভাড়া',
-    created_at: '2026-10-01T00:00:00Z',
-    updated_at: '2026-10-01T00:00:00Z',
-  },
-]
+const MOCK_DUES_SUMMARY: BoarderDueSummary[] = []
+const MOCK_CHARGES: BoarderCharge[] = []
 
 // ==============================================================================
 // Hooks
