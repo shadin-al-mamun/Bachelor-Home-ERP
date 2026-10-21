@@ -64,9 +64,14 @@ export const FinancialAccountsPage: React.FC = () => {
   const [openingSource, setOpeningSource] = useState<string>('')
   const [modalError, setModalError] = useState<string | null>(null)
 
-  // Total Balance across all accounts
+  // Total Balance across all accounts (incorporates live or newly initialized opening balance)
   const totalHostelFunds = useMemo(() => {
-    return accounts.reduce((sum, a) => sum + (Number(a.current_balance) || 0), 0)
+    return accounts.reduce((sum, a) => {
+      const cur = Number(a.current_balance) || 0
+      const open = Number(a.opening_balance) || 0
+      const effective = cur > 0 ? cur : open
+      return sum + effective
+    }, 0)
   }, [accounts])
 
   // Open Opening Balance Modal
@@ -90,10 +95,16 @@ export const FinancialAccountsPage: React.FC = () => {
       return
     }
 
+    const oldOpening = Number(openingBalanceAccount.opening_balance) || 0
+    const oldCurrent = Number(openingBalanceAccount.current_balance) || 0
+    const diff = parsed - oldOpening
+    const newCurrent = oldCurrent === 0 && oldOpening === 0 ? parsed : Math.max(0, oldCurrent + diff)
+
     try {
       await updateAccountMutation.mutateAsync({
         id: openingBalanceAccount.id,
         opening_balance: parsed,
+        current_balance: newCurrent,
         opening_balance_date: openingDate,
         opening_balance_source: openingSource.trim() || undefined,
       })
@@ -106,6 +117,25 @@ export const FinancialAccountsPage: React.FC = () => {
   // Build Comprehensive Running Ledger Entries
   const rawLedgerEntries = useMemo(() => {
     const list: LedgerEntry[] = []
+
+    // 0. Opening Balance entries
+    accounts.forEach((acc) => {
+      const openBal = Number(acc.opening_balance) || 0
+      if (openBal <= 0) return
+      list.push({
+        id: `open-${acc.id}`,
+        date: acc.opening_balance_date || '2026-10-01',
+        accountId: acc.id,
+        accountName: acc.account_name,
+        type: 'OPENING',
+        typeLabel: 'প্রারম্ভিক ব্যালেন্স (Opening)',
+        referenceNo: acc.account_number || 'OPENING',
+        description: `প্রারম্ভিক ব্যালেন্স নির্ধারণ ${acc.opening_balance_source ? `(${acc.opening_balance_source})` : ''}`,
+        credit: openBal,
+        debit: 0,
+        runningBalance: 0,
+      })
+    })
 
     // 1. Receipts (Bill Collection Credit)
     receipts.forEach((r) => {
@@ -206,9 +236,8 @@ export const FinancialAccountsPage: React.FC = () => {
       }
     })
 
-    // Return reversed (most recent transactions first)
     return calculated.reverse()
-  }, [receipts, incomes, expenses, transfers])
+  }, [accounts, receipts, incomes, expenses, transfers])
 
   // Filtered Ledger
   const filteredLedger = useMemo(() => {
@@ -376,7 +405,7 @@ export const FinancialAccountsPage: React.FC = () => {
                   <div>
                     <span className="text-[10px] text-slate-400 block">বর্তমান লাইভ স্থিতি:</span>
                     <span className="font-mono font-black text-emerald-400 text-sm">
-                      {formatCurrencyBn(acc.current_balance)}
+                      {formatCurrencyBn(Number(acc.current_balance) > 0 ? acc.current_balance : (acc.opening_balance || 0))}
                     </span>
                   </div>
                 </div>
