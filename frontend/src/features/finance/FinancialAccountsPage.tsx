@@ -308,16 +308,22 @@ export const FinancialAccountsPage: React.FC = () => {
 
       {/* Account Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {accounts.map((acc) => {
+        {accounts.map((acc, index) => {
           const isSelected = selectedAccountId === acc.id
-          const isMain = acc.account_type === 'BANK' || acc.account_name.toLowerCase().includes('main')
-          const isManager = acc.account_type === 'CASH_MANAGER' || acc.account_name.toLowerCase().includes('manager')
-          const IconComponent = isMain ? Building2 : isManager ? Wallet : ShieldCheck
-          const badgeLabel = isMain
-            ? '১. মেইন অ্যাকাউন্ট (Main Account)'
-            : isManager
-            ? '২. ম্যানেজার অ্যাকাউন্ট (Cash Box)'
-            : '৩. অ্যাডমিন অ্যাকাউন্ট (Owner Account)'
+          
+          let badgeLabel = `${index + 1}. অ্যাকাউন্ট`
+          let IconComponent = Wallet
+          
+          if (acc.id === '11111111-0000-0000-0000-000000000001' || acc.account_name.toLowerCase().includes('main')) {
+            badgeLabel = '১. মেইন অ্যাকাউন্ট (Hostel Main)'
+            IconComponent = Building2
+          } else if (acc.id === '11111111-0000-0000-0000-000000000002' || acc.account_name.toLowerCase().includes('manager')) {
+            badgeLabel = '২. ম্যানেজার অ্যাকাউন্ট (Cash Box)'
+            IconComponent = Wallet
+          } else if (acc.id === '11111111-0000-0000-0000-000000000003' || acc.account_name.toLowerCase().includes('admin') || acc.account_name.toLowerCase().includes('owner')) {
+            badgeLabel = '৩. ওনার/অ্যাডমিন অ্যাকাউন্ট (Admin)'
+            IconComponent = ShieldCheck
+          }
 
           return (
             <div

@@ -64,11 +64,11 @@ export function useBillingHeads() {
 
 const MOCK_ACCOUNTS: FinancialAccount[] = [
   {
-    id: 'fa-1',
+    id: '11111111-0000-0000-0000-000000000001',
     account_name: 'Hostel Main Account (মেইন একাউন্ট)',
     account_type: 'CASH_OWNER',
     account_number: 'MAIN-VAULT-01',
-    bank_name: 'হোস্টেল সেন্ট্রাল ক্যাশ ভল্ট',
+    bank_name: 'Hostel Central Safe / Vault',
     opening_balance: 0,
     current_balance: 0,
     is_active: true,
@@ -76,11 +76,11 @@ const MOCK_ACCOUNTS: FinancialAccount[] = [
     updated_at: '2026-10-15T00:00:00Z',
   },
   {
-    id: 'fa-2',
-    account_name: 'Manager Account (ম্যানেজার ক্যাশ)',
+    id: '11111111-0000-0000-0000-000000000002',
+    account_name: 'Manager Cash Box (ম্যানেজার ক্যাশ)',
     account_type: 'CASH_MANAGER',
     account_number: 'MGR-CASH-01',
-    bank_name: 'ম্যানেজার শিফট ড্রয়ার',
+    bank_name: 'Manager Shift Cash Drawer',
     opening_balance: 0,
     current_balance: 0,
     is_active: true,
@@ -88,11 +88,11 @@ const MOCK_ACCOUNTS: FinancialAccount[] = [
     updated_at: '2026-10-15T00:00:00Z',
   },
   {
-    id: 'fa-3',
-    account_name: 'Admin Account (এডমিন একাউন্ট)',
+    id: '11111111-0000-0000-0000-000000000003',
+    account_name: 'Owner/Admin Account (এডমিন একাউন্ট)',
     account_type: 'BANK',
     account_number: 'ADM-BANK-01',
-    bank_name: 'Dutch-Bangla Bank PLC',
+    bank_name: 'Hostel Operating Bank Account',
     opening_balance: 0,
     current_balance: 0,
     is_active: true,
