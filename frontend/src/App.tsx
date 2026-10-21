@@ -4,6 +4,8 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClient } from '@/lib/queryClient'
 import { router } from '@/app/router'
 import { useAuthStore } from '@/app/store/useAuthStore'
+import { useBrandingStore } from '@/app/store/useBrandingStore'
+import { useAccessControlStore } from '@/app/store/useAccessControlStore'
 import { isSupabaseConfigured } from '@/lib/supabaseClient'
 import type { UserRole } from '@/types/database'
 import { Shield } from 'lucide-react'
@@ -14,6 +16,8 @@ export const App: React.FC = () => {
   useEffect(() => {
     const initApp = async () => {
       await initializeAuth()
+      await useBrandingStore.getState().initializeBranding()
+      await useAccessControlStore.getState().initializePermissions()
       // Only default to Super Admin in offline demo mode when Supabase is not configured
       if (!isSupabaseConfigured && !useAuthStore.getState().isAuthenticated) {
         useAuthStore.getState().setDemoUser('SUPER_ADMIN')

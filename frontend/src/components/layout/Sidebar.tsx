@@ -18,9 +18,11 @@ import {
   DollarSign,
   ArrowRightLeft,
   Sparkles,
+  KeyRound,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import { useBrandingStore } from '@/app/store/useBrandingStore'
+import { useAccessControlStore } from '@/app/store/useAccessControlStore'
 import { useBoarders } from '@/features/boarders/api/useBoarders'
 import { cn } from '@/utils/cn'
 
@@ -38,6 +40,7 @@ interface NavItem {
   icon: React.ReactNode
   roles: string[]
   badge?: string
+  permissionKey?: string
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -49,6 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { t } = useTranslation()
   const { profile } = useAuthStore()
   const { logoUrl, shortName } = useBrandingStore()
+  const { hasMenuAccess } = useAccessControlStore()
   const userRole = profile?.role || 'SUPER_ADMIN'
 
   // Master Navigation Items
@@ -66,6 +70,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       href: '/accommodation',
       icon: <Building className="w-5 h-5 shrink-0" />,
       roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'AUDITOR'],
+      permissionKey: 'accommodations',
     },
     {
       titleKey: 'nav.boarders',
@@ -73,6 +78,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       href: '/boarders',
       icon: <Users className="w-5 h-5 shrink-0" />,
       roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'AUDITOR'],
+      permissionKey: 'boarders',
     },
     {
       titleKey: 'nav.governance',
@@ -80,6 +86,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       href: '/settings/users',
       icon: <ShieldCheck className="w-5 h-5 shrink-0 text-indigo-400" />,
       roles: ['SUPER_ADMIN', 'ADMIN'],
+      permissionKey: 'governance',
     },
     {
       titleKey: 'nav.branding',
@@ -87,7 +94,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
       href: '/settings/branding',
       icon: <Sparkles className="w-5 h-5 shrink-0 text-amber-400" />,
       roles: ['SUPER_ADMIN', 'ADMIN'],
+      permissionKey: 'branding',
       badge: 'নতুন',
+    },
+    {
+      titleKey: 'nav.access_control',
+      defaultTitle: 'এক্সেস কন্ট্রোল ও পারমিশন',
+      href: '/settings/access-control',
+      icon: <KeyRound className="w-5 h-5 shrink-0 text-cyan-400" />,
+      roles: ['SUPER_ADMIN'],
+      badge: 'SuperAdmin',
     },
     {
       titleKey: 'nav.billing',
@@ -95,6 +111,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       href: '/billing',
       icon: <CreditCard className="w-5 h-5 shrink-0" />,
       roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'AUDITOR'],
+      permissionKey: 'billing',
     },
     {
       titleKey: 'nav.collections',
@@ -102,6 +119,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       href: '/billing/receipts',
       icon: <Receipt className="w-5 h-5 shrink-0 text-emerald-400" />,
       roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'AUDITOR'],
+      permissionKey: 'collections',
     },
     {
       titleKey: 'nav.expenses',
@@ -109,6 +127,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       href: '/expenses',
       icon: <Receipt className="w-5 h-5 shrink-0" />,
       roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'AUDITOR'],
+      permissionKey: 'expenses',
     },
     {
       titleKey: 'nav.incomes',
@@ -116,6 +135,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       href: '/finance/income',
       icon: <DollarSign className="w-5 h-5 shrink-0" />,
       roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'AUDITOR'],
+      permissionKey: 'incomes',
     },
     {
       titleKey: 'nav.transfers',
@@ -123,6 +143,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       href: '/finance/transfers',
       icon: <ArrowRightLeft className="w-5 h-5 shrink-0" />,
       roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'AUDITOR'],
+      permissionKey: 'transfers',
     },
     {
       titleKey: 'nav.cashbook',
@@ -130,6 +151,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       href: '/cash-custody',
       icon: <Wallet className="w-5 h-5 shrink-0" />,
       roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'AUDITOR'],
+      permissionKey: 'cashbook',
     },
     {
       titleKey: 'nav.meals',
@@ -137,6 +159,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       href: '/meals',
       icon: <UtensilsCrossed className="w-5 h-5 shrink-0" />,
       roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'MEAL_OPERATOR', 'AUDITOR'],
+      permissionKey: 'meals',
     },
     {
       titleKey: 'nav.meal_settings',
@@ -144,6 +167,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       href: '/meals/settings',
       icon: <DollarSign className="w-5 h-5 shrink-0 text-amber-400" />,
       roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
+      permissionKey: 'meal_settings',
     },
     // Boarder specific nav items
     {
@@ -166,6 +190,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       href: '/reports',
       icon: <FileBarChart2 className="w-5 h-5 shrink-0" />,
       roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'AUDITOR'],
+      permissionKey: 'reports',
     },
     {
       titleKey: 'nav.settings',
@@ -173,12 +198,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
       href: '/settings',
       icon: <Settings className="w-5 h-5 shrink-0" />,
       roles: ['SUPER_ADMIN', 'ADMIN'],
+      permissionKey: 'governance',
     },
   ]
 
   const { data: pendingBoarders = [] } = useBoarders({ status: 'PENDING' })
 
-  const filteredItems = navItems.filter((item) => item.roles.includes(userRole))
+  const filteredItems = navItems.filter((item) => {
+    // 1. Boarder / Applicant items
+    if (userRole === 'BOARDER' || userRole === 'APPLICANT') {
+      return item.roles.includes(userRole)
+    }
+
+    // 2. Super Admin always sees all administration items
+    if (userRole === 'SUPER_ADMIN') {
+      return item.roles.includes('SUPER_ADMIN')
+    }
+
+    // 3. Access control page is strictly restricted to SUPER_ADMIN only
+    if (item.href === '/settings/access-control') {
+      return false
+    }
+
+    // 4. For configurable operator roles, verify dynamic permission
+    if (item.permissionKey) {
+      return hasMenuAccess(userRole, item.permissionKey)
+    }
+
+    return item.roles.includes(userRole)
+  })
 
   return (
     <>

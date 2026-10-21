@@ -78,6 +78,7 @@ import ReportsHubPage from '@/features/reports/ReportsHubPage'
 import AuditLogPage from '@/features/governance/AuditLogPage'
 import UserManagementPage from '@/features/governance/UserManagementPage'
 import BrandingSettingsPage from '@/features/settings/BrandingSettingsPage'
+import AccessControlPage from '@/features/governance/AccessControlPage'
 
 
 export const router = createBrowserRouter([
@@ -255,6 +256,14 @@ export const router = createBrowserRouter([
       {
         path: 'settings/branding',
         element: <BrandingSettingsPage />,
+      },
+      {
+        path: 'settings/access-control',
+        element: (
+          <ProtectedRoute allowedRoles={['SUPER_ADMIN']}>
+            <AccessControlPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'settings/audit-logs',
