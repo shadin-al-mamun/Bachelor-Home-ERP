@@ -53,7 +53,7 @@ export interface BoarderWithRelations extends Boarder {
 }
 
 // Initial realistic mock data for development & preview
-const INITIAL_MOCK_BOARDERS: BoarderWithRelations[] = [
+export const INITIAL_MOCK_BOARDERS: BoarderWithRelations[] = [
   {
     id: 'b-imran-3688',
     user_id: 'u-imran',

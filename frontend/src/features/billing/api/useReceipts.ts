@@ -6,6 +6,7 @@ import type {
   FinancialAccount,
   BoarderCharge,
 } from '@/types/database'
+import { getStoredBoarders, INITIAL_MOCK_BOARDERS } from '@/features/boarders/api/useBoarders'
 
 // ==============================================================================
 // Mock Data for Receipts & Accounts
@@ -103,6 +104,33 @@ const MOCK_ACCOUNTS: FinancialAccount[] = [
 
 // Test financial transaction data reset for fresh baseline as instructed by user
 let MOCK_RECEIPTS: ExtendedReceipt[] = []
+export const RECEIPTS_STORAGE_KEY = 'bachelor_erp_receipts'
+
+export function getStoredReceipts(): ExtendedReceipt[] {
+  if (isSupabaseConfigured) {
+    return []
+  }
+  try {
+    const raw = localStorage.getItem(RECEIPTS_STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load receipts from localStorage:', err)
+  }
+  return [...MOCK_RECEIPTS]
+}
+
+export function saveStoredReceipts(receipts: ExtendedReceipt[]) {
+  try {
+    localStorage.setItem(RECEIPTS_STORAGE_KEY, JSON.stringify(receipts))
+  } catch (err) {
+    console.error('Failed to save receipts to localStorage:', err)
+  }
+}
 
 // ==============================================================================
 // Hooks
@@ -120,7 +148,7 @@ export function useReceipts(filters?: ReceiptFilters) {
     queryKey: ['receipts', filters],
     queryFn: async (): Promise<ExtendedReceipt[]> => {
       if (!isSupabaseConfigured) {
-        let result = [...MOCK_RECEIPTS]
+        let result = getStoredReceipts()
         if (filters?.status === 'VALID') {
           result = result.filter((r) => !r.is_void)
         } else if (filters?.status === 'VOID') {
@@ -176,21 +204,32 @@ export function useReceipts(filters?: ReceiptFilters) {
         return []
       }
 
-      return (data || []).map((r: any) => ({
-        ...r,
-        boarder_name: r.boarder?.full_name || 'অজানা বর্ডার',
-        boarder_code: r.boarder?.boarder_code || '',
-        boarder_phone: r.boarder?.phone_number || '',
-        collector_name: 'ম্যানেজার',
-        account_name: r.destination_account?.account_name || 'ক্যাশ একাউন্ট',
-        allocations: (r.receipt_allocations || []).map((ra: any) => ({
-          charge_id: ra.charge?.id,
-          charge_type: ra.charge?.charge_type,
-          billing_month: ra.charge?.billing_month,
-          description: ra.charge?.description,
-          amount: ra.allocated_amount,
-        })),
-      })) as ExtendedReceipt[]
+      return (data || []).map((r: any) => {
+        let b = r.boarder
+        if (Array.isArray(b)) b = b.length > 0 ? b[0] : null
+        let acc = r.destination_account
+        if (Array.isArray(acc)) acc = acc.length > 0 ? acc[0] : null
+
+        return {
+          ...r,
+          boarder_name: b?.full_name || r.boarder_name || 'অজানা বর্ডার',
+          boarder_code: b?.boarder_code || r.boarder_code || '',
+          boarder_phone: b?.phone_number || r.boarder_phone || '',
+          collector_name: 'ম্যানেজার',
+          account_name: acc?.account_name || 'ক্যাশ একাউন্ট',
+          allocations: (r.receipt_allocations || []).map((ra: any) => {
+            let ch = ra.charge
+            if (Array.isArray(ch)) ch = ch.length > 0 ? ch[0] : null
+            return {
+              charge_id: ch?.id,
+              charge_type: ch?.charge_type,
+              billing_month: ch?.billing_month,
+              description: ch?.description,
+              amount: ra.allocated_amount,
+            }
+          }),
+        }
+      }) as ExtendedReceipt[]
     },
   })
 }
@@ -358,12 +397,19 @@ export function useRecordReceiptMutation() {
 
       if (!isSupabaseConfigured) {
         const receiptNo = `RCT-${Math.floor(100000 + Math.random() * 900000)}`
+        const allBoarders = getStoredBoarders()
+        const b = allBoarders.find((item: any) => item.id === params.boarderId) || INITIAL_MOCK_BOARDERS.find((item: any) => item.id === params.boarderId)
+        const bName = b?.full_name || 'বোর্ডার'
+        const bCode = b?.boarder_code || 'BDR-2026-XXX'
+        const bPhone = b?.phone_number || ''
+
         const newReceipt: ExtendedReceipt = {
           id: `rc-${Date.now()}`,
           receipt_number: receiptNo,
           boarder_id: params.boarderId,
-          boarder_name: 'বোর্ডার',
-          boarder_code: 'BDR-2026-XXX',
+          boarder_name: bName,
+          boarder_code: bCode,
+          boarder_phone: bPhone,
           received_by: 'mgr-current',
           collector_name: 'দায়িত্বপ্রাপ্ত ম্যানেজার',
           destination_account_id: params.destinationAccountId,
@@ -383,7 +429,8 @@ export function useRecordReceiptMutation() {
             amount: a.amount,
           })),
         }
-        MOCK_RECEIPTS = [newReceipt, ...MOCK_RECEIPTS]
+        MOCK_RECEIPTS = [newReceipt, ...getStoredReceipts()]
+        saveStoredReceipts(MOCK_RECEIPTS)
         return {
           success: true,
           receipt_id: newReceipt.id,
