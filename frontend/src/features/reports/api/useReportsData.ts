@@ -54,7 +54,7 @@ export function useReportsData(filters: ReportFilterState) {
   return useQuery({
     queryKey: ['reports-data', filters],
     queryFn: async () => {
-      const { startDate, endDate, managerId, accountId } = filters
+      const { startDate, endDate, managerId, accountId, buildingId, flatId } = filters
 
       // 1. Receipts Query
       let receiptsQuery = supabase
@@ -77,8 +77,8 @@ export function useReportsData(filters: ReportFilterState) {
           collector:profiles!receipts_received_by_fkey(id, full_name),
           void_user:profiles!receipts_void_by_fkey(id, full_name)
         `)
-        .gte('receipt_date', startDate)
-        .lte('receipt_date', endDate)
+        .gte('receipt_date', `${startDate}T00:00:00`)
+        .lte('receipt_date', `${endDate}T23:59:59`)
         .order('receipt_date', { ascending: false })
 
       if (managerId) receiptsQuery = receiptsQuery.eq('received_by', managerId)
@@ -109,6 +109,8 @@ export function useReportsData(filters: ReportFilterState) {
         .lte('expense_date', endDate)
         .order('expense_date', { ascending: false })
 
+      if (buildingId) expensesQuery = expensesQuery.eq('building_id', buildingId)
+      if (flatId) expensesQuery = expensesQuery.eq('flat_id', flatId)
       if (managerId) expensesQuery = expensesQuery.eq('paid_by', managerId)
       if (accountId) expensesQuery = expensesQuery.eq('source_account_id', accountId)
 
@@ -132,6 +134,11 @@ export function useReportsData(filters: ReportFilterState) {
         .gte('income_date', startDate)
         .lte('income_date', endDate)
         .order('income_date', { ascending: false })
+
+      if (buildingId) incomesQuery = incomesQuery.eq('building_id', buildingId)
+      if (flatId) incomesQuery = incomesQuery.eq('flat_id', flatId)
+      if (managerId) incomesQuery = incomesQuery.eq('received_by', managerId)
+      if (accountId) incomesQuery = incomesQuery.eq('destination_account_id', accountId)
 
       // 4. Boarder Charges & Dues Query
       const chargesQuery = supabase
@@ -270,6 +277,25 @@ export function useReportsData(filters: ReportFilterState) {
       const rawHandovers = (handoversRes.data ?? []) as any[]
       const rawOwnerDeposits = (ownerDepositsRes.data ?? []) as any[]
 
+      if (receiptsRes.error) console.warn('[useReportsData] receipts error:', receiptsRes.error)
+      if (expensesRes.error) console.warn('[useReportsData] expenses error:', expensesRes.error)
+      if (incomesRes.error) console.warn('[useReportsData] incomes error:', incomesRes.error)
+      if (chargesRes.error) console.warn('[useReportsData] charges error:', chargesRes.error)
+      if (allocationsRes.error) console.warn('[useReportsData] allocations error:', allocationsRes.error)
+      if (sessionsRes.error) console.warn('[useReportsData] sessions error:', sessionsRes.error)
+      if (handoversRes.error) console.warn('[useReportsData] handovers error:', handoversRes.error)
+      if (ownerDepositsRes.error) console.warn('[useReportsData] ownerDeposits error:', ownerDepositsRes.error)
+
+      // Map boarder active allocation info for flat & seat
+      const boarderLocationMap = new Map<string, { flatName: string; seatName: string }>()
+      rawAllocations.forEach((alloc) => {
+        if (alloc.boarder?.id && (alloc.status === 'ACTIVE' || !boarderLocationMap.has(alloc.boarder.id))) {
+          const flatName = alloc.seat?.room?.flat?.name || 'Active Flat'
+          const seatName = alloc.seat?.seat_name || 'Seat'
+          boarderLocationMap.set(alloc.boarder.id, { flatName, seatName })
+        }
+      })
+
       // =========================================================================
       // Report 1: Daily Income & Expense
       // =========================================================================
@@ -277,7 +303,7 @@ export function useReportsData(filters: ReportFilterState) {
 
       rawReceipts.forEach((r) => {
         if (r.is_void) return
-        const d = r.receipt_date
+        const d = r.receipt_date ? r.receipt_date.slice(0, 10) : startDate
         const current = dailyMap.get(d) || {
           date: d,
           rentReceipts: 0,
@@ -444,19 +470,22 @@ export function useReportsData(filters: ReportFilterState) {
       // =========================================================================
       // Report 4: Receipt-wise Collection Report
       // =========================================================================
-      const receiptCollection: ReceiptCollectionRow[] = rawReceipts.map((r) => ({
-        receiptNumber: r.receipt_number || 'REC-TEMP',
-        date: r.receipt_date,
-        boarderName: r.boarder?.full_name || 'Walk-in / Unknown',
-        boarderCode: r.boarder?.boarder_code || '—',
-        flatName: 'Hostel Resident',
-        amount: Number(r.amount) || 0,
-        paymentMethod: r.payment_method || 'CASH',
-        collectorName: r.collector?.full_name || 'Staff',
-        accountName: r.account?.account_name || 'Main Cash',
-        isVoid: Boolean(r.is_void),
-        remarks: r.remarks || '',
-      }))
+      const receiptCollection: ReceiptCollectionRow[] = rawReceipts.map((r) => {
+        const loc = r.boarder?.id ? boarderLocationMap.get(r.boarder.id) : undefined
+        return {
+          receiptNumber: r.receipt_number || 'REC-TEMP',
+          date: r.receipt_date ? r.receipt_date.slice(0, 10) : startDate,
+          boarderName: r.boarder?.full_name || 'Walk-in / Unknown',
+          boarderCode: r.boarder?.boarder_code || '—',
+          flatName: loc?.flatName || 'Hostel Resident',
+          amount: Number(r.amount) || 0,
+          paymentMethod: r.payment_method || 'CASH',
+          collectorName: r.collector?.full_name || 'Staff',
+          accountName: r.account?.account_name || 'Main Cash',
+          isVoid: Boolean(r.is_void),
+          remarks: r.remarks || '',
+        }
+      })
 
       // =========================================================================
       // Report 5: Boarder Ledger & Dues Aging Report
@@ -468,12 +497,13 @@ export function useReportsData(filters: ReportFilterState) {
         const b = c.boarder
         if (!b) return
         const bId = b.id
+        const loc = boarderLocationMap.get(bId) || { flatName: 'Active Flat', seatName: 'Seat' }
         const current = boarderDuesMap.get(bId) || {
           boarderCode: b.boarder_code,
           boarderName: b.full_name,
           phoneNumber: b.phone_number || '—',
-          flatName: 'Active Flat',
-          seatName: 'Seat',
+          flatName: loc.flatName,
+          seatName: loc.seatName,
           totalBilled: 0,
           totalPaid: 0,
           totalOutstandingDue: 0,
@@ -526,7 +556,7 @@ export function useReportsData(filters: ReportFilterState) {
       rawReceipts.forEach((r) => {
         if (r.is_void) return
         ledgerEntries.push({
-          date: r.receipt_date,
+          date: r.receipt_date ? r.receipt_date.slice(0, 10) : startDate,
           accountName: r.account?.account_name || 'Cash Account',
           accountType: r.account?.account_type || 'CASH_MANAGER',
           transactionType: 'Receipt (ভাড়া আদায়)',
@@ -775,7 +805,7 @@ export function useReportsData(filters: ReportFilterState) {
         .filter((r) => r.is_void)
         .map((r) => ({
           receiptNumber: r.receipt_number,
-          receiptDate: r.receipt_date,
+          receiptDate: r.receipt_date ? r.receipt_date.slice(0, 10) : startDate,
           voidAt: r.void_at?.slice(0, 16) || '—',
           boarderName: r.boarder?.full_name || 'Boarder',
           boarderCode: r.boarder?.boarder_code || '—',

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react'
+import React, { useState, useMemo } from 'react'
 import {
   FileText,
   Calendar,
@@ -24,8 +24,8 @@ import { useReportsData } from './api/useReportsData'
 import { ReportFilterBar } from './components/ReportFilterBar'
 import { ReportTableRenderer } from './components/ReportTableRenderer'
 import { ExportActions } from './components/ExportActions'
+import { getReportExportData } from './reportExportData'
 import {
-  type ExportColumn,
   type ExportMetadata,
   exportToExcel,
   exportToPDF,
@@ -53,10 +53,11 @@ const REPORT_ICONS: Record<string, React.ElementType> = {
 }
 
 export const ReportsHubPage: React.FC = () => {
-  // Default to current month
+  // Default to current month (Local date)
   const today = new Date()
-  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10)
-  const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().slice(0, 10)
+  const firstDay = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`
+  const lastDayDate = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+  const lastDay = `${lastDayDate.getFullYear()}-${String(lastDayDate.getMonth() + 1).padStart(2, '0')}-${String(lastDayDate.getDate()).padStart(2, '0')}`
 
   const [activeReportId, setActiveReportId] = useState<ReportId>('DAILY_INCOME_EXPENSE')
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL')
@@ -72,23 +73,6 @@ export const ReportsHubPage: React.FC = () => {
     managerId: '',
     accountId: '',
   })
-
-  // Export dataset holder
-  const [exportPayload, setExportPayload] = useState<{
-    columns: ExportColumn[]
-    rows: Record<string, unknown>[]
-    summary?: Record<string, unknown>
-  }>({
-    columns: [],
-    rows: [],
-  })
-
-  const handleExportColumnsReady = useCallback(
-    (columns: ExportColumn[], rows: Record<string, unknown>[], summary?: Record<string, unknown>) => {
-      setExportPayload({ columns, rows, summary })
-    },
-    []
-  )
 
   // Query reports data
   const { data, isLoading } = useReportsData(filters)
@@ -114,9 +98,11 @@ export const ReportsHubPage: React.FC = () => {
 
   // Handle PDF Export
   const handleExportPDF = async () => {
-    if (!exportPayload.columns.length) return
     setIsExporting(true)
     try {
+      const { columns, rows, summaryRow } = getReportExportData(activeReportId, data)
+      if (!columns.length) return
+
       const meta: ExportMetadata = {
         reportTitle: `${activeReport.titleEn} (${activeReport.titleBn})`,
         dateRange: `${filters.startDate} to ${filters.endDate}`,
@@ -129,10 +115,10 @@ export const ReportsHubPage: React.FC = () => {
       }
       exportToPDF(
         activeReport.id.toLowerCase(),
-        exportPayload.columns,
-        exportPayload.rows,
+        columns,
+        rows,
         meta,
-        exportPayload.summary,
+        summaryRow,
         'landscape'
       )
     } finally {
@@ -142,11 +128,13 @@ export const ReportsHubPage: React.FC = () => {
 
   // Handle Excel Export
   const handleExportExcel = async () => {
-    if (!exportPayload.columns.length) return
     setIsExporting(true)
     try {
+      const { columns, rows, summaryRow } = getReportExportData(activeReportId, data)
+      if (!columns.length) return
+
       const meta: ExportMetadata = {
-        reportTitle: activeReport.titleEn,
+        reportTitle: `${activeReport.titleEn} (${activeReport.titleBn})`,
         dateRange: `${filters.startDate} to ${filters.endDate}`,
         filtersApplied: [
           filters.buildingId ? 'Building Filtered' : '',
@@ -157,10 +145,10 @@ export const ReportsHubPage: React.FC = () => {
       }
       await exportToExcel(
         activeReport.id.toLowerCase(),
-        exportPayload.columns,
-        exportPayload.rows,
+        columns,
+        rows,
         meta,
-        exportPayload.summary
+        summaryRow
       )
     } finally {
       setIsExporting(false)
@@ -320,7 +308,6 @@ export const ReportsHubPage: React.FC = () => {
               reportId={activeReportId}
               data={data}
               isLoading={isLoading}
-              onExportColumnsReady={handleExportColumnsReady}
             />
           </div>
         </div>

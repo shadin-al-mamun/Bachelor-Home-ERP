@@ -251,6 +251,22 @@ export function exportToPDF(
   const pageWidth = doc.internal.pageSize.getWidth()
   const nowStr = new Date().toLocaleString('en-GB', { timeZone: 'Asia/Dhaka' })
 
+  const cleanHeaderForPDF = (header: string): string => {
+    if (header.includes('/')) {
+      const parts = header.split('/')
+      return parts[parts.length - 1].replace(/৳/g, 'BDT').trim()
+    }
+    return header.replace(/৳/g, 'BDT').trim()
+  }
+
+  // Sanitize title for Helvetica font (remove Bengali characters in parentheses if present)
+  const cleanTitle =
+    metadata.reportTitle
+      .replace(/\([^\)]*[\u0980-\u09FF]+[^\)]*\)/g, '')
+      .replace(/[^\x00-\x7F]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim() || 'Bachelor Home ERP Report'
+
   // Header Banner
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(16)
@@ -259,7 +275,7 @@ export function exportToPDF(
 
   doc.setFontSize(12)
   doc.setTextColor(15, 23, 42) // Dark Slate
-  doc.text(metadata.reportTitle, 40, 58)
+  doc.text(cleanTitle, 40, 58)
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8.5)
@@ -281,7 +297,7 @@ export function exportToPDF(
   doc.line(40, 80, pageWidth - 40, 80)
 
   // Format table headers
-  const head = [columns.map((col) => col.header)]
+  const head = [columns.map((col) => cleanHeaderForPDF(col.header))]
 
   // Format data body
   const body = data.map((item) =>

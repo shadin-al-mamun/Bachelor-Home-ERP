@@ -11,6 +11,13 @@ interface ReportFilterBarProps {
 export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({ filters, onChange }) => {
   const { data: meta } = useReportsMetadata()
 
+  const toLocalYMD = (d: Date): string => {
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
   const setQuickPeriod = (preset: ReportFilterState['quickPeriod']) => {
     const today = new Date()
     let start = new Date()
@@ -44,8 +51,8 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({ filters, onCha
     onChange({
       ...filters,
       quickPeriod: preset,
-      startDate: start.toISOString().slice(0, 10),
-      endDate: end.toISOString().slice(0, 10),
+      startDate: toLocalYMD(start),
+      endDate: toLocalYMD(end),
     })
   }
 
