@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { getReportExportData } from '@/features/reports/reportExportData'
+import { cleanValueForPDF, transliterateBengali } from '@/lib/exportUtils'
 
 describe('Reports Boarder Name Verification', () => {
   it('correctly formats and displays boarder names in Receipt Collection Report', () => {
@@ -127,5 +128,18 @@ describe('Reports Boarder Name Verification', () => {
     expect(rows[0].boarderName).toBe('মাহমুদুল করিম')
     expect(rows[0].boarderCode).toBe('BDR-2026-003')
     expect(summaryRow?.amount).toBe(2000)
+  })
+
+  it('correctly transliterates Bengali boarder names into readable English for jsPDF Helvetica export', () => {
+    expect(transliterateBengali('তানভীর আহমেদ')).toBe('Tanvir Ahmed')
+    expect(transliterateBengali('রাকিবুল হাসান')).toBe('Rakibul Hasan')
+    expect(transliterateBengali('নাজমুল হাসান')).toBe('Nazmul Hasan')
+    expect(transliterateBengali('রিয়াদ মাহমুদ')).toBe('Riyad Mahmud')
+    expect(transliterateBengali('শামীম রেজা')).toBe('Shamim Reza')
+    expect(transliterateBengali('আরিফুল ইসলাম')).toBe('Ariful Islam')
+
+    expect(cleanValueForPDF('তানভীর আহমেদ')).toBe('Tanvir Ahmed')
+    expect(cleanValueForPDF(5000, true)).toBe('BDT 5,000.00')
+    expect(cleanValueForPDF('Flat-206 - Seat A-1')).toBe('Flat-206 - Seat A-1')
   })
 })
