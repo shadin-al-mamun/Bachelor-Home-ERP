@@ -614,7 +614,9 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
                           <User className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                           <span className="font-semibold truncate">{seat.occupant_name || 'বর্ডার বরাদ্দ'}</span>
                         </div>
-                        <span className="text-[10px] text-indigo-300 font-mono">সক্রিয়</span>
+                        <span className="text-[10px] text-indigo-300 font-mono">
+                          {seat.occupant_code || 'সক্রিয়'}
+                        </span>
                       </div>
                     )}
 
@@ -646,17 +648,28 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
                             size="sm"
                             variant="outline"
                             className="flex-1 text-[11px] py-1 text-primary-400 border-primary-500/30 hover:bg-primary-500/10"
-                            onClick={() =>
+                            onClick={() => {
+                              const activeAlloc =
+                                seat.active_allocation ||
+                                seat.allocations?.find((a: any) => a.status === 'ACTIVE') ||
+                                seat.allocations?.[0]
+
+                              const allocId = activeAlloc?.id || seat.allocation_id || ''
+                              const boarderName = activeAlloc?.boarder?.full_name || seat.occupant_name || 'বর্তমান বর্ডার'
+                              const boarderCode = activeAlloc?.boarder?.boarder_code || seat.occupant_code || 'BDR-ACTIVE'
+                              const boarderId = activeAlloc?.boarder?.id || (activeAlloc as any)?.boarder_id || seat.occupant_id || ''
+                              const rent = activeAlloc?.monthly_rent ?? seat.occupant_rent ?? seat.default_rent
+
                               setTransferringAllocation({
-                                allocationId: `alloc-${seat.id}`,
-                                boarderId: 'b-demo',
-                                boarderName: seat.occupant_name || 'বর্তমান বর্ডার',
-                                boarderCode: 'BDR-LIVE',
+                                allocationId: allocId,
+                                boarderId: boarderId,
+                                boarderName: boarderName,
+                                boarderCode: boarderCode,
                                 currentSeatId: seat.id,
                                 currentSeatCode: seat.seat_code,
-                                currentRent: seat.default_rent,
+                                currentRent: rent,
                               })
-                            }
+                            }}
                             leftIcon={<ArrowRightLeft className="w-3 h-3" />}
                           >
                             স্থানান্তর
@@ -665,14 +678,24 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
                             size="sm"
                             variant="outline"
                             className="flex-1 text-[11px] py-1 text-rose-400 border-rose-500/30 hover:bg-rose-500/10"
-                            onClick={() =>
+                            onClick={() => {
+                              const activeAlloc =
+                                seat.active_allocation ||
+                                seat.allocations?.find((a: any) => a.status === 'ACTIVE') ||
+                                seat.allocations?.[0]
+
+                              const allocId = activeAlloc?.id || seat.allocation_id || ''
+                              const boarderName = activeAlloc?.boarder?.full_name || seat.occupant_name || 'বর্তমান বর্ডার'
+                              const boarderCode = activeAlloc?.boarder?.boarder_code || seat.occupant_code || 'BDR-ACTIVE'
+
                               setCancellingAllocation({
-                                allocationId: `alloc-${seat.id}`,
-                                boarderName: seat.occupant_name || 'বর্তমান বর্ডার',
-                                boarderCode: 'BDR-LIVE',
+                                allocationId: allocId,
+                                seatId: seat.id,
+                                boarderName: boarderName,
+                                boarderCode: boarderCode,
                                 seatCode: seat.seat_code,
                               })
-                            }
+                            }}
                             leftIcon={<LogOut className="w-3 h-3" />}
                           >
                             প্রস্থান

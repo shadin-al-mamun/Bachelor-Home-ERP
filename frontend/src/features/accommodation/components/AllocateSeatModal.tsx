@@ -17,7 +17,7 @@ interface AllocateSeatModalProps {
 }
 
 interface AvailableSeat extends Seat {
-  occupant_name?: string
+  occupant_name?: string | null
   buildingName: string
   flatCode: string
   roomName: string

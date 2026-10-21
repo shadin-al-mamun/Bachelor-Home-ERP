@@ -88,7 +88,7 @@ let mockRooms: Room[] = [
   },
 ]
 
-let mockSeats: (Seat & { room_name?: string; flat_name?: string; occupant_name?: string; room?: Room })[] = [
+let mockSeats: (Seat & { room_name?: string; flat_name?: string; room?: Room })[] = [
   {
     id: '44444444-4444-4444-4444-444444444441',
     room_id: '33333333-3333-3333-3333-333333333333',
@@ -97,7 +97,11 @@ let mockSeats: (Seat & { room_name?: string; flat_name?: string; occupant_name?:
     seat_type: 'SINGLE_BED',
     default_rent: 4500,
     status: 'OCCUPIED',
+    allocation_id: '55555555-5555-5555-5555-555555555551',
     occupant_name: 'তানভীর আহমেদ',
+    occupant_code: 'BDR-2026-101',
+    occupant_id: '66666666-6666-6666-6666-666666666661',
+    occupant_rent: 4500,
     description: 'East facing window corner bed with reading lamp and power socket.',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -445,8 +449,8 @@ export function useSeats(params?: SeatFilterParams) {
             )
           ),
           allocations (
-            id, status,
-            boarder:boarders (id, full_name, boarder_code)
+            id, status, monthly_rent, security_deposit, start_date, boarder_id,
+            boarder:boarders (id, full_name, boarder_code, phone_number)
           )
         `)
 
@@ -463,10 +467,15 @@ export function useSeats(params?: SeatFilterParams) {
         return []
       }
       return (data || []).map((s: any) => {
-        const activeAlloc = s.allocations?.find((a: any) => a.status === 'ACTIVE')
+        const activeAlloc = s.allocations?.find((a: any) => a.status === 'ACTIVE') || s.allocations?.[0]
         return {
           ...s,
+          active_allocation: activeAlloc || null,
+          allocation_id: activeAlloc?.id || null,
           occupant_name: activeAlloc?.boarder?.full_name || s.occupant_name || null,
+          occupant_code: activeAlloc?.boarder?.boarder_code || null,
+          occupant_id: activeAlloc?.boarder?.id || activeAlloc?.boarder_id || null,
+          occupant_rent: activeAlloc?.monthly_rent ?? s.default_rent,
         }
       })
     },
@@ -596,7 +605,7 @@ export interface RoomWithSeats {
   room_type: string
   capacity: number
   status: string
-  seats: (Seat & { occupant_name?: string })[]
+  seats: (Seat & { occupant_name?: string | null })[]
 }
 
 export interface FlatWithRooms {

@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Modal } from '@/components/common/Modal'
 import { Button } from '@/components/common/Button'
 import { Input } from '@/components/common/Input'
-import { useAccommodation, type RoomWithSeats, type FlatWithRooms, type BuildingWithFlats } from '../api/useAccommodation'
+import { useAccommodation, useSeats, type RoomWithSeats, type FlatWithRooms, type BuildingWithFlats } from '../api/useAccommodation'
 import { useTransferSeatMutation } from '../api/useSeatAllocations'
 import { formatCurrencyBn } from '@/utils/date'
 import type { Seat } from '@/types/database'
@@ -25,7 +25,7 @@ interface TransferSeatModalProps {
 }
 
 interface AvailableSeat extends Seat {
-  occupant_name?: string
+  occupant_name?: string | null
   buildingName: string
   flatCode: string
   roomName: string
@@ -37,6 +37,7 @@ export const TransferSeatModal: React.FC<TransferSeatModalProps> = ({
   currentAllocation,
 }) => {
   const { data: seatMatrix = [] } = useAccommodation()
+  const { data: directSeats = [] } = useSeats({ status: 'AVAILABLE' })
   const [newSeatId, setNewSeatId] = useState('')
   const [effectiveDate, setEffectiveDate] = useState(new Date().toISOString().slice(0, 10))
   const [reason, setReason] = useState('')
@@ -46,21 +47,35 @@ export const TransferSeatModal: React.FC<TransferSeatModalProps> = ({
   const transferMutation = useTransferSeatMutation()
 
   // Build available seats excluding the current one
-  const availableSeats: AvailableSeat[] = (seatMatrix as BuildingWithFlats[]).flatMap(
-    (b: BuildingWithFlats) =>
-      (b.flats || []).flatMap((f: FlatWithRooms) =>
-        (f.rooms || []).flatMap((r: RoomWithSeats) =>
-          (r.seats || [])
-            .filter((s) => s.status === 'AVAILABLE' && s.id !== currentAllocation?.currentSeatId)
-            .map((s) => ({
-              ...s,
-              buildingName: b.name,
-              flatCode: f.flat_code,
-              roomName: r.name,
-            }))
+  const availableSeats: AvailableSeat[] = useMemo(() => {
+    const fromHierarchy = (seatMatrix as BuildingWithFlats[]).flatMap(
+      (b: BuildingWithFlats) =>
+        (b.flats || []).flatMap((f: FlatWithRooms) =>
+          (f.rooms || []).flatMap((r: RoomWithSeats) =>
+            (r.seats || [])
+              .filter((s) => s.status === 'AVAILABLE' && s.id !== currentAllocation?.currentSeatId)
+              .map((s) => ({
+                ...s,
+                buildingName: b.name,
+                flatCode: f.flat_code,
+                roomName: r.name,
+              }))
+          )
         )
-      )
-  )
+    )
+
+    if (fromHierarchy.length > 0) return fromHierarchy
+
+    // Fallback directly from available seats
+    return directSeats
+      .filter((s) => s.status === 'AVAILABLE' && s.id !== currentAllocation?.currentSeatId)
+      .map((s: any) => ({
+        ...s,
+        buildingName: s.room?.flat?.building?.name || 'প্রধান ভবন',
+        flatCode: s.room?.flat?.flat_code || s.room?.flat?.name || 'ফ্ল্যাট',
+        roomName: s.room?.name || 'রুম',
+      }))
+  }, [seatMatrix, directSeats, currentAllocation?.currentSeatId])
 
   useEffect(() => {
     if (isOpen) {
@@ -90,9 +105,12 @@ export const TransferSeatModal: React.FC<TransferSeatModalProps> = ({
     try {
       await transferMutation.mutateAsync({
         allocationId: currentAllocation.allocationId,
+        currentSeatId: currentAllocation.currentSeatId,
         newSeatId,
         effectiveDate,
         reason: reason.trim(),
+        boarderId: currentAllocation.boarderId,
+        currentRent: currentAllocation.currentRent,
       })
       setIsSuccess(true)
       setTimeout(() => onClose(), 1500)

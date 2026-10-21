@@ -7,6 +7,7 @@ import { AlertTriangle, LogOut, CheckCircle2 } from 'lucide-react'
 
 export interface AllocationCancelInfo {
   allocationId: string
+  seatId?: string
   boarderName: string
   boarderCode: string
   seatCode: string
@@ -55,6 +56,7 @@ export const CancelAllocationModal: React.FC<CancelAllocationModalProps> = ({
     try {
       await cancelMutation.mutateAsync({
         allocationId: allocation.allocationId,
+        seatId: allocation.seatId,
         endDate,
         reason: reason.trim(),
         status: actionType,

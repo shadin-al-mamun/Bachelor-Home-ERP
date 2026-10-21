@@ -111,6 +111,13 @@ export interface Seat {
   updated_at: string
   // Optional expanded relations
   room?: Room
+  allocations?: Allocation[]
+  active_allocation?: Allocation | null
+  allocation_id?: string | null
+  occupant_name?: string | null
+  occupant_code?: string | null
+  occupant_id?: string | null
+  occupant_rent?: number | null
 }
 
 export interface Boarder {
