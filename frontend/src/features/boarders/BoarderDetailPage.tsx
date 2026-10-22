@@ -26,8 +26,10 @@ import {
   Receipt,
   Clock,
   SlidersHorizontal,
+  Megaphone,
 } from 'lucide-react'
 import { StaffMealControlModal } from '@/features/meals/components/StaffMealControlModal'
+import { SendNoticeModal } from '@/features/notices/components/SendNoticeModal'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import { isMealManagerRole } from '@/features/meals/api/useMeals'
 
@@ -42,6 +44,7 @@ export const BoarderDetailPage: React.FC = () => {
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false)
   const [isMealControlOpen, setIsMealControlOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isSendNoticeOpen, setIsSendNoticeOpen] = useState(false)
 
   useEffect(() => {
     if (boarder?.nid_document_url) {
@@ -170,6 +173,17 @@ export const BoarderDetailPage: React.FC = () => {
               >
                 <SlidersHorizontal className="w-3.5 h-3.5 mr-1.5" />
                 প্রোফাইল সম্পাদন (Edit)
+              </Button>
+            )}
+            {(profile?.role === 'SUPER_ADMIN' || profile?.role === 'ADMIN' || profile?.role === 'MANAGER' || !profile?.role) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsSendNoticeOpen(true)}
+                className="border-amber-500/40 text-amber-300 hover:bg-amber-500/10 text-xs shadow-sm"
+              >
+                <Megaphone className="w-3.5 h-3.5 mr-1.5" />
+                নোটিশ পাঠান
               </Button>
             )}
             {boarder.status === 'PENDING' && (
@@ -708,6 +722,14 @@ export const BoarderDetailPage: React.FC = () => {
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
         boarder={boarder}
+      />
+
+      {/* Send Notice Modal */}
+      <SendNoticeModal
+        isOpen={isSendNoticeOpen}
+        onClose={() => setIsSendNoticeOpen(false)}
+        initialBoarderId={boarder.id}
+        initialBoarderName={boarder.full_name}
       />
     </div>
   )

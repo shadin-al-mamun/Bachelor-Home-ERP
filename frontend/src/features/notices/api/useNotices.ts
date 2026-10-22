@@ -1,0 +1,282 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
+import { useAuthStore } from '@/app/store/useAuthStore'
+
+export type NoticeType = 'INFO' | 'ALERT' | 'WARNING' | 'MEAL'
+export type TargetAudience = 'ALL' | 'SPECIFIC'
+
+export interface HostelNotice {
+  id: string
+  title: string
+  message: string
+  type: NoticeType
+  target_audience: TargetAudience
+  target_boarder_id: string | null
+  target_boarder_name: string | null
+  created_by?: string | null
+  created_by_name: string
+  is_active: boolean
+  created_at: string
+}
+
+const LOCAL_STORAGE_KEY = 'bachelor_erp_hostel_notices'
+
+// Default seed notices for smooth initial experience
+const DEFAULT_NOTICES: HostelNotice[] = [
+  {
+    id: 'notice-seed-1',
+    title: 'বিদ্যুৎ লাইন রক্ষণাবেক্ষণ সংক্রান্ত ঘোষণা',
+    message: 'আগামীকাল সকাল ১০:০০ টা থেকে দুপুর ০১:০০ টা পর্যন্ত হোস্টেলের মূল বিদ্যুৎ লাইনে মেরামতের কাজ চলবে। সংশ্লিষ্ট সকলকে প্রয়োজনীয় প্রস্তুতি রাখার জন্য অনুরোধ করা হচ্ছে।',
+    type: 'INFO',
+    target_audience: 'ALL',
+    target_boarder_id: null,
+    target_boarder_name: null,
+    created_by_name: 'হোস্টেল সুপারএডমিন',
+    is_active: true,
+    created_at: new Date(Date.now() - 2 * 3600000).toISOString(),
+  },
+]
+
+function getLocalNotices(): HostelNotice[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY)
+    if (raw) {
+      return JSON.parse(raw)
+    }
+  } catch (e) {
+    console.warn('Failed to parse local notices:', e)
+  }
+  return DEFAULT_NOTICES
+}
+
+function saveLocalNotices(notices: HostelNotice[]) {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(notices))
+  } catch (e) {
+    console.warn('Failed to save local notices:', e)
+  }
+}
+
+export const useNotices = (options?: { activeOnly?: boolean; boarderId?: string }) => {
+  const { profile } = useAuthStore()
+
+  return useQuery({
+    queryKey: ['hostel_notices', options?.activeOnly, options?.boarderId, profile?.id],
+    queryFn: async (): Promise<HostelNotice[]> => {
+      const localNotices = getLocalNotices()
+
+      if (!isSupabaseConfigured) {
+        let result = [...localNotices]
+        if (options?.activeOnly) {
+          result = result.filter((n) => n.is_active)
+        }
+        if (options?.boarderId) {
+          result = result.filter(
+            (n) => n.target_audience === 'ALL' || n.target_boarder_id === options.boarderId
+          )
+        }
+        return result
+      }
+
+      try {
+        let query = supabase
+          .from('hostel_notices')
+          .select('*')
+          .order('created_at', { ascending: false })
+
+        if (options?.activeOnly) {
+          query = query.eq('is_active', true)
+        }
+
+        const { data, error } = await query
+
+        if (error) {
+          // If table not yet created on remote, fallback to localStorage
+          console.warn('hostel_notices table fetch warning:', error.message)
+          let result = [...localNotices]
+          if (options?.activeOnly) result = result.filter((n) => n.is_active)
+          if (options?.boarderId) {
+            result = result.filter(
+              (n) => n.target_audience === 'ALL' || n.target_boarder_id === options.boarderId
+            )
+          }
+          return result
+        }
+
+        const remoteNotices: HostelNotice[] = (data || []).map((row) => ({
+          id: row.id,
+          title: row.title,
+          message: row.message,
+          type: (row.type as NoticeType) || 'INFO',
+          target_audience: (row.target_audience as TargetAudience) || 'ALL',
+          target_boarder_id: row.target_boarder_id,
+          target_boarder_name: row.target_boarder_name,
+          created_by: row.created_by,
+          created_by_name: row.created_by_name || 'সুপারএডমিন',
+          is_active: row.is_active !== false,
+          created_at: row.created_at,
+        }))
+
+        // Merge with local if any unique
+        const mergedMap = new Map<string, HostelNotice>()
+        remoteNotices.forEach((n) => mergedMap.set(n.id, n))
+        localNotices.forEach((n) => {
+          if (!mergedMap.has(n.id)) mergedMap.set(n.id, n)
+        })
+
+        let list = Array.from(mergedMap.values()).sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )
+
+        if (options?.activeOnly) {
+          list = list.filter((n) => n.is_active)
+        }
+        if (options?.boarderId) {
+          list = list.filter(
+            (n) => n.target_audience === 'ALL' || n.target_boarder_id === options.boarderId
+          )
+        }
+
+        return list
+      } catch {
+        return localNotices
+      }
+    },
+    staleTime: 10000,
+  })
+}
+
+export interface CreateNoticePayload {
+  title: string
+  message: string
+  type: NoticeType
+  target_audience: TargetAudience
+  target_boarder_id?: string | null
+  target_boarder_name?: string | null
+}
+
+export const useCreateNotice = () => {
+  const queryClient = useQueryClient()
+  const { profile } = useAuthStore()
+
+  return useMutation({
+    mutationFn: async (payload: CreateNoticePayload) => {
+      const newNotice: HostelNotice = {
+        id: `notice-${Date.now()}`,
+        title: payload.title.trim(),
+        message: payload.message.trim(),
+        type: payload.type,
+        target_audience: payload.target_audience,
+        target_boarder_id: payload.target_audience === 'SPECIFIC' ? payload.target_boarder_id || null : null,
+        target_boarder_name: payload.target_audience === 'SPECIFIC' ? payload.target_boarder_name || null : null,
+        created_by: profile?.id || null,
+        created_by_name: profile?.full_name || 'সুপারএডমিন',
+        is_active: true,
+        created_at: new Date().toISOString(),
+      }
+
+      // Save to localStorage
+      const local = getLocalNotices()
+      saveLocalNotices([newNotice, ...local])
+
+      if (isSupabaseConfigured) {
+        try {
+          const { data, error } = await supabase
+            .from('hostel_notices')
+            .insert({
+              title: newNotice.title,
+              message: newNotice.message,
+              type: newNotice.type,
+              target_audience: newNotice.target_audience,
+              target_boarder_id: newNotice.target_boarder_id,
+              target_boarder_name: newNotice.target_boarder_name,
+              created_by: profile?.id || null,
+              created_by_name: profile?.full_name || 'সুপারএডমিন',
+              is_active: true,
+            })
+            .select()
+            .single()
+
+          if (!error && data?.id) {
+            newNotice.id = data.id
+          }
+
+          // Dispatch in-app system notifications for the recipient boarder(s)
+          if (payload.target_audience === 'SPECIFIC' && payload.target_boarder_id) {
+            const { data: boarderData } = await supabase
+              .from('boarders')
+              .select('user_id')
+              .eq('id', payload.target_boarder_id)
+              .maybeSingle()
+
+            if (boarderData?.user_id) {
+              await supabase.from('system_notifications').insert({
+                recipient_id: boarderData.user_id,
+                title: payload.title,
+                message: payload.message,
+                type: payload.type === 'ALERT' ? 'ALERT' : payload.type === 'WARNING' ? 'WARNING' : payload.type === 'MEAL' ? 'MEAL' : 'INFO',
+                is_read: false,
+                action_url: '/portal/dashboard',
+              })
+            }
+          } else if (payload.target_audience === 'ALL') {
+            // Get all active boarders
+            const { data: allActiveBoarders } = await supabase
+              .from('boarders')
+              .select('user_id')
+              .eq('status', 'ACTIVE')
+              .not('user_id', 'is', null)
+
+            if (allActiveBoarders && allActiveBoarders.length > 0) {
+              const notificationsToInsert = allActiveBoarders
+                .filter((b) => Boolean(b.user_id))
+                .map((b) => ({
+                  recipient_id: b.user_id,
+                  title: payload.title,
+                  message: payload.message,
+                  type: payload.type === 'ALERT' ? 'ALERT' : payload.type === 'WARNING' ? 'WARNING' : payload.type === 'MEAL' ? 'MEAL' : 'INFO',
+                  is_read: false,
+                  action_url: '/portal/dashboard',
+                }))
+
+              if (notificationsToInsert.length > 0) {
+                await supabase.from('system_notifications').insert(notificationsToInsert)
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Could not sync notice to Supabase:', err)
+        }
+      }
+
+      return newNotice
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hostel_notices'] })
+      queryClient.invalidateQueries({ queryKey: ['system_notifications'] })
+    },
+  })
+}
+
+export const useDeleteNotice = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (noticeId: string) => {
+      // Remove from localStorage
+      const local = getLocalNotices().filter((n) => n.id !== noticeId)
+      saveLocalNotices(local)
+
+      if (isSupabaseConfigured) {
+        try {
+          await supabase.from('hostel_notices').delete().eq('id', noticeId)
+        } catch (err) {
+          console.warn('Could not delete notice from Supabase:', err)
+        }
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hostel_notices'] })
+    },
+  })
+}

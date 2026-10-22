@@ -80,6 +80,7 @@ import AuditLogPage from '@/features/governance/AuditLogPage'
 import UserManagementPage from '@/features/governance/UserManagementPage'
 import HostelSettingsPage from '@/features/settings/HostelSettingsPage'
 import AccessControlPage from '@/features/governance/AccessControlPage'
+import NoticesPage from '@/features/notices/NoticesPage'
 
 
 export const router = createBrowserRouter([
@@ -161,6 +162,10 @@ export const router = createBrowserRouter([
       {
         path: 'boarders/:id',
         element: <BoarderDetailPage />,
+      },
+      {
+        path: 'notices',
+        element: <NoticesPage />,
       },
       {
         path: 'billing',

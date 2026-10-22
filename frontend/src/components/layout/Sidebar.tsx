@@ -20,6 +20,7 @@ import {
   ArrowRightLeft,
   KeyRound,
   ShieldAlert,
+  Megaphone,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import { useBrandingStore } from '@/app/store/useBrandingStore'
@@ -113,6 +114,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
       href: '/boarders',
       icon: <Users className="w-5 h-5 shrink-0" />,
       roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'AUDITOR'],
+      permissionKey: 'boarders',
+    },
+
+    // Notices & Announcements
+    {
+      type: 'link',
+      id: 'notices',
+      titleKey: 'nav.notices',
+      defaultTitle: 'নোটিশ ও ঘোষণা',
+      href: '/notices',
+      icon: <Megaphone className="w-5 h-5 shrink-0 text-amber-400" />,
+      roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
       permissionKey: 'boarders',
     },
 

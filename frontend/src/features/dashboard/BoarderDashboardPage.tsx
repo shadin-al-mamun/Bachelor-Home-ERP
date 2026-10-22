@@ -13,9 +13,11 @@ import {
   CalendarDays,
   Sparkles,
   Info,
+  Megaphone,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import { useBrandingStore, DEFAULT_BRANDING } from '@/app/store/useBrandingStore'
+import { useNotices } from '@/features/notices/api/useNotices'
 import {
   getDhakaNow,
   formatDhakaDate,
@@ -59,6 +61,12 @@ export const BoarderDashboardPage: React.FC = () => {
       (profile?.phone_number && b.phone_number === profile.phone_number) ||
       (profile?.full_name && b.full_name === profile.full_name)
   )
+
+  // Fetch active notices for this boarder
+  const { data: boarderNotices = [] } = useNotices({
+    activeOnly: true,
+    boarderId: matchedResident?.id,
+  })
 
   const currentBoarder = matchedResident || (!isStaffRole && !isSupabaseConfigured ? boardersList[0] : null)
   const activeBoarderId = currentBoarder?.id
@@ -644,6 +652,46 @@ export const BoarderDashboardPage: React.FC = () => {
                 <PhoneCall className="w-3.5 h-3.5" />
                 <span>{helplinePhone}</span>
               </div>
+            </div>
+
+            {/* Hostel Notice Board */}
+            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-amber-300 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  <Megaphone className="w-3.5 h-3.5 text-amber-400" />
+                  হোস্টেল নোটিশ বোর্ড:
+                </span>
+                {boarderNotices.length > 0 && (
+                  <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded-full font-bold">
+                    {boarderNotices.length} টি নোটিশ
+                  </span>
+                )}
+              </div>
+
+              {boarderNotices.length === 0 ? (
+                <div className="text-[11px] text-slate-400 italic py-1">
+                  বর্তমানে কোনো নতুন নোটিশ নেই।
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {boarderNotices.map((n) => (
+                    <div
+                      key={n.id}
+                      className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1"
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-bold text-white text-xs truncate">{n.title}</span>
+                        <span className="text-[9px] text-slate-500 shrink-0">
+                          {formatDateBn(n.created_at)}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 leading-relaxed whitespace-pre-wrap">
+                        {n.message}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Hostel Rules */}

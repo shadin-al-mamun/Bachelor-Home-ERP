@@ -20,7 +20,9 @@ import {
   Phone,
   Eye,
   SlidersHorizontal,
+  Megaphone,
 } from 'lucide-react'
+import { SendNoticeModal } from '@/features/notices/components/SendNoticeModal'
 
 export const BoarderListPage: React.FC = () => {
   const navigate = useNavigate()
@@ -28,6 +30,8 @@ export const BoarderListPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [reviewApplicant, setReviewApplicant] = useState<BoarderWithRelations | null>(null)
   const [editingBoarder, setEditingBoarder] = useState<BoarderWithRelations | null>(null)
+  const [isNoticeModalOpen, setIsNoticeModalOpen] = useState(false)
+  const [noticeTargetBoarder, setNoticeTargetBoarder] = useState<{ id: string; name: string } | null>(null)
 
   const { data: boarders = [], isLoading } = useBoarders({
     status: selectedStatus,
@@ -78,6 +82,18 @@ export const BoarderListPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          <Button
+            size="sm"
+            onClick={() => {
+              setNoticeTargetBoarder(null)
+              setIsNoticeModalOpen(true)
+            }}
+            className="bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white text-xs shadow-md shadow-indigo-600/20"
+          >
+            <Megaphone className="w-4 h-4 mr-1.5" />
+            নোটিশ পাঠান
+          </Button>
+
           <Link to="/register" target="_blank" rel="noreferrer">
             <Button variant="outline" size="sm" className="border-slate-700 text-slate-300">
               <UserPlus className="w-4 h-4 mr-1.5" />
@@ -345,6 +361,18 @@ export const BoarderListPage: React.FC = () => {
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                onClick={() => {
+                                  setNoticeTargetBoarder({ id: boarder.id, name: boarder.full_name })
+                                  setIsNoticeModalOpen(true)
+                                }}
+                                className="text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 text-xs py-1 px-2"
+                                title="এই বর্ডারকে নোটিশ পাঠান"
+                              >
+                                <Megaphone className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => setEditingBoarder(boarder)}
                                 className="text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 text-xs py-1 px-2"
                                 title="বোর্ডার তথ্য সম্পাদন করুন"
@@ -397,6 +425,17 @@ export const BoarderListPage: React.FC = () => {
         isOpen={Boolean(editingBoarder)}
         onClose={() => setEditingBoarder(null)}
         boarder={editingBoarder}
+      />
+
+      {/* Send Notice Modal */}
+      <SendNoticeModal
+        isOpen={isNoticeModalOpen}
+        onClose={() => {
+          setIsNoticeModalOpen(false)
+          setNoticeTargetBoarder(null)
+        }}
+        initialBoarderId={noticeTargetBoarder?.id}
+        initialBoarderName={noticeTargetBoarder?.name}
       />
     </div>
   )
