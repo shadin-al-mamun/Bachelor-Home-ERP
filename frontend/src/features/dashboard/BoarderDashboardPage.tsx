@@ -15,7 +15,7 @@ import {
   Info,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
-import { useBrandingStore } from '@/app/store/useBrandingStore'
+import { useBrandingStore, DEFAULT_BRANDING } from '@/app/store/useBrandingStore'
 import {
   getDhakaNow,
   formatDhakaDate,
@@ -650,10 +650,15 @@ export const BoarderDashboardPage: React.FC = () => {
             <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80 space-y-2 text-slate-300 text-[11px]">
               <div className="font-semibold text-slate-200">আবাসিক নিয়মাবলি:</div>
               <ul className="space-y-1.5 list-disc list-inside text-slate-400">
-                <li>খাবার অন/অফ প্রতিদিন রাত <strong className="text-amber-300">১০:০০ টার মধ্যে</strong> সম্পন্ন করতে হবে।</li>
-                <li>মাসের ১০ তারিখের মধ্যে মাসিক সিট ভাড়া ও মেস বিল পরিশোধ করতে হবে।</li>
-                <li>হোস্টেলের মূল গেট রাত <strong className="text-rose-300">১১:০০ টায়</strong> বন্ধ হয়ে যায়।</li>
-                <li>বহিরাগত মেহমান নিয়ে আসার ক্ষেত্রে পূর্বানুমতি প্রযোজ্য।</li>
+                {(branding.hostelRules || DEFAULT_BRANDING.hostelRules)
+                  .split('\n')
+                  .map((rule) => rule.trim().replace(/^[•\-\*]\s*/, ''))
+                  .filter(Boolean)
+                  .map((rule, idx) => (
+                    <li key={idx} className="leading-relaxed">
+                      {rule}
+                    </li>
+                  ))}
               </ul>
             </div>
           </div>

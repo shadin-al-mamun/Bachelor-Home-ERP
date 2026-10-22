@@ -15,6 +15,7 @@ export interface BrandingSettings {
   appIconUrl: string | null
   faviconUrl: string | null
   primaryColor: string
+  hostelRules: string
 }
 
 interface BrandingState extends BrandingSettings {
@@ -43,6 +44,10 @@ export const DEFAULT_BRANDING: BrandingSettings = {
   appIconUrl: '/pwa-192x192.svg',
   faviconUrl: '/favicon.svg',
   primaryColor: '#6366f1',
+  hostelRules: `খাবার অন/অফ প্রতিদিন রাত ১০:০০ টার মধ্যে সম্পন্ন করতে হবে।
+মাসের ১০ তারিখের মধ্যে মাসিক সিট ভাড়া ও মেস বিল পরিশোধ করতে হবে।
+হোস্টেলের মূল গেট রাত ১১:০০ টায় বন্ধ হয়ে যায়।
+বহিরাগত মেহমান নিয়ে আসার ক্ষেত্রে পূর্বানুমতি প্রযোজ্য।`,
 }
 
 function applyFaviconToDOM(iconUrl: string) {
@@ -114,6 +119,7 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
             appIconUrl: data.app_icon_url || state.appIconUrl,
             faviconUrl: data.favicon_url || state.faviconUrl,
             primaryColor: data.primary_color || state.primaryColor,
+            hostelRules: data.hostel_rules !== undefined && data.hostel_rules !== null ? data.hostel_rules : state.hostelRules,
           }))
 
           const current = get()
@@ -145,6 +151,7 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
       appIconUrl: newSettings.appIconUrl !== undefined ? newSettings.appIconUrl : get().appIconUrl,
       faviconUrl: newSettings.faviconUrl !== undefined ? newSettings.faviconUrl : get().faviconUrl,
       primaryColor: newSettings.primaryColor ?? get().primaryColor,
+      hostelRules: newSettings.hostelRules !== undefined ? newSettings.hostelRules : get().hostelRules,
     }
 
     // Update state & localStorage
@@ -176,6 +183,7 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
           logo_url: updated.logoUrl,
           app_icon_url: updated.appIconUrl,
           favicon_url: updated.faviconUrl,
+          hostel_rules: updated.hostelRules,
           updated_at: new Date().toISOString(),
         }
 

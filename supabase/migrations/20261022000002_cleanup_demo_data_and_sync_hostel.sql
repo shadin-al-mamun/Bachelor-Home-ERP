@@ -3,6 +3,10 @@
 -- 1. Updates building name in public.buildings from old demo 'Sunflower Hostel' to the real hostel name configured in organization_settings
 -- 2. Provides cleanup for demo boarder 'আল ইমরান' (BDR-2026-3688) so real boarders take precedence
 
+-- 1. Ensure hostel_rules column exists in organization_settings
+ALTER TABLE public.organization_settings
+    ADD COLUMN IF NOT EXISTS hostel_rules TEXT DEFAULT NULL;
+
 DO $$
 DECLARE
     v_real_hostel_name TEXT;

@@ -38,6 +38,7 @@ export const HostelSettingsPage: React.FC = () => {
     receiptFooterNote,
     receiptPrefix,
     logoUrl,
+    hostelRules,
     updateBranding,
     uploadCustomLogo,
     resetToDefault,
@@ -55,6 +56,7 @@ export const HostelSettingsPage: React.FC = () => {
   const [formEmergencyContact, setFormEmergencyContact] = useState(emergencyContact)
   const [formReceiptFooterNote, setFormReceiptFooterNote] = useState(receiptFooterNote)
   const [formReceiptPrefix, setFormReceiptPrefix] = useState(receiptPrefix)
+  const [formHostelRules, setFormHostelRules] = useState(hostelRules)
   const [previewLogo, setPreviewLogo] = useState<string | null>(logoUrl)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -74,6 +76,7 @@ export const HostelSettingsPage: React.FC = () => {
     setFormEmergencyContact(emergencyContact)
     setFormReceiptFooterNote(receiptFooterNote)
     setFormReceiptPrefix(receiptPrefix)
+    setFormHostelRules(hostelRules)
     setPreviewLogo(logoUrl)
   }, [
     orgName,
@@ -85,6 +88,7 @@ export const HostelSettingsPage: React.FC = () => {
     emergencyContact,
     receiptFooterNote,
     receiptPrefix,
+    hostelRules,
     logoUrl,
   ])
 
@@ -117,6 +121,7 @@ export const HostelSettingsPage: React.FC = () => {
         emergencyContact: formEmergencyContact.trim() || DEFAULT_BRANDING.emergencyContact,
         receiptFooterNote: formReceiptFooterNote.trim() || DEFAULT_BRANDING.receiptFooterNote,
         receiptPrefix: formReceiptPrefix.trim() || DEFAULT_BRANDING.receiptPrefix,
+        hostelRules: formHostelRules.trim() || DEFAULT_BRANDING.hostelRules,
         logoUrl: previewLogo,
         appIconUrl: previewLogo,
         faviconUrl: previewLogo,
@@ -141,6 +146,7 @@ export const HostelSettingsPage: React.FC = () => {
       setFormEmergencyContact(DEFAULT_BRANDING.emergencyContact)
       setFormReceiptFooterNote(DEFAULT_BRANDING.receiptFooterNote)
       setFormReceiptPrefix(DEFAULT_BRANDING.receiptPrefix)
+      setFormHostelRules(DEFAULT_BRANDING.hostelRules)
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 3000)
     }
@@ -428,6 +434,63 @@ export const HostelSettingsPage: React.FC = () => {
                 <span className="text-[11px] text-slate-500 block">
                   যেমন: {formReceiptPrefix || 'RCT'}-001004
                 </span>
+              </div>
+            </div>
+
+            {/* Section 3: আবাসিক নিয়মাবলী (Hostel Rules & Regulations) */}
+            <div className="pt-4 border-t border-slate-800 space-y-4">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-amber-400" />
+                <h3 className="text-sm font-bold text-white">আবাসিক নিয়মাবলী (বোর্ডার পোর্টালে সরাসরি প্রদর্শিত)</h3>
+              </div>
+              <p className="text-xs text-slate-400">
+                বোর্ডার আইডির হোম ড্যাশবোর্ডের <strong className="text-slate-200">"হোস্টেল সহায়তা ও নিয়মাবলী"</strong> কার্ডে এই নিয়মগুলো লাইভ দৃশ্যমান হবে। প্রতিটি নিয়ম আলাদা লাইনে লিখুন।
+              </p>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-300">
+                  হোস্টেল আবাসিক নিয়মাবলী তালিকা
+                </label>
+                <textarea
+                  rows={6}
+                  value={formHostelRules}
+                  onChange={(e) => setFormHostelRules(e.target.value)}
+                  placeholder="খাবার অন/অফ প্রতিদিন রাত ১০:০০ টার মধ্যে সম্পন্ন করতে হবে।&#10;মাসের ১০ তারিখের মধ্যে মাসিক সিট ভাড়া ও মেস বিল পরিশোধ করতে হবে।&#10;হোস্টেলের মূল গেট রাত ১১:০০ টায় বন্ধ হয়ে যায়।&#10;বহিরাগত মেহমান নিয়ে আসার ক্ষেত্রে পূর্বানুমতি প্রযোজ্য।"
+                  className="w-full px-3.5 py-3 rounded-xl bg-slate-950/60 border border-slate-700 text-sm text-slate-200 leading-relaxed focus:outline-none focus:border-primary-500 font-sans"
+                />
+                <span className="text-[11px] text-slate-500 block">
+                  পরামর্শ: বুলেট চিহ্ন (•) দেওয়ার প্রয়োজন নেই, সিস্টেম প্রতিটি লাইনকে স্বয়ংক্রিয়ভাবে বুলেট পয়েন্টে সুন্দর করে সাজিয়ে দেবে।
+                </span>
+              </div>
+
+              {/* Live Preview of Hostel Rules Card */}
+              <div className="p-4 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-2.5">
+                <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
+                  <span className="flex items-center gap-1.5 text-indigo-400">
+                    <Info className="w-3.5 h-3.5" />
+                    বোর্ডার পোর্টালে যেভাবে লাইভ প্রদর্শিত হবে:
+                  </span>
+                  <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-mono">
+                    Live Preview
+                  </span>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2 text-xs">
+                  <div className="font-semibold text-slate-200 flex items-center gap-1.5">
+                    <span>আবাসিক নিয়মাবলি:</span>
+                  </div>
+                  <ul className="space-y-1.5 list-disc list-inside text-slate-400 text-[11px]">
+                    {formHostelRules
+                      .split('\n')
+                      .map((line) => line.replace(/^[•\-\*]\s*/, '').trim())
+                      .filter(Boolean)
+                      .map((rule, idx) => (
+                        <li key={idx} className="leading-relaxed">
+                          {rule}
+                        </li>
+                      ))}
+                  </ul>
+                </div>
               </div>
             </div>
 

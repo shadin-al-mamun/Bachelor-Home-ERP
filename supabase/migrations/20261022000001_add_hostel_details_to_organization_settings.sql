@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS public.organization_settings (
     favicon_url TEXT DEFAULT '/favicon.svg',
     primary_color VARCHAR(20) DEFAULT '#6366f1',
     access_control_permissions JSONB DEFAULT NULL,
+    hostel_rules TEXT DEFAULT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('Asia/Dhaka', now()),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('Asia/Dhaka', now())
 );
@@ -37,6 +38,7 @@ ALTER TABLE public.organization_settings
     ADD COLUMN IF NOT EXISTS emergency_contact VARCHAR(50) DEFAULT NULL,
     ADD COLUMN IF NOT EXISTS receipt_footer_note TEXT DEFAULT 'সফটওয়্যার জেনারেটেড ডিজিটাল ভাউচার। কোনো সিল বা স্বাক্ষরের প্রয়োজন নেই।',
     ADD COLUMN IF NOT EXISTS receipt_prefix VARCHAR(20) DEFAULT 'RCT',
+    ADD COLUMN IF NOT EXISTS hostel_rules TEXT DEFAULT NULL,
     ADD COLUMN IF NOT EXISTS access_control_permissions JSONB DEFAULT NULL;
 
 -- 3. Insert initial record if table is currently empty
