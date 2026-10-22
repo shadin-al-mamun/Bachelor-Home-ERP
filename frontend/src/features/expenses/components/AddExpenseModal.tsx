@@ -24,6 +24,7 @@ import {
   useRecordExpenseMutation,
   type RecordExpenseInput,
 } from '../api/useExpenses'
+import { useAuthStore } from '@/app/store/useAuthStore'
 import type { ExpenseScope } from '@/types/database'
 
 interface AddExpenseModalProps {
@@ -95,6 +96,27 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
 
+  const { profile } = useAuthStore()
+  const isAdmin = profile?.role === 'SUPER_ADMIN' || profile?.role === 'ADMIN'
+
+  // Filter accounts belonging to manager
+  const managerAccounts = useMemo(() => {
+    return accounts.filter((a) => {
+      if (profile?.id && a.assigned_manager_id === profile.id) return true
+      if (a.account_type === 'CASH_MANAGER') return true
+      const name = a.account_name.toLowerCase()
+      if (name.includes('manager') || a.account_name.includes('ম্যানেজার')) return true
+      return false
+    })
+  }, [accounts, profile?.id])
+
+  // For Managers: ONLY manager accounts are accessible ("অন্য একাউন্ট তার এখানে আসবে না")
+  // For Admins/SuperAdmins: all accounts are accessible
+  const availableAccounts = useMemo(() => {
+    if (isAdmin) return accounts
+    return managerAccounts.length > 0 ? managerAccounts : accounts
+  }, [isAdmin, accounts, managerAccounts])
+
   // Filter categories by selected scope
   const filteredCategories = useMemo(() => {
     return categories.filter((c) => {
@@ -117,13 +139,14 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     }
   }, [filteredCategories, categoryId])
 
-  // Default account selection
+  // Default account selection restricted to availableAccounts
   useEffect(() => {
-    if (accounts.length > 0 && !sourceAccountId) {
-      const defaultAcc = accounts.find((a) => a.account_type === 'CASH_MANAGER' || a.account_type === 'CASH_OWNER')
-      setSourceAccountId(defaultAcc ? defaultAcc.id : accounts[0].id)
+    if (availableAccounts.length > 0) {
+      if (!sourceAccountId || !availableAccounts.some((a) => a.id === sourceAccountId)) {
+        setSourceAccountId(availableAccounts[0].id)
+      }
     }
-  }, [accounts, sourceAccountId])
+  }, [availableAccounts, sourceAccountId])
 
   // Default flat selection when FLAT_MISC is selected
   useEffect(() => {
@@ -187,6 +210,11 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
     if (!sourceAccountId) {
       setErrorMsg('পরিশোধের একাউন্ট নির্বাচন করুন।')
+      return
+    }
+
+    if (!isAdmin && !managerAccounts.some((a) => a.id === sourceAccountId)) {
+      setErrorMsg('ম্যানেজার শুধুমাত্র নিজের ম্যানেজার ক্যাশ একাউন্ট থেকেই খরচ এন্ট্রি করতে পারবেন।')
       return
     }
 
@@ -442,19 +470,27 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                   <Wallet className="w-3.5 h-3.5 text-indigo-400" />
                   যে অ্যাকাউন্ট থেকে প্রদান করা হয়েছে <span className="text-rose-400">*</span>
                 </span>
-                {selectedAccount && (
-                  <span className="text-[10px] text-emerald-400 font-mono">
-                    ব্যালেন্স: ৳{selectedAccount.current_balance.toLocaleString('en-IN')}
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {!isAdmin && (
+                    <span className="text-[10px] text-cyan-400 bg-cyan-950/60 border border-cyan-800/60 px-2 py-0.5 rounded-md font-medium">
+                      ম্যানেজার ক্যাশ নির্ধারিত
+                    </span>
+                  )}
+                  {selectedAccount && (
+                    <span className="text-[10px] text-emerald-400 font-mono">
+                      ব্যালেন্স: ৳{selectedAccount.current_balance.toLocaleString('en-IN')}
+                    </span>
+                  )}
+                </div>
               </label>
               <select
                 value={sourceAccountId}
                 onChange={(e) => setSourceAccountId(e.target.value)}
                 required
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700/80 text-white text-xs focus:outline-none focus:border-indigo-500 transition-all"
+                disabled={!isAdmin && availableAccounts.length === 1}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700/80 text-white text-xs focus:outline-none focus:border-indigo-500 transition-all disabled:opacity-90 disabled:cursor-not-allowed"
               >
-                {accounts.map((a) => (
+                {availableAccounts.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.account_name} — ৳{a.current_balance.toLocaleString('en-IN')}
                   </option>

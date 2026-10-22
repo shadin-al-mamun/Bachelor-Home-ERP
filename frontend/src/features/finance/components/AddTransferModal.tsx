@@ -14,6 +14,7 @@ import {
   type RecordTransferInput,
 } from '../api/useFinance'
 import { useExpenseAccounts } from '@/features/expenses/api/useExpenses'
+import { useAuthStore } from '@/app/store/useAuthStore'
 
 interface AddTransferModalProps {
   isOpen: boolean
@@ -40,15 +41,54 @@ export const AddTransferModal: React.FC<AddTransferModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [successTransferNo, setSuccessTransferNo] = useState<string | null>(null)
 
-  // Initialize accounts with different defaults
+  const { profile } = useAuthStore()
+  const isAdmin = profile?.role === 'SUPER_ADMIN' || profile?.role === 'ADMIN'
+
+  // Filter accounts belonging to manager
+  const managerAccounts = React.useMemo(() => {
+    return accounts.filter((a) => {
+      if (profile?.id && a.assigned_manager_id === profile.id) return true
+      if (a.account_type === 'CASH_MANAGER') return true
+      const name = a.account_name.toLowerCase()
+      if (name.includes('manager') || a.account_name.includes('ম্যানেজার')) return true
+      return false
+    })
+  }, [accounts, profile?.id])
+
+  // Source accounts (From):
+  // Admins can transfer from ANY account.
+  // Managers can ONLY transfer OUT from their own manager cash custody account!
+  const availableSourceAccounts = React.useMemo(() => {
+    if (isAdmin) return accounts
+    return managerAccounts.length > 0 ? managerAccounts : accounts
+  }, [isAdmin, accounts, managerAccounts])
+
+  // Destination accounts (To):
+  // Can be any account EXCEPT the currently selected source account.
+  const availableDestAccounts = React.useMemo(() => {
+    return accounts.filter((a) => a.id !== fromAccountId)
+  }, [accounts, fromAccountId])
+
+  // Initialize and keep fromAccountId valid in availableSourceAccounts
   React.useEffect(() => {
-    if (accounts.length >= 2) {
-      if (!fromAccountId) setFromAccountId(accounts[0].id)
-      if (!toAccountId) setToAccountId(accounts[1].id)
-    } else if (accounts.length === 1) {
-      if (!fromAccountId) setFromAccountId(accounts[0].id)
+    if (availableSourceAccounts.length > 0) {
+      if (!fromAccountId || !availableSourceAccounts.some((a) => a.id === fromAccountId)) {
+        setFromAccountId(availableSourceAccounts[0].id)
+      }
     }
-  }, [accounts, fromAccountId, toAccountId])
+  }, [availableSourceAccounts, fromAccountId])
+
+  // Initialize and keep toAccountId valid in availableDestAccounts
+  React.useEffect(() => {
+    if (fromAccountId && accounts.length > 0) {
+      if (!toAccountId || toAccountId === fromAccountId) {
+        const defaultDest = accounts.find((a) => a.id !== fromAccountId)
+        if (defaultDest) {
+          setToAccountId(defaultDest.id)
+        }
+      }
+    }
+  }, [fromAccountId, toAccountId, accounts])
 
   if (!isOpen) return null
 
@@ -65,6 +105,11 @@ export const AddTransferModal: React.FC<AddTransferModalProps> = ({
 
     if (isSameAccount) {
       setErrorMsg('উৎস এবং গন্তব্য একই একাউন্ট হতে পারে না। অনুগ্রহ করে দুটি ভিন্ন একাউন্ট নির্বাচন করুন।')
+      return
+    }
+
+    if (!isAdmin && !managerAccounts.some((a) => a.id === fromAccountId)) {
+      setErrorMsg('ম্যানেজার শুধুমাত্র নিজের ম্যানেজার ক্যাশ একাউন্ট থেকে অন্য একাউন্টে টাকা পাঠাতে পারবেন। অন্য একাউন্ট থেকে অর্থ স্থানান্তরের অনুমতি নেই।')
       return
     }
 
@@ -168,21 +213,29 @@ export const AddTransferModal: React.FC<AddTransferModalProps> = ({
               <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
                 <span className="flex items-center gap-1.5 text-rose-300">
                   <Wallet className="w-3.5 h-3.5 text-rose-400" />
-                  উৎস একাউন্ট (টাকা কাটা হবে) <span className="text-rose-400">*</span>
+                  উৎস একাউন্ট (টাকা কাটা যাবে) <span className="text-rose-400">*</span>
                 </span>
-                {fromAccount && (
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    ব্যালেন্স: ৳{fromAccount.current_balance.toLocaleString('en-IN')}
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {!isAdmin && (
+                    <span className="text-[10px] text-cyan-400 bg-cyan-950/60 border border-cyan-800/60 px-2 py-0.5 rounded-md font-medium">
+                      ম্যানেজার ক্যাশ নির্ধারিত
+                    </span>
+                  )}
+                  {fromAccount && (
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      ব্যালেন্স: ৳{fromAccount.current_balance.toLocaleString('en-IN')}
+                    </span>
+                  )}
+                </div>
               </label>
               <select
                 value={fromAccountId}
                 onChange={(e) => setFromAccountId(e.target.value)}
                 required
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700/80 text-white text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all"
+                disabled={!isAdmin && availableSourceAccounts.length === 1}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700/80 text-white text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all disabled:opacity-90 disabled:cursor-not-allowed"
               >
-                {accounts.map((a) => (
+                {availableSourceAccounts.map((a) => (
                   <option key={a.id} value={a.id} className="bg-slate-900 text-white">
                     {a.account_name} — ৳{a.current_balance.toLocaleString('en-IN')}
                   </option>
@@ -209,7 +262,7 @@ export const AddTransferModal: React.FC<AddTransferModalProps> = ({
                 required
                 className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700/80 text-white text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all"
               >
-                {accounts.map((a) => (
+                {availableDestAccounts.map((a) => (
                   <option key={a.id} value={a.id} className="bg-slate-900 text-white">
                     {a.account_name} — ৳{a.current_balance.toLocaleString('en-IN')}
                   </option>
