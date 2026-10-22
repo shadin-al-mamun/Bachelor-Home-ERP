@@ -15,11 +15,10 @@ import {
 import { useAuthStore } from '@/app/store/useAuthStore'
 import { useBrandingStore } from '@/app/store/useBrandingStore'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
-import { useMealBoardersList } from '@/features/meals/api/useMeals'
 import { useReceipts, type ExtendedReceipt } from '@/features/billing/api/useReceipts'
 import { ReceiptPrintView } from '@/features/billing/components/ReceiptPrintView'
 import { formatCurrencyBn, formatDateBn } from '@/utils/date'
-import { isPhoneMatch } from '@/utils/phone'
+import { useCurrentBoarder } from '@/features/boarders/api/useCurrentBoarder'
 import type { BoarderCharge, ChargeType, ChargeStatus } from '@/types/database'
 
 export const BoarderDuesPage: React.FC = () => {
@@ -31,30 +30,8 @@ export const BoarderDuesPage: React.FC = () => {
   const [selectedReceipt, setSelectedReceipt] = useState<ExtendedReceipt | null>(null)
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false)
 
-  // 1. Resolve boarder identity
-  const { data: boardersList = [], refetch: refetchBoarders } = useMealBoardersList()
-  const isStaffRole = profile?.role === 'SUPER_ADMIN' || profile?.role === 'ADMIN' || profile?.role === 'MANAGER'
-
-  const matchedResident = boardersList.find(
-    (b) =>
-      (profile?.id && (b.user_id === profile.id || b.id === profile.id)) ||
-      (profile?.phone_number && isPhoneMatch(b.phone_number, profile.phone_number)) ||
-      (profile?.full_name && b.full_name === profile.full_name)
-  )
-
-  const currentBoarder = matchedResident || (!isStaffRole && !isSupabaseConfigured ? boardersList[0] : null)
-  const activeBoarderId = currentBoarder?.id
-
-  // Self-heal / Link boarder profile if Supabase is live and user is authenticated
-  useEffect(() => {
-    if (isSupabaseConfigured && profile?.id && !matchedResident) {
-      supabase.rpc('claim_my_boarder_profile').then(({ data, error }) => {
-        if (!error && data?.success) {
-          refetchBoarders()
-        }
-      })
-    }
-  }, [profile?.id, matchedResident, refetchBoarders])
+  // 1. Resolve boarder identity authoritatively
+  const { currentBoarder, activeBoarderId, isLoading: isLoadingBoarder } = useCurrentBoarder()
 
   // Boarder details display
   const boarderName = currentBoarder?.full_name || profile?.full_name || 'বর্ডার'
@@ -198,6 +175,15 @@ export const BoarderDuesPage: React.FC = () => {
       default:
         return <span className="text-slate-400">{method}</span>
     }
+  }
+
+  if (isLoadingBoarder) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center space-y-4">
+        <div className="w-10 h-10 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
+        <p className="text-xs text-slate-400 font-medium">বকেয়া ও রসিদের তথ্য লোড হচ্ছে...</p>
+      </div>
+    )
   }
 
   return (

@@ -14,6 +14,7 @@ import {
 import { useAuthStore } from '@/app/store/useAuthStore'
 import { isSupabaseConfigured } from '@/lib/supabaseClient'
 import { isPhoneMatch } from '@/utils/phone'
+import { useCurrentBoarder } from '@/features/boarders/api/useCurrentBoarder'
 import {
   getDhakaNow,
   formatDhakaDate,
@@ -66,8 +67,13 @@ export const BoarderMealPortal: React.FC = () => {
 
   const toggleMutation = useToggleMealMutation()
   const batchToggleMutation = useBatchToggleMealsMutation()
+  const { currentBoarder: authoritativeBoarder } = useCurrentBoarder()
 
   React.useEffect(() => {
+    if (authoritativeBoarder?.id && profile?.role === 'BOARDER') {
+      setSelectedBoarderId(authoritativeBoarder.id)
+      return
+    }
     if (boarders.length > 0) {
       if (profile?.role === 'BOARDER') {
         const matched = boarders.find(
@@ -88,10 +94,10 @@ export const BoarderMealPortal: React.FC = () => {
         }
       }
     }
-  }, [profile, boarders, selectedBoarderId])
+  }, [profile, boarders, selectedBoarderId, authoritativeBoarder])
 
   // Current active boarder info
-  const activeBoarder = boarders.find((b) => b.id === selectedBoarderId) || (isStaff || !isSupabaseConfigured ? boarders[0] : null)
+  const activeBoarder = authoritativeBoarder || boarders.find((b) => b.id === selectedBoarderId) || (isStaff || !isSupabaseConfigured ? boarders[0] : null)
 
   // Date status calculation for selected date
   const dateStatus = getDateMealStatus(selectedDate, settings?.cutoff_time || '22:00:00')

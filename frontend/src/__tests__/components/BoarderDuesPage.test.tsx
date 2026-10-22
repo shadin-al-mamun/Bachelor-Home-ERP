@@ -64,6 +64,17 @@ vi.mock('@/features/meals/api/useMeals', () => ({
   }),
 }))
 
+// Mock useCurrentBoarder hook
+vi.mock('@/features/boarders/api/useCurrentBoarder', () => ({
+  useCurrentBoarder: () => ({
+    currentBoarder: MOCK_BOARDER,
+    activeBoarderId: MOCK_BOARDER.id,
+    hasActiveSeat: true,
+    isLoading: false,
+    refetch: vi.fn(),
+  }),
+}))
+
 // Mock receipts query
 vi.mock('@/features/billing/api/useReceipts', () => ({
   useReceipts: () => ({

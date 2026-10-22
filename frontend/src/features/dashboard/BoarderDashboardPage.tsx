@@ -27,11 +27,10 @@ import {
   useMealSettings,
   useBoarderMealSelections,
   useToggleMealMutation,
-  useMealBoardersList,
   useActiveMealRates,
 } from '@/features/meals/api/useMeals'
 import { formatCurrencyBn, formatDateBn } from '@/utils/date'
-import { isPhoneMatch } from '@/utils/phone'
+import { useCurrentBoarder } from '@/features/boarders/api/useCurrentBoarder'
 import { getStoredReceipts, type ExtendedReceipt } from '@/features/billing/api/useReceipts'
 import { ReceiptPrintView } from '@/features/billing/components/ReceiptPrintView'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
@@ -56,33 +55,15 @@ export const BoarderDashboardPage: React.FC = () => {
   tomorrow.setDate(tomorrow.getDate() + 1)
   const tomorrowStr = formatDhakaDate(tomorrow)
 
-  // Dynamic boarder matching based on logged-in user profile
-  const { data: boardersList = [], isLoading: isLoadingBoarders } = useMealBoardersList()
   const isStaffRole = profile?.role === 'SUPER_ADMIN' || profile?.role === 'ADMIN' || profile?.role === 'MANAGER'
-
-  const matchedResident = boardersList.find(
-    (b) =>
-      (profile?.id && (b.user_id === profile.id || b.id === profile.id)) ||
-      (profile?.phone_number && isPhoneMatch(b.phone_number, profile.phone_number)) ||
-      (profile?.full_name && b.full_name === profile.full_name)
-  )
-
-  // Self-heal / Link boarder profile if Supabase is live and user is authenticated
-  React.useEffect(() => {
-    if (isSupabaseConfigured && profile?.id && !matchedResident) {
-      supabase.rpc('claim_my_boarder_profile').then(() => {}, () => {})
-    }
-  }, [profile?.id, matchedResident])
+  const { currentBoarder, activeBoarderId, hasActiveSeat, isLoading: isLoadingBoarder } = useCurrentBoarder()
 
   // Fetch active notices for this boarder (ALL, flat-targeted, or individual)
   const { data: boarderNotices = [] } = useNotices({
     activeOnly: true,
-    boarderId: matchedResident?.id,
-    flatId: matchedResident?.flat_id,
+    boarderId: currentBoarder?.id,
+    flatId: currentBoarder?.flat_id,
   })
-
-  const currentBoarder = matchedResident || (!isStaffRole && !isSupabaseConfigured ? boardersList[0] : null)
-  const activeBoarderId = currentBoarder?.id
 
   // Modal state for viewing official receipts
   const [selectedReceipt, setSelectedReceipt] = React.useState<ExtendedReceipt | null>(null)
@@ -258,8 +239,18 @@ export const BoarderDashboardPage: React.FC = () => {
     }
   }
 
+  // Loading state while verifying boarder credentials
+  if (!isStaffRole && isLoadingBoarder) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center space-y-4">
+        <div className="w-10 h-10 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
+        <p className="text-xs text-slate-400 font-medium">বোর্ডার ও সিট বরাদ্দের তথ্য যাচাই করা হচ্ছে...</p>
+      </div>
+    )
+  }
+
   // If authenticated as a resident boarder but no active allocation found
-  if (!isStaffRole && !currentBoarder && isSupabaseConfigured && !isLoadingBoarders) {
+  if (!isStaffRole && !hasActiveSeat && !currentBoarder && isSupabaseConfigured && !isLoadingBoarder) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center space-y-4">
         <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center animate-pulse">
