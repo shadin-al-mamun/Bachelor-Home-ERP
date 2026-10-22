@@ -66,9 +66,20 @@ export const BoarderDashboardPage: React.FC = () => {
   // Authenticated boarder or dynamic profile info (strictly from real data, zero hardcoded placeholders)
   const boarderName = currentBoarder?.full_name || profile?.full_name || (isStaffRole ? 'অ্যাডমিন ইউজার' : 'বর্ডার')
   const boarderCode = currentBoarder?.boarder_code || (isStaffRole ? 'STAFF' : 'BDR')
-  const boarderBuilding = currentBoarder?.building_name || branding?.orgName || 'প্রধান ভবন'
-  const boarderFlat = currentBoarder?.flat_name || ''
-  const boarderRoom = currentBoarder?.room_name || ''
+
+  // Clean hostel & building name: strictly prioritize real configured branding name over demo seeds
+  const rawBuilding = currentBoarder?.building_name || ''
+  const isDemoBuilding =
+    !rawBuilding ||
+    rawBuilding.includes('Sunflower') ||
+    rawBuilding.includes('সানফ্লাওয়ার') ||
+    rawBuilding.includes('মেইন ভবন')
+
+  const boarderBuilding =
+    branding?.orgName || (!isDemoBuilding ? rawBuilding : 'প্রধান ক্যাম্পাস')
+
+  const boarderFlat = currentBoarder?.flat_name && currentBoarder.flat_name !== 'ফ্ল্যাট' ? currentBoarder.flat_name : ''
+  const boarderRoom = currentBoarder?.room_name && currentBoarder.room_name !== 'রুম' ? currentBoarder.room_name : ''
   const boarderSeat = currentBoarder?.seat_name || currentBoarder?.seat_code || 'সিট বরাদ্দ নেই'
   const monthlySeatRent = currentBoarder?.monthly_rent ?? 0
   const boarderStatus = currentBoarder?.status === 'ACTIVE' ? 'সক্রিয় (Active)' : (currentBoarder?.status || 'সক্রিয় (Active)')
@@ -278,6 +289,12 @@ export const BoarderDashboardPage: React.FC = () => {
                   <>
                     <span className="text-slate-600">•</span>
                     <span className="text-amber-300 font-semibold">{boarderRoom}</span>
+                  </>
+                )}
+                {!boarderFlat && !boarderRoom && boarderSeat && boarderSeat !== 'সিট বরাদ্দ নেই' && (
+                  <>
+                    <span className="text-slate-600">•</span>
+                    <span className="text-amber-300 font-semibold">{boarderSeat}</span>
                   </>
                 )}
               </p>

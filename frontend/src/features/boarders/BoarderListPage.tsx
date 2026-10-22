@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useBoarders, type BoarderWithRelations } from './api/useBoarders'
 import ApplicantReviewModal from './components/ApplicantReviewModal'
+import EditBoarderModal from './components/EditBoarderModal'
 import Badge from '@/components/common/Badge'
 import Button from '@/components/common/Button'
 import Input from '@/components/common/Input'
@@ -18,6 +19,7 @@ import {
   BedDouble,
   Phone,
   Eye,
+  SlidersHorizontal,
 } from 'lucide-react'
 
 export const BoarderListPage: React.FC = () => {
@@ -25,6 +27,7 @@ export const BoarderListPage: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState<BoarderStatus | 'ALL'>('ALL')
   const [searchQuery, setSearchQuery] = useState('')
   const [reviewApplicant, setReviewApplicant] = useState<BoarderWithRelations | null>(null)
+  const [editingBoarder, setEditingBoarder] = useState<BoarderWithRelations | null>(null)
 
   const { data: boarders = [], isLoading } = useBoarders({
     status: selectedStatus,
@@ -338,16 +341,27 @@ export const BoarderListPage: React.FC = () => {
                               আবেদন যাচাই
                             </Button>
                           ) : (
-                            <Link to={`/boarders/${boarder.id}`}>
+                            <>
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="text-slate-300 hover:text-white text-xs py-1"
+                                onClick={() => setEditingBoarder(boarder)}
+                                className="text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 text-xs py-1 px-2"
+                                title="বোর্ডার তথ্য সম্পাদন করুন"
                               >
-                                <Eye className="w-3.5 h-3.5 mr-1" />
-                                প্রোফাইল
+                                <SlidersHorizontal className="w-3.5 h-3.5" />
                               </Button>
-                            </Link>
+                              <Link to={`/boarders/${boarder.id}`}>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-slate-300 hover:text-white text-xs py-1"
+                                >
+                                  <Eye className="w-3.5 h-3.5 mr-1" />
+                                  প্রোফাইল
+                                </Button>
+                              </Link>
+                            </>
                           )}
 
                           {boarder.status === 'ACTIVE' && !boarder.active_allocation && (
@@ -376,6 +390,13 @@ export const BoarderListPage: React.FC = () => {
         isOpen={Boolean(reviewApplicant)}
         onClose={() => setReviewApplicant(null)}
         applicant={reviewApplicant}
+      />
+
+      {/* Edit Boarder Modal */}
+      <EditBoarderModal
+        isOpen={Boolean(editingBoarder)}
+        onClose={() => setEditingBoarder(null)}
+        boarder={editingBoarder}
       />
     </div>
   )

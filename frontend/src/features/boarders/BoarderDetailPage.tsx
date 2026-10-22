@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useBoarder, getDocumentSignedUrl } from './api/useBoarders'
 import ApplicantReviewModal from './components/ApplicantReviewModal'
+import EditBoarderModal from './components/EditBoarderModal'
 import Badge from '@/components/common/Badge'
 import Button from '@/components/common/Button'
 import { formatDateBn, formatCurrencyBn } from '@/utils/date'
@@ -40,6 +41,7 @@ export const BoarderDetailPage: React.FC = () => {
   const [isLoadingDoc, setIsLoadingDoc] = useState(false)
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false)
   const [isMealControlOpen, setIsMealControlOpen] = useState(false)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
 
   useEffect(() => {
     if (boarder?.nid_document_url) {
@@ -159,6 +161,17 @@ export const BoarderDetailPage: React.FC = () => {
 
           {/* Quick Actions */}
           <div className="flex flex-wrap items-center gap-2">
+            {(profile?.role === 'SUPER_ADMIN' || profile?.role === 'ADMIN' || profile?.role === 'MANAGER' || !profile?.role) && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setIsEditModalOpen(true)}
+                className="bg-indigo-600 hover:bg-indigo-500 text-xs shadow-md shadow-indigo-600/20"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5 mr-1.5" />
+                প্রোফাইল সম্পাদন (Edit)
+              </Button>
+            )}
             {boarder.status === 'PENDING' && (
               <Button
                 variant="primary"
@@ -689,6 +702,13 @@ export const BoarderDetailPage: React.FC = () => {
           initialBoarderId={boarder.id}
         />
       )}
+
+      {/* Edit Boarder Profile Modal */}
+      <EditBoarderModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        boarder={boarder}
+      />
     </div>
   )
 }

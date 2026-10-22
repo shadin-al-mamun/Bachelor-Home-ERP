@@ -1120,3 +1120,207 @@ export function useRejectApplicantMutation() {
   })
 }
 
+export interface UpdateBoarderParams {
+  boarderId: string
+  fullName: string
+  phoneNumber: string
+  email?: string
+  guardianName?: string
+  guardianPhone?: string
+  guardianRelation?: string
+  permanentAddress?: string
+  presentAddress?: string
+  institution?: string
+  department?: string
+  studentId?: string
+  nidPassportNumber?: string
+  remarks?: string
+  status?: BoarderStatus
+}
+
+export function useUpdateBoarderMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (params: UpdateBoarderParams) => {
+      if (isSupabaseConfigured) {
+        const { data, error } = await supabase
+          .from('boarders')
+          .update({
+            full_name: params.fullName.trim(),
+            phone_number: params.phoneNumber.trim(),
+            email: params.email?.trim() || null,
+            guardian_name: params.guardianName?.trim() || null,
+            guardian_phone: params.guardianPhone?.trim() || null,
+            guardian_relation: params.guardianRelation?.trim() || null,
+            permanent_address: params.permanentAddress?.trim() || null,
+            present_address: params.presentAddress?.trim() || null,
+            institution: params.institution?.trim() || null,
+            department: params.department?.trim() || null,
+            student_id: params.studentId?.trim() || null,
+            nid_passport_number: params.nidPassportNumber?.trim() || null,
+            remarks: params.remarks?.trim() || null,
+            ...(params.status ? { status: params.status } : {}),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', params.boarderId)
+          .select()
+          .single()
+
+        if (error) {
+          throw new Error(error.message || 'বোর্ডার তথ্য আপডেট করা সম্ভব হয়নি।')
+        }
+
+        // If user profile is linked, sync user profile as well
+        if (data?.user_id) {
+          try {
+            await supabase
+              .from('profiles')
+              .update({
+                full_name: params.fullName.trim(),
+                phone_number: params.phoneNumber.trim(),
+                email: params.email?.trim() || null,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', data.user_id)
+          } catch {
+            // non-fatal
+          }
+        }
+
+        // Update local storage copy
+        const list = getStoredBoarders()
+        const idx = list.findIndex((b) => b.id === params.boarderId)
+        if (idx !== -1) {
+          list[idx] = {
+            ...list[idx],
+            full_name: params.fullName.trim(),
+            phone_number: params.phoneNumber.trim(),
+            email: params.email?.trim() || list[idx].email,
+            guardian_name: params.guardianName?.trim() || list[idx].guardian_name,
+            guardian_phone: params.guardianPhone?.trim() || list[idx].guardian_phone,
+            permanent_address: params.permanentAddress?.trim() || list[idx].permanent_address,
+            present_address: params.presentAddress?.trim() || list[idx].present_address,
+            institution: params.institution?.trim() || list[idx].institution,
+            department: params.department?.trim() || list[idx].department,
+            student_id: params.studentId?.trim() || list[idx].student_id,
+            nid_passport_number: params.nidPassportNumber?.trim() || list[idx].nid_passport_number,
+            remarks: params.remarks?.trim() || list[idx].remarks,
+            status: params.status || list[idx].status,
+            updated_at: new Date().toISOString(),
+          }
+          saveStoredBoarders(list)
+        }
+
+        return { success: true, boarder: data }
+      }
+
+      // Offline mode
+      const list = getStoredBoarders()
+      const idx = list.findIndex((b) => b.id === params.boarderId)
+      if (idx !== -1) {
+        list[idx] = {
+          ...list[idx],
+          full_name: params.fullName.trim(),
+          phone_number: params.phoneNumber.trim(),
+          email: params.email?.trim() || list[idx].email,
+          guardian_name: params.guardianName?.trim() || list[idx].guardian_name,
+          guardian_phone: params.guardianPhone?.trim() || list[idx].guardian_phone,
+          permanent_address: params.permanentAddress?.trim() || list[idx].permanent_address,
+          present_address: params.presentAddress?.trim() || list[idx].present_address,
+          institution: params.institution?.trim() || list[idx].institution,
+          department: params.department?.trim() || list[idx].department,
+          student_id: params.studentId?.trim() || list[idx].student_id,
+          nid_passport_number: params.nidPassportNumber?.trim() || list[idx].nid_passport_number,
+          remarks: params.remarks?.trim() || list[idx].remarks,
+          status: params.status || list[idx].status,
+          updated_at: new Date().toISOString(),
+        }
+        saveStoredBoarders(list)
+        return { success: true, boarder: list[idx] }
+      }
+
+      throw new Error('বোর্ডার পাওয়া যায়নি।')
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['boarders'] })
+      queryClient.invalidateQueries({ queryKey: ['boarder'] })
+      queryClient.invalidateQueries({ queryKey: ['meal-boarders-list'] })
+      queryClient.invalidateQueries({ queryKey: ['kitchen-meals-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['owner-executive-dashboard'] })
+    },
+  })
+}
+
+export function useDeleteBoarderMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ boarderId }: { boarderId: string }) => {
+      if (isSupabaseConfigured) {
+        // 1. Release active allocations to free up seat
+        const { data: activeAlloc } = await supabase
+          .from('allocations')
+          .select('id, seat_id')
+          .eq('boarder_id', boarderId)
+          .eq('status', 'ACTIVE')
+          .maybeSingle()
+
+        if (activeAlloc) {
+          await supabase
+            .from('allocations')
+            .update({
+              status: 'ENDED',
+              end_date: new Date().toISOString().slice(0, 10),
+              cancellation_reason: 'প্রশাসক কর্তৃক বোর্ডার অ্যাকাউন্ট অপসারিত',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', activeAlloc.id)
+
+          if (activeAlloc.seat_id) {
+            await supabase
+              .from('seats')
+              .update({ status: 'AVAILABLE', updated_at: new Date().toISOString() })
+              .eq('id', activeAlloc.seat_id)
+          }
+        }
+
+        // 2. Try direct delete
+        const { error } = await supabase
+          .from('boarders')
+          .delete()
+          .eq('id', boarderId)
+
+        if (error) {
+          // If foreign key constraint (charges, payments) prevents hard delete, set status to LEFT / INACTIVE
+          console.warn('Foreign key prevents hard delete, setting to LEFT status:', error.message)
+          await supabase
+            .from('boarders')
+            .update({
+              status: 'LEFT',
+              remarks: 'প্রশাসক কর্তৃক বোর্ডার প্রোফাইল অপসারিত / নিষ্ক্রিয় করা হয়েছে',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', boarderId)
+        }
+      }
+
+      // Update local storage
+      const list = getStoredBoarders()
+      const updated = list.filter((b) => b.id !== boarderId)
+      saveStoredBoarders(updated)
+
+      return { success: true }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['boarders'] })
+      queryClient.invalidateQueries({ queryKey: ['boarder'] })
+      queryClient.invalidateQueries({ queryKey: ['seats'] })
+      queryClient.invalidateQueries({ queryKey: ['accommodation'] })
+      queryClient.invalidateQueries({ queryKey: ['meal-boarders-list'] })
+      queryClient.invalidateQueries({ queryKey: ['owner-executive-dashboard'] })
+    },
+  })
+}
+
+
