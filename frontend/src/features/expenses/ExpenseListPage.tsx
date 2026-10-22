@@ -46,7 +46,7 @@ export const ExpenseListPage: React.FC = () => {
   const [scopeFilter, setScopeFilter] = useState<ExpenseScope | 'ALL'>('ALL')
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL')
   const [flatFilter, setFlatFilter] = useState<string>('ALL')
-  const [dateFilter, setDateFilter] = useState<'ALL' | 'TODAY' | 'THIS_MONTH'>('THIS_MONTH')
+  const [dateFilter, setDateFilter] = useState<'ALL' | 'TODAY' | 'THIS_MONTH'>('ALL')
 
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -383,9 +383,9 @@ export const ExpenseListPage: React.FC = () => {
               onChange={(e) => setDateFilter(e.target.value as any)}
               className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-800 text-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
             >
+              <option value="ALL">সর্বকালের সব (All Time)</option>
               <option value="THIS_MONTH">চলতি মাস</option>
               <option value="TODAY">আজকের খরচ</option>
-              <option value="ALL">সর্বকালের সব</option>
             </select>
           </div>
         </div>

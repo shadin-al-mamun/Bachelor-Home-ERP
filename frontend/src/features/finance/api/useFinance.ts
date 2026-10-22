@@ -212,55 +212,149 @@ export function useIncomes(filters?: IncomeFilters) {
         )
       }
 
-      let query = supabase
-        .from('incomes')
-        .select(`
-          *,
-          category:category_id ( id, name ),
-          destination_account:destination_account_id ( id, account_name ),
-          flat:flat_id ( id, flat_code, name ),
-          building:building_id ( id, name ),
-          receiver:received_by ( full_name )
-        `)
-        .order('income_date', { ascending: false })
+      let data: any[] = []
+      let joinedSuccess = false
 
-      if (filters?.categoryId && filters.categoryId !== 'ALL') {
-        query = query.eq('category_id', filters.categoryId)
+      // 1. Try querying with foreign table joins
+      try {
+        let joinedQuery = supabase
+          .from('incomes')
+          .select(`
+            *,
+            category:income_categories(id, name),
+            destination_account:financial_accounts(id, account_name),
+            flat:flats(id, flat_code, name),
+            building:buildings(id, name),
+            receiver:profiles!incomes_received_by_fkey(full_name)
+          `)
+          .order('income_date', { ascending: false })
+
+        if (filters?.categoryId && filters.categoryId !== 'ALL') {
+          joinedQuery = joinedQuery.eq('category_id', filters.categoryId)
+        }
+
+        if (filters?.accountId && filters.accountId !== 'ALL') {
+          joinedQuery = joinedQuery.eq('destination_account_id', filters.accountId)
+        }
+
+        if (filters?.flatId) {
+          if (filters.flatId === 'GENERAL') {
+            joinedQuery = joinedQuery.is('flat_id', null)
+          } else if (filters.flatId !== 'ALL') {
+            joinedQuery = joinedQuery.eq('flat_id', filters.flatId)
+          }
+        }
+
+        if (filters?.searchQuery && filters.searchQuery.trim() !== '') {
+          joinedQuery = joinedQuery.or(
+            `income_voucher_no.ilike.%${filters.searchQuery}%,description.ilike.%${filters.searchQuery}%`
+          )
+        }
+
+        const res = await joinedQuery
+        if (!res.error && res.data) {
+          data = res.data
+          joinedSuccess = true
+        } else if (res.error) {
+          console.warn('Joined incomes query error, falling back to base select:', res.error)
+        }
+      } catch (err) {
+        console.warn('Joined incomes query threw, using fallback:', err)
       }
 
-      if (filters?.accountId && filters.accountId !== 'ALL') {
-        query = query.eq('destination_account_id', filters.accountId)
+      // 2. High-resilience fallback: simple select '*' if joined query failed
+      if (!joinedSuccess) {
+        let fallbackQuery = supabase
+          .from('incomes')
+          .select('*')
+          .order('income_date', { ascending: false })
+
+        if (filters?.categoryId && filters.categoryId !== 'ALL') {
+          fallbackQuery = fallbackQuery.eq('category_id', filters.categoryId)
+        }
+
+        if (filters?.accountId && filters.accountId !== 'ALL') {
+          fallbackQuery = fallbackQuery.eq('destination_account_id', filters.accountId)
+        }
+
+        if (filters?.flatId) {
+          if (filters.flatId === 'GENERAL') {
+            fallbackQuery = fallbackQuery.is('flat_id', null)
+          } else if (filters.flatId !== 'ALL') {
+            fallbackQuery = fallbackQuery.eq('flat_id', filters.flatId)
+          }
+        }
+
+        if (filters?.searchQuery && filters.searchQuery.trim() !== '') {
+          fallbackQuery = fallbackQuery.or(
+            `income_voucher_no.ilike.%${filters.searchQuery}%,description.ilike.%${filters.searchQuery}%`
+          )
+        }
+
+        const fallbackRes = await fallbackQuery
+        if (fallbackRes.error) {
+          console.error('Fallback incomes query failed:', fallbackRes.error)
+          throw new Error(fallbackRes.error.message)
+        }
+        data = fallbackRes.data || []
       }
 
-      if (filters?.flatId) {
-        if (filters.flatId === 'GENERAL') {
-          query = query.is('flat_id', null)
-        } else if (filters.flatId !== 'ALL') {
-          query = query.eq('flat_id', filters.flatId)
+      // 3. Hydrate missing lookup metadata
+      const categoryMap = new Map<string, string>()
+      const accountMap = new Map<string, string>()
+      const flatMap = new Map<string, { name: string; code: string }>()
+      const profileMap = new Map<string, string>()
+
+      const needsCat = data.some((r) => (!r.category || (Array.isArray(r.category) && !r.category[0])) && r.category_id)
+      const needsAcc = data.some((r) => (!r.destination_account || (Array.isArray(r.destination_account) && !r.destination_account[0])) && r.destination_account_id)
+      const needsFlat = data.some((r) => (!r.flat || (Array.isArray(r.flat) && !r.flat[0])) && r.flat_id)
+      const needsReceiver = data.some((r) => (!r.receiver || (Array.isArray(r.receiver) && !r.receiver[0])) && r.received_by)
+
+      if (needsCat || needsAcc || needsFlat || needsReceiver) {
+        try {
+          const [catsRes, accsRes, flatsRes, profsRes] = await Promise.all([
+            needsCat ? supabase.from('income_categories').select('id, name') : Promise.resolve({ data: [] }),
+            needsAcc ? supabase.from('financial_accounts').select('id, account_name') : Promise.resolve({ data: [] }),
+            needsFlat ? supabase.from('flats').select('id, name, flat_code') : Promise.resolve({ data: [] }),
+            needsReceiver ? supabase.from('profiles').select('id, full_name') : Promise.resolve({ data: [] }),
+          ])
+          catsRes.data?.forEach((c: any) => categoryMap.set(c.id, c.name))
+          accsRes.data?.forEach((a: any) => accountMap.set(a.id, a.account_name))
+          flatsRes.data?.forEach((f: any) => flatMap.set(f.id, { name: f.name, code: f.flat_code }))
+          profsRes.data?.forEach((p: any) => profileMap.set(p.id, p.full_name))
+        } catch (lookupErr) {
+          console.warn('Incomes metadata lookup warning:', lookupErr)
         }
       }
 
-      if (filters?.searchQuery && filters.searchQuery.trim() !== '') {
-        query = query.or(
-          `income_voucher_no.ilike.%${filters.searchQuery}%,description.ilike.%${filters.searchQuery}%`
-        )
+      let list = data.map((row: any) => {
+        const cat = Array.isArray(row.category) ? row.category[0] : row.category
+        const acc = Array.isArray(row.destination_account) ? row.destination_account[0] : row.destination_account
+        const fl = Array.isArray(row.flat) ? row.flat[0] : row.flat
+        const bld = Array.isArray(row.building) ? row.building[0] : row.building
+        const rec = Array.isArray(row.receiver) ? row.receiver[0] : row.receiver
+
+        return {
+          ...row,
+          category_name: cat?.name || categoryMap.get(row.category_id) || 'নন-রেন্ট আয়',
+          destination_account_name: acc?.account_name || accountMap.get(row.destination_account_id) || 'একাউন্ট',
+          receiver_name: rec?.full_name || profileMap.get(row.received_by) || 'ম্যানেজার',
+          flat_name: fl?.name || flatMap.get(row.flat_id)?.name,
+          flat_code: fl?.flat_code || flatMap.get(row.flat_id)?.code,
+          building_name: bld?.name,
+        }
+      })
+
+      // 4. Date Range Filter
+      if (filters?.dateRange === 'TODAY') {
+        const today = new Date().toISOString().slice(0, 10)
+        list = list.filter((i) => i.income_date === today)
+      } else if (filters?.dateRange === 'THIS_MONTH') {
+        const monthPrefix = new Date().toISOString().slice(0, 7)
+        list = list.filter((i) => i.income_date && i.income_date.startsWith(monthPrefix))
       }
 
-      const { data, error } = await query
-      if (error) {
-        console.error('Error fetching incomes:', error)
-        throw new Error(error.message)
-      }
-
-      return (data || []).map((row: any) => ({
-        ...row,
-        category_name: row.category?.name || 'নন-রেন্ট আয়',
-        destination_account_name: row.destination_account?.account_name || 'একাউন্ট',
-        receiver_name: row.receiver?.full_name || 'ম্যানেজার',
-        flat_name: row.flat?.name,
-        flat_code: row.flat?.flat_code,
-        building_name: row.building?.name,
-      }))
+      return list
     },
   })
 }

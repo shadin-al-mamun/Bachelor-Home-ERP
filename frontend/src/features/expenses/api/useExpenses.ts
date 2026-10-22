@@ -371,57 +371,152 @@ export function useExpenses(filters?: ExpenseFilters) {
         )
       }
 
-      let query = supabase
-        .from('expenses')
-        .select(`
-          *,
-          category:category_id ( id, name ),
-          source_account:source_account_id ( id, account_name ),
-          flat:flat_id ( id, flat_code, name ),
-          building:building_id ( id, name ),
-          payer:paid_by ( full_name, phone_number ),
-          approver:approved_by ( full_name )
-        `)
-        .order('expense_date', { ascending: false })
+      let data: any[] = []
+      let joinedSuccess = false
 
-      if (filters?.status && filters.status !== 'ALL') {
-        query = query.eq('approval_status', filters.status)
+      // 1. Try querying with foreign table joins
+      try {
+        let joinedQuery = supabase
+          .from('expenses')
+          .select(`
+            *,
+            category:expense_categories(id, name),
+            source_account:financial_accounts(id, account_name),
+            flat:flats(id, flat_code, name),
+            building:buildings(id, name),
+            payer:profiles!expenses_paid_by_fkey(full_name, phone_number),
+            approver:profiles!expenses_approved_by_fkey(full_name)
+          `)
+          .order('expense_date', { ascending: false })
+
+        if (filters?.status && filters.status !== 'ALL') {
+          joinedQuery = joinedQuery.eq('approval_status', filters.status)
+        }
+
+        if (filters?.categoryId && filters.categoryId !== 'ALL') {
+          joinedQuery = joinedQuery.eq('category_id', filters.categoryId)
+        }
+
+        if (filters?.flatId) {
+          if (filters.flatId === 'GENERAL') {
+            joinedQuery = joinedQuery.is('flat_id', null)
+          } else if (filters.flatId !== 'ALL') {
+            joinedQuery = joinedQuery.eq('flat_id', filters.flatId)
+          }
+        }
+
+        if (filters?.searchQuery && filters.searchQuery.trim() !== '') {
+          joinedQuery = joinedQuery.or(
+            `expense_voucher_no.ilike.%${filters.searchQuery}%,description.ilike.%${filters.searchQuery}%`
+          )
+        }
+
+        const res = await joinedQuery
+        if (!res.error && res.data) {
+          data = res.data
+          joinedSuccess = true
+        } else if (res.error) {
+          console.warn('Joined expenses query error, falling back to base select:', res.error)
+        }
+      } catch (err) {
+        console.warn('Joined expenses query threw, using fallback:', err)
       }
 
-      if (filters?.categoryId && filters.categoryId !== 'ALL') {
-        query = query.eq('category_id', filters.categoryId)
+      // 2. High-resilience fallback: simple select '*' if joined query failed (e.g. relationship cache or constraint name mismatch)
+      if (!joinedSuccess) {
+        let fallbackQuery = supabase
+          .from('expenses')
+          .select('*')
+          .order('expense_date', { ascending: false })
+
+        if (filters?.status && filters.status !== 'ALL') {
+          fallbackQuery = fallbackQuery.eq('approval_status', filters.status)
+        }
+
+        if (filters?.categoryId && filters.categoryId !== 'ALL') {
+          fallbackQuery = fallbackQuery.eq('category_id', filters.categoryId)
+        }
+
+        if (filters?.flatId) {
+          if (filters.flatId === 'GENERAL') {
+            fallbackQuery = fallbackQuery.is('flat_id', null)
+          } else if (filters.flatId !== 'ALL') {
+            fallbackQuery = fallbackQuery.eq('flat_id', filters.flatId)
+          }
+        }
+
+        if (filters?.searchQuery && filters.searchQuery.trim() !== '') {
+          fallbackQuery = fallbackQuery.or(
+            `expense_voucher_no.ilike.%${filters.searchQuery}%,description.ilike.%${filters.searchQuery}%`
+          )
+        }
+
+        const fallbackRes = await fallbackQuery
+        if (fallbackRes.error) {
+          console.error('Fallback expenses query failed:', fallbackRes.error)
+          throw new Error(fallbackRes.error.message)
+        }
+        data = fallbackRes.data || []
       }
 
-      if (filters?.flatId) {
-        if (filters.flatId === 'GENERAL') {
-          query = query.is('flat_id', null)
-        } else if (filters.flatId !== 'ALL') {
-          query = query.eq('flat_id', filters.flatId)
+      // 3. Hydrate missing lookup metadata (category names, account names, flat codes, names)
+      const categoryMap = new Map<string, string>()
+      const accountMap = new Map<string, string>()
+      const flatMap = new Map<string, { name: string; code: string }>()
+      const profileMap = new Map<string, string>()
+
+      const needsCat = data.some((r) => (!r.category || (Array.isArray(r.category) && !r.category[0])) && r.category_id)
+      const needsAcc = data.some((r) => (!r.source_account || (Array.isArray(r.source_account) && !r.source_account[0])) && r.source_account_id)
+      const needsFlat = data.some((r) => (!r.flat || (Array.isArray(r.flat) && !r.flat[0])) && r.flat_id)
+      const needsProfile = data.some((r) => (!r.payer || (Array.isArray(r.payer) && !r.payer[0])) && r.paid_by)
+
+      if (needsCat || needsAcc || needsFlat || needsProfile) {
+        try {
+          const [catsRes, accsRes, flatsRes, profsRes] = await Promise.all([
+            needsCat ? supabase.from('expense_categories').select('id, name') : Promise.resolve({ data: [] }),
+            needsAcc ? supabase.from('financial_accounts').select('id, account_name') : Promise.resolve({ data: [] }),
+            needsFlat ? supabase.from('flats').select('id, name, flat_code') : Promise.resolve({ data: [] }),
+            needsProfile ? supabase.from('profiles').select('id, full_name') : Promise.resolve({ data: [] }),
+          ])
+          catsRes.data?.forEach((c: any) => categoryMap.set(c.id, c.name))
+          accsRes.data?.forEach((a: any) => accountMap.set(a.id, a.account_name))
+          flatsRes.data?.forEach((f: any) => flatMap.set(f.id, { name: f.name, code: f.flat_code }))
+          profsRes.data?.forEach((p: any) => profileMap.set(p.id, p.full_name))
+        } catch (lookupErr) {
+          console.warn('Metadata lookup warning:', lookupErr)
         }
       }
 
-      if (filters?.searchQuery && filters.searchQuery.trim() !== '') {
-        query = query.or(
-          `expense_voucher_no.ilike.%${filters.searchQuery}%,description.ilike.%${filters.searchQuery}%`
-        )
+      let list = data.map((row: any) => {
+        const cat = Array.isArray(row.category) ? row.category[0] : row.category
+        const acc = Array.isArray(row.source_account) ? row.source_account[0] : row.source_account
+        const fl = Array.isArray(row.flat) ? row.flat[0] : row.flat
+        const bld = Array.isArray(row.building) ? row.building[0] : row.building
+        const pyr = Array.isArray(row.payer) ? row.payer[0] : row.payer
+        const app = Array.isArray(row.approver) ? row.approver[0] : row.approver
+
+        return {
+          ...row,
+          category_name: cat?.name || categoryMap.get(row.category_id) || 'অনির্ধারিত',
+          source_account_name: acc?.account_name || accountMap.get(row.source_account_id) || 'একাউন্ট',
+          payer_name: pyr?.full_name || profileMap.get(row.paid_by) || 'ম্যানেজার',
+          approver_name: app?.full_name || (row.approved_by ? profileMap.get(row.approved_by) : undefined),
+          flat_name: fl?.name || flatMap.get(row.flat_id)?.name,
+          flat_code: fl?.flat_code || flatMap.get(row.flat_id)?.code,
+          building_name: bld?.name,
+        }
+      })
+
+      // 4. Date Range Filter
+      if (filters?.dateRange === 'TODAY') {
+        const today = new Date().toISOString().slice(0, 10)
+        list = list.filter((e) => e.expense_date === today)
+      } else if (filters?.dateRange === 'THIS_MONTH') {
+        const monthPrefix = new Date().toISOString().slice(0, 7)
+        list = list.filter((e) => e.expense_date && e.expense_date.startsWith(monthPrefix))
       }
 
-      const { data, error } = await query
-      if (error) {
-        console.error('Error fetching expenses:', error)
-        throw new Error(error.message)
-      }
-
-      return (data || []).map((row: any) => ({
-        ...row,
-        category_name: row.category?.name || 'অনির্ধারিত',
-        source_account_name: row.source_account?.account_name || 'একাউন্ট',
-        payer_name: row.payer?.full_name || 'ম্যানেজার',
-        approver_name: row.approver?.full_name,
-        flat_name: row.flat?.name,
-        flat_code: row.flat?.flat_code,
-        building_name: row.building?.name,
-      }))
+      return list
     },
   })
 }
@@ -491,14 +586,28 @@ export function useExpenseFlats() {
         return MOCK_FLATS
       }
 
-      const { data, error } = await supabase
+      try {
+        const { data, error } = await supabase
+          .from('flats')
+          .select('*, building:buildings(*)')
+          .eq('status', 'ACTIVE')
+          .order('flat_code')
+
+        if (!error && data) {
+          return data
+        }
+      } catch (err) {
+        console.warn('Flats with building join failed, falling back to base select:', err)
+      }
+
+      const { data: baseData, error: baseErr } = await supabase
         .from('flats')
-        .select('*, building:building_id(*)')
+        .select('*')
         .eq('status', 'ACTIVE')
         .order('flat_code')
 
-      if (error) throw new Error(error.message)
-      return data || []
+      if (baseErr) throw new Error(baseErr.message)
+      return baseData || []
     },
   })
 }
