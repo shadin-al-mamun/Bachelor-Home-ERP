@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   Building,
   Save,
+  Megaphone,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useBrandingStore, DEFAULT_BRANDING } from '@/app/store/useBrandingStore'
@@ -219,6 +220,13 @@ export const HostelSettingsPage: React.FC = () => {
         >
           <Building2 className="w-4 h-4 text-slate-950" />
           <span>হোস্টেল সেটিংস</span>
+        </Link>
+        <Link
+          to="/settings/notices"
+          className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 flex items-center gap-2 transition-colors whitespace-nowrap"
+        >
+          <Megaphone className="w-4 h-4 text-amber-400" />
+          <span>হোস্টেল নোটিশ ও ঘোষণা</span>
         </Link>
         <Link
           to="/settings/audit-logs"

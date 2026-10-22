@@ -226,7 +226,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           href: '/settings/hostel',
           icon: <Building2 className="w-4 h-4 shrink-0 text-amber-400" />,
           roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
-          permissionKey: 'branding',
+          permissionKey: 'hostel_settings',
           badge: 'সেটিংস',
         },
         {
@@ -236,7 +236,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           href: '/settings/notices',
           icon: <Megaphone className="w-4 h-4 shrink-0 text-amber-400" />,
           roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
-          permissionKey: 'governance',
+          permissionKey: 'notices',
         },
         {
           id: 'access_control',

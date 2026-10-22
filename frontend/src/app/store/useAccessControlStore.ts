@@ -225,6 +225,31 @@ export const ERP_MENU_DEFINITIONS: MenuDefinition[] = [
     ],
   },
   {
+    id: 'hostel_settings',
+    name: 'হোস্টেল সেটিংস ও প্রোফাইল',
+    nameEn: 'Hostel Settings & Profile',
+    category: 'governance',
+    iconName: 'Building2',
+    path: '/settings/hostel',
+    options: [
+      { id: 'view_settings', label: 'হোস্টেল তথ্য ও প্রোফাইল দেখা', desc: 'হোস্টেলের নাম, ঠিকানা, হেল্পলাইন ও রুলস দেখা' },
+      { id: 'edit_settings', label: 'হোস্টেল সেটিংস ও লোগো পরিবর্তন', desc: 'নতুন লোগো, ঠিকানা, নিয়মাবলী ও রশিদ ফুটার সম্পাদন' },
+    ],
+  },
+  {
+    id: 'notices',
+    name: 'হোস্টেল নোটিশ ও ঘোষণা',
+    nameEn: 'Hostel Notices & Announcements',
+    category: 'governance',
+    iconName: 'Megaphone',
+    path: '/settings/notices',
+    options: [
+      { id: 'view_notices', label: 'নোটিশ ও ঘোষণা দেখা', desc: 'সকল সক্রিয় ও পূর্ববর্তী নোটিশের তালিকা দেখা' },
+      { id: 'create_notice', label: 'নতুন নোটিশ তৈরি ও প্রচার', desc: 'সকল বা নির্দিষ্ট ফ্ল্যাটের জন্য নোটিশ পাঠানো' },
+      { id: 'delete_notice', label: 'নোটিশ মুছে ফেলা', desc: 'পুরোনো বা অপ্রয়োজনীয় নোটিশ রিমুভ করা' },
+    ],
+  },
+  {
     id: 'audit_logs',
     name: 'সিস্টেম অডিট ট্রেইল',
     nameEn: 'System Audit Logs',
@@ -269,6 +294,8 @@ function buildDefaultPermissions(): AllRolesPermissions {
     reports: makeMenu('reports', true),
     governance: makeMenu('governance', true),
     branding: makeMenu('branding', true),
+    hostel_settings: makeMenu('hostel_settings', true),
+    notices: makeMenu('notices', true),
     audit_logs: makeMenu('audit_logs', true),
   }
 
@@ -288,6 +315,8 @@ function buildDefaultPermissions(): AllRolesPermissions {
     reports: makeMenu('reports', true, ['dues_report', 'cash_report', 'meal_report']),
     governance: makeMenu('governance', false),
     branding: makeMenu('branding', false),
+    hostel_settings: makeMenu('hostel_settings', true, ['view_settings']),
+    notices: makeMenu('notices', true),
     audit_logs: makeMenu('audit_logs', false),
   }
 
@@ -307,6 +336,8 @@ function buildDefaultPermissions(): AllRolesPermissions {
     reports: makeMenu('reports', true),
     governance: makeMenu('governance', false),
     branding: makeMenu('branding', false),
+    hostel_settings: makeMenu('hostel_settings', true, ['view_settings']),
+    notices: makeMenu('notices', true, ['view_notices']),
     audit_logs: makeMenu('audit_logs', true, ['view_audit']),
   }
 
@@ -326,6 +357,8 @@ function buildDefaultPermissions(): AllRolesPermissions {
     reports: makeMenu('reports', false),
     governance: makeMenu('governance', false),
     branding: makeMenu('branding', false),
+    hostel_settings: makeMenu('hostel_settings', false),
+    notices: makeMenu('notices', false),
     audit_logs: makeMenu('audit_logs', false),
   }
 
@@ -345,6 +378,8 @@ function buildDefaultPermissions(): AllRolesPermissions {
     reports: makeMenu('reports', true),
     governance: makeMenu('governance', false),
     branding: makeMenu('branding', false),
+    hostel_settings: makeMenu('hostel_settings', true, ['view_settings']),
+    notices: makeMenu('notices', true, ['view_notices']),
     audit_logs: makeMenu('audit_logs', true, ['view_audit']),
   }
 
@@ -588,10 +623,19 @@ export const useAccessControlStore = create<AccessControlState>((set, get) => ({
     }
     const state = get()
     const roleMap = state.rolePermissions[role as ConfigurableRole]
-    if (!roleMap || !roleMap[menuId]) {
-      return DEFAULT_ROLE_PERMISSIONS[role as ConfigurableRole]?.[menuId]?.enabled ?? false
+    let targetKey = menuId
+    if (!roleMap?.[targetKey]) {
+      if (menuId === 'branding' && roleMap?.['hostel_settings']) {
+        targetKey = 'hostel_settings'
+      } else if (menuId === 'hostel_settings' && roleMap?.['branding']) {
+        targetKey = 'branding'
+      }
     }
-    return Boolean(roleMap[menuId].enabled)
+    if (!roleMap || !roleMap[targetKey]) {
+      const def = DEFAULT_ROLE_PERMISSIONS[role as ConfigurableRole]
+      return def?.[targetKey]?.enabled ?? (targetKey === 'hostel_settings' ? (def?.['branding']?.enabled ?? true) : false)
+    }
+    return Boolean(roleMap[targetKey].enabled)
   },
 
   hasOptionAccess: (role, menuId, optionId) => {
@@ -601,11 +645,19 @@ export const useAccessControlStore = create<AccessControlState>((set, get) => ({
     }
     const state = get()
     const roleMap = state.rolePermissions[role as ConfigurableRole]
-    const menuState = roleMap?.[menuId] || DEFAULT_ROLE_PERMISSIONS[role as ConfigurableRole]?.[menuId]
+    let targetKey = menuId
+    if (!roleMap?.[targetKey]) {
+      if (menuId === 'branding' && roleMap?.['hostel_settings']) {
+        targetKey = 'hostel_settings'
+      } else if (menuId === 'hostel_settings' && roleMap?.['branding']) {
+        targetKey = 'branding'
+      }
+    }
+    const menuState = roleMap?.[targetKey] || DEFAULT_ROLE_PERMISSIONS[role as ConfigurableRole]?.[targetKey]
     if (!menuState || !menuState.enabled) return false
     if (menuState.options && menuState.options[optionId] !== undefined) {
       return Boolean(menuState.options[optionId])
     }
-    return DEFAULT_ROLE_PERMISSIONS[role as ConfigurableRole]?.[menuId]?.options?.[optionId] ?? false
+    return DEFAULT_ROLE_PERMISSIONS[role as ConfigurableRole]?.[targetKey]?.options?.[optionId] ?? false
   },
 }))

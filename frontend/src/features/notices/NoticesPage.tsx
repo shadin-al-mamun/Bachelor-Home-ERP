@@ -13,7 +13,11 @@ import {
   Clock,
   ShieldCheck,
   Search,
+  KeyRound,
+  ShieldAlert,
 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { useAuthStore } from '@/app/store/useAuthStore'
 import Button from '@/components/common/Button'
 import { useNotices, useDeleteNotice } from './api/useNotices'
 import type { NoticeType } from './api/useNotices'
@@ -21,6 +25,7 @@ import { SendNoticeModal } from './components/SendNoticeModal'
 import { formatDhakaDate } from '@/utils/date'
 
 export const NoticesPage: React.FC = () => {
+  const { profile } = useAuthStore()
   const { data: notices = [], isLoading } = useNotices()
   const deleteNoticeMutation = useDeleteNotice()
 
@@ -115,6 +120,50 @@ export const NoticesPage: React.FC = () => {
           <Plus className="w-4 h-4 mr-1.5" />
           নতুন নোটিশ তৈরি ও প্রকাশ করুন
         </Button>
+      </div>
+
+      {/* Governance & Settings Navigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-slate-800 pb-3 overflow-x-auto scrollbar-none">
+        <Link
+          to="/settings/users"
+          className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 flex items-center gap-2 transition-colors whitespace-nowrap"
+        >
+          <Users className="w-4 h-4 text-indigo-400" />
+          <span>কর্মকর্তা ও পদবী ব্যবস্থাপনা</span>
+        </Link>
+        <Link
+          to="/settings/hostel"
+          className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 flex items-center gap-2 transition-colors whitespace-nowrap"
+        >
+          <Building2 className="w-4 h-4 text-amber-400" />
+          <span>হোস্টেল সেটিংস</span>
+        </Link>
+        <Link
+          to="/settings/notices"
+          className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20 flex items-center gap-2 whitespace-nowrap"
+        >
+          <Megaphone className="w-4 h-4 text-slate-950" />
+          <span>হোস্টেল নোটিশ ও ঘোষণা</span>
+        </Link>
+        <Link
+          to="/settings/audit-logs"
+          className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 flex items-center gap-2 transition-colors whitespace-nowrap"
+        >
+          <ShieldAlert className="w-4 h-4 text-rose-400" />
+          <span>সিস্টেম অডিট ট্রেইল</span>
+        </Link>
+        {profile?.role === 'SUPER_ADMIN' && (
+          <Link
+            to="/settings/access-control"
+            className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 hover:bg-slate-800 text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 flex items-center gap-2 transition-colors whitespace-nowrap"
+          >
+            <KeyRound className="w-4 h-4 text-cyan-400" />
+            <span>এক্সেস কন্ট্রোল ও পারমিশন</span>
+            <span className="px-1.5 py-0.2 rounded text-[9px] bg-cyan-950 text-cyan-300 border border-cyan-500/30 font-mono">
+              SuperAdmin
+            </span>
+          </Link>
+        )}
       </div>
 
       {/* KPI Stats */}

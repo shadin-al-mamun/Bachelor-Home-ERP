@@ -71,13 +71,22 @@ describe('Sidebar.test.tsx - Hierarchical Navigation & Submenu System', () => {
   it('opens সিস্টেম সেটিংস and displays settings sub-items', () => {
     renderSidebar()
 
-    const settingsGroupBtn = screen.getByText('সিস্টেম সেটিংস').closest('button')!
-    fireEvent.click(settingsGroupBtn)
-
+    // Sub-items should already be visible by default
     expect(screen.getByText('কর্মকর্তা ও পদবী ব্যবস্থাপনা')).toBeInTheDocument()
     expect(screen.getByText('হোস্টেল সেটিংস')).toBeInTheDocument()
+    expect(screen.getByText('নোটিশ ও ঘোষণা')).toBeInTheDocument()
     expect(screen.getByText('মেনু ও একসেস কন্ট্রোল ব্যবস্থাপনা')).toBeInTheDocument()
     expect(screen.getByText('সিস্টেম অডিট ট্রেইল')).toBeInTheDocument()
+
+    // Clicking group header collapses the submenu
+    const settingsGroupBtn = screen.getByText('সিস্টেম সেটিংস').closest('button')!
+    fireEvent.click(settingsGroupBtn)
+    expect(screen.queryByText('হোস্টেল সেটিংস')).not.toBeInTheDocument()
+
+    // Clicking again re-opens it
+    fireEvent.click(settingsGroupBtn)
+    expect(screen.getByText('হোস্টেল সেটিংস')).toBeInTheDocument()
+    expect(screen.getByText('নোটিশ ও ঘোষণা')).toBeInTheDocument()
   })
 
   it('automatically expands group when current route matches a child link', () => {

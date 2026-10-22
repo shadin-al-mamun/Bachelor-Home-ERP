@@ -24,6 +24,8 @@ import {
   Lock,
   Sliders,
   Layers,
+  Building2,
+  Megaphone,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import {
@@ -35,6 +37,7 @@ import {
 // Dynamic icon mapper for menus
 const MENU_ICONS: Record<string, React.ReactNode> = {
   Building: <Building className="w-5 h-5" />,
+  Building2: <Building2 className="w-5 h-5" />,
   Users: <Users className="w-5 h-5" />,
   CreditCard: <CreditCard className="w-5 h-5" />,
   Receipt: <Receipt className="w-5 h-5" />,
@@ -46,6 +49,7 @@ const MENU_ICONS: Record<string, React.ReactNode> = {
   ShieldCheck: <ShieldCheck className="w-5 h-5" />,
   Sparkles: <Sparkles className="w-5 h-5" />,
   ShieldAlert: <ShieldAlert className="w-5 h-5" />,
+  Megaphone: <Megaphone className="w-5 h-5" />,
 }
 
 const CATEGORY_NAMES: Record<string, string> = {
@@ -192,11 +196,18 @@ export const AccessControlPage: React.FC = () => {
           <span>কর্মকর্তা ও পদবী ব্যবস্থাপনা</span>
         </Link>
         <Link
-          to="/settings/branding"
+          to="/settings/hostel"
           className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 hover:bg-slate-800 text-amber-400 hover:text-amber-300 border border-amber-500/20 flex items-center gap-2 transition-colors whitespace-nowrap"
         >
-          <Sparkles className="w-4 h-4" />
-          <span>হোস্টেল লোগো ও ব্র্যান্ডিং ব্যবস্থাপনা</span>
+          <Building2 className="w-4 h-4" />
+          <span>হোস্টেল সেটিংস</span>
+        </Link>
+        <Link
+          to="/settings/notices"
+          className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 hover:bg-slate-800 text-amber-400 hover:text-amber-300 border border-amber-500/20 flex items-center gap-2 transition-colors whitespace-nowrap"
+        >
+          <Megaphone className="w-4 h-4" />
+          <span>হোস্টেল নোটিশ ও ঘোষণা</span>
         </Link>
         <Link
           to="/settings/audit-logs"
