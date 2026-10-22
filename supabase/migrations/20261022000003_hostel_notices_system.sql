@@ -11,7 +11,9 @@ CREATE TABLE IF NOT EXISTS public.hostel_notices (
     title VARCHAR(200) NOT NULL,
     message TEXT NOT NULL,
     type VARCHAR(50) NOT NULL DEFAULT 'INFO', -- 'INFO', 'ALERT', 'WARNING', 'MEAL'
-    target_audience VARCHAR(50) NOT NULL DEFAULT 'ALL', -- 'ALL', 'SPECIFIC'
+    target_audience VARCHAR(50) NOT NULL DEFAULT 'ALL', -- 'ALL', 'FLAT', 'SPECIFIC'
+    target_flat_id UUID REFERENCES public.flats(id) ON DELETE SET NULL,
+    target_flat_name VARCHAR(150) DEFAULT NULL,
     target_boarder_id UUID REFERENCES public.boarders(id) ON DELETE SET NULL,
     target_boarder_name VARCHAR(150) DEFAULT NULL,
     created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
@@ -21,14 +23,19 @@ CREATE TABLE IF NOT EXISTS public.hostel_notices (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('Asia/Dhaka', now())
 );
 
+ALTER TABLE public.hostel_notices
+    ADD COLUMN IF NOT EXISTS target_flat_id UUID REFERENCES public.flats(id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS target_flat_name VARCHAR(150) DEFAULT NULL;
+
 -- Indexes for lightning fast queries
 CREATE INDEX IF NOT EXISTS idx_hostel_notices_active_created ON public.hostel_notices(is_active, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_hostel_notices_target_boarder ON public.hostel_notices(target_boarder_id);
+CREATE INDEX IF NOT EXISTS idx_hostel_notices_target_flat ON public.hostel_notices(target_flat_id);
 
 -- Enable RLS
 ALTER TABLE public.hostel_notices ENABLE ROW LEVEL SECURITY;
 
--- Select policy: Staff can see all notices; Boarders can see active notices addressed to ALL or to themselves
+-- Select policy: Staff can see all notices; Boarders can see active notices addressed to ALL, to their FLAT, or to themselves
 DROP POLICY IF EXISTS hostel_notices_select_policy ON public.hostel_notices;
 CREATE POLICY hostel_notices_select_policy ON public.hostel_notices
 FOR SELECT TO authenticated
@@ -41,6 +48,20 @@ USING (
             OR target_boarder_id IN (
                 SELECT id FROM public.boarders WHERE user_id = auth.uid() OR phone_number IN (
                     SELECT phone_number FROM public.profiles WHERE id = auth.uid()
+                )
+            )
+            OR (
+                target_audience = 'FLAT'
+                AND target_flat_id IN (
+                    SELECT r.flat_id
+                    FROM public.boarder_allocations ba
+                    JOIN public.seats s ON s.id = ba.seat_id
+                    JOIN public.rooms r ON r.id = s.room_id
+                    JOIN public.boarders b ON b.id = ba.boarder_id
+                    WHERE ba.status = 'ACTIVE'
+                    AND (b.user_id = auth.uid() OR b.phone_number IN (
+                        SELECT phone_number FROM public.profiles WHERE id = auth.uid()
+                    ))
                 )
             )
         )

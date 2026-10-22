@@ -62,10 +62,11 @@ export const BoarderDashboardPage: React.FC = () => {
       (profile?.full_name && b.full_name === profile.full_name)
   )
 
-  // Fetch active notices for this boarder
+  // Fetch active notices for this boarder (ALL, flat-targeted, or individual)
   const { data: boarderNotices = [] } = useNotices({
     activeOnly: true,
     boarderId: matchedResident?.id,
+    flatId: matchedResident?.flat_id,
   })
 
   const currentBoarder = matchedResident || (!isStaffRole && !isSupabaseConfigured ? boardersList[0] : null)

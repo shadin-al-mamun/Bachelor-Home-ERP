@@ -9,6 +9,7 @@ import {
   Utensils,
   Users,
   User,
+  Building2,
   Clock,
   ShieldCheck,
   Search,
@@ -24,7 +25,7 @@ export const NoticesPage: React.FC = () => {
   const deleteNoticeMutation = useDeleteNotice()
 
   const [isSendModalOpen, setIsSendModalOpen] = useState(false)
-  const [filterAudience, setFilterAudience] = useState<'ALL' | 'AUDIENCE_ALL' | 'SPECIFIC'>('ALL')
+  const [filterAudience, setFilterAudience] = useState<'ALL' | 'AUDIENCE_ALL' | 'FLAT' | 'SPECIFIC'>('ALL')
   const [filterType, setFilterType] = useState<string>('ALL')
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -37,6 +38,7 @@ export const NoticesPage: React.FC = () => {
   // Filtered notices
   const filteredNotices = notices.filter((n) => {
     if (filterAudience === 'AUDIENCE_ALL' && n.target_audience !== 'ALL') return false
+    if (filterAudience === 'FLAT' && n.target_audience !== 'FLAT') return false
     if (filterAudience === 'SPECIFIC' && n.target_audience !== 'SPECIFIC') return false
     if (filterType !== 'ALL' && n.type !== filterType) return false
     if (searchQuery.trim()) {
@@ -44,7 +46,8 @@ export const NoticesPage: React.FC = () => {
       const matchTitle = n.title.toLowerCase().includes(q)
       const matchMsg = n.message.toLowerCase().includes(q)
       const matchBoarder = n.target_boarder_name?.toLowerCase().includes(q)
-      return matchTitle || matchMsg || matchBoarder
+      const matchFlat = n.target_flat_name?.toLowerCase().includes(q)
+      return matchTitle || matchMsg || matchBoarder || matchFlat
     }
     return true
   })
@@ -52,8 +55,8 @@ export const NoticesPage: React.FC = () => {
   // KPI stats
   const totalCount = notices.length
   const allAudienceCount = notices.filter((n) => n.target_audience === 'ALL').length
+  const flatAudienceCount = notices.filter((n) => n.target_audience === 'FLAT').length
   const specificCount = notices.filter((n) => n.target_audience === 'SPECIFIC').length
-  const alertCount = notices.filter((n) => n.type === 'ALERT').length
 
   const getTypeStyle = (type: NoticeType) => {
     switch (type) {
@@ -101,7 +104,7 @@ export const NoticesPage: React.FC = () => {
             হোস্টেল নোটিশ ও ঘোষণা (Notice Board)
           </h1>
           <p className="text-sm text-slate-400 mt-1">
-            সুপারএডমিন কর্তৃক সকল বোর্ডার অথবা নির্দিষ্ট কোনো বোর্ডারকে নোটিশ, সতর্কতা ও জরুরি বার্তা পাঠান।
+            সুপারএডমিন কর্তৃক সকল বোর্ডার, নির্দিষ্ট কোনো ফ্ল্যাট অথবা নির্দিষ্ট কোনো বোর্ডারকে নোটিশ পাঠান।
           </p>
         </div>
 
@@ -135,31 +138,31 @@ export const NoticesPage: React.FC = () => {
         </div>
 
         <div className="glass-card p-4 rounded-2xl border border-slate-800 bg-slate-900/40">
+          <div className="flex items-center justify-between text-amber-400 mb-1">
+            <span className="text-xs font-medium">ফ্ল্যাট ভিত্তিক নোটিশ</span>
+            <Building2 className="w-4 h-4 text-amber-400" />
+          </div>
+          <div className="text-2xl font-bold text-white">{flatAudienceCount}</div>
+          <p className="text-[11px] text-amber-400/70 mt-0.5">নির্দিষ্ট ফ্ল্যাটের জন্য প্রেরিত</p>
+        </div>
+
+        <div className="glass-card p-4 rounded-2xl border border-slate-800 bg-slate-900/40">
           <div className="flex items-center justify-between text-indigo-400 mb-1">
             <span className="text-xs font-medium">নির্দিষ্ট বোর্ডারদের জন্য</span>
             <User className="w-4 h-4 text-indigo-400" />
           </div>
           <div className="text-2xl font-bold text-white">{specificCount}</div>
-          <p className="text-[11px] text-indigo-400/70 mt-0.5">ব্যক্তিগত বা নির্দিষ্ট তাগাদা</p>
-        </div>
-
-        <div className="glass-card p-4 rounded-2xl border border-slate-800 bg-slate-900/40">
-          <div className="flex items-center justify-between text-rose-400 mb-1">
-            <span className="text-xs font-medium">জরুরি সতর্কতা</span>
-            <AlertTriangle className="w-4 h-4 text-rose-400" />
-          </div>
-          <div className="text-2xl font-bold text-white">{alertCount}</div>
-          <p className="text-[11px] text-rose-400/70 mt-0.5">হাই-প্রায়োরিটি সতর্কতা</p>
+          <p className="text-[11px] text-indigo-400/70 mt-0.5">ব্যক্তিগত বা একক তাগাদা</p>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
       <div className="glass-card p-4 rounded-2xl border border-slate-800 bg-slate-900/40 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
         {/* Audience filter tabs */}
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950/80 border border-slate-800/80">
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950/80 border border-slate-800/80 overflow-x-auto scrollbar-none">
           <button
             onClick={() => setFilterAudience('ALL')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
               filterAudience === 'ALL'
                 ? 'bg-indigo-600 text-white shadow'
                 : 'text-slate-400 hover:text-white'
@@ -169,23 +172,33 @@ export const NoticesPage: React.FC = () => {
           </button>
           <button
             onClick={() => setFilterAudience('AUDIENCE_ALL')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
               filterAudience === 'AUDIENCE_ALL'
                 ? 'bg-indigo-600 text-white shadow'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            সকল বোর্ডারদের ({allAudienceCount})
+            সকল বোর্ডার ({allAudienceCount})
+          </button>
+          <button
+            onClick={() => setFilterAudience('FLAT')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+              filterAudience === 'FLAT'
+                ? 'bg-indigo-600 text-white shadow'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            ফ্ল্যাট ভিত্তিক ({flatAudienceCount})
           </button>
           <button
             onClick={() => setFilterAudience('SPECIFIC')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
               filterAudience === 'SPECIFIC'
                 ? 'bg-indigo-600 text-white shadow'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            নির্দিষ্ট বোর্ডারদের ({specificCount})
+            নির্দিষ্ট বোর্ডার ({specificCount})
           </button>
         </div>
 
@@ -209,7 +222,7 @@ export const NoticesPage: React.FC = () => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="নোটিশের শিরোনাম বা প্রাপক খুঁজুন..."
+              placeholder="নোটিশের বিষয় বা ফ্ল্যাট/প্রাপক খুঁজুন..."
               className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs placeholder-slate-600 focus:outline-none focus:border-indigo-500"
             />
           </div>
@@ -257,6 +270,11 @@ export const NoticesPage: React.FC = () => {
                       <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
                         <Users className="w-3 h-3" />
                         সকল আবাসিক বোর্ডার
+                      </span>
+                    ) : notice.target_audience === 'FLAT' ? (
+                      <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1">
+                        <Building2 className="w-3 h-3" />
+                        ফ্ল্যাট: {notice.target_flat_name || 'ফ্ল্যাট'}
                       </span>
                     ) : (
                       <span className="text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center gap-1">

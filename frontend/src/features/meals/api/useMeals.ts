@@ -66,6 +66,7 @@ export interface BoarderOption {
   full_name: string
   boarder_code: string
   phone_number: string
+  flat_id?: string
   flat_name?: string
   room_name?: string
   seat_name?: string
@@ -440,6 +441,7 @@ export function useMealBoardersList() {
           seat_name: seat?.seat_name || seat?.seat_code || '',
           seat_code: seat?.seat_code || '',
           room_name: room?.name || '',
+          flat_id: flat?.id || '',
           flat_name: flat?.name || '',
           building_name: building?.name || '',
           admission_date: b.admission_date || activeAlloc?.start_date || '',

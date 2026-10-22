@@ -3,7 +3,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
 import { useAuthStore } from '@/app/store/useAuthStore'
 
 export type NoticeType = 'INFO' | 'ALERT' | 'WARNING' | 'MEAL'
-export type TargetAudience = 'ALL' | 'SPECIFIC'
+export type TargetAudience = 'ALL' | 'FLAT' | 'SPECIFIC'
 
 export interface HostelNotice {
   id: string
@@ -11,8 +11,10 @@ export interface HostelNotice {
   message: string
   type: NoticeType
   target_audience: TargetAudience
-  target_boarder_id: string | null
-  target_boarder_name: string | null
+  target_flat_id?: string | null
+  target_flat_name?: string | null
+  target_boarder_id?: string | null
+  target_boarder_name?: string | null
   created_by?: string | null
   created_by_name: string
   is_active: boolean
@@ -29,6 +31,8 @@ const DEFAULT_NOTICES: HostelNotice[] = [
     message: 'আগামীকাল সকাল ১০:০০ টা থেকে দুপুর ০১:০০ টা পর্যন্ত হোস্টেলের মূল বিদ্যুৎ লাইনে মেরামতের কাজ চলবে। সংশ্লিষ্ট সকলকে প্রয়োজনীয় প্রস্তুতি রাখার জন্য অনুরোধ করা হচ্ছে।',
     type: 'INFO',
     target_audience: 'ALL',
+    target_flat_id: null,
+    target_flat_name: null,
     target_boarder_id: null,
     target_boarder_name: null,
     created_by_name: 'হোস্টেল সুপারএডমিন',
@@ -57,23 +61,34 @@ function saveLocalNotices(notices: HostelNotice[]) {
   }
 }
 
-export const useNotices = (options?: { activeOnly?: boolean; boarderId?: string }) => {
+export const useNotices = (options?: { activeOnly?: boolean; boarderId?: string; flatId?: string }) => {
   const { profile } = useAuthStore()
 
   return useQuery({
-    queryKey: ['hostel_notices', options?.activeOnly, options?.boarderId, profile?.id],
+    queryKey: ['hostel_notices', options?.activeOnly, options?.boarderId, options?.flatId, profile?.id],
     queryFn: async (): Promise<HostelNotice[]> => {
       const localNotices = getLocalNotices()
+
+      const filterByAudience = (list: HostelNotice[]) => {
+        return list.filter((n) => {
+          if (n.target_audience === 'ALL') return true
+          if (n.target_audience === 'FLAT') {
+            return options?.flatId ? n.target_flat_id === options.flatId : false
+          }
+          if (n.target_audience === 'SPECIFIC') {
+            return options?.boarderId ? n.target_boarder_id === options.boarderId : false
+          }
+          return false
+        })
+      }
 
       if (!isSupabaseConfigured) {
         let result = [...localNotices]
         if (options?.activeOnly) {
           result = result.filter((n) => n.is_active)
         }
-        if (options?.boarderId) {
-          result = result.filter(
-            (n) => n.target_audience === 'ALL' || n.target_boarder_id === options.boarderId
-          )
+        if (options?.boarderId || options?.flatId) {
+          result = filterByAudience(result)
         }
         return result
       }
@@ -95,10 +110,8 @@ export const useNotices = (options?: { activeOnly?: boolean; boarderId?: string 
           console.warn('hostel_notices table fetch warning:', error.message)
           let result = [...localNotices]
           if (options?.activeOnly) result = result.filter((n) => n.is_active)
-          if (options?.boarderId) {
-            result = result.filter(
-              (n) => n.target_audience === 'ALL' || n.target_boarder_id === options.boarderId
-            )
+          if (options?.boarderId || options?.flatId) {
+            result = filterByAudience(result)
           }
           return result
         }
@@ -109,8 +122,10 @@ export const useNotices = (options?: { activeOnly?: boolean; boarderId?: string 
           message: row.message,
           type: (row.type as NoticeType) || 'INFO',
           target_audience: (row.target_audience as TargetAudience) || 'ALL',
-          target_boarder_id: row.target_boarder_id,
-          target_boarder_name: row.target_boarder_name,
+          target_flat_id: row.target_flat_id || null,
+          target_flat_name: row.target_flat_name || null,
+          target_boarder_id: row.target_boarder_id || null,
+          target_boarder_name: row.target_boarder_name || null,
           created_by: row.created_by,
           created_by_name: row.created_by_name || 'সুপারএডমিন',
           is_active: row.is_active !== false,
@@ -131,10 +146,8 @@ export const useNotices = (options?: { activeOnly?: boolean; boarderId?: string 
         if (options?.activeOnly) {
           list = list.filter((n) => n.is_active)
         }
-        if (options?.boarderId) {
-          list = list.filter(
-            (n) => n.target_audience === 'ALL' || n.target_boarder_id === options.boarderId
-          )
+        if (options?.boarderId || options?.flatId) {
+          list = filterByAudience(list)
         }
 
         return list
@@ -151,6 +164,8 @@ export interface CreateNoticePayload {
   message: string
   type: NoticeType
   target_audience: TargetAudience
+  target_flat_id?: string | null
+  target_flat_name?: string | null
   target_boarder_id?: string | null
   target_boarder_name?: string | null
 }
@@ -167,6 +182,8 @@ export const useCreateNotice = () => {
         message: payload.message.trim(),
         type: payload.type,
         target_audience: payload.target_audience,
+        target_flat_id: payload.target_audience === 'FLAT' ? payload.target_flat_id || null : null,
+        target_flat_name: payload.target_audience === 'FLAT' ? payload.target_flat_name || null : null,
         target_boarder_id: payload.target_audience === 'SPECIFIC' ? payload.target_boarder_id || null : null,
         target_boarder_name: payload.target_audience === 'SPECIFIC' ? payload.target_boarder_name || null : null,
         created_by: profile?.id || null,
@@ -188,6 +205,8 @@ export const useCreateNotice = () => {
               message: newNotice.message,
               type: newNotice.type,
               target_audience: newNotice.target_audience,
+              target_flat_id: newNotice.target_flat_id,
+              target_flat_name: newNotice.target_flat_name,
               target_boarder_id: newNotice.target_boarder_id,
               target_boarder_name: newNotice.target_boarder_name,
               created_by: profile?.id || null,
@@ -218,6 +237,31 @@ export const useCreateNotice = () => {
                 is_read: false,
                 action_url: '/portal/dashboard',
               })
+            }
+          } else if (payload.target_audience === 'FLAT' && payload.target_flat_id) {
+            // Find all active boarders living in this flat
+            const { data: flatAllocations } = await supabase
+              .from('boarder_allocations')
+              .select('boarder:boarders!inner(user_id), seat:seats!inner(room:rooms!inner(flat_id))')
+              .eq('status', 'ACTIVE')
+              .eq('seat.room.flat_id', payload.target_flat_id)
+
+            if (flatAllocations && flatAllocations.length > 0) {
+              const notificationsToInsert = flatAllocations
+                .map((a: any) => a.boarder?.user_id)
+                .filter(Boolean)
+                .map((uid: string) => ({
+                  recipient_id: uid,
+                  title: `[${payload.target_flat_name || 'ফ্ল্যাট নোটিশ'}] ${payload.title}`,
+                  message: payload.message,
+                  type: payload.type === 'ALERT' ? 'ALERT' : payload.type === 'WARNING' ? 'WARNING' : payload.type === 'MEAL' ? 'MEAL' : 'INFO',
+                  is_read: false,
+                  action_url: '/portal/dashboard',
+                }))
+
+              if (notificationsToInsert.length > 0) {
+                await supabase.from('system_notifications').insert(notificationsToInsert)
+              }
             }
           } else if (payload.target_audience === 'ALL') {
             // Get all active boarders

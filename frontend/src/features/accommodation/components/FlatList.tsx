@@ -1,10 +1,11 @@
 import React, { useState } from 'react'
-import { DoorOpen, Plus, BedDouble, Layers, Edit3 } from 'lucide-react'
+import { DoorOpen, Plus, BedDouble, Layers, Edit3, Megaphone } from 'lucide-react'
 import { Button, Card, Badge } from '@/components/common'
 import { useFlats, useRooms } from '../api/useAccommodation'
 import type { Room } from '@/types/database'
 import FlatModal from './FlatModal'
 import RoomModal from './RoomModal'
+import { SendNoticeModal } from '@/features/notices/components/SendNoticeModal'
 
 export const FlatList: React.FC = () => {
   const { data: flats = [], isLoading: isFlatsLoading } = useFlats()
@@ -14,6 +15,7 @@ export const FlatList: React.FC = () => {
   const [isRoomModalOpen, setIsRoomModalOpen] = useState(false)
   const [editingRoom, setEditingRoom] = useState<Room | null>(null)
   const [activeFlatIdForRoom, setActiveFlatIdForRoom] = useState<string | undefined>(undefined)
+  const [noticeFlat, setNoticeFlat] = useState<{ id: string; name: string } | null>(null)
 
   const handleOpenRoomModal = (flatId: string) => {
     setEditingRoom(null)
@@ -105,6 +107,16 @@ export const FlatList: React.FC = () => {
                     <Button
                       size="sm"
                       variant="ghost"
+                      onClick={() => setNoticeFlat({ id: flat.id, name: `${flat.name} (${flat.flat_code})` })}
+                      className="text-xs text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
+                      title="এই ফ্ল্যাটের সকল সদস্যকে নোটিশ পাঠান"
+                    >
+                      <Megaphone className="w-3.5 h-3.5 mr-1" />
+                      নোটিশ
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
                       onClick={() => handleOpenRoomModal(flat.id)}
                       className="text-xs text-primary-400 hover:text-primary-300"
                     >
@@ -183,6 +195,13 @@ export const FlatList: React.FC = () => {
         }}
         flatId={activeFlatIdForRoom}
         roomToEdit={editingRoom}
+      />
+
+      {/* Send Notice to Flat Modal */}
+      <SendNoticeModal
+        isOpen={Boolean(noticeFlat)}
+        onClose={() => setNoticeFlat(null)}
+        initialFlatId={noticeFlat?.id}
       />
     </div>
   )

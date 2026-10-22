@@ -8,6 +8,7 @@ import {
   Utensils,
   Users,
   User,
+  Building2,
   Send,
   Sparkles,
 } from 'lucide-react'
@@ -15,12 +16,14 @@ import Button from '@/components/common/Button'
 import { useCreateNotice } from '../api/useNotices'
 import type { NoticeType, TargetAudience } from '../api/useNotices'
 import { useMealBoardersList } from '@/features/meals/api/useMeals'
+import { useFlats } from '@/features/accommodation/api/useAccommodation'
 
 interface SendNoticeModalProps {
   isOpen: boolean
   onClose: () => void
   initialBoarderId?: string | null
   initialBoarderName?: string | null
+  initialFlatId?: string | null
 }
 
 export const SendNoticeModal: React.FC<SendNoticeModalProps> = ({
@@ -28,14 +31,17 @@ export const SendNoticeModal: React.FC<SendNoticeModalProps> = ({
   onClose,
   initialBoarderId = null,
   initialBoarderName = null,
+  initialFlatId = null,
 }) => {
   const { data: boardersList = [] } = useMealBoardersList()
+  const { data: flats = [] } = useFlats()
   const createNoticeMutation = useCreateNotice()
 
   const [targetAudience, setTargetAudience] = useState<TargetAudience>(
-    initialBoarderId ? 'SPECIFIC' : 'ALL'
+    initialBoarderId ? 'SPECIFIC' : initialFlatId ? 'FLAT' : 'ALL'
   )
   const [selectedBoarderId, setSelectedBoarderId] = useState<string>(initialBoarderId || '')
+  const [selectedFlatId, setSelectedFlatId] = useState<string>(initialFlatId || '')
   const [noticeType, setNoticeType] = useState<NoticeType>('INFO')
   const [title, setTitle] = useState('')
   const [message, setMessage] = useState('')
@@ -46,8 +52,11 @@ export const SendNoticeModal: React.FC<SendNoticeModalProps> = ({
     if (initialBoarderId) {
       setTargetAudience('SPECIFIC')
       setSelectedBoarderId(initialBoarderId)
+    } else if (initialFlatId) {
+      setTargetAudience('FLAT')
+      setSelectedFlatId(initialFlatId)
     }
-  }, [initialBoarderId])
+  }, [initialBoarderId, initialFlatId])
 
   if (!isOpen) return null
 
@@ -67,11 +76,21 @@ export const SendNoticeModal: React.FC<SendNoticeModalProps> = ({
       setErrorMsg('অনুগ্রহ করে নির্দিষ্ট বোর্ডার নির্বাচন করুন।')
       return
     }
+    if (targetAudience === 'FLAT' && !selectedFlatId) {
+      setErrorMsg('অনুগ্রহ করে নির্দিষ্ট ফ্ল্যাট নির্বাচন করুন।')
+      return
+    }
 
     let boarderName: string | null = null
     if (targetAudience === 'SPECIFIC') {
       const b = boardersList.find((item) => item.id === selectedBoarderId)
       boarderName = b ? b.full_name : initialBoarderName || 'বোর্ডার'
+    }
+
+    let flatName: string | null = null
+    if (targetAudience === 'FLAT') {
+      const f = flats.find((item) => item.id === selectedFlatId)
+      flatName = f ? `${f.name} (${f.flat_code})` : 'ফ্ল্যাট'
     }
 
     try {
@@ -80,6 +99,8 @@ export const SendNoticeModal: React.FC<SendNoticeModalProps> = ({
         message: message.trim(),
         type: noticeType,
         target_audience: targetAudience,
+        target_flat_id: targetAudience === 'FLAT' ? selectedFlatId : null,
+        target_flat_name: flatName,
         target_boarder_id: targetAudience === 'SPECIFIC' ? selectedBoarderId : null,
         target_boarder_name: boarderName,
       })
@@ -89,6 +110,8 @@ export const SendNoticeModal: React.FC<SendNoticeModalProps> = ({
         setSuccessMsg(false)
         setTitle('')
         setMessage('')
+        setSelectedFlatId('')
+        setSelectedBoarderId('')
         onClose()
       }, 1500)
     } catch (err: any) {
@@ -131,6 +154,16 @@ export const SendNoticeModal: React.FC<SendNoticeModalProps> = ({
 
   const currentTypeConfig = getTypeStyle(noticeType)
 
+  const getRecipientLabel = () => {
+    if (targetAudience === 'ALL') return 'সকল আবাসিক বোর্ডার'
+    if (targetAudience === 'FLAT') {
+      const f = flats.find((item) => item.id === selectedFlatId)
+      return f ? `ফ্ল্যাট: ${f.name} (${f.flat_code})` : 'নির্বাচিত ফ্ল্যাট'
+    }
+    const b = boardersList.find((item) => item.id === selectedBoarderId)
+    return b ? `বোর্ডার: ${b.full_name}` : 'নির্দিষ্ট বোর্ডার'
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 sm:p-8 space-y-6">
@@ -145,7 +178,7 @@ export const SendNoticeModal: React.FC<SendNoticeModalProps> = ({
                 বোর্ডারদের নোটিশ ও ঘোষণা পাঠান
               </h2>
               <p className="text-xs text-slate-400">
-                সকল বোর্ডার অথবা নির্দিষ্ট কোনো বোর্ডারকে নোটিশ পাঠান
+                সকল বোর্ডার, নির্দিষ্ট ফ্ল্যাট অথবা কোনো নির্দিষ্ট সদস্যকে নোটিশ পাঠান
               </p>
             </div>
           </div>
@@ -172,16 +205,17 @@ export const SendNoticeModal: React.FC<SendNoticeModalProps> = ({
         )}
 
         <form onSubmit={handleSend} className="space-y-5">
-          {/* Target Audience Selector */}
+          {/* Target Audience Selector (3 Options: ALL, FLAT, SPECIFIC) */}
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-2">
               প্রাপক নির্বাচন করুন (Target Audience):
             </label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {/* Option 1: All Boarders */}
               <button
                 type="button"
                 onClick={() => setTargetAudience('ALL')}
-                className={`p-3.5 rounded-2xl border text-left flex items-center gap-3 transition-all ${
+                className={`p-3 rounded-2xl border text-left flex items-center gap-2.5 transition-all ${
                   targetAudience === 'ALL'
                     ? 'border-indigo-500 bg-indigo-500/15 ring-2 ring-indigo-500/30 text-white'
                     : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700'
@@ -191,15 +225,35 @@ export const SendNoticeModal: React.FC<SendNoticeModalProps> = ({
                   <Users className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-xs font-bold">সকল আবাসিক বোর্ডার</div>
-                  <div className="text-[10px] text-slate-400">সকল বোর্ডারদের পোর্টালে যাবে</div>
+                  <div className="text-xs font-bold">সকল বোর্ডার</div>
+                  <div className="text-[10px] text-slate-400">সকল আবাসিক সদস্য</div>
                 </div>
               </button>
 
+              {/* Option 2: Flat Based */}
+              <button
+                type="button"
+                onClick={() => setTargetAudience('FLAT')}
+                className={`p-3 rounded-2xl border text-left flex items-center gap-2.5 transition-all ${
+                  targetAudience === 'FLAT'
+                    ? 'border-indigo-500 bg-indigo-500/15 ring-2 ring-indigo-500/30 text-white'
+                    : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700'
+                }`}
+              >
+                <div className={`p-2 rounded-xl ${targetAudience === 'FLAT' ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                  <Building2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold">ফ্ল্যাট ভিত্তিক</div>
+                  <div className="text-[10px] text-slate-400">নির্দিষ্ট ফ্ল্যাটের বাসিন্দারা</div>
+                </div>
+              </button>
+
+              {/* Option 3: Specific Boarder */}
               <button
                 type="button"
                 onClick={() => setTargetAudience('SPECIFIC')}
-                className={`p-3.5 rounded-2xl border text-left flex items-center gap-3 transition-all ${
+                className={`p-3 rounded-2xl border text-left flex items-center gap-2.5 transition-all ${
                   targetAudience === 'SPECIFIC'
                     ? 'border-indigo-500 bg-indigo-500/15 ring-2 ring-indigo-500/30 text-white'
                     : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700'
@@ -210,16 +264,39 @@ export const SendNoticeModal: React.FC<SendNoticeModalProps> = ({
                 </div>
                 <div>
                   <div className="text-xs font-bold">নির্দিষ্ট বোর্ডার</div>
-                  <div className="text-[10px] text-slate-400">শুধু নির্বাচিত বর্ডারের কাছে যাবে</div>
+                  <div className="text-[10px] text-slate-400">ব্যক্তিগত নোটিশ</div>
                 </div>
               </button>
             </div>
           </div>
 
-          {/* If specific boarder, dropdown list */}
+          {/* If Flat selected, show flat dropdown */}
+          {targetAudience === 'FLAT' && (
+            <div className="animate-in fade-in duration-200">
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5 text-indigo-400" />
+                ফ্ল্যাট নির্বাচন করুন:
+              </label>
+              <select
+                value={selectedFlatId}
+                onChange={(e) => setSelectedFlatId(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              >
+                <option value="">-- ফ্ল্যাট বেছে নিন --</option>
+                {flats.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name} ({f.flat_code}) {f.floor_number ? `— তলা: ${f.floor_number}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* If specific boarder selected, show boarder dropdown */}
           {targetAudience === 'SPECIFIC' && (
             <div className="animate-in fade-in duration-200">
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-indigo-400" />
                 বোর্ডার নির্বাচন করুন:
               </label>
               <select
@@ -279,7 +356,7 @@ export const SendNoticeModal: React.FC<SendNoticeModalProps> = ({
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="যেমন: আগামীকাল বিদ্যুৎ লাইন সংস্কার / বকেয়া বিল পরিশোধের তাগাদা"
+              placeholder="যেমন: ফ্ল্যাটের গ্যাস সিলিন্ডার পরিবর্তন / বকেয়া পরিশোধের তাগাদা"
               className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
             />
           </div>
@@ -301,9 +378,14 @@ export const SendNoticeModal: React.FC<SendNoticeModalProps> = ({
           {/* Live Preview Card */}
           {(title || message) && (
             <div className="p-4 rounded-2xl bg-slate-950/90 border border-slate-800/80 space-y-2">
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                লাইভ প্রিভিউ (বোর্ডার যেমনটি দেখবে):
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  লাইভ প্রিভিউ (বোর্ডার যেমনটি দেখবে):
+                </span>
+                <span className="text-indigo-400 font-medium">
+                  {getRecipientLabel()}
+                </span>
               </div>
               <div className={`p-3.5 rounded-xl border ${currentTypeConfig.bg} space-y-1.5`}>
                 <div className="flex items-center justify-between gap-2">
