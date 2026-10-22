@@ -18,7 +18,6 @@ import {
   Receipt,
   DollarSign,
   ArrowRightLeft,
-  Sparkles,
   KeyRound,
   ShieldAlert,
 } from 'lucide-react'
@@ -225,7 +224,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           defaultTitle: 'হোস্টেল সেটিংস',
           href: '/settings/hostel',
           icon: <Building2 className="w-4 h-4 shrink-0 text-amber-400" />,
-          roles: ['SUPER_ADMIN', 'ADMIN'],
+          roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
           permissionKey: 'branding',
           badge: 'সেটিংস',
         },
@@ -277,7 +276,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => ({
     meal_management: true,
     billing_finance: true,
-    system_settings: false,
+    system_settings: true,
   }))
 
   // Flyout menu state for collapsed sidebar

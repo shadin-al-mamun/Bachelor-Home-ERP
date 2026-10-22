@@ -56,8 +56,6 @@ export const HostelSettingsPage: React.FC = () => {
   const [formReceiptFooterNote, setFormReceiptFooterNote] = useState(receiptFooterNote)
   const [formReceiptPrefix, setFormReceiptPrefix] = useState(receiptPrefix)
   const [previewLogo, setPreviewLogo] = useState<string | null>(logoUrl)
-
-  const [activeTab, setActiveTab] = useState<'info' | 'receipt' | 'logo'>('info')
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)

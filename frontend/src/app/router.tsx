@@ -78,7 +78,6 @@ import MealSettingsPage from '@/features/meals/MealSettingsPage'
 import ReportsHubPage from '@/features/reports/ReportsHubPage'
 import AuditLogPage from '@/features/governance/AuditLogPage'
 import UserManagementPage from '@/features/governance/UserManagementPage'
-import BrandingSettingsPage from '@/features/settings/BrandingSettingsPage'
 import HostelSettingsPage from '@/features/settings/HostelSettingsPage'
 import AccessControlPage from '@/features/governance/AccessControlPage'
 
