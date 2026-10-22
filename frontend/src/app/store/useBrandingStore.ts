@@ -5,6 +5,12 @@ export interface BrandingSettings {
   orgName: string
   shortName: string
   tagline: string
+  address: string
+  phone: string
+  email: string
+  emergencyContact: string
+  receiptFooterNote: string
+  receiptPrefix: string
   logoUrl: string | null
   appIconUrl: string | null
   faviconUrl: string | null
@@ -23,9 +29,15 @@ interface BrandingState extends BrandingSettings {
 const STORAGE_KEY = 'bachelor_erp_branding_settings'
 
 export const DEFAULT_BRANDING: BrandingSettings = {
-  orgName: 'Bachelor Home',
-  shortName: 'Bachelor Home',
-  tagline: 'স্মার্ট মেস ও হোস্টেল ম্যানেজমেন্ট ERP',
+  orgName: 'ব্যাচেলর হোম ইআরপি',
+  shortName: 'ব্যাচেলর হোম',
+  tagline: 'স্মার্ট ব্যাচেলর হোস্টেল ও মেস ম্যানেজমেন্ট',
+  address: 'ধানমন্ডি, ঢাকা-১২০৫',
+  phone: '০১৭৪৪-০০০০০০',
+  email: 'info@bachelorhome.com',
+  emergencyContact: '০১৭১১-০০০০০০',
+  receiptFooterNote: 'সফটওয়্যার জেনারেটেড ডিজিটাল ভাউচার। কোনো সিল বা স্বাক্ষরের প্রয়োজন নেই।',
+  receiptPrefix: 'RCT',
   logoUrl: '/pwa-512x512.svg',
   appIconUrl: '/pwa-192x192.svg',
   faviconUrl: '/favicon.svg',
@@ -65,7 +77,7 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
       const stored = localStorage.getItem(STORAGE_KEY)
       if (stored) {
         const parsed = JSON.parse(stored)
-        set({ ...parsed })
+        set({ ...DEFAULT_BRANDING, ...parsed })
         if (parsed.faviconUrl || parsed.logoUrl) {
           applyFaviconToDOM(parsed.faviconUrl || parsed.logoUrl)
         }
@@ -89,6 +101,12 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
             orgName: data.org_name || DEFAULT_BRANDING.orgName,
             shortName: data.short_name || DEFAULT_BRANDING.shortName,
             tagline: data.tagline || DEFAULT_BRANDING.tagline,
+            address: data.address || DEFAULT_BRANDING.address,
+            phone: data.phone || DEFAULT_BRANDING.phone,
+            email: data.email || DEFAULT_BRANDING.email,
+            emergencyContact: data.emergency_contact || DEFAULT_BRANDING.emergencyContact,
+            receiptFooterNote: data.receipt_footer_note || DEFAULT_BRANDING.receiptFooterNote,
+            receiptPrefix: data.receipt_prefix || DEFAULT_BRANDING.receiptPrefix,
             logoUrl: data.logo_url || DEFAULT_BRANDING.logoUrl,
             appIconUrl: data.app_icon_url || DEFAULT_BRANDING.appIconUrl,
             faviconUrl: data.favicon_url || DEFAULT_BRANDING.faviconUrl,
@@ -108,9 +126,15 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
     set({ isLoading: true, isSaved: false })
 
     const updated: BrandingSettings = {
-      orgName: newSettings.orgName ?? get().orgName,
-      shortName: newSettings.shortName ?? get().shortName,
-      tagline: newSettings.tagline ?? get().tagline,
+      orgName: newSettings.orgName !== undefined ? newSettings.orgName : get().orgName,
+      shortName: newSettings.shortName !== undefined ? newSettings.shortName : get().shortName,
+      tagline: newSettings.tagline !== undefined ? newSettings.tagline : get().tagline,
+      address: newSettings.address !== undefined ? newSettings.address : get().address,
+      phone: newSettings.phone !== undefined ? newSettings.phone : get().phone,
+      email: newSettings.email !== undefined ? newSettings.email : get().email,
+      emergencyContact: newSettings.emergencyContact !== undefined ? newSettings.emergencyContact : get().emergencyContact,
+      receiptFooterNote: newSettings.receiptFooterNote !== undefined ? newSettings.receiptFooterNote : get().receiptFooterNote,
+      receiptPrefix: newSettings.receiptPrefix !== undefined ? newSettings.receiptPrefix : get().receiptPrefix,
       logoUrl: newSettings.logoUrl !== undefined ? newSettings.logoUrl : get().logoUrl,
       appIconUrl: newSettings.appIconUrl !== undefined ? newSettings.appIconUrl : get().appIconUrl,
       faviconUrl: newSettings.faviconUrl !== undefined ? newSettings.faviconUrl : get().faviconUrl,
@@ -137,6 +161,12 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
           org_name: updated.orgName,
           short_name: updated.shortName,
           tagline: updated.tagline,
+          address: updated.address,
+          phone: updated.phone,
+          email: updated.email,
+          emergency_contact: updated.emergencyContact,
+          receipt_footer_note: updated.receiptFooterNote,
+          receipt_prefix: updated.receiptPrefix,
           logo_url: updated.logoUrl,
           app_icon_url: updated.appIconUrl,
           favicon_url: updated.faviconUrl,

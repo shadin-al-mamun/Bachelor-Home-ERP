@@ -4,7 +4,7 @@ import { Button } from '@/components/common/Button'
 import { formatCurrencyBn, formatDateBn } from '@/utils/date'
 import type { ExtendedReceipt } from '../api/useReceipts'
 import { Printer, ShieldCheck, Building } from 'lucide-react'
-
+import { useBrandingStore } from '@/app/store/useBrandingStore'
 
 interface ReceiptPrintViewProps {
   isOpen: boolean
@@ -17,6 +17,8 @@ export const ReceiptPrintView: React.FC<ReceiptPrintViewProps> = ({
   onClose,
   receipt,
 }) => {
+  const { orgName, tagline, address, phone, logoUrl, receiptFooterNote } = useBrandingStore()
+
   if (!receipt) return null
 
   const handlePrint = () => {
@@ -45,18 +47,22 @@ export const ReceiptPrintView: React.FC<ReceiptPrintViewProps> = ({
           {/* Header */}
           <div className="flex items-start justify-between border-b border-slate-200 pb-5">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-xl shadow">
-                <Building className="w-6 h-6 text-primary-400" />
+              <div className="w-12 h-12 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-xl shadow overflow-hidden shrink-0 border border-slate-800">
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
+                ) : (
+                  <Building className="w-6 h-6 text-primary-400" />
+                )}
               </div>
               <div>
                 <h2 className="text-xl font-black text-slate-900 tracking-tight">
-                  ব্যাচেলর হোম ইআরপি
+                  {orgName || 'ব্যাচেলর হোম ইআরপি'}
                 </h2>
                 <p className="text-xs text-slate-500 font-medium">
-                  স্মার্ট ব্যাচেলর হোস্টেল ও মেস ম্যানেজমেন্ট
+                  {tagline || 'স্মার্ট ব্যাচেলর হোস্টেল ও মেস ম্যানেজমেন্ট'}
                 </p>
                 <p className="text-[11px] text-slate-400">
-                  ধানমন্ডি, ঢাকা-১২০৫ • হটলাইন: ০১৭১১-০০০০০০
+                  {address || 'ধানমন্ডি, ঢাকা-১২০৫'}{phone ? ` • হটলাইন: ${phone}` : ''}
                 </p>
               </div>
             </div>
@@ -144,10 +150,10 @@ export const ReceiptPrintView: React.FC<ReceiptPrintViewProps> = ({
                     <tr key={idx} className="hover:bg-slate-50/50">
                       <td className="py-2.5 px-3 text-slate-500 font-mono">{idx + 1}</td>
                       <td className="py-2.5 px-3 font-medium text-slate-800">
-                        {alloc.description || `${alloc.charge_type} ফি`}
+                        {alloc.description || (alloc.charge_type ? `${alloc.charge_type} ফি` : 'পেমেন্ট সমন্বয় ফি')}
                       </td>
                       <td className="py-2.5 px-3 font-mono text-slate-600">
-                        {alloc.billing_month}
+                        {alloc.billing_month || '—'}
                       </td>
                       <td className="py-2.5 px-3 text-right font-bold text-slate-900">
                         {formatCurrencyBn(alloc.amount)}
@@ -191,8 +197,8 @@ export const ReceiptPrintView: React.FC<ReceiptPrintViewProps> = ({
           {/* Signatures & Verification Stamp */}
           <div className="pt-8 flex items-end justify-between border-t border-slate-200 text-xs">
             <div className="flex items-center gap-2 text-slate-500 text-[11px]">
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              <span>সফটওয়্যার জেনারেটেড ডিজিটাল ভাউচার। সিগনেচার প্রয়োজন নেই।</span>
+              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{receiptFooterNote || 'সফটওয়্যার জেনারেটেড ডিজিটাল ভাউচার। সিগনেচার প্রয়োজন নেই।'}</span>
             </div>
 
             <div className="text-center space-y-1">

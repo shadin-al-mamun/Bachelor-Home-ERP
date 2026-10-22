@@ -75,7 +75,7 @@ describe('Sidebar.test.tsx - Hierarchical Navigation & Submenu System', () => {
     fireEvent.click(settingsGroupBtn)
 
     expect(screen.getByText('কর্মকর্তা ও পদবী ব্যবস্থাপনা')).toBeInTheDocument()
-    expect(screen.getByText('হোস্টেল লোগো ও মোবাইল অ্যাপ ব্র্যান্ডিং')).toBeInTheDocument()
+    expect(screen.getByText('হোস্টেল সেটিংস')).toBeInTheDocument()
     expect(screen.getByText('মেনু ও একসেস কন্ট্রোল ব্যবস্থাপনা')).toBeInTheDocument()
     expect(screen.getByText('সিস্টেম অডিট ট্রেইল')).toBeInTheDocument()
   })

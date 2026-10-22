@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import {
   LayoutDashboard,
   Building,
+  Building2,
   Users,
   Wallet,
   UtensilsCrossed,
@@ -219,14 +220,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           permissionKey: 'governance',
         },
         {
-          id: 'branding',
-          titleKey: 'nav.branding',
-          defaultTitle: 'হোস্টেল লোগো ও অ্যাপ ব্রান্ডিং',
-          href: '/settings/branding',
-          icon: <Sparkles className="w-4 h-4 shrink-0 text-amber-400" />,
+          id: 'hostel_settings',
+          titleKey: 'nav.hostel_settings',
+          defaultTitle: 'হোস্টেল সেটিংস',
+          href: '/settings/hostel',
+          icon: <Building2 className="w-4 h-4 shrink-0 text-amber-400" />,
           roles: ['SUPER_ADMIN', 'ADMIN'],
           permissionKey: 'branding',
-          badge: 'নতুন',
+          badge: 'সেটিংস',
         },
         {
           id: 'access_control',

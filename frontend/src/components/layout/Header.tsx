@@ -81,9 +81,9 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
         )}
 
         <Link
-          to={(profile?.role === 'SUPER_ADMIN' || profile?.role === 'ADMIN' || !profile?.role) ? '/settings/branding' : '/dashboard'}
+          to={(profile?.role === 'SUPER_ADMIN' || profile?.role === 'ADMIN' || !profile?.role) ? '/settings/hostel' : '/dashboard'}
           className="flex items-center gap-2.5 group cursor-pointer select-none"
-          title="হোস্টেল লোগো ও ব্র্যান্ডিং ব্যবস্থাপনা"
+          title="হোস্টেল সেটিংস"
         >
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-primary-600 to-indigo-400 p-0.5 shadow-md shadow-primary-500/20 flex items-center justify-center overflow-hidden group-hover:scale-105 transition-transform">
             <div className="w-full h-full bg-slate-900 rounded-[10px] flex items-center justify-center overflow-hidden">
@@ -187,12 +187,12 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
               {/* Branding Link for Admins */}
               {(profile?.role === 'SUPER_ADMIN' || profile?.role === 'ADMIN' || !profile?.role) && (
                 <Link
-                  to="/settings/branding"
+                  to="/settings/hostel"
                   onClick={() => setIsUserMenuOpen(false)}
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-amber-300 hover:bg-amber-500/10 hover:text-amber-200 transition-colors border border-amber-500/30 bg-amber-500/10"
                 >
                   <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span className="truncate">হোস্টেল লোগো ও ব্র্যান্ডিং</span>
+                  <span className="truncate">হোস্টেল সেটিংস</span>
                 </Link>
               )}
 
