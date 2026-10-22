@@ -338,7 +338,7 @@ export const HostelSettingsPage: React.FC = () => {
                   type="text"
                   value={formAddress}
                   onChange={(e) => setFormAddress(e.target.value)}
-                  placeholder="যেমন: বাড়ি #১২, রোড #০৫, ধানমন্ডি, ঢাকা-১২০৫"
+                  placeholder="হোস্টেলের পূর্ণ ঠিকানা লিখুন (যেমন: বাড়ি #১২, রোড #০৫, এলাকা, শহর)"
                   className="bg-slate-950/60 border-slate-700 text-sm font-medium"
                   required
                 />
@@ -542,10 +542,17 @@ export const HostelSettingsPage: React.FC = () => {
                   <p className="text-[11px] text-slate-500 font-medium">
                     {formTagline || 'স্মার্ট ব্যাচেলর হোস্টেল ও মেস ম্যানেজমেন্ট'}
                   </p>
-                  <p className="text-[10px] text-slate-600 font-semibold mt-0.5 bg-amber-50 px-1 py-0.5 rounded border border-amber-200/60 inline-block">
-                    {formAddress || 'ধানমন্ডি, ঢাকা-১২০৫'}
-                    {formPhone ? ` • হটলাইন: ${formPhone}` : ''}
-                  </p>
+                  {(formAddress || formPhone) ? (
+                    <p className="text-[10px] text-slate-600 font-semibold mt-0.5 bg-amber-50 px-1 py-0.5 rounded border border-amber-200/60 inline-block">
+                      {formAddress}
+                      {formAddress && formPhone ? ' • ' : ''}
+                      {formPhone ? `হটলাইন: ${formPhone}` : ''}
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-slate-400 italic mt-0.5">
+                      (ঠিকানা ও হটলাইন এখনো সেট করা হয়নি)
+                    </p>
+                  )}
                 </div>
               </div>
 

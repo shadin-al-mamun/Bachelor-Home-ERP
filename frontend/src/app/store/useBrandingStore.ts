@@ -18,6 +18,7 @@ export interface BrandingSettings {
 }
 
 interface BrandingState extends BrandingSettings {
+  id: string | null
   isLoading: boolean
   isSaved: boolean
   updateBranding: (settings: Partial<BrandingSettings>) => Promise<void>
@@ -32,10 +33,10 @@ export const DEFAULT_BRANDING: BrandingSettings = {
   orgName: 'ব্যাচেলর হোম ইআরপি',
   shortName: 'ব্যাচেলর হোম',
   tagline: 'স্মার্ট ব্যাচেলর হোস্টেল ও মেস ম্যানেজমেন্ট',
-  address: 'ধানমন্ডি, ঢাকা-১২০৫',
-  phone: '০১৭৪৪-০০০০০০',
-  email: 'info@bachelorhome.com',
-  emergencyContact: '০১৭১১-০০০০০০',
+  address: '',
+  phone: '',
+  email: '',
+  emergencyContact: '',
   receiptFooterNote: 'সফটওয়্যার জেনারেটেড ডিজিটাল ভাউচার। কোনো সিল বা স্বাক্ষরের প্রয়োজন নেই।',
   receiptPrefix: 'RCT',
   logoUrl: '/pwa-512x512.svg',
@@ -68,6 +69,7 @@ function applyFaviconToDOM(iconUrl: string) {
 
 export const useBrandingStore = create<BrandingState>((set, get) => ({
   ...DEFAULT_BRANDING,
+  id: null,
   isLoading: false,
   isSaved: false,
 
@@ -77,7 +79,7 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
       const stored = localStorage.getItem(STORAGE_KEY)
       if (stored) {
         const parsed = JSON.parse(stored)
-        set({ ...DEFAULT_BRANDING, ...parsed })
+        set((state) => ({ ...state, ...DEFAULT_BRANDING, ...parsed }))
         if (parsed.faviconUrl || parsed.logoUrl) {
           applyFaviconToDOM(parsed.faviconUrl || parsed.logoUrl)
         }
@@ -97,24 +99,28 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
           .maybeSingle()
 
         if (!error && data) {
-          const remoteSettings: BrandingSettings = {
-            orgName: data.org_name || DEFAULT_BRANDING.orgName,
-            shortName: data.short_name || DEFAULT_BRANDING.shortName,
-            tagline: data.tagline || DEFAULT_BRANDING.tagline,
-            address: data.address || DEFAULT_BRANDING.address,
-            phone: data.phone || DEFAULT_BRANDING.phone,
-            email: data.email || DEFAULT_BRANDING.email,
-            emergencyContact: data.emergency_contact || DEFAULT_BRANDING.emergencyContact,
-            receiptFooterNote: data.receipt_footer_note || DEFAULT_BRANDING.receiptFooterNote,
-            receiptPrefix: data.receipt_prefix || DEFAULT_BRANDING.receiptPrefix,
-            logoUrl: data.logo_url || DEFAULT_BRANDING.logoUrl,
-            appIconUrl: data.app_icon_url || DEFAULT_BRANDING.appIconUrl,
-            faviconUrl: data.favicon_url || DEFAULT_BRANDING.faviconUrl,
-            primaryColor: DEFAULT_BRANDING.primaryColor,
+          set((state) => ({
+            id: data.id || state.id,
+            orgName: data.org_name || state.orgName,
+            shortName: data.short_name || state.shortName,
+            tagline: data.tagline || state.tagline,
+            address: data.address !== undefined && data.address !== null ? data.address : state.address,
+            phone: data.phone !== undefined && data.phone !== null ? data.phone : state.phone,
+            email: data.email !== undefined && data.email !== null ? data.email : state.email,
+            emergencyContact: data.emergency_contact !== undefined && data.emergency_contact !== null ? data.emergency_contact : state.emergencyContact,
+            receiptFooterNote: data.receipt_footer_note || state.receiptFooterNote,
+            receiptPrefix: data.receipt_prefix || state.receiptPrefix,
+            logoUrl: data.logo_url || state.logoUrl,
+            appIconUrl: data.app_icon_url || state.appIconUrl,
+            faviconUrl: data.favicon_url || state.faviconUrl,
+            primaryColor: data.primary_color || state.primaryColor,
+          }))
+
+          const current = get()
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(current))
+          if (current.faviconUrl || current.logoUrl) {
+            applyFaviconToDOM(current.faviconUrl || current.logoUrl || '/favicon.svg')
           }
-          set({ ...remoteSettings })
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(remoteSettings))
-          applyFaviconToDOM(remoteSettings.faviconUrl || remoteSettings.logoUrl || '/favicon.svg')
         }
       } catch {
         // Table may not yet exist on Supabase, fallback silently
@@ -144,7 +150,7 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
     // Update state & localStorage
     set({ ...updated, isLoading: false, isSaved: true })
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...get(), ...updated }))
     } catch (e) {
       console.warn('LocalStorage save failed:', e)
     }
@@ -157,7 +163,7 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
     // Attempt remote save to Supabase
     if (isSupabaseConfigured) {
       try {
-        await supabase.from('organization_settings').upsert({
+        const payload: Record<string, any> = {
           org_name: updated.orgName,
           short_name: updated.shortName,
           tagline: updated.tagline,
@@ -171,7 +177,55 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
           app_icon_url: updated.appIconUrl,
           favicon_url: updated.faviconUrl,
           updated_at: new Date().toISOString(),
-        })
+        }
+
+        const currentId = get().id
+        if (currentId) {
+          const { error } = await supabase
+            .from('organization_settings')
+            .update(payload)
+            .eq('id', currentId)
+
+          if (error) {
+            // Fallback: update only core columns if migration not run yet
+            await supabase
+              .from('organization_settings')
+              .update({
+                org_name: updated.orgName,
+                short_name: updated.shortName,
+                tagline: updated.tagline,
+                logo_url: updated.logoUrl,
+                app_icon_url: updated.appIconUrl,
+                favicon_url: updated.faviconUrl,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', currentId)
+          }
+        } else {
+          const { data: existing } = await supabase
+            .from('organization_settings')
+            .select('id')
+            .limit(1)
+            .maybeSingle()
+
+          if (existing?.id) {
+            set({ id: existing.id })
+            await supabase
+              .from('organization_settings')
+              .update(payload)
+              .eq('id', existing.id)
+          } else {
+            const { data: inserted } = await supabase
+              .from('organization_settings')
+              .insert(payload)
+              .select('id')
+              .maybeSingle()
+
+            if (inserted?.id) {
+              set({ id: inserted.id })
+            }
+          }
+        }
       } catch (err) {
         console.warn('Could not sync branding settings to Supabase table:', err)
       }

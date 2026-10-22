@@ -9,20 +9,9 @@
 -- ==============================================================================
 
 ALTER TABLE public.organization_settings
-  ADD COLUMN IF NOT EXISTS address TEXT DEFAULT 'ধানমন্ডি, ঢাকা-১২০৫',
-  ADD COLUMN IF NOT EXISTS phone VARCHAR(50) DEFAULT '০১৭৪৪-০০০০০০',
-  ADD COLUMN IF NOT EXISTS email VARCHAR(100) DEFAULT 'info@bachelorhome.com',
-  ADD COLUMN IF NOT EXISTS emergency_contact VARCHAR(50) DEFAULT '০১৭১১-০০০০০০',
+  ADD COLUMN IF NOT EXISTS address TEXT DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS phone VARCHAR(50) DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS email VARCHAR(100) DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS emergency_contact VARCHAR(50) DEFAULT NULL,
   ADD COLUMN IF NOT EXISTS receipt_footer_note TEXT DEFAULT 'সফটওয়্যার জেনারেটেড ডিজিটাল ভাউচার। কোনো সিল বা স্বাক্ষরের প্রয়োজন নেই।',
   ADD COLUMN IF NOT EXISTS receipt_prefix VARCHAR(20) DEFAULT 'RCT';
-
--- Update existing default record if fields are null
-UPDATE public.organization_settings
-SET
-  address = COALESCE(address, 'ধানমন্ডি, ঢাকা-১২০৫'),
-  phone = COALESCE(phone, '০১৭৪৪-০০০০০০'),
-  email = COALESCE(email, 'info@bachelorhome.com'),
-  emergency_contact = COALESCE(emergency_contact, '০১৭১১-০০০০০০'),
-  receipt_footer_note = COALESCE(receipt_footer_note, 'সফটওয়্যার জেনারেটেড ডিজিটাল ভাউচার। কোনো সিল বা স্বাক্ষরের প্রয়োজন নেই।'),
-  receipt_prefix = COALESCE(receipt_prefix, 'RCT')
-WHERE id IS NOT NULL;

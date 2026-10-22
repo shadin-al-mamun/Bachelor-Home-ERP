@@ -61,9 +61,11 @@ export const ReceiptPrintView: React.FC<ReceiptPrintViewProps> = ({
                 <p className="text-xs text-slate-500 font-medium">
                   {tagline || 'স্মার্ট ব্যাচেলর হোস্টেল ও মেস ম্যানেজমেন্ট'}
                 </p>
-                <p className="text-[11px] text-slate-400">
-                  {address || 'ধানমন্ডি, ঢাকা-১২০৫'}{phone ? ` • হটলাইন: ${phone}` : ''}
-                </p>
+                {(address || phone) ? (
+                  <p className="text-[11px] text-slate-500">
+                    {address}{address && phone ? ' • ' : ''}{phone ? `হটলাইন: ${phone}` : ''}
+                  </p>
+                ) : null}
               </div>
             </div>
 

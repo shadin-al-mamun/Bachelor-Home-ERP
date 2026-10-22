@@ -179,7 +179,7 @@ export const BoarderDashboardPage: React.FC = () => {
   })
 
   const helplineName = managerContact?.full_name || branding?.orgName || 'হোস্টেল এডমিন'
-  const helplinePhone = managerContact?.phone_number || '০১৭১১-০০০০০০'
+  const helplinePhone = managerContact?.phone_number || branding?.phone || branding?.emergencyContact || ''
 
   const handleToggleTomorrow = async (session: 'BREAKFAST' | 'LUNCH' | 'DINNER', currentState: boolean) => {
     if (tomorrowDateStatus.isLockedForBoarder) {
