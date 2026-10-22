@@ -45,15 +45,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, ch
   return children ? <>{children}</> : <Outlet />
 }
 
-// Temporary demo views for router scaffolding until specific prompt builds full UI
-const PlaceholderView: React.FC<{ title: string; desc: string }> = ({ title, desc }) => (
-  <div className="p-4 sm:p-8 space-y-4">
-    <div className="glass-card p-6 rounded-2xl border border-slate-800">
-      <h2 className="text-2xl font-bold text-white tracking-tight">{title}</h2>
-      <p className="text-sm text-slate-400 mt-1">{desc}</p>
-    </div>
-  </div>
-)
+
 
 import OwnerDashboardPage from '@/features/dashboard/OwnerDashboardPage'
 import BoarderDashboardPage from '@/features/dashboard/BoarderDashboardPage'
@@ -81,6 +73,7 @@ import UserManagementPage from '@/features/governance/UserManagementPage'
 import HostelSettingsPage from '@/features/settings/HostelSettingsPage'
 import AccessControlPage from '@/features/governance/AccessControlPage'
 import NoticesPage from '@/features/notices/NoticesPage'
+import BoarderPortalDuesPage from '@/features/portal/BoarderDuesPage'
 
 
 export const router = createBrowserRouter([
@@ -125,7 +118,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'my-dues',
-        element: <PlaceholderView title="আমার বকেয়া ও পেমেন্ট রশিদ" desc="ভাড়া ও মিলের বকেয়া হিসাব এবং রশিদ।" />,
+        element: <BoarderPortalDuesPage />,
       },
       {
         path: 'my-application',

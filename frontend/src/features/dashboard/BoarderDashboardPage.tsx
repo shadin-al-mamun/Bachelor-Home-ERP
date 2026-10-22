@@ -14,6 +14,8 @@ import {
   Sparkles,
   Info,
   Megaphone,
+  Eye,
+  ExternalLink,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import { useBrandingStore, DEFAULT_BRANDING } from '@/app/store/useBrandingStore'
@@ -29,6 +31,9 @@ import {
   useActiveMealRates,
 } from '@/features/meals/api/useMeals'
 import { formatCurrencyBn, formatDateBn } from '@/utils/date'
+import { isPhoneMatch } from '@/utils/phone'
+import { getStoredReceipts, type ExtendedReceipt } from '@/features/billing/api/useReceipts'
+import { ReceiptPrintView } from '@/features/billing/components/ReceiptPrintView'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
 
 export const BoarderDashboardPage: React.FC = () => {
@@ -58,9 +63,16 @@ export const BoarderDashboardPage: React.FC = () => {
   const matchedResident = boardersList.find(
     (b) =>
       (profile?.id && (b.user_id === profile.id || b.id === profile.id)) ||
-      (profile?.phone_number && b.phone_number === profile.phone_number) ||
+      (profile?.phone_number && isPhoneMatch(b.phone_number, profile.phone_number)) ||
       (profile?.full_name && b.full_name === profile.full_name)
   )
+
+  // Self-heal / Link boarder profile if Supabase is live and user is authenticated
+  React.useEffect(() => {
+    if (isSupabaseConfigured && profile?.id && !matchedResident) {
+      supabase.rpc('claim_my_boarder_profile').then(() => {}, () => {})
+    }
+  }, [profile?.id, matchedResident])
 
   // Fetch active notices for this boarder (ALL, flat-targeted, or individual)
   const { data: boarderNotices = [] } = useNotices({
@@ -71,6 +83,10 @@ export const BoarderDashboardPage: React.FC = () => {
 
   const currentBoarder = matchedResident || (!isStaffRole && !isSupabaseConfigured ? boardersList[0] : null)
   const activeBoarderId = currentBoarder?.id
+
+  // Modal state for viewing official receipts
+  const [selectedReceipt, setSelectedReceipt] = React.useState<ExtendedReceipt | null>(null)
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = React.useState(false)
 
   // Authenticated boarder or dynamic profile info (strictly from real data, zero hardcoded placeholders)
   const boarderName = currentBoarder?.full_name || profile?.full_name || (isStaffRole ? 'অ্যাডমিন ইউজার' : 'বর্ডার')
@@ -96,8 +112,11 @@ export const BoarderDashboardPage: React.FC = () => {
   // 1. Fetch live financial charges for this boarder from database
   const { data: boarderCharges = [] } = useQuery({
     queryKey: ['boarder-charges', activeBoarderId],
-    enabled: Boolean(activeBoarderId && isSupabaseConfigured),
+    enabled: Boolean(activeBoarderId),
     queryFn: async () => {
+      if (!isSupabaseConfigured) {
+        return []
+      }
       const { data, error } = await supabase
         .from('boarder_charges')
         .select('id, charge_type, amount, paid_amount, due_amount, status, billing_month')
@@ -111,25 +130,42 @@ export const BoarderDashboardPage: React.FC = () => {
     },
   })
 
-  // 2. Fetch live receipts for this boarder from database
+  // 2. Fetch live receipts for this boarder from database (with fallback to local/demo storage)
   const { data: boarderReceipts = [] } = useQuery({
     queryKey: ['boarder-receipts', activeBoarderId],
-    enabled: Boolean(activeBoarderId && isSupabaseConfigured),
+    enabled: Boolean(activeBoarderId),
     queryFn: async () => {
+      if (!isSupabaseConfigured) {
+        return getStoredReceipts().filter((r) => !r.is_void && (!activeBoarderId || r.boarder_id === activeBoarderId))
+      }
       const { data, error } = await supabase
         .from('receipts')
-        .select('id, receipt_number, receipt_date, amount, payment_method, status, is_void')
+        .select('id, receipt_number, receipt_date, amount, payment_method, is_void, transaction_reference')
         .eq('boarder_id', activeBoarderId!)
         .eq('is_void', false)
         .order('receipt_date', { ascending: false })
         .limit(10)
       if (error) {
         console.warn('boarder receipts query error:', error.message)
-        return []
+        return getStoredReceipts().filter((r) => !r.is_void && (!activeBoarderId || r.boarder_id === activeBoarderId))
       }
       return data || []
     },
   })
+
+  const handleOpenReceipt = (rec: any) => {
+    const formatted: ExtendedReceipt = {
+      ...rec,
+      boarder_name: boarderName,
+      boarder_code: boarderCode,
+      boarder_phone: profile?.phone_number || '',
+      collector_name: 'ম্যানেজার',
+      account_name: 'হোস্টেল একাউন্ট',
+      allocations: rec.allocations || [],
+    }
+    setSelectedReceipt(formatted)
+    setIsReceiptModalOpen(true)
+  }
 
   // Calculate live financial summary (zero if clean/no charges in DB)
   const totalBilled = boarderCharges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
@@ -578,9 +614,13 @@ export const BoarderDashboardPage: React.FC = () => {
                 আমার সাম্প্রতিক পেমেন্ট রশিদ (Payment History)
               </h3>
             </div>
-            <span className="text-[11px] text-slate-400">
-              ডাটাবেসের সর্বশেষ মানি রিসিপ্ট
-            </span>
+            <Link
+              to="/portal/my-dues"
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 hover:text-indigo-300 border border-indigo-500/20 text-xs font-semibold transition-all"
+            >
+              <span>সব রশিদ দেখুন</span>
+              <ExternalLink className="w-3 h-3" />
+            </Link>
           </div>
 
           <div className="overflow-x-auto">
@@ -591,13 +631,14 @@ export const BoarderDashboardPage: React.FC = () => {
                   <th className="py-2.5 px-3">তারিখ</th>
                   <th className="py-2.5 px-3 text-right">পরিমাণ</th>
                   <th className="py-2.5 px-3 text-center">মাধ্যম</th>
-                  <th className="py-2.5 px-3 text-right">স্ট্যাটাস</th>
+                  <th className="py-2.5 px-3 text-center">স্ট্যাটাস</th>
+                  <th className="py-2.5 px-3 text-right">ভাউচার</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {boarderReceipts.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-slate-500">
+                    <td colSpan={6} className="py-8 text-center text-slate-500">
                       কোনো পরিশোধিত মানি রিসিপ্ট পাওয়া যায়নি।
                     </td>
                   </tr>
@@ -620,10 +661,19 @@ export const BoarderDashboardPage: React.FC = () => {
                           ? 'মোবাইল ব্যাংকিং (MFS)'
                           : 'ব্যাংক ট্রান্সফার'}
                       </td>
-                      <td className="py-3 px-3 text-right">
+                      <td className="py-3 px-3 text-center">
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
                           {rec.is_void ? 'বাতিল' : 'পরিশোধিত'}
                         </span>
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <button
+                          onClick={() => handleOpenReceipt(rec)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500 hover:text-white border border-indigo-500/20 text-[11px] font-semibold transition-all"
+                        >
+                          <Eye className="w-3 h-3" />
+                          <span>দেখুন</span>
+                        </button>
                       </td>
                     </tr>
                   ))
@@ -713,6 +763,13 @@ export const BoarderDashboardPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Official Printable Voucher Modal */}
+      <ReceiptPrintView
+        isOpen={isReceiptModalOpen}
+        onClose={() => setIsReceiptModalOpen(false)}
+        receipt={selectedReceipt}
+      />
     </div>
   )
 }

@@ -455,20 +455,28 @@ export const LoginPage: React.FC = () => {
             boarderStatus = seatCheck[0].boarder_status || 'PENDING'
           } else {
             // Check 2: Direct query on boarders and allocations table
+            const phoneFilters = normalizedPhone
+              ? `,phone_number.eq.${normalizedPhone},phone_number.eq.+88${normalizedPhone}`
+              : ''
             const { data: bdr } = await supabase
               .from('boarders')
               .select('id, status, user_id')
-              .or(`user_id.eq.${data.user.id},phone_number.eq.${normalizedPhone || ''},email.eq.${loginEmail}`)
+              .or(`user_id.eq.${data.user.id}${phoneFilters},email.eq.${loginEmail}`)
               .limit(1)
               .maybeSingle()
 
-            if (bdr) {
-              boarderStatus = bdr.status
-
-              // Automatically link user_id if not linked yet
-              if (!bdr.user_id) {
+            // Call security-definer claim RPC to ensure boarder row is linked to auth user
+            try {
+              await supabase.rpc('claim_my_boarder_profile')
+            } catch {
+              // fallback to direct update if RPC is pending
+              if (bdr && !bdr.user_id) {
                 await supabase.from('boarders').update({ user_id: data.user.id }).eq('id', bdr.id)
               }
+            }
+
+            if (bdr) {
+              boarderStatus = bdr.status
 
               const { data: alloc } = await supabase
                 .from('allocations')

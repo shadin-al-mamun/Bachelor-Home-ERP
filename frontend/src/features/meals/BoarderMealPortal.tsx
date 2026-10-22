@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import { isSupabaseConfigured } from '@/lib/supabaseClient'
+import { isPhoneMatch } from '@/utils/phone'
 import {
   getDhakaNow,
   formatDhakaDate,
@@ -73,7 +74,7 @@ export const BoarderMealPortal: React.FC = () => {
           (b) =>
             b.user_id === profile.id ||
             b.id === profile.id ||
-            b.phone_number === profile.phone_number ||
+            (profile?.phone_number && isPhoneMatch(b.phone_number, profile.phone_number)) ||
             b.full_name === profile.full_name
         )
         if (matched) {
