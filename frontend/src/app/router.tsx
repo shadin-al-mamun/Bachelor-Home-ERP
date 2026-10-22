@@ -276,6 +276,10 @@ export const router = createBrowserRouter([
         element: <HostelSettingsPage />,
       },
       {
+        path: 'settings/notices',
+        element: <NoticesPage />,
+      },
+      {
         path: 'settings/access-control',
         element: (
           <ProtectedRoute allowedRoles={['SUPER_ADMIN']}>

@@ -117,18 +117,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       permissionKey: 'boarders',
     },
 
-    // Notices & Announcements
-    {
-      type: 'link',
-      id: 'notices',
-      titleKey: 'nav.notices',
-      defaultTitle: 'নোটিশ ও ঘোষণা',
-      href: '/notices',
-      icon: <Megaphone className="w-5 h-5 shrink-0 text-amber-400" />,
-      roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
-      permissionKey: 'boarders',
-    },
-
     // Submenu Group: মিল ব্যবস্থাপনা (Meal Management)
     {
       type: 'group',
@@ -240,6 +228,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
           permissionKey: 'branding',
           badge: 'সেটিংস',
+        },
+        {
+          id: 'notices',
+          titleKey: 'nav.notices',
+          defaultTitle: 'নোটিশ ও ঘোষণা',
+          href: '/settings/notices',
+          icon: <Megaphone className="w-4 h-4 shrink-0 text-amber-400" />,
+          roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
+          permissionKey: 'governance',
         },
         {
           id: 'access_control',
