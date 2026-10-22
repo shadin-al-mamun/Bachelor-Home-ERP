@@ -164,12 +164,12 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
 
           {/* User Dropdown Menu */}
           {isUserMenuOpen && (
-            <div className="absolute right-0 mt-2 w-56 rounded-2xl glass-card border border-slate-700/80 shadow-2xl p-2 space-y-1 z-50">
+            <div className="absolute right-0 mt-2 w-64 rounded-2xl glass-card border border-slate-700/80 shadow-2xl p-2 space-y-1 z-50">
               <div className="px-3 py-2 border-b border-slate-800/80">
-                <p className="text-xs font-semibold text-white truncate">
+                <p className="text-sm font-semibold text-white truncate">
                   {profile?.full_name || 'হোস্টেল এডমিন'}
                 </p>
-                <p className="text-[11px] text-slate-400 truncate">
+                <p className="text-xs text-slate-400 truncate">
                   {profile?.email || 'admin@bachelorhome.erp'}
                 </p>
                 <div className="mt-1.5">
@@ -179,7 +179,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
                 </div>
               </div>
 
-              <div className="px-3 py-1.5 text-[11px] text-slate-400 flex items-center gap-1.5">
+              <div className="px-3 py-1.5 text-xs text-slate-400 flex items-center gap-1.5">
                 <Shield className="w-3.5 h-3.5 text-indigo-400" />
                 <span>Zero-Trust RLS Active</span>
               </div>
@@ -189,7 +189,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
                 <Link
                   to="/settings/branding"
                   onClick={() => setIsUserMenuOpen(false)}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-amber-300 hover:bg-amber-500/10 hover:text-amber-200 transition-colors border border-amber-500/30 bg-amber-500/10"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-amber-300 hover:bg-amber-500/10 hover:text-amber-200 transition-colors border border-amber-500/30 bg-amber-500/10"
                 >
                   <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
                   <span className="truncate">হোস্টেল লোগো ও ব্র্যান্ডিং</span>
@@ -201,7 +201,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
                   setIsUserMenuOpen(false)
                   signOut()
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-colors"
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-colors"
               >
                 <LogOut className="w-4 h-4" />
                 <span>লগআউট (Sign Out)</span>

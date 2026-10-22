@@ -359,7 +359,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         className={cn(
           'fixed lg:sticky top-0 left-0 z-40 h-screen transition-all duration-300 flex flex-col',
           'bg-slate-900/95 backdrop-blur-xl border-r border-slate-800/80',
-          isCollapsed ? 'w-20' : 'w-64',
+          isCollapsed ? 'w-20' : 'w-72 max-w-[85vw]',
           isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
       >
@@ -375,10 +375,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 )}
               </div>
               <div className="truncate">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-200 block truncate">
+                <span className="text-sm font-bold uppercase tracking-wider text-slate-200 block truncate">
                   {shortName || 'Bachelor Home'}
                 </span>
-                <span className="text-[10px] text-slate-400 font-mono block">
+                <span className="text-xs text-slate-400 font-mono block">
                   ERP Navigation
                 </span>
               </div>
@@ -418,7 +418,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <button
                       onClick={() => setActiveFlyoutGroup(isFlyoutOpen ? null : item.id)}
                       className={cn(
-                        'w-full flex items-center justify-center py-2.5 rounded-xl text-xs font-medium transition-all select-none',
+                        'w-full flex items-center justify-center py-2.5 rounded-xl text-sm font-medium transition-all select-none',
                         hasActiveChild
                           ? 'bg-primary-600/20 text-white border border-primary-500/40 shadow-sm shadow-primary-500/10'
                           : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
@@ -435,8 +435,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                     {/* Collapsed Flyout Submenu */}
                     {isFlyoutOpen && (
-                      <div className="absolute left-full top-0 ml-2 w-56 p-2 rounded-2xl bg-slate-900/95 border border-slate-700/80 shadow-2xl backdrop-blur-2xl z-50 space-y-1 animate-in fade-in zoom-in-95 duration-150">
-                        <div className="px-3 py-1.5 border-b border-slate-800 text-[11px] font-bold text-slate-300 flex items-center gap-2">
+                      <div className="absolute left-full top-0 ml-2 w-60 p-2 rounded-2xl bg-slate-900/95 border border-slate-700/80 shadow-2xl backdrop-blur-2xl z-50 space-y-1 animate-in fade-in zoom-in-95 duration-150">
+                        <div className="px-3 py-2 border-b border-slate-800 text-xs font-bold text-slate-200 flex items-center gap-2">
                           {item.icon}
                           <span className="truncate">{groupLabel}</span>
                         </div>
@@ -454,7 +454,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                   onCloseMobile?.()
                                 }}
                                 className={cn(
-                                  'flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all select-none',
+                                  'flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all select-none',
                                   active
                                     ? 'bg-primary-600/25 text-white border border-primary-500/40 shadow-sm'
                                     : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
@@ -463,7 +463,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 {child.icon}
                                 <span className="truncate flex-1">{childLabel}</span>
                                 {child.badge && (
-                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
                                     {child.badge}
                                   </span>
                                 )}
@@ -484,7 +484,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     type="button"
                     onClick={() => toggleGroup(item.id)}
                     className={cn(
-                      'w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all group select-none text-left',
+                      'w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all group select-none text-left',
                       hasActiveChild
                         ? 'bg-slate-800/60 text-slate-100 border border-slate-700/60'
                         : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/40'
@@ -494,7 +494,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <div className="text-primary-400 group-hover:text-primary-300 transition-colors">
                         {item.icon}
                       </div>
-                      <span className="truncate font-semibold tracking-wide text-[12px]">{groupLabel}</span>
+                      <span className="truncate font-semibold tracking-wide text-sm">{groupLabel}</span>
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
@@ -523,7 +523,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             to={child.href}
                             onClick={onCloseMobile}
                             className={cn(
-                              'flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all group select-none',
+                              'flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all group select-none',
                               active
                                 ? 'bg-primary-600/25 text-white border border-primary-500/40 shadow-sm shadow-primary-500/10 font-semibold'
                                 : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/50'
@@ -534,7 +534,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             </div>
                             <span className="truncate flex-1">{childLabel}</span>
                             {child.badge && (
-                              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0">
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0">
                                 {child.badge}
                               </span>
                             )}
@@ -559,9 +559,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 to={item.href}
                 onClick={onCloseMobile}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all group select-none relative',
+                  'flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all group select-none relative',
                   active
-                    ? 'bg-primary-600/20 text-white border border-primary-500/40 shadow-sm shadow-primary-500/10'
+                    ? 'bg-primary-600/20 text-white border border-primary-500/40 shadow-sm shadow-primary-500/10 font-semibold'
                     : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60',
                   isCollapsed && 'justify-center px-2'
                 )}
@@ -578,11 +578,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <div className="flex items-center justify-between flex-1 min-w-0">
                     <span className="truncate">{label}</span>
                     {hasPending ? (
-                      <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-slate-950 animate-pulse shrink-0">
+                      <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-slate-950 animate-pulse shrink-0">
                         {pendingBoarders.length}
                       </span>
                     ) : item.badge ? (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0">
+                      <span className="px-1.5 py-0.5 rounded text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0">
                         {item.badge}
                       </span>
                     ) : null}
@@ -596,11 +596,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* User Scope Info Footer */}
         {!isCollapsed && (
           <div className="p-3 border-t border-slate-800/80 bg-slate-950/40">
-            <div className="text-[11px] text-slate-400 flex items-center justify-between">
+            <div className="text-xs text-slate-400 flex items-center justify-between">
               <span>রোল স্তর:</span>
               <span className="font-semibold text-primary-400">{userRole}</span>
             </div>
-            <div className="text-[10px] text-slate-500 truncate mt-0.5">
+            <div className="text-[11px] text-slate-500 truncate mt-0.5">
               Hostel ERP v1.0 • PWA Ready
             </div>
           </div>

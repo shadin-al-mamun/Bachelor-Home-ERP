@@ -59,7 +59,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ onOpenMobileMenu }) => {
           }
         >
           {item.icon}
-          <span className="text-[10px] mt-0.5 tracking-tight">{item.label}</span>
+          <span className="text-xs mt-0.5 tracking-tight font-medium">{item.label}</span>
         </NavLink>
       ))}
 
@@ -68,7 +68,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ onOpenMobileMenu }) => {
         className="flex flex-col items-center justify-center w-14 py-1 text-slate-400 hover:text-slate-200 transition-colors"
       >
         <Menu className="w-5 h-5" />
-        <span className="text-[10px] mt-0.5 tracking-tight">মেনু</span>
+        <span className="text-xs mt-0.5 tracking-tight font-medium">মেনু</span>
       </button>
     </nav>
   )
