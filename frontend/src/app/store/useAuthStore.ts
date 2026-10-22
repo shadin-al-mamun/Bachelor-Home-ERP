@@ -130,6 +130,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
 
         // Self-heal database in background if role or phone out of sync
+        supabase.rpc('sync_owner_profile').then(() => {}, () => {})
+
         if (profileData?.role !== 'SUPER_ADMIN' || profileData?.phone_number !== '01712394767') {
           supabase
             .from('profiles')

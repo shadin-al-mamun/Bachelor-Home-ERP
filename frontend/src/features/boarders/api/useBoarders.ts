@@ -635,62 +635,79 @@ export function useBoarders(filters?: BoarderFilters) {
       }
 
       // --- When Supabase is configured: Query Real Supabase Database ---
-      let query = supabase
-        .from('boarders')
-        .select(`
-          *,
-          active_allocation:allocations(
-            id,
-            boarder_id,
-            seat_id,
-            monthly_rent,
-            security_deposit,
-            start_date,
-            status,
-            seat:seats(
+      let data: any[] | null = null
+
+      // 1. Try authoritative SECURITY DEFINER RPC first (bypasses RLS issues)
+      try {
+        const { data: rpcData, error: rpcError } = await supabase.rpc('get_admin_boarders_list')
+        if (!rpcError && Array.isArray(rpcData) && rpcData.length > 0) {
+          data = rpcData
+        }
+      } catch {
+        // Fall back to table query
+      }
+
+      // 2. Direct table query if RPC not yet migrated or returned empty
+      if (!data) {
+        let query = supabase
+          .from('boarders')
+          .select(`
+            *,
+            active_allocation:allocations(
               id,
-              seat_code,
-              seat_name,
-              default_rent,
-              room:rooms(
+              boarder_id,
+              seat_id,
+              monthly_rent,
+              security_deposit,
+              start_date,
+              status,
+              seat:seats(
                 id,
-                room_code,
-                name,
-                flat:flats(
+                seat_code,
+                seat_name,
+                default_rent,
+                room:rooms(
                   id,
-                  flat_code,
+                  room_code,
                   name,
-                  building:buildings(id, name)
+                  flat:flats(
+                    id,
+                    flat_code,
+                    name,
+                    building:buildings(id, name)
+                  )
                 )
               )
             )
-          )
-        `)
-        .order('created_at', { ascending: false })
-
-      if (filters?.search && filters.search.trim()) {
-        const q = filters.search.trim()
-        query = query.or(`full_name.ilike.%${q}%,phone_number.ilike.%${q}%,boarder_code.ilike.%${q}%`)
-      }
-
-      let { data, error } = await query
-      if (error) {
-        console.warn('Supabase deep boarders fetch error, falling back to simple select:', error.message)
-        let simpleQuery = supabase
-          .from('boarders')
-          .select('*')
+          `)
           .order('created_at', { ascending: false })
 
         if (filters?.search && filters.search.trim()) {
           const q = filters.search.trim()
-          simpleQuery = simpleQuery.or(`full_name.ilike.%${q}%,phone_number.ilike.%${q}%,boarder_code.ilike.%${q}%`)
+          query = query.or(`full_name.ilike.%${q}%,phone_number.ilike.%${q}%,boarder_code.ilike.%${q}%`)
         }
-        const simpleRes = await simpleQuery
-        if (simpleRes.error) {
-          console.error('Supabase boarders fetch error:', simpleRes.error.message)
-          data = []
+
+        const res = await query
+        if (res.error) {
+          console.warn('Supabase deep boarders fetch error, falling back to simple select:', res.error.message)
+          let simpleQuery = supabase
+            .from('boarders')
+            .select('*')
+            .order('created_at', { ascending: false })
+
+          if (filters?.search && filters.search.trim()) {
+            const q = filters.search.trim()
+            simpleQuery = simpleQuery.or(`full_name.ilike.%${q}%,phone_number.ilike.%${q}%,boarder_code.ilike.%${q}%`)
+          }
+          const simpleRes = await simpleQuery
+          if (simpleRes.error) {
+            console.error('Supabase boarders fetch error:', simpleRes.error.message)
+            data = []
+          } else {
+            data = simpleRes.data
+          }
         } else {
-          data = simpleRes.data
+          data = res.data
         }
       }
 
@@ -763,23 +780,6 @@ export function useBoarders(filters?: BoarderFilters) {
         if (b.user_id && staffUserIds.has(b.user_id)) return false
         return true
       })
-
-      // Self-healing fallback: Ensure the boarders directory is NEVER an empty 0-count ghost screen
-      // If there are no ACTIVE boarders in filteredList, merge in baseline active boarders (e.g. Al Imran)
-      const hasActive = filteredList.some((b: any) => b.status === 'ACTIVE')
-      if (!hasActive) {
-        const baselineActive = INITIAL_MOCK_BOARDERS.filter(
-          (b) => b.status === 'ACTIVE' && b.email?.toLowerCase() !== 'shadin0158@gmail.com' && b.boarder_code !== 'BDR-2026-4071'
-        )
-        filteredList = [...filteredList, ...baselineActive]
-      }
-
-      // If filteredList is still completely empty, provide full baseline
-      if (filteredList.length === 0) {
-        filteredList = INITIAL_MOCK_BOARDERS.filter(
-          (b) => b.email?.toLowerCase() !== 'shadin0158@gmail.com' && b.boarder_code !== 'BDR-2026-4071'
-        )
-      }
 
       // Apply status filter if set
       let result = filteredList

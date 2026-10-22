@@ -385,6 +385,17 @@ export function useOwnerDashboard() {
         tomorrow.setDate(tomorrow.getDate() + 1)
         const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`
 
+        // 0. Try high-precision authoritative RPC first (bypasses RLS or permission discrepancies)
+        let rpcKpis: any = null
+        try {
+          const { data: rpcData, error: rpcErr } = await supabase.rpc('get_executive_kpis')
+          if (!rpcErr && rpcData && typeof rpcData === 'object') {
+            rpcKpis = rpcData
+          }
+        } catch {
+          // Fall back to direct queries
+        }
+
         // Query live counts in parallel
         const [
           seatsRes,
@@ -418,21 +429,24 @@ export function useOwnerDashboard() {
         ])
 
         const seats = seatsRes.data || []
-        const totalSeats = seats.length
-        const occupiedSeats = seats.filter((s) => s.status === 'OCCUPIED').length
-        const vacantSeats = seats.filter((s) => s.status === 'AVAILABLE').length
-        const maintenanceSeats = seats.filter((s) => s.status === 'MAINTENANCE').length
-        const occupancyRate = totalSeats > 0 ? (occupiedSeats / totalSeats) * 100 : 0
+        const totalSeats = Number(rpcKpis?.total_seats) || seats.length
+        const occupiedSeats = Number(rpcKpis?.occupied_seats) || seats.filter((s) => s.status === 'OCCUPIED').length
+        const vacantSeats = Number(rpcKpis?.vacant_seats) || seats.filter((s) => s.status === 'AVAILABLE').length
+        const maintenanceSeats = Number(rpcKpis?.maintenance_seats) || seats.filter((s) => s.status === 'MAINTENANCE').length
+        const occupancyRate = Number(rpcKpis?.occupancy_rate) || (totalSeats > 0 ? (occupiedSeats / totalSeats) * 100 : 0)
 
         const charges = chargesRes.data || []
-        const totalBilled = charges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+        const totalBilledDirect = charges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
         const totalCollectedCharges = charges.reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
         const totalReceipts = (receiptsRes.data || []).reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
-        const totalCollected = totalReceipts || totalCollectedCharges
-        const totalDues = Math.max(0, totalBilled - totalCollectedCharges)
+        const totalCollectedDirect = Math.max(totalReceipts, totalCollectedCharges)
 
-        const totalExpenses = (expensesRes.data || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
-        const totalIncomes = (incomesRes.data || []).reduce((sum, i) => sum + (Number(i.amount) || 0), 0)
+        const totalBilled = rpcKpis?.total_billed_month !== undefined ? Number(rpcKpis.total_billed_month) : totalBilledDirect
+        const totalCollected = rpcKpis?.total_collected_month !== undefined ? Number(rpcKpis.total_collected_month) : totalCollectedDirect
+        const totalDues = rpcKpis?.total_outstanding_dues !== undefined ? Number(rpcKpis.total_outstanding_dues) : Math.max(0, totalBilled - totalCollected)
+
+        const totalExpenses = rpcKpis?.operating_expenses_month !== undefined ? Number(rpcKpis.operating_expenses_month) : (expensesRes.data || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
+        const totalIncomes = rpcKpis?.non_rent_incomes_month !== undefined ? Number(rpcKpis.non_rent_incomes_month) : (incomesRes.data || []).reduce((sum, i) => sum + (Number(i.amount) || 0), 0)
 
         // Find Manager Cash account(s) matching by type, known ID, account number, or name
         const managerAccounts = (managerAccountsRes.data || []).filter((a: any) =>
