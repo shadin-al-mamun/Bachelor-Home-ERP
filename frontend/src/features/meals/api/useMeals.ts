@@ -213,15 +213,42 @@ export const MOCK_MEAL_SETTINGS: MealSettings = {
   updated_at: new Date().toISOString(),
 }
 
+export const MEAL_RATES_STORAGE_KEY = 'bachelor_erp_active_meal_rates'
+
 export const MOCK_ACTIVE_RATE: MealRate = {
-  id: 'rate-active-2026',
+  id: 'rate-active-default',
   effective_from: '2026-01-01',
   effective_to: null,
-  breakfast_rate: 30.0,
-  lunch_rate: 65.0,
-  dinner_rate: 60.0,
+  breakfast_rate: 0,
+  lunch_rate: 0,
+  dinner_rate: 0,
   created_by: 'usr-admin1',
   created_at: '2026-01-01T00:00:00Z',
+}
+
+export function getStoredActiveMealRate(): MealRate {
+  try {
+    const raw = typeof window !== 'undefined' ? localStorage.getItem(MEAL_RATES_STORAGE_KEY) : null
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (parsed && typeof parsed === 'object') {
+        return parsed
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to parse stored meal rate:', e)
+  }
+  return MOCK_ACTIVE_RATE
+}
+
+export function saveStoredActiveMealRate(rate: MealRate): void {
+  try {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(MEAL_RATES_STORAGE_KEY, JSON.stringify(rate))
+    }
+  } catch (e) {
+    console.warn('Failed to save stored meal rate:', e)
+  }
 }
 
 export const MOCK_BOARDERS_FOR_MEAL: BoarderOption[] = [
@@ -336,8 +363,9 @@ export function useActiveMealRates() {
   return useQuery({
     queryKey: ['active-meal-rate'],
     queryFn: async (): Promise<MealRate> => {
+      const stored = getStoredActiveMealRate()
       if (!isSupabaseConfigured) {
-        return MOCK_ACTIVE_RATE
+        return stored
       }
 
       const todayStr = formatDhakaDate(getDhakaNow())
@@ -351,8 +379,9 @@ export function useActiveMealRates() {
         .limit(1)
 
       if (error || !data || data.length === 0) {
-        return MOCK_ACTIVE_RATE
+        return stored
       }
+      saveStoredActiveMealRate(data[0])
       return data[0]
     },
     staleTime: 5000,

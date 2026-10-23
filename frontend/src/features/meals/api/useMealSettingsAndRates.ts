@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
 import type { MealSettings, MealRate, MealSession } from '@/types/database'
-import { MOCK_MEAL_SETTINGS, MOCK_ACTIVE_RATE } from './useMeals'
+import { MOCK_MEAL_SETTINGS, MOCK_ACTIVE_RATE, getStoredActiveMealRate, saveStoredActiveMealRate } from './useMeals'
 
 // ==============================================================================
 // Types & Interfaces
@@ -383,6 +383,7 @@ export function useCreateMealRateMutation() {
         created_by: 'usr-admin1',
         created_at: new Date().toISOString(),
       }
+      saveStoredActiveMealRate(mockItem)
       MOCK_RATES_LIST = [mockItem, ...MOCK_RATES_LIST.filter((r) => r.effective_from !== input.effectiveFrom)]
 
       if (!isSupabaseConfigured) {
@@ -473,6 +474,7 @@ export function useCreateMealRateMutation() {
         created_at: new Date().toISOString(),
       }
 
+      saveStoredActiveMealRate(updatedRate)
       queryClient.setQueryData(['active-meal-rate'], updatedRate)
       queryClient.setQueryData(['meal-rate-history'], (old: any) => {
         if (!Array.isArray(old)) return [updatedRate]

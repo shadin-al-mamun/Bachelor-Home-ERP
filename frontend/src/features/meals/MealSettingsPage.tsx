@@ -65,9 +65,9 @@ export const MealSettingsPage: React.FC = () => {
   const [rateEffectiveFrom, setRateEffectiveFrom] = useState<string>(
     new Date().toISOString().slice(0, 10)
   )
-  const [newBreakfastRate, setNewBreakfastRate] = useState<string>('30')
-  const [newLunchRate, setNewLunchRate] = useState<string>('65')
-  const [newDinnerRate, setNewDinnerRate] = useState<string>('60')
+  const [newBreakfastRate, setNewBreakfastRate] = useState<string>('')
+  const [newLunchRate, setNewLunchRate] = useState<string>('')
+  const [newDinnerRate, setNewDinnerRate] = useState<string>('')
   const [rateSuccessMsg, setRateSuccessMsg] = useState<string | null>(null)
   const [rateErrorMsg, setRateErrorMsg] = useState<string | null>(null)
 
@@ -243,7 +243,7 @@ export const MealSettingsPage: React.FC = () => {
                       <span>সকালের নাস্তা (Breakfast):</span>
                     </span>
                     <span className="text-lg font-extrabold font-mono text-amber-400">
-                      ৳{activeRate ? Number(activeRate.breakfast_rate).toFixed(2) : '30.00'}
+                      ৳{activeRate ? Number(activeRate.breakfast_rate).toFixed(2) : '0.00'}
                     </span>
                   </div>
 
@@ -253,7 +253,7 @@ export const MealSettingsPage: React.FC = () => {
                       <span>দুপুরের খাবার (Lunch):</span>
                     </span>
                     <span className="text-lg font-extrabold font-mono text-emerald-400">
-                      ৳{activeRate ? Number(activeRate.lunch_rate).toFixed(2) : '65.00'}
+                      ৳{activeRate ? Number(activeRate.lunch_rate).toFixed(2) : '0.00'}
                     </span>
                   </div>
 
@@ -263,7 +263,7 @@ export const MealSettingsPage: React.FC = () => {
                       <span>রাতের খাবার (Dinner):</span>
                     </span>
                     <span className="text-lg font-extrabold font-mono text-indigo-400">
-                      ৳{activeRate ? Number(activeRate.dinner_rate).toFixed(2) : '60.00'}
+                      ৳{activeRate ? Number(activeRate.dinner_rate).toFixed(2) : '0.00'}
                     </span>
                   </div>
                 </div>
@@ -273,13 +273,13 @@ export const MealSettingsPage: React.FC = () => {
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-400">দৈনিক ৩ বেলা ফুল মিল খরচ:</span>
                   <span className="text-base font-extrabold font-mono text-amber-300">
-                    ৳{activeRate ? (Number(activeRate.breakfast_rate) + Number(activeRate.lunch_rate) + Number(activeRate.dinner_rate)).toFixed(2) : '155.00'}
+                    ৳{activeRate ? (Number(activeRate.breakfast_rate) + Number(activeRate.lunch_rate) + Number(activeRate.dinner_rate)).toFixed(2) : '0.00'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-slate-500">
                   <span>কার্যকর শুরুর তারিখ:</span>
                   <span className="font-mono text-slate-300 font-semibold">
-                    {activeRate?.effective_from || '২০২৬-০১-০১'}
+                    {activeRate?.effective_from || 'নির্ধারিত হয়নি'}
                   </span>
                 </div>
               </div>

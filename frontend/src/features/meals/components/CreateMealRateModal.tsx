@@ -27,13 +27,13 @@ export const CreateMealRateModal: React.FC<CreateMealRateModalProps> = ({
   const todayStr = new Date().toISOString().slice(0, 10)
   const [effectiveFrom, setEffectiveFrom] = useState<string>(todayStr)
   const [breakfastRate, setBreakfastRate] = useState<string>(
-    activeRate ? String(activeRate.breakfast_rate) : '30'
+    activeRate ? String(activeRate.breakfast_rate) : ''
   )
   const [lunchRate, setLunchRate] = useState<string>(
-    activeRate ? String(activeRate.lunch_rate) : '65'
+    activeRate ? String(activeRate.lunch_rate) : ''
   )
   const [dinnerRate, setDinnerRate] = useState<string>(
-    activeRate ? String(activeRate.dinner_rate) : '60'
+    activeRate ? String(activeRate.dinner_rate) : ''
   )
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)

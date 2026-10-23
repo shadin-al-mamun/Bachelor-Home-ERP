@@ -23,29 +23,26 @@ export interface HostelNotice {
 
 const LOCAL_STORAGE_KEY = 'bachelor_erp_hostel_notices'
 
-// Default seed notices for smooth initial experience
-const DEFAULT_NOTICES: HostelNotice[] = [
-  {
-    id: 'notice-seed-1',
-    title: 'বিদ্যুৎ লাইন রক্ষণাবেক্ষণ সংক্রান্ত ঘোষণা',
-    message: 'আগামীকাল সকাল ১০:০০ টা থেকে দুপুর ০১:০০ টা পর্যন্ত হোস্টেলের মূল বিদ্যুৎ লাইনে মেরামতের কাজ চলবে। সংশ্লিষ্ট সকলকে প্রয়োজনীয় প্রস্তুতি রাখার জন্য অনুরোধ করা হচ্ছে।',
-    type: 'INFO',
-    target_audience: 'ALL',
-    target_flat_id: null,
-    target_flat_name: null,
-    target_boarder_id: null,
-    target_boarder_name: null,
-    created_by_name: 'হোস্টেল সুপারএডমিন',
-    is_active: true,
-    created_at: new Date(Date.now() - 2 * 3600000).toISOString(),
-  },
-]
+// Clean baseline: zero hardcoded demo seeds so only real hostel notices appear
+const DEFAULT_NOTICES: HostelNotice[] = []
 
 function getLocalNotices(): HostelNotice[] {
   try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY)
+    const raw = typeof window !== 'undefined' ? localStorage.getItem(LOCAL_STORAGE_KEY) : null
     if (raw) {
-      return JSON.parse(raw)
+      const parsed: HostelNotice[] = JSON.parse(raw)
+      // Purge any legacy demo seeds like notice-seed-1 or maintenance notice
+      const cleaned = parsed.filter(
+        (n) =>
+          n.id !== 'notice-seed-1' &&
+          !n.id.startsWith('seed-') &&
+          !n.id.startsWith('demo-') &&
+          !n.title?.includes('বিদ্যুৎ লাইন রক্ষণাবেক্ষণ')
+      )
+      if (cleaned.length !== parsed.length && typeof window !== 'undefined') {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cleaned))
+      }
+      return cleaned
     }
   } catch (e) {
     console.warn('Failed to parse local notices:', e)
@@ -55,7 +52,9 @@ function getLocalNotices(): HostelNotice[] {
 
 function saveLocalNotices(notices: HostelNotice[]) {
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(notices))
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(notices))
+    }
   } catch (e) {
     console.warn('Failed to save local notices:', e)
   }
@@ -106,7 +105,7 @@ export const useNotices = (options?: { activeOnly?: boolean; boarderId?: string;
         const { data, error } = await query
 
         if (error) {
-          // If table not yet created on remote, fallback to localStorage
+          // If table not yet created on remote, fallback to clean localStorage
           console.warn('hostel_notices table fetch warning:', error.message)
           let result = [...localNotices]
           if (options?.activeOnly) result = result.filter((n) => n.is_active)
@@ -116,23 +115,30 @@ export const useNotices = (options?: { activeOnly?: boolean; boarderId?: string;
           return result
         }
 
-        const remoteNotices: HostelNotice[] = (data || []).map((row) => ({
-          id: row.id,
-          title: row.title,
-          message: row.message,
-          type: (row.type as NoticeType) || 'INFO',
-          target_audience: (row.target_audience as TargetAudience) || 'ALL',
-          target_flat_id: row.target_flat_id || null,
-          target_flat_name: row.target_flat_name || null,
-          target_boarder_id: row.target_boarder_id || null,
-          target_boarder_name: row.target_boarder_name || null,
-          created_by: row.created_by,
-          created_by_name: row.created_by_name || 'সুপারএডমিন',
-          is_active: row.is_active !== false,
-          created_at: row.created_at,
-        }))
+        const remoteNotices: HostelNotice[] = (data || [])
+          .filter(
+            (row) =>
+              row.id !== 'notice-seed-1' &&
+              !row.id.startsWith('seed-') &&
+              !row.title?.includes('বিদ্যুৎ লাইন রক্ষণাবেক্ষণ')
+          )
+          .map((row) => ({
+            id: row.id,
+            title: row.title,
+            message: row.message,
+            type: (row.type as NoticeType) || 'INFO',
+            target_audience: (row.target_audience as TargetAudience) || 'ALL',
+            target_flat_id: row.target_flat_id || null,
+            target_flat_name: row.target_flat_name || null,
+            target_boarder_id: row.target_boarder_id || null,
+            target_boarder_name: row.target_boarder_name || null,
+            created_by: row.created_by,
+            created_by_name: row.created_by_name || 'সুপারএডমিন',
+            is_active: row.is_active !== false,
+            created_at: row.created_at,
+          }))
 
-        // Merge with local if any unique
+        // Merge user-created local notices only if not in remote
         const mergedMap = new Map<string, HostelNotice>()
         remoteNotices.forEach((n) => mergedMap.set(n.id, n))
         localNotices.forEach((n) => {

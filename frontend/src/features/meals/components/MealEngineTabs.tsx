@@ -170,15 +170,15 @@ export const MealEngineTabs: React.FC<MealEngineTabsProps> = ({
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             <span className="text-slate-400 font-medium">বর্তমান কার্যকর রেট:</span>
             <span className="font-mono font-bold text-amber-300 text-sm">
-              🍳 নাস্তা: ৳{activeRate?.breakfast_rate || '30'}
+              🍳 নাস্তা: ৳{activeRate ? activeRate.breakfast_rate : '0'}
             </span>
             <span className="text-slate-600">•</span>
             <span className="font-mono font-bold text-emerald-300 text-sm">
-              🍛 দুপুর: ৳{activeRate?.lunch_rate || '65'}
+              🍛 দুপুর: ৳{activeRate ? activeRate.lunch_rate : '0'}
             </span>
             <span className="text-slate-600">•</span>
             <span className="font-mono font-bold text-indigo-300 text-sm">
-              🍲 রাত: ৳{activeRate?.dinner_rate || '60'}
+              🍲 রাত: ৳{activeRate ? activeRate.dinner_rate : '0'}
             </span>
           </div>
 

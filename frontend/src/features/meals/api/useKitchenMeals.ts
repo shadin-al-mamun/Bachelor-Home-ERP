@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
 import {
   MOCK_ACTIVE_RATE,
+  getStoredActiveMealRate,
   formatDhakaDate,
   getDhakaNow,
 } from './useMeals'
@@ -243,10 +244,11 @@ export function useKitchenMealSummary(mealDate?: string) {
         const totalMeals = breakfastCount + lunchCount + dinnerCount
         const totalBoarders = MOCK_KITCHEN_FLATS.reduce((sum, f) => sum + f.total_boarders, 0)
 
+        const currentRates = getStoredActiveMealRate()
         const estimatedBudget =
-          breakfastCount * MOCK_ACTIVE_RATE.breakfast_rate +
-          lunchCount * MOCK_ACTIVE_RATE.lunch_rate +
-          dinnerCount * MOCK_ACTIVE_RATE.dinner_rate
+          breakfastCount * (currentRates.breakfast_rate || 0) +
+          lunchCount * (currentRates.lunch_rate || 0) +
+          dinnerCount * (currentRates.dinner_rate || 0)
 
         return {
           meal_date: targetDate,
@@ -358,10 +360,11 @@ export function useKitchenMealSummary(mealDate?: string) {
       })
 
       const totalMeals = grandBreakfast + grandLunch + grandDinner
+      const currentRates = getStoredActiveMealRate()
       const estimatedBudget =
-        grandBreakfast * MOCK_ACTIVE_RATE.breakfast_rate +
-        grandLunch * MOCK_ACTIVE_RATE.lunch_rate +
-        grandDinner * MOCK_ACTIVE_RATE.dinner_rate
+        grandBreakfast * (currentRates.breakfast_rate || 0) +
+        grandLunch * (currentRates.lunch_rate || 0) +
+        grandDinner * (currentRates.dinner_rate || 0)
 
       return {
         meal_date: targetDate,

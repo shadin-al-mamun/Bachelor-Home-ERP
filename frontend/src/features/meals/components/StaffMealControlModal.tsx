@@ -120,9 +120,9 @@ export const StaffMealControlModal: React.FC<StaffMealControlModalProps> = ({
 
   if (!isOpen) return null
 
-  const breakfastRate = rates?.breakfast_rate ?? 30
-  const lunchRate = rates?.lunch_rate ?? 65
-  const dinnerRate = rates?.dinner_rate ?? 60
+  const breakfastRate = rates?.breakfast_rate ?? 0
+  const lunchRate = rates?.lunch_rate ?? 0
+  const dinnerRate = rates?.dinner_rate ?? 0
 
   const totalMealCount = (breakfast ? 1 : 0) + (lunch ? 1 : 0) + (dinner ? 1 : 0)
   const totalCost =

@@ -110,9 +110,9 @@ export const BoarderMealPortal: React.FC = () => {
   const dinnerActive = currentDaySelection?.dinner ?? true
 
   // Rates
-  const breakfastRate = rates?.breakfast_rate ?? 30.0
-  const lunchRate = rates?.lunch_rate ?? 65.0
-  const dinnerRate = rates?.dinner_rate ?? 60.0
+  const breakfastRate = rates?.breakfast_rate ?? 0
+  const lunchRate = rates?.lunch_rate ?? 0
+  const dinnerRate = rates?.dinner_rate ?? 0
 
   // Calculate day total cost
   const dayTotalCost =

@@ -171,9 +171,9 @@ export const BoarderDashboardPage: React.FC = () => {
   const tomorrowDateStatus = getDateMealStatus(tomorrowStr, settings?.cutoff_time || '22:00:00')
 
   // Calculate month meal count & cost from live selections
-  const breakfastRate = rates?.breakfast_rate ?? 30.0
-  const lunchRate = rates?.lunch_rate ?? 65.0
-  const dinnerRate = rates?.dinner_rate ?? 60.0
+  const breakfastRate = rates?.breakfast_rate ?? 0
+  const lunchRate = rates?.lunch_rate ?? 0
+  const dinnerRate = rates?.dinner_rate ?? 0
 
   const currentMonthStr = todayStr.slice(0, 7)
   const monthSelections = selections.filter(
@@ -529,7 +529,9 @@ export const BoarderDashboardPage: React.FC = () => {
               <span className="text-2xl">🍳</span>
               <div>
                 <div className="text-xs font-bold text-white">সকালের নাস্তা</div>
-                <div className="text-[10px] text-slate-400">০৭:৩০ − ০৯:০০ (৳৩০)</div>
+                <div className="text-[10px] text-slate-400">
+                  ০৭:৩০ − ০৯:০০ ({rates ? formatCurrencyBn(breakfastRate) : '...'})
+                </div>
               </div>
             </div>
 
@@ -552,7 +554,9 @@ export const BoarderDashboardPage: React.FC = () => {
               <span className="text-2xl">🍛</span>
               <div>
                 <div className="text-xs font-bold text-white">দুপুরের খাবার</div>
-                <div className="text-[10px] text-slate-400">০১:০০ − ০২:৩০ (৳৬৫)</div>
+                <div className="text-[10px] text-slate-400">
+                  ০১:০০ − ০২:৩০ ({rates ? formatCurrencyBn(lunchRate) : '...'})
+                </div>
               </div>
             </div>
 
@@ -575,7 +579,9 @@ export const BoarderDashboardPage: React.FC = () => {
               <span className="text-2xl">🍲</span>
               <div>
                 <div className="text-xs font-bold text-white">রাতের খাবার</div>
-                <div className="text-[10px] text-slate-400">০৮:৩০ − ১০:০০ (৳৬০)</div>
+                <div className="text-[10px] text-slate-400">
+                  ০৮:৩০ − ১০:০০ ({rates ? formatCurrencyBn(dinnerRate) : '...'})
+                </div>
               </div>
             </div>
 
