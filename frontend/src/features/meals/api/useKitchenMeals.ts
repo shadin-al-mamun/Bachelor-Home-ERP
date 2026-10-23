@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
 import {
-  MOCK_ACTIVE_RATE,
   getStoredActiveMealRate,
   formatDhakaDate,
   getDhakaNow,

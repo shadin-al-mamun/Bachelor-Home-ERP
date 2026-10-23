@@ -224,6 +224,10 @@ export function useMealRateHistory() {
     queryKey: ['meal-rate-history'],
     queryFn: async (): Promise<MealRate[]> => {
       if (!isSupabaseConfigured) {
+        const stored = getStoredActiveMealRate()
+        if (stored && stored.id !== 'rate-active-default') {
+          return [stored, ...MOCK_RATES_LIST.filter((r) => r.id !== stored.id)]
+        }
         return MOCK_RATES_LIST
       }
 
