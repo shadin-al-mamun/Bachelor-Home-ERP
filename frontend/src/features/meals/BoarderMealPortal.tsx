@@ -10,10 +10,12 @@ import {
   HelpCircle,
   Receipt,
   UserCheck,
+  Users,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import { isSupabaseConfigured } from '@/lib/supabaseClient'
 import { isPhoneMatch } from '@/utils/phone'
+import { formatCurrencyBn } from '@/utils/date'
 import { useCurrentBoarder } from '@/features/boarders/api/useCurrentBoarder'
 import {
   getDhakaNow,
@@ -31,6 +33,11 @@ import type { MealSessionType } from './api/useMeals'
 import { CutoffCountdownBanner } from './components/CutoffCountdownBanner'
 import { MealSessionCard } from './components/MealSessionCard'
 import { AdminMealOverrideModal } from './components/AdminMealOverrideModal'
+import { BookGuestMealModal } from './components/BookGuestMealModal'
+import {
+  useGuestMealBookings,
+  useCancelGuestMealMutation,
+} from './api/useGuestMeals'
 
 export const BoarderMealPortal: React.FC = () => {
   const { profile } = useAuthStore()
@@ -109,16 +116,30 @@ export const BoarderMealPortal: React.FC = () => {
   const lunchActive = currentDaySelection?.lunch ?? true
   const dinnerActive = currentDaySelection?.dinner ?? true
 
+  // Guest meals state & query for selected boarder & date
+  const [isGuestMealModalOpen, setIsGuestMealModalOpen] = useState(false)
+  const { data: allGuestBookings = [] } = useGuestMealBookings({
+    boarderId: selectedBoarderId || activeBoarder?.id,
+  })
+  const cancelGuestMealMutation = useCancelGuestMealMutation()
+
+  const selectedDateGuestMeals = allGuestBookings.filter(
+    (b) => b.meal_date === selectedDate && b.status === 'CONFIRMED'
+  )
+  const selectedDateGuestCost = selectedDateGuestMeals.reduce((s, g) => s + g.total_amount, 0)
+  const selectedDateGuestCount = selectedDateGuestMeals.reduce((s, g) => s + g.guest_count, 0)
+
   // Rates
   const breakfastRate = rates?.breakfast_rate ?? 0
   const lunchRate = rates?.lunch_rate ?? 0
   const dinnerRate = rates?.dinner_rate ?? 0
 
-  // Calculate day total cost
-  const dayTotalCost =
+  // Calculate day total cost (including guest meals)
+  const dayResidentCost =
     (breakfastActive ? breakfastRate : 0) +
     (lunchActive ? lunchRate : 0) +
     (dinnerActive ? dinnerRate : 0)
+  const dayTotalCost = dayResidentCost + selectedDateGuestCost
 
   // Generate 12-day date strip (past 1 day, today, next 10 days)
   const dateStrip = Array.from({ length: 12 }, (_, i) => {
@@ -354,7 +375,15 @@ export const BoarderMealPortal: React.FC = () => {
         </div>
 
         {/* Quick Batch Actions */}
-        <div className="flex items-center gap-2 self-end sm:self-center">
+        <div className="flex items-center gap-2 self-end sm:self-center flex-wrap">
+          <button
+            onClick={() => setIsGuestMealModalOpen(true)}
+            disabled={dateStatus.isLockedForBoarder && !isStaff}
+            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 transition-all disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>+ গেস্ট মিল অন করুন</span>
+          </button>
           <button
             onClick={() => handleBatch(true)}
             disabled={dateStatus.isLockedForBoarder && !isStaff}
@@ -462,6 +491,90 @@ export const BoarderMealPortal: React.FC = () => {
         </div>
       )}
 
+      {/* Selected Date Guest Meals List */}
+      {selectedDateGuestMeals.length > 0 && (
+        <div className="p-4 rounded-3xl bg-amber-500/10 border border-amber-500/30 space-y-3">
+          <div className="flex items-center justify-between text-xs font-bold text-amber-300">
+            <span className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-amber-400" />
+              <span>নির্বাচিত দিনের গেস্ট মিল ({selectedDateGuestCount} জন মেহমান)</span>
+            </span>
+            {(!dateStatus.isLockedForBoarder || isStaff) && (
+              <button
+                type="button"
+                onClick={() => setIsGuestMealModalOpen(true)}
+                className="text-[11px] text-amber-400 hover:text-amber-300 font-semibold underline cursor-pointer"
+              >
+                + আরও যোগ করুন
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+            {selectedDateGuestMeals.map((booking) => {
+              const sessionLabel =
+                booking.session === 'BREAKFAST'
+                  ? 'সকালের নাস্তা'
+                  : booking.session === 'LUNCH'
+                  ? 'দুপুরের খাবার'
+                  : 'রাতের খাবার'
+              const sessionEmoji =
+                booking.session === 'BREAKFAST'
+                  ? '🍳'
+                  : booking.session === 'LUNCH'
+                  ? '🍛'
+                  : '🍲'
+
+              return (
+                <div
+                  key={booking.id}
+                  className="p-3 rounded-2xl bg-slate-900/90 border border-amber-500/20 flex items-center justify-between shadow-sm"
+                >
+                  <div className="space-y-0.5">
+                    <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <span>{sessionEmoji}</span>
+                      <span>{sessionLabel}</span>
+                      <span className="text-[10px] bg-amber-500/20 text-amber-300 font-bold px-1.5 py-0.2 rounded">
+                        {booking.guest_count} জন
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-slate-400 flex items-center gap-1.5">
+                      <span className="text-amber-400 font-mono font-medium">
+                        {formatCurrencyBn(booking.total_amount)}
+                      </span>
+                      {booking.remarks && (
+                        <span className="text-slate-500 truncate max-w-[120px]">
+                          • {booking.remarks}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {(!dateStatus.isLockedForBoarder || isStaff) && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (window.confirm('আপনি কি এই গেস্ট মিলটি বাতিল করতে চান?')) {
+                          try {
+                            await cancelGuestMealMutation.mutateAsync(booking)
+                          } catch (err: any) {
+                            alert(err.message || 'বাতিল করা যায়নি')
+                          }
+                        }
+                      }}
+                      disabled={cancelGuestMealMutation.isPending}
+                      className="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 text-[10px] font-bold border border-rose-500/30 transition-all cursor-pointer"
+                    >
+                      বাতিল
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Daily Cost Summary & Forecast Card */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Card A: Selected Day Cost */}
@@ -472,11 +585,12 @@ export const BoarderMealPortal: React.FC = () => {
               নির্বাচিত দিনের মোট খরচ:
             </span>
             <div className="text-xl sm:text-2xl font-extrabold font-mono text-white">
-              ৳{dayTotalCost.toFixed(2)}
+              {formatCurrencyBn(dayTotalCost)}
             </div>
             <p className="text-[10px] text-slate-400">
-              {breakfastActive ? 'সকাল' : ''} {lunchActive ? 'দুপুর' : ''}{' '}
-              {dinnerActive ? 'রাত' : ''} ({dayTotalCost > 0 ? 'চালু আছে' : 'কোনো খাবার নেই'})
+              {selectedDateGuestCost > 0
+                ? `নিজস্ব: ${formatCurrencyBn(dayResidentCost)} • গেস্ট (${selectedDateGuestCount} জন): ${formatCurrencyBn(selectedDateGuestCost)}`
+                : `${breakfastActive ? 'সকাল' : ''} ${lunchActive ? 'দুপুর' : ''} ${dinnerActive ? 'রাত' : ''} (${dayResidentCost > 0 ? 'চালু আছে' : 'কোনো খাবার নেই'})`}
             </p>
           </div>
 
@@ -564,6 +678,15 @@ export const BoarderMealPortal: React.FC = () => {
           boarderName={activeBoarder?.full_name || 'বর্ডার'}
         />
       )}
+
+      {/* Book Guest Meal Modal */}
+      <BookGuestMealModal
+        isOpen={isGuestMealModalOpen}
+        onClose={() => setIsGuestMealModalOpen(false)}
+        boarderId={selectedBoarderId || activeBoarder?.id || ''}
+        flatId={activeBoarder?.flat_id}
+        initialDate={selectedDate}
+      />
     </div>
   )
 }

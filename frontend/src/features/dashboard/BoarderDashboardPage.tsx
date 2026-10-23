@@ -16,6 +16,7 @@ import {
   Megaphone,
   Eye,
   ExternalLink,
+  Users,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import { useBrandingStore, DEFAULT_BRANDING } from '@/app/store/useBrandingStore'
@@ -34,6 +35,11 @@ import { useCurrentBoarder } from '@/features/boarders/api/useCurrentBoarder'
 import { getStoredReceipts, type ExtendedReceipt } from '@/features/billing/api/useReceipts'
 import { ReceiptPrintView } from '@/features/billing/components/ReceiptPrintView'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
+import { BookGuestMealModal } from '@/features/meals/components/BookGuestMealModal'
+import {
+  useGuestMealBookings,
+  useCancelGuestMealMutation,
+} from '@/features/meals/api/useGuestMeals'
 
 export const BoarderDashboardPage: React.FC = () => {
   const { profile } = useAuthStore()
@@ -182,16 +188,27 @@ export const BoarderDashboardPage: React.FC = () => {
     .filter((c) => c.charge_type === 'MEAL')
     .reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
 
-  // 3. Meal selections & cutoff status
+  // 3. Meal selections, guest meals & cutoff status
   const { data: settings } = useMealSettings()
   const { data: rates } = useActiveMealRates()
   const { data: selections = [] } = useBoarderMealSelections(activeBoarderId)
   const toggleMutation = useToggleMealMutation()
   const [toastMessage, setToastMessage] = React.useState<string | null>(null)
 
+  // Guest meals state & query
+  const [isGuestMealModalOpen, setIsGuestMealModalOpen] = React.useState(false)
+  const { data: allGuestBookings = [] } = useGuestMealBookings({ boarderId: activeBoarderId || currentBoarder?.id })
+  const cancelGuestMealMutation = useCancelGuestMealMutation()
+
   const todaySelection = selections.find((s) => s.meal_date === todayStr)
   const tomorrowSelection = selections.find((s) => s.meal_date === tomorrowStr)
   const tomorrowDateStatus = getDateMealStatus(tomorrowStr, settings?.cutoff_time || '22:00:00')
+
+  // Tomorrow guest meals
+  const tomorrowGuestMeals = allGuestBookings.filter(
+    (b) => b.meal_date === tomorrowStr && b.status === 'CONFIRMED'
+  )
+  const totalTomorrowGuestCount = tomorrowGuestMeals.reduce((sum, b) => sum + b.guest_count, 0)
 
   // Calculate month meal count & cost from live selections
   const breakfastRate = rates?.breakfast_rate ?? 0
@@ -219,6 +236,16 @@ export const BoarderDashboardPage: React.FC = () => {
       calculatedMealCost += dinnerRate
     }
   })
+
+  // Month guest meals calculation
+  const monthGuestBookings = allGuestBookings.filter(
+    (b) => b.meal_date.startsWith(currentMonthStr) && b.meal_date <= todayStr && b.status === 'CONFIRMED'
+  )
+  const monthGuestMealsCount = monthGuestBookings.reduce((sum, b) => sum + b.guest_count, 0)
+  const monthGuestMealsCost = monthGuestBookings.reduce((sum, b) => sum + b.total_amount, 0)
+
+  const totalCompletedMeals = completedMealsCount + monthGuestMealsCount
+  const totalCalculatedCost = (mealBillCharges || calculatedMealCost) + monthGuestMealsCost
 
   const bengaliMonthName = dhakaNow.toLocaleDateString('bn-BD', { month: 'long' })
 
@@ -490,13 +517,17 @@ export const BoarderDashboardPage: React.FC = () => {
           </div>
 
           <div className="text-2xl sm:text-3xl font-extrabold font-mono text-teal-300 mt-2">
-            {completedMealsCount} <span className="text-xs font-normal text-slate-400">টি মিল সম্পন্ন</span>
+            {totalCompletedMeals} <span className="text-xs font-normal text-slate-400">টি মিল সম্পন্ন</span>
           </div>
 
           <div className="flex items-center justify-between text-[10px] text-slate-400 mt-2 pt-2 border-t border-slate-800">
-            <span>মিল বাবদ খরচ:</span>
+            <span>
+              {monthGuestMealsCount > 0
+                ? `মিল বাবদ খরচ (গেস্ট ${monthGuestMealsCount}টি সহ):`
+                : 'মিল বাবদ খরচ:'}
+            </span>
             <span className="text-teal-400 font-bold font-mono">
-              {formatCurrencyBn(mealBillCharges || calculatedMealCost)}
+              {formatCurrencyBn(totalCalculatedCost)}
             </span>
           </div>
         </div>
@@ -515,19 +546,31 @@ export const BoarderDashboardPage: React.FC = () => {
             </p>
           </div>
 
-          {tomorrowDateStatus.isLockedForBoarder ? (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">
-              <Lock className="w-3.5 h-3.5" />
-              <span>লকড (কাটঅফ অতিক্রান্ত)</span>
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              <span>
-                {tomorrowDateStatus.cutoffPassed ? '🧪 টেস্ট মোডে পরিবর্তন সক্রিয়' : 'পরিবর্তন সক্রিয় (রাত ১০:০০ PM পর্যন্ত)'}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setIsGuestMealModalOpen(true)}
+              disabled={tomorrowDateStatus.isLockedForBoarder}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-md shadow-amber-500/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>+ গেস্ট মিল অন করুন</span>
+            </button>
+
+            {tomorrowDateStatus.isLockedForBoarder ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">
+                <Lock className="w-3.5 h-3.5" />
+                <span>লকড (কাটঅফ অতিক্রান্ত)</span>
               </span>
-            </span>
-          )}
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                <span>
+                  {tomorrowDateStatus.cutoffPassed ? '🧪 টেস্ট মোডে পরিবর্তন সক্রিয়' : 'পরিবর্তন সক্রিয় (রাত ১০:০০ PM পর্যন্ত)'}
+                </span>
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Live Toast Confirmation */}
@@ -627,6 +670,109 @@ export const BoarderDashboardPage: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Guest Meals Section for Tomorrow */}
+        {tomorrowGuestMeals.length > 0 ? (
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-slate-950 to-indigo-500/10 border border-amber-500/30 space-y-3">
+            <div className="flex items-center justify-between text-xs font-bold text-amber-300">
+              <span className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-amber-400" />
+                <span>আগামীকালের বুককৃত গেস্ট মিল ({totalTomorrowGuestCount} জন মেহমান)</span>
+              </span>
+              {!tomorrowDateStatus.isLockedForBoarder && (
+                <button
+                  type="button"
+                  onClick={() => setIsGuestMealModalOpen(true)}
+                  className="text-amber-400 hover:text-amber-300 text-[11px] font-semibold underline cursor-pointer"
+                >
+                  + আরও যুক্ত করুন
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+              {tomorrowGuestMeals.map((booking) => {
+                const sessionLabel =
+                  booking.session === 'BREAKFAST'
+                    ? 'সকালের নাস্তা'
+                    : booking.session === 'LUNCH'
+                    ? 'দুপুরের খাবার'
+                    : 'রাতের খাবার'
+                const sessionEmoji =
+                  booking.session === 'BREAKFAST'
+                    ? '🍳'
+                    : booking.session === 'LUNCH'
+                    ? '🍛'
+                    : '🍲'
+
+                return (
+                  <div
+                    key={booking.id}
+                    className="p-3 rounded-xl bg-slate-900/90 border border-amber-500/20 flex items-center justify-between shadow-sm"
+                  >
+                    <div className="space-y-0.5">
+                      <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <span>{sessionEmoji}</span>
+                        <span>{sessionLabel}</span>
+                        <span className="text-[10px] bg-amber-500/20 text-amber-300 font-bold px-1.5 py-0.2 rounded">
+                          {booking.guest_count} জন
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 flex items-center gap-1.5">
+                        <span className="text-amber-400 font-mono font-medium">
+                          {formatCurrencyBn(booking.total_amount)}
+                        </span>
+                        {booking.remarks && (
+                          <span className="text-slate-500 truncate max-w-[120px]">
+                            • {booking.remarks}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {!tomorrowDateStatus.isLockedForBoarder && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (window.confirm('আপনি কি এই গেস্ট মিল বুকিংটি বাতিল করতে চান?')) {
+                            try {
+                              await cancelGuestMealMutation.mutateAsync(booking)
+                              setToastMessage('✅ গেস্ট মিল সফলভাবে বাতিল করা হয়েছে।')
+                              setTimeout(() => setToastMessage(null), 3000)
+                            } catch (e: any) {
+                              alert(e.message || 'বাতিল করা যায়নি')
+                            }
+                          }
+                        }}
+                        disabled={cancelGuestMealMutation.isPending}
+                        className="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 text-[10px] font-bold border border-rose-500/30 transition-all cursor-pointer"
+                      >
+                        বাতিল
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-400">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-slate-500 shrink-0" />
+              <span>
+                আগামীকাল আপনার কোনো মেহমান বা অতিথি আসছেন? আপনি সরাসরি এখান থেকেই গেস্ট মিল অন করতে পারেন।
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsGuestMealModalOpen(true)}
+              disabled={tomorrowDateStatus.isLockedForBoarder}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 text-[11px] font-bold border border-slate-700 transition-all cursor-pointer shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span>+ গেস্ট মিল বুকিং</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 4. Bottom Grid: Real Payment Receipts + Hostel Contact & Rules */}
@@ -795,6 +941,15 @@ export const BoarderDashboardPage: React.FC = () => {
         isOpen={isReceiptModalOpen}
         onClose={() => setIsReceiptModalOpen(false)}
         receipt={selectedReceipt}
+      />
+
+      {/* Book Guest Meal Modal */}
+      <BookGuestMealModal
+        isOpen={isGuestMealModalOpen}
+        onClose={() => setIsGuestMealModalOpen(false)}
+        boarderId={activeBoarderId || currentBoarder?.id || ''}
+        flatId={currentBoarder?.flat_id}
+        initialDate={tomorrowStr}
       />
     </div>
   )

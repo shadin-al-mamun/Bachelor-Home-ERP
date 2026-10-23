@@ -300,6 +300,40 @@ export function useKitchenMealSummary(mealDate?: string) {
 
       const selections = selectionsData || []
 
+      // Fetch confirmed guest meal bookings for targetDate
+      let guestBookings: any[] = []
+      try {
+        const { data: gData } = await supabase
+          .from('guest_meal_bookings')
+          .select('*')
+          .eq('meal_date', targetDate)
+          .eq('status', 'CONFIRMED')
+        guestBookings = gData || []
+      } catch (err) {
+        console.warn('guest_meal_bookings query in kitchen summary:', err)
+      }
+
+      // Also merge any local bookings
+      try {
+        if (typeof window !== 'undefined') {
+          const raw = localStorage.getItem('bachelor_erp_guest_meal_bookings')
+          if (raw) {
+            const localG = JSON.parse(raw)
+            localG.forEach((lg: any) => {
+              if (
+                lg.meal_date === targetDate &&
+                lg.status === 'CONFIRMED' &&
+                !guestBookings.some((gb) => gb.id === lg.id)
+              ) {
+                guestBookings.push(lg)
+              }
+            })
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+
       // Build flat summaries
       let grandBreakfast = 0
       let grandLunch = 0
@@ -337,6 +371,17 @@ export function useKitchenMealSummary(mealDate?: string) {
           }
         }
 
+        // Add guest meals for this flat
+        const flatGuestBookings = guestBookings.filter(
+          (gb: any) => gb.flat_id === flat.id || uniqueBoarderIds.includes(gb.boarder_id)
+        )
+        flatGuestBookings.forEach((gb: any) => {
+          const count = Number(gb.guest_count) || 0
+          if (gb.session === 'BREAKFAST') bCount += count
+          if (gb.session === 'LUNCH') lCount += count
+          if (gb.session === 'DINNER') dCount += count
+        })
+
         const tMeals = bCount + lCount + dCount
 
         grandBreakfast += bCount
@@ -357,6 +402,29 @@ export function useKitchenMealSummary(mealDate?: string) {
           total_meals: tMeals,
         }
       })
+
+      // Add unassigned guest meals to grand totals
+      const accountedGuestIds = new Set(
+        (flatsData || []).flatMap((flat: any) => {
+          const flatBoarderIds: string[] = (flat.rooms || [])
+            .flatMap((r: any) => r.seats || [])
+            .flatMap((s: any) => s.allocations || [])
+            .filter((a: any) => a && (a.status === 'ACTIVE' || !a.status))
+            .map((a: any) => a.boarder_id)
+          return guestBookings
+            .filter((gb: any) => gb.flat_id === flat.id || flatBoarderIds.includes(gb.boarder_id))
+            .map((gb: any) => gb.id)
+        })
+      )
+
+      guestBookings
+        .filter((gb: any) => !accountedGuestIds.has(gb.id))
+        .forEach((gb: any) => {
+          const count = Number(gb.guest_count) || 0
+          if (gb.session === 'BREAKFAST') grandBreakfast += count
+          if (gb.session === 'LUNCH') grandLunch += count
+          if (gb.session === 'DINNER') grandDinner += count
+        })
 
       const totalMeals = grandBreakfast + grandLunch + grandDinner
       const currentRates = getStoredActiveMealRate()
