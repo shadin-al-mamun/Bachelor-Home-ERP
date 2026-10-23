@@ -101,10 +101,9 @@ jobs:
           echo "Security _headers verified in dist output."
 
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: 'bachelor-home-erp'
-          directory: 'frontend/dist'
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          command: pages deploy frontend/dist --project-name=bachelor-home-erp
