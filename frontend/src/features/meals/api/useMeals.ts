@@ -232,6 +232,16 @@ export function getStoredActiveMealRate(): MealRate {
     if (raw) {
       const parsed = JSON.parse(raw)
       if (parsed && typeof parsed === 'object') {
+        // Active purge for legacy demo rates (30, 65, 60 or seed id)
+        if (
+          parsed.id === 'rate-2026-curr' ||
+          (parsed.breakfast_rate === 30 && parsed.lunch_rate === 65 && parsed.dinner_rate === 60)
+        ) {
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem(MEAL_RATES_STORAGE_KEY)
+          }
+          return MOCK_ACTIVE_RATE
+        }
         return parsed
       }
     }

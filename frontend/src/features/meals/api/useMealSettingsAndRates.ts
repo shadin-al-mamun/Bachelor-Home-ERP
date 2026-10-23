@@ -82,28 +82,7 @@ export interface MealChangeAuditItem {
 
 let MOCK_SETTINGS_STATE: MealSettings = { ...MOCK_MEAL_SETTINGS }
 
-let MOCK_RATES_LIST: MealRate[] = [
-  {
-    id: 'rate-2026-curr',
-    effective_from: '2026-01-01',
-    effective_to: null,
-    breakfast_rate: 30.0,
-    lunch_rate: 65.0,
-    dinner_rate: 60.0,
-    created_by: 'usr-admin1',
-    created_at: '2026-01-01T00:00:00Z',
-  },
-  {
-    id: 'rate-2025-prior',
-    effective_from: '2025-06-01',
-    effective_to: '2025-12-31',
-    breakfast_rate: 25.0,
-    lunch_rate: 60.0,
-    dinner_rate: 55.0,
-    created_by: 'usr-admin1',
-    created_at: '2025-06-01T00:00:00Z',
-  },
-]
+let MOCK_RATES_LIST: MealRate[] = []
 
 const MOCK_AUDIT_LOGS: MealChangeAuditItem[] = [
   {
