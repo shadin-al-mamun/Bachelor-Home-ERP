@@ -77,6 +77,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (href === '/dashboard' || href === '/portal/dashboard') {
       return currentPath === href
     }
+    if (href.includes('?')) {
+      return location.pathname + location.search === href
+    }
+    if (href === '/settings/hostel' && location.search.includes('tab=menu')) {
+      return false
+    }
     return currentPath === href || currentPath.startsWith(href + '/')
   }
 
@@ -142,6 +148,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: <DollarSign className="w-4 h-4 shrink-0 text-amber-400" />,
           roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
           permissionKey: 'meal_settings',
+        },
+        {
+          id: 'weekly_menu',
+          titleKey: 'nav.weekly_menu',
+          defaultTitle: 'সাপ্তাহিক খাবারের মেনু',
+          href: '/settings/hostel?tab=menu',
+          icon: <UtensilsCrossed className="w-4 h-4 shrink-0 text-orange-400" />,
+          roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
+          permissionKey: 'meal_settings',
+          badge: 'মেনু',
         },
       ],
     },

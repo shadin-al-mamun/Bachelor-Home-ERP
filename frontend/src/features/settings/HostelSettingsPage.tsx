@@ -24,7 +24,7 @@ import {
   ChefHat,
   Eye,
 } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   useBrandingStore,
@@ -42,6 +42,9 @@ import Input from '@/components/common/Input'
 export const HostelSettingsPage: React.FC = () => {
   const queryClient = useQueryClient()
   const { profile } = useAuthStore()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tabParam = searchParams.get('tab')
+
   const {
     orgName,
     shortName,
@@ -62,6 +65,23 @@ export const HostelSettingsPage: React.FC = () => {
     isLoading,
   } = useBrandingStore()
 
+  // Section switcher state
+  const [activeSection, setActiveSection] = useState<
+    'all' | 'menu' | 'general' | 'receipt' | 'rules' | 'logo'
+  >(
+    tabParam === 'menu'
+      ? 'menu'
+      : tabParam === 'general'
+      ? 'general'
+      : tabParam === 'receipt'
+      ? 'receipt'
+      : tabParam === 'rules'
+      ? 'rules'
+      : tabParam === 'logo'
+      ? 'logo'
+      : 'all'
+  )
+
   // Form states
   const [formOrgName, setFormOrgName] = useState(orgName)
   const [formShortName, setFormShortName] = useState(shortName)
@@ -78,7 +98,44 @@ export const HostelSettingsPage: React.FC = () => {
   )
   const [selectedDayTab, setSelectedDayTab] = useState<DayKey>('saturday')
   const [showFullWeeklyMenuModal, setShowFullWeeklyMenuModal] = useState<boolean>(false)
-  const [rightPanelTab, setRightPanelTab] = useState<'receipt' | 'meal_card'>('receipt')
+  const [rightPanelTab, setRightPanelTab] = useState<'receipt' | 'meal_card'>(
+    tabParam === 'menu' ? 'meal_card' : 'receipt'
+  )
+
+  // Sync tabParam on route change
+  useEffect(() => {
+    if (tabParam === 'menu') {
+      setActiveSection('menu')
+      setRightPanelTab('meal_card')
+    } else if (tabParam === 'general') {
+      setActiveSection('general')
+      setRightPanelTab('receipt')
+    } else if (tabParam === 'receipt') {
+      setActiveSection('receipt')
+      setRightPanelTab('receipt')
+    } else if (tabParam === 'rules') {
+      setActiveSection('rules')
+      setRightPanelTab('receipt')
+    } else if (tabParam === 'logo') {
+      setActiveSection('logo')
+      setRightPanelTab('receipt')
+    }
+  }, [tabParam])
+
+  const handleSectionTabClick = (
+    section: 'all' | 'menu' | 'general' | 'receipt' | 'rules' | 'logo'
+  ) => {
+    setActiveSection(section)
+    if (section === 'menu') {
+      setRightPanelTab('meal_card')
+      setSearchParams({ tab: 'menu' })
+    } else if (section === 'all') {
+      setSearchParams({})
+    } else {
+      setRightPanelTab('receipt')
+      setSearchParams({ tab: section })
+    }
+  }
 
   const [previewLogo, setPreviewLogo] = useState<string | null>(logoUrl)
   const [saveSuccess, setSaveSuccess] = useState(false)
@@ -319,24 +376,149 @@ export const HostelSettingsPage: React.FC = () => {
         </div>
       )}
 
+      {/* Sub-Section Navigation Tabs (হোস্টেল সেটিংস সেকশন নির্বাচক) */}
+      <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-900/80 border border-slate-800 overflow-x-auto scrollbar-none shadow-md">
+        <button
+          type="button"
+          onClick={() => handleSectionTabClick('menu')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 border cursor-pointer ${
+            activeSection === 'menu'
+              ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-lg shadow-amber-500/20 scale-[1.02]'
+              : 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20'
+          }`}
+        >
+          <UtensilsCrossed className="w-4 h-4 shrink-0" />
+          <span>🍽️ সাপ্তাহিক খাবারের মেনু রুটিন</span>
+          <span
+            className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+              activeSection === 'menu'
+                ? 'bg-slate-950 text-amber-400'
+                : 'bg-amber-500/20 text-amber-300'
+            }`}
+          >
+            বোর্ডার মিল
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleSectionTabClick('general')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+            activeSection === 'general'
+              ? 'bg-primary-600 text-white shadow'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+          }`}
+        >
+          <Building className="w-3.5 h-3.5 text-indigo-400" />
+          <span>সাধারণ তথ্য ও ঠিকানা</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleSectionTabClick('receipt')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+            activeSection === 'receipt'
+              ? 'bg-primary-600 text-white shadow'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+          }`}
+        >
+          <FileText className="w-3.5 h-3.5 text-emerald-400" />
+          <span>মানি রিসিপ্ট ভাউচার</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleSectionTabClick('rules')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+            activeSection === 'rules'
+              ? 'bg-primary-600 text-white shadow'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+          }`}
+        >
+          <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+          <span>হোস্টেল নিয়মাবলী</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleSectionTabClick('logo')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+            activeSection === 'logo'
+              ? 'bg-primary-600 text-white shadow'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+          }`}
+        >
+          <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+          <span>লোগো ও অ্যাপ আইকন</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleSectionTabClick('all')}
+          className={`px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+            activeSection === 'all'
+              ? 'bg-slate-800 text-white shadow'
+              : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/40'
+          }`}
+        >
+          <span>সবগুলো সেকশন (All)</span>
+        </button>
+      </div>
+
+      {/* Featured Quick Jump Banner when in 'all' view */}
+      {activeSection === 'all' && (
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-transparent border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+              <UtensilsCrossed className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                <span>সাপ্তাহিক খাবারের মেনু রুটিন এডিটর</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                  নতুন ফিচার
+                </span>
+              </h4>
+              <p className="text-xs text-slate-300">
+                বোর্ডারদের ড্যাশবোর্ডে আগামীকালের সকাল, দুপুর ও রাতের খাবারের বিবরণ লাইভ শো করতে চান?
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleSectionTabClick('menu')}
+            className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 hover:bg-amber-400 transition-colors shadow-md shadow-amber-500/20 shrink-0 flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+          >
+            <span>সরাসরি মেনু এডিটরে যান</span>
+            <ArrowLeft className="w-3.5 h-3.5 rotate-180" />
+          </button>
+        </div>
+      )}
+
       {/* Main Grid: Form Inputs (Left) and Live Real-Time Receipt Voucher Preview (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Column: Configuration Forms (7 cols) */}
         <div className="lg:col-span-7 space-y-6">
-          {/* Section 1: Hostel Identity & Contact Information */}
-          <form
-            onSubmit={handleSaveAllSettings}
-            className="glass-card p-6 rounded-2xl border border-slate-800 bg-slate-900/50 space-y-5"
-          >
-            <div className="flex items-center gap-2.5 pb-4 border-b border-slate-800">
-              <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
-                <Building className="w-4 h-4" />
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-white">হোস্টেলের সাধারণ তথ্য ও ঠিকানা</h2>
-                <p className="text-xs text-slate-400">রিসিপ্ট এবং ভাউচারের উপরের অংশে এই তথ্যগুলো প্রদর্শিত হবে</p>
-              </div>
-            </div>
+          {/* Main Configuration Form (renders when not in 'logo' mode) */}
+          {activeSection !== 'logo' && (
+            <form
+              onSubmit={handleSaveAllSettings}
+              className="glass-card p-6 rounded-2xl border border-slate-800 bg-slate-900/50 space-y-5"
+            >
+              {/* Section 1: Hostel Identity & Contact Information */}
+              {(activeSection === 'all' || activeSection === 'general') && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2.5 pb-4 border-b border-slate-800">
+                    <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                      <Building className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold text-white">হোস্টেলের সাধারণ তথ্য ও ঠিকানা</h2>
+                      <p className="text-xs text-slate-400">
+                        রিসিপ্ট এবং ভাউচারের উপরের অংশে এই তথ্যগুলো প্রদর্শিত হবে
+                      </p>
+                    </div>
+                  </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5 md:col-span-2">
@@ -454,343 +636,373 @@ export const HostelSettingsPage: React.FC = () => {
                 />
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Section 2: Money Receipt Voucher Configuration */}
-            <div className="pt-4 border-t border-slate-800 space-y-4">
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-indigo-400" />
-                <h3 className="text-sm font-bold text-white">মানি রিসিপ্ট ভাউচার ফুটার ও বার্তা</h3>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300">
-                  ভাউচার ফুটার বার্তা / ভেরিফিকেশন নোট
-                </label>
-                <Input
-                  type="text"
-                  value={formReceiptFooterNote}
-                  onChange={(e) => setFormReceiptFooterNote(e.target.value)}
-                  placeholder="যেমন: সফটওয়্যার জেনারেটেড ডিজিটাল ভাউচার। কোনো সিল বা স্বাক্ষরের প্রয়োজন নেই।"
-                  className="bg-slate-950/60 border-slate-700 text-sm"
-                />
-                <span className="text-[11px] text-slate-500 block">
-                  প্রতিটি প্রিন্ট ভাউচারের নিচের ভেরিফিকেশন অংশে এটি দৃশ্যমান হবে।
-                </span>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300">
-                  রিসিপ্ট নাম্বার প্রিফিক্স কোড
-                </label>
-                <Input
-                  type="text"
-                  value={formReceiptPrefix}
-                  onChange={(e) => setFormReceiptPrefix(e.target.value)}
-                  placeholder="RCT"
-                  className="bg-slate-950/60 border-slate-700 text-sm font-mono w-40"
-                />
-                <span className="text-[11px] text-slate-500 block">
-                  যেমন: {formReceiptPrefix || 'RCT'}-001004
-                </span>
-              </div>
+        {/* Section 2: Money Receipt Voucher Configuration */}
+        {(activeSection === 'all' || activeSection === 'receipt') && (
+          <div
+            className={`space-y-4 ${
+              activeSection === 'all' ? 'pt-6 border-t border-slate-800' : ''
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-indigo-400" />
+              <h3 className="text-sm font-bold text-white">মানি রিসিপ্ট ভাউচার ফুটার ও বার্তা</h3>
             </div>
 
-            {/* Section 3: আবাসিক নিয়মাবলী (Hostel Rules & Regulations) */}
-            <div className="pt-4 border-t border-slate-800 space-y-4">
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-amber-400" />
-                <h3 className="text-sm font-bold text-white">আবাসিক নিয়মাবলী (বোর্ডার পোর্টালে সরাসরি প্রদর্শিত)</h3>
-              </div>
-              <p className="text-xs text-slate-400">
-                বোর্ডার আইডির হোম ড্যাশবোর্ডের <strong className="text-slate-200">"হোস্টেল সহায়তা ও নিয়মাবলী"</strong> কার্ডে এই নিয়মগুলো লাইভ দৃশ্যমান হবে। প্রতিটি নিয়ম আলাদা লাইনে লিখুন।
-              </p>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300">
+                ভাউচার ফুটার বার্তা / ভেরিফিকেশন নোট
+              </label>
+              <Input
+                type="text"
+                value={formReceiptFooterNote}
+                onChange={(e) => setFormReceiptFooterNote(e.target.value)}
+                placeholder="যেমন: সফটওয়্যার জেনারেটেড ডিজিটাল ভাউচার। কোনো সিল বা স্বাক্ষরের প্রয়োজন নেই।"
+                className="bg-slate-950/60 border-slate-700 text-sm"
+              />
+              <span className="text-[11px] text-slate-500 block">
+                প্রতিটি প্রিন্ট ভাউচারের নিচের ভেরিফিকেশন অংশে এটি দৃশ্যমান হবে।
+              </span>
+            </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300">
-                  হোস্টেল আবাসিক নিয়মাবলী তালিকা
-                </label>
-                <textarea
-                  rows={6}
-                  value={formHostelRules}
-                  onChange={(e) => setFormHostelRules(e.target.value)}
-                  placeholder="খাবার অন/অফ প্রতিদিন রাত ১০:০০ টার মধ্যে সম্পন্ন করতে হবে।&#10;মাসের ১০ তারিখের মধ্যে মাসিক সিট ভাড়া ও মেস বিল পরিশোধ করতে হবে।&#10;হোস্টেলের মূল গেট রাত ১১:০০ টায় বন্ধ হয়ে যায়।&#10;বহিরাগত মেহমান নিয়ে আসার ক্ষেত্রে পূর্বানুমতি প্রযোজ্য।"
-                  className="w-full px-3.5 py-3 rounded-xl bg-slate-950/60 border border-slate-700 text-sm text-slate-200 leading-relaxed focus:outline-none focus:border-primary-500 font-sans"
-                />
-                <span className="text-[11px] text-slate-500 block">
-                  পরামর্শ: বুলেট চিহ্ন (•) দেওয়ার প্রয়োজন নেই, সিস্টেম প্রতিটি লাইনকে স্বয়ংক্রিয়ভাবে বুলেট পয়েন্টে সুন্দর করে সাজিয়ে দেবে।
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300">
+                রিসিপ্ট নাম্বার প্রিফিক্স কোড
+              </label>
+              <Input
+                type="text"
+                value={formReceiptPrefix}
+                onChange={(e) => setFormReceiptPrefix(e.target.value)}
+                placeholder="RCT"
+                className="bg-slate-950/60 border-slate-700 text-sm font-mono w-40"
+              />
+              <span className="text-[11px] text-slate-500 block">
+                যেমন: {formReceiptPrefix || 'RCT'}-001004
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Section 3: আবাসিক নিয়মাবলী (Hostel Rules & Regulations) */}
+        {(activeSection === 'all' || activeSection === 'rules') && (
+          <div
+            className={`space-y-4 ${
+              activeSection === 'all' ? 'pt-6 border-t border-slate-800' : ''
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-amber-400" />
+              <h3 className="text-sm font-bold text-white">
+                আবাসিক নিয়মাবলী (বোর্ডার পোর্টালে সরাসরি প্রদর্শিত)
+              </h3>
+            </div>
+            <p className="text-xs text-slate-400">
+              বোর্ডার আইডির হোম ড্যাশবোর্ডের <strong className="text-slate-200">"হোস্টেল সহায়তা ও নিয়মাবলী"</strong> কার্ডে এই নিয়মগুলো লাইভ দৃশ্যমান হবে। প্রতিটি নিয়ম আলাদা লাইনে লিখুন।
+            </p>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300">
+                হোস্টেল আবাসিক নিয়মাবলী তালিকা
+              </label>
+              <textarea
+                rows={6}
+                value={formHostelRules}
+                onChange={(e) => setFormHostelRules(e.target.value)}
+                placeholder="খাবার অন/অফ প্রতিদিন রাত ১০:০০ টার মধ্যে সম্পন্ন করতে হবে।&#10;মাসের ১০ তারিখের মধ্যে মাসিক সিট ভাড়া ও মেস বিল পরিশোধ করতে হবে।&#10;হোস্টেলের মূল গেট রাত ১১:০০ টায় বন্ধ হয়ে যায়।&#10;বহিরাগত মেহমান নিয়ে আসার ক্ষেত্রে পূর্বানুমতি প্রযোজ্য।"
+                className="w-full px-3.5 py-3 rounded-xl bg-slate-950/60 border border-slate-700 text-sm text-slate-200 leading-relaxed focus:outline-none focus:border-primary-500 font-sans"
+              />
+              <span className="text-[11px] text-slate-500 block">
+                পরামর্শ: বুলেট চিহ্ন (•) দেওয়ার প্রয়োজন নেই, সিস্টেম প্রতিটি লাইনকে স্বয়ংক্রিয়ভাবে বুলেট পয়েন্টে সুন্দর করে সাজিয়ে দেবে।
+              </span>
+            </div>
+
+            {/* Live Preview of Hostel Rules Card */}
+            <div className="p-4 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-2.5">
+              <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
+                <span className="flex items-center gap-1.5 text-indigo-400">
+                  <Info className="w-3.5 h-3.5" />
+                  বোর্ডার পোর্টালে যেভাবে লাইভ প্রদর্শিত হবে:
+                </span>
+                <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-mono">
+                  Live Preview
                 </span>
               </div>
 
-              {/* Live Preview of Hostel Rules Card */}
-              <div className="p-4 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-2.5">
-                <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
-                  <span className="flex items-center gap-1.5 text-indigo-400">
-                    <Info className="w-3.5 h-3.5" />
-                    বোর্ডার পোর্টালে যেভাবে লাইভ প্রদর্শিত হবে:
-                  </span>
-                  <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-mono">
-                    Live Preview
-                  </span>
+              <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2 text-xs">
+                <div className="font-semibold text-slate-200 flex items-center gap-1.5">
+                  <span>আবাসিক নিয়মাবলি:</span>
                 </div>
-
-                <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2 text-xs">
-                  <div className="font-semibold text-slate-200 flex items-center gap-1.5">
-                    <span>আবাসিক নিয়মাবলি:</span>
-                  </div>
-                  <ul className="space-y-1.5 list-disc list-inside text-slate-400 text-[11px]">
-                    {formHostelRules
-                      .split('\n')
-                      .map((line) => line.replace(/^[•\-\*]\s*/, '').trim())
-                      .filter(Boolean)
-                      .map((rule, idx) => (
-                        <li key={idx} className="leading-relaxed">
-                          {rule}
-                        </li>
-                      ))}
-                  </ul>
-                </div>
+                <ul className="space-y-1.5 list-disc list-inside text-slate-400 text-[11px]">
+                  {formHostelRules
+                    .split('\n')
+                    .map((line) => line.replace(/^[•\-\*]\s*/, '').trim())
+                    .filter(Boolean)
+                    .map((rule, idx) => (
+                      <li key={idx} className="leading-relaxed">
+                        {rule}
+                      </li>
+                    ))}
+                </ul>
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Section 4: সাপ্তাহিক খাবারের মেনু রুটিন (Weekly Meal Menu Routine) */}
-            <div className="pt-4 border-t border-slate-800 space-y-4">
-              <div className="flex items-center justify-between pb-1">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-orange-400">
-                    <UtensilsCrossed className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                      <span>সাপ্তাহিক খাবারের মেনু রুটিন (Weekly Food Menu)</span>
-                      <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                        বোর্ডার আইডিতে লাইভ সিঙ্ক
-                      </span>
-                    </h3>
-                    <p className="text-xs text-slate-400">
-                      সপ্তাহের ৭ দিনের সকালের নাস্তা, দুপুর এবং রাতের খাবারের মেনু নির্ধারণ করুন।
-                    </p>
-                  </div>
+        {/* Section 4: সাপ্তাহিক খাবারের মেনু রুটিন (Weekly Meal Menu Routine) */}
+        {(activeSection === 'all' || activeSection === 'menu') && (
+          <div
+            id="weekly-food-menu"
+            className={`space-y-4 ${
+              activeSection === 'all' ? 'pt-6 border-t border-slate-800' : ''
+            }`}
+          >
+            <div className="flex items-center justify-between pb-1">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-orange-400">
+                  <UtensilsCrossed className="w-4 h-4" />
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowFullWeeklyMenuModal(true)}
-                    className="text-xs text-amber-400 hover:text-amber-300 font-medium flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 transition-colors"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                    <span>পুরো সপ্তাহের রুটিন</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleResetMenuToDefault}
-                    className="text-xs text-slate-400 hover:text-white flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-slate-800 transition-colors"
-                    title="ডিফল্ট পুষ্টিকর মেনু লোড করুন"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    <span>ডিফল্ট মেনু</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-xs text-amber-300/90 leading-relaxed flex items-start gap-2.5">
-                <ChefHat className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-semibold text-amber-300">এডমিন নিয়ন্ত্রণ বিজ্ঞপ্তি:</p>
-                  <p className="text-[11px] text-amber-300/80 mt-0.5">
-                    বর্ডার আইডির হোম ড্যাশবোর্ডের <strong className="text-white">"আগামীকালের খাবার দ্রুত নির্ধারণ"</strong> অপশনে সকালের নাস্তার নিচে সকালের মেনু, দুপুরের খাবারের নিচে দুপুরের মেনু এবং রাতের খাবারের নিচে রাতের মেনু স্বয়ংক্রিয়ভাবে দৃশ্যমান হবে।
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <span>সাপ্তাহিক খাবারের মেনু রুটিন (Weekly Food Menu)</span>
+                    <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                      বোর্ডার আইডিতে লাইভ সিঙ্ক
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    সপ্তাহের ৭ দিনের সকালের নাস্তা, দুপুর এবং রাতের খাবারের মেনু নির্ধারণ করুন।
                   </p>
                 </div>
               </div>
 
-              {/* 7 Days of the Week Selection Tabs */}
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-                  <span>দিন নির্বাচন করুন:</span>
-                  <span className="text-[11px] text-primary-400 font-medium">
-                    বর্তমান দিন: {DAY_METADATA[selectedDayTab]?.nameBn}
-                  </span>
-                </label>
-
-                <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
-                  {DAY_ORDER.map((dayKey) => {
-                    const meta = DAY_METADATA[dayKey]
-                    const isSelected = selectedDayTab === dayKey
-                    const dayData = formWeeklyMealMenu[dayKey]
-                    const hasData = Boolean(dayData?.breakfast || dayData?.lunch || dayData?.dinner)
-
-                    return (
-                      <button
-                        key={dayKey}
-                        type="button"
-                        onClick={() => setSelectedDayTab(dayKey)}
-                        className={`p-2 rounded-xl text-xs font-bold transition-all text-center flex flex-col items-center justify-center gap-0.5 border ${
-                          isSelected
-                            ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20 scale-[1.02]'
-                            : 'bg-slate-950/60 text-slate-300 hover:text-white border-slate-800 hover:bg-slate-800'
-                        }`}
-                      >
-                        <span className="text-xs font-bold">{meta.nameBn}</span>
-                        <span
-                          className={`text-[9px] font-mono px-1 rounded ${
-                            isSelected
-                              ? 'bg-slate-950/20 text-slate-950 font-bold'
-                              : hasData
-                              ? 'text-emerald-400'
-                              : 'text-slate-500'
-                          }`}
-                        >
-                          {hasData ? '✓ মেনু' : 'ফাঁকা'}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* Day Inputs: Breakfast, Lunch, Dinner */}
-              <div className="p-4 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-4">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-xs">
-                  <div className="font-bold text-white flex items-center gap-2">
-                    <CalendarDays className="w-4 h-4 text-amber-400" />
-                    <span>{DAY_METADATA[selectedDayTab]?.nameBn}-এর খাবার মেনু নির্ধারণ</span>
-                  </div>
-                  <span className="text-[11px] text-slate-400">
-                    প্রতিটি বেলার পুষ্টিকর ও সুস্বাদু খাবারের বিবরণ লিখুন
-                  </span>
-                </div>
-
-                <div className="space-y-3.5">
-                  {/* Breakfast Menu Input */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-amber-300 flex items-center gap-1.5">
-                      <span className="text-base">🍳</span>
-                      <span>সকালের নাস্তার মেনু (Breakfast Menu)</span>
-                    </label>
-                    <Input
-                      type="text"
-                      value={formWeeklyMealMenu[selectedDayTab]?.breakfast || ''}
-                      onChange={(e) =>
-                        handleDayMealChange(selectedDayTab, 'breakfast', e.target.value)
-                      }
-                      placeholder="যেমন: ভুনা খিচুড়ি, ডিম ভাজি, আচার / পরোটা, সবজি"
-                      className="bg-slate-900 border-slate-700 text-sm focus:border-amber-500"
-                    />
-                  </div>
-
-                  {/* Lunch Menu Input */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-emerald-300 flex items-center gap-1.5">
-                      <span className="text-base">🍛</span>
-                      <span>দুপুরের খাবারের মেনু (Lunch Menu)</span>
-                    </label>
-                    <Input
-                      type="text"
-                      value={formWeeklyMealMenu[selectedDayTab]?.lunch || ''}
-                      onChange={(e) =>
-                        handleDayMealChange(selectedDayTab, 'lunch', e.target.value)
-                      }
-                      placeholder="যেমন: সাদা ভাত, রুই মাছের ঝোল, আলু ভর্তা, ডাল"
-                      className="bg-slate-900 border-slate-700 text-sm focus:border-emerald-500"
-                    />
-                  </div>
-
-                  {/* Dinner Menu Input */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-indigo-300 flex items-center gap-1.5">
-                      <span className="text-base">🍲</span>
-                      <span>রাতের খাবারের মেনু (Dinner Menu)</span>
-                    </label>
-                    <Input
-                      type="text"
-                      value={formWeeklyMealMenu[selectedDayTab]?.dinner || ''}
-                      onChange={(e) =>
-                        handleDayMealChange(selectedDayTab, 'dinner', e.target.value)
-                      }
-                      placeholder="যেমন: সাদা ভাত, মুরগির মাংস ভুনা, ঘন ডাল"
-                      className="bg-slate-900 border-slate-700 text-sm focus:border-indigo-500"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Submit Button */}
-            <div className="pt-4 flex items-center justify-between border-t border-slate-800">
-              <span className="text-xs text-slate-400">
-                পরিবর্তন সম্পন্ন হলে নিচের বাটনে ক্লিক করে ডেটাবেজে সংরক্ষণ করুন।
-              </span>
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={isLoading}
-                className="bg-primary-600 hover:bg-primary-500 text-sm px-6 py-2.5"
-              >
-                <Save className="w-4 h-4 mr-1.5" />
-                {isLoading ? 'সংরক্ষণ হচ্ছে...' : 'সকল হোস্টেল সেটিংস সংরক্ষণ'}
-              </Button>
-            </div>
-          </form>
-
-          {/* Section 5: Logo & App Branding Upload */}
-          <div className="glass-card p-6 rounded-2xl border border-slate-800 bg-slate-900/50 space-y-5">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div>
-                  <h2 className="text-base font-bold text-white">হোস্টেল লোগো ও অ্যাপ আইকন</h2>
-                  <p className="text-xs text-slate-400">রিসিপ্টের বাম পাশে এবং সফটওয়্যার হেডারে এই লোগোটি শো করবে</p>
-                </div>
-              </div>
-
-              {previewLogo && previewLogo !== DEFAULT_BRANDING.logoUrl && (
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={handleReset}
-                  className="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors"
+                  onClick={() => setShowFullWeeklyMenuModal(true)}
+                  className="text-xs text-amber-400 hover:text-amber-300 font-medium flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 transition-colors cursor-pointer"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>রিসেট</span>
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>পুরো সপ্তাহের রুটিন</span>
                 </button>
-              )}
+                <button
+                  type="button"
+                  onClick={handleResetMenuToDefault}
+                  className="text-xs text-slate-400 hover:text-white flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+                  title="ডিফল্ট পুষ্টিকর মেনু লোড করুন"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>ডিফল্ট মেনু</span>
+                </button>
+              </div>
             </div>
 
-            {/* Drag & Drop Upload Zone */}
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-slate-700 hover:border-indigo-500 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all bg-slate-950/40 hover:bg-slate-900/60 group"
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                onChange={handleFileChange}
-                className="hidden"
-              />
+            <div className="p-3.5 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-xs text-amber-300/90 leading-relaxed flex items-start gap-2.5">
+              <ChefHat className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-amber-300">এডমিন নিয়ন্ত্রণ বিজ্ঞপ্তি:</p>
+                <p className="text-[11px] text-amber-300/80 mt-0.5">
+                  বর্ডার আইডির হোম ড্যাশবোর্ডের <strong className="text-white">"আগামীকালের খাবার দ্রুত নির্ধারণ"</strong> অপশনে সকালের নাস্তার নিচে সকালের মেনু, দুপুরের খাবারের নিচে দুপুরের মেনু এবং রাতের খাবারের নিচে রাতের মেনু স্বয়ংক্রিয়ভাবে দৃশ্যমান হবে। ডানপাশের লাইভ প্রিভিউ প্যানেলে তাৎক্ষণিক চেক করতে পারেন।
+                </p>
+              </div>
+            </div>
 
-              <div className="w-20 h-20 rounded-2xl overflow-hidden bg-slate-900 border border-slate-700/80 shadow-lg flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
-                {currentActiveLogo ? (
-                  <img
-                    src={currentActiveLogo}
-                    alt="Active Logo"
-                    className="w-full h-full object-contain p-2"
-                  />
-                ) : (
-                  <Building className="w-8 h-8 text-slate-400" />
-                )}
+            {/* 7 Days of the Week Selection Tabs */}
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                <span>দিন নির্বাচন করুন:</span>
+                <span className="text-[11px] text-primary-400 font-medium">
+                  বর্তমান দিন: {DAY_METADATA[selectedDayTab]?.nameBn}
+                </span>
+              </label>
+
+              <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+                {DAY_ORDER.map((dayKey) => {
+                  const meta = DAY_METADATA[dayKey]
+                  const isSelected = selectedDayTab === dayKey
+                  const dayData = formWeeklyMealMenu[dayKey]
+                  const hasData = Boolean(dayData?.breakfast || dayData?.lunch || dayData?.dinner)
+
+                  return (
+                    <button
+                      key={dayKey}
+                      type="button"
+                      onClick={() => setSelectedDayTab(dayKey)}
+                      className={`p-2 rounded-xl text-xs font-bold transition-all text-center flex flex-col items-center justify-center gap-0.5 border cursor-pointer ${
+                        isSelected
+                          ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20 scale-[1.02]'
+                          : 'bg-slate-950/60 text-slate-300 hover:text-white border-slate-800 hover:bg-slate-800'
+                      }`}
+                    >
+                      <span className="text-xs font-bold">{meta.nameBn}</span>
+                      <span
+                        className={`text-[9px] font-mono px-1 rounded ${
+                          isSelected
+                            ? 'bg-slate-950/20 text-slate-950 font-bold'
+                            : hasData
+                            ? 'text-emerald-400'
+                            : 'text-slate-500'
+                        }`}
+                      >
+                        {hasData ? '✓ মেনু' : 'ফাঁকা'}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Day Inputs: Breakfast, Lunch, Dinner */}
+            <div className="p-4 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-xs">
+                <div className="font-bold text-white flex items-center gap-2">
+                  <CalendarDays className="w-4 h-4 text-amber-400" />
+                  <span>{DAY_METADATA[selectedDayTab]?.nameBn}-এর খাবার মেনু নির্ধারণ</span>
+                </div>
+                <span className="text-[11px] text-slate-400">
+                  প্রতিটি বেলার পুষ্টিকর ও সুস্বাদু খাবারের বিবরণ লিখুন
+                </span>
               </div>
 
-              <p className="text-sm font-semibold text-white group-hover:text-indigo-400 transition-colors">
-                নতুন লোগো নির্বাচন করতে এখানে ক্লিক করুন
-              </p>
-              <p className="text-xs text-slate-500 mt-1">
-                PNG, JPG, SVG, WebP (বর্গাকার ছবি সবচেয়ে ভালো দেখায়)
-              </p>
+              <div className="space-y-3.5">
+                {/* Breakfast Menu Input */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-amber-300 flex items-center gap-1.5">
+                    <span className="text-base">🍳</span>
+                    <span>সকালের নাস্তার মেনু (Breakfast Menu)</span>
+                  </label>
+                  <Input
+                    type="text"
+                    value={formWeeklyMealMenu[selectedDayTab]?.breakfast || ''}
+                    onChange={(e) =>
+                      handleDayMealChange(selectedDayTab, 'breakfast', e.target.value)
+                    }
+                    placeholder="যেমন: ভুনা খিচুড়ি, ডিম ভাজি, আচার / পরোটা, সবজি"
+                    className="bg-slate-900 border-slate-700 text-sm focus:border-amber-500"
+                  />
+                </div>
+
+                {/* Lunch Menu Input */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-emerald-300 flex items-center gap-1.5">
+                    <span className="text-base">🍛</span>
+                    <span>দুপুরের খাবারের মেনু (Lunch Menu)</span>
+                  </label>
+                  <Input
+                    type="text"
+                    value={formWeeklyMealMenu[selectedDayTab]?.lunch || ''}
+                    onChange={(e) =>
+                      handleDayMealChange(selectedDayTab, 'lunch', e.target.value)
+                    }
+                    placeholder="যেমন: সাদা ভাত, রুই মাছের ঝোল, আলু ভর্তা, ডাল"
+                    className="bg-slate-900 border-slate-700 text-sm focus:border-emerald-500"
+                  />
+                </div>
+
+                {/* Dinner Menu Input */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-indigo-300 flex items-center gap-1.5">
+                    <span className="text-base">🍲</span>
+                    <span>রাতের খাবারের মেনু (Dinner Menu)</span>
+                  </label>
+                  <Input
+                    type="text"
+                    value={formWeeklyMealMenu[selectedDayTab]?.dinner || ''}
+                    onChange={(e) =>
+                      handleDayMealChange(selectedDayTab, 'dinner', e.target.value)
+                    }
+                    placeholder="যেমন: সাদা ভাত, মুরগির মাংস ভুনা, ঘন ডাল"
+                    className="bg-slate-900 border-slate-700 text-sm focus:border-indigo-500"
+                  />
+                </div>
+              </div>
             </div>
           </div>
+        )}
+
+        {/* Submit Button */}
+        <div className="pt-4 flex items-center justify-between border-t border-slate-800">
+          <span className="text-xs text-slate-400">
+            পরিবর্তন সম্পন্ন হলে নিচের বাটনে ক্লিক করে ডেটাবেজে সংরক্ষণ করুন।
+          </span>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={isLoading}
+            className="bg-primary-600 hover:bg-primary-500 text-sm px-6 py-2.5 cursor-pointer shadow-lg shadow-primary-600/20"
+          >
+            <Save className="w-4 h-4 mr-1.5" />
+            {isLoading
+              ? 'সংরক্ষণ হচ্ছে...'
+              : activeSection === 'menu'
+              ? 'সাপ্তাহিক মেনু সংরক্ষণ করুন'
+              : 'সকল হোস্টেল সেটিংস সংরক্ষণ'}
+          </Button>
         </div>
+      </form>
+    )}
+
+    {/* Section 5: Logo & App Branding Upload */}
+    {(activeSection === 'all' || activeSection === 'logo') && (
+      <div className="glass-card p-6 rounded-2xl border border-slate-800 bg-slate-900/50 space-y-5">
+        <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-white">হোস্টেল লোগো ও অ্যাপ আইকন</h2>
+              <p className="text-xs text-slate-400">রিসিপ্টের বাম পাশে এবং সফটওয়্যার হেডারে এই লোগোটি শো করবে</p>
+            </div>
+          </div>
+
+          {previewLogo && previewLogo !== DEFAULT_BRANDING.logoUrl && (
+            <button
+              type="button"
+              onClick={handleReset}
+              className="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>রিসেট</span>
+            </button>
+          )}
+        </div>
+
+        {/* Drag & Drop Upload Zone */}
+        <div
+          onClick={() => fileInputRef.current?.click()}
+          className="border-2 border-dashed border-slate-700 hover:border-indigo-500 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all bg-slate-950/40 hover:bg-slate-900/60 group"
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/svg+xml"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+
+          <div className="w-20 h-20 rounded-2xl overflow-hidden bg-slate-900 border border-slate-700/80 shadow-lg flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+            {currentActiveLogo ? (
+              <img
+                src={currentActiveLogo}
+                alt="Active Logo"
+                className="w-full h-full object-contain p-2"
+              />
+            ) : (
+              <Building className="w-8 h-8 text-slate-400" />
+            )}
+          </div>
+
+          <p className="text-sm font-semibold text-white group-hover:text-indigo-400 transition-colors">
+            নতুন লোগো নির্বাচন করতে এখানে ক্লিক করুন
+          </p>
+          <p className="text-xs text-slate-500 mt-1">
+            PNG, JPG, SVG, WebP (বর্গাকার ছবি সবচেয়ে ভালো দেখায়)
+          </p>
+        </div>
+      </div>
+    )}
+  </div>
 
         {/* Right Column: Live Real-Time Preview (Receipt OR Boarder Meal Toggle) (5 cols) */}
         <div className="lg:col-span-5 space-y-4 lg:sticky lg:top-24">

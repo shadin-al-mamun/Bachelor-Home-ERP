@@ -10,6 +10,7 @@ import {
   Clock,
   Printer,
   Activity,
+  ChefHat,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import { isMealManagerRole, useMealSettings } from '../api/useMeals'
@@ -59,6 +60,14 @@ export const MealEngineTabs: React.FC<MealEngineTabsProps> = ({
       exact: true,
       description: 'এডমিন কর্তৃক খাবার রেট ও কাটঅফ সময় নির্ধারণ',
       badge: 'এডমিন',
+    },
+    {
+      to: '/settings/hostel?tab=menu',
+      label: 'সাপ্তাহিক খাবারের মেনু',
+      icon: <ChefHat className="w-4 h-4 text-orange-400" />,
+      exact: false,
+      description: '৭ দিনের সকালের নাস্তা, দুপুর ও রাতের খাবার তালিকা নির্ধারণ',
+      badge: 'মেনু',
     },
     {
       to: '/meals/billing',
@@ -205,6 +214,8 @@ export const MealEngineTabs: React.FC<MealEngineTabsProps> = ({
         {navLinks.map((tab) => {
           const isActive = tab.exact
             ? location.pathname === tab.to
+            : tab.to.includes('?')
+            ? location.pathname + location.search === tab.to
             : location.pathname.startsWith(tab.to)
 
           return (

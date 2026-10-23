@@ -13,8 +13,9 @@ import {
   TrendingUp,
   AlertCircle,
   Sparkles,
+  UtensilsCrossed,
 } from 'lucide-react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, Link } from 'react-router-dom'
 import { useMealSettings } from './api/useMeals'
 import {
   useMealRateHistory,
@@ -219,6 +220,36 @@ export const MealSettingsPage: React.FC = () => {
               <span className="font-semibold">{rateErrorMsg}</span>
             </div>
           )}
+
+          {/* Weekly Food Menu Routine Spotlight Banner */}
+          <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-orange-500/15 via-amber-500/10 to-indigo-500/10 border-2 border-orange-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
+            <div className="flex items-start sm:items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center text-orange-400 shrink-0 shadow">
+                <UtensilsCrossed className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">
+                    সাপ্তাহিক খাবারের মেনু রুটিন (Weekly Food Menu)
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/20 text-orange-300 border border-orange-500/40">
+                    বোর্ডার ড্যাশবোর্ড সিঙ্ক
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 mt-1">
+                  বোর্ডারদের ড্যাশবোর্ডে আগামীকালের মিল অন/অফের নিচে সকালের নাস্তা, দুপুর ও রাতের খাবারের বিস্তারিত মেনু রুটিন লিখে নির্ধারণ করুন।
+                </p>
+              </div>
+            </div>
+
+            <Link
+              to="/settings/hostel?tab=menu"
+              className="px-4 py-2.5 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-400 text-slate-950 transition-all shadow-lg shadow-orange-500/20 shrink-0 flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+            >
+              <span>মেনু এডিটর ও লাইভ প্রিভিউ খুলুন</span>
+              <span>➔</span>
+            </Link>
+          </div>
 
           {/* Section 1: Prominent Meal Rates Configuration Showcase */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
