@@ -204,10 +204,18 @@ export const BoarderDashboardPage: React.FC = () => {
   const tomorrowSelection = selections.find((s) => s.meal_date === tomorrowStr)
   const tomorrowDateStatus = getDateMealStatus(tomorrowStr, settings?.cutoff_time || '22:00:00')
 
-  // Tomorrow guest meals
-  const tomorrowGuestMeals = allGuestBookings.filter(
+  // Tomorrow guest meals (deduplicated by session to ensure exactly 1 entry per session)
+  const tomorrowGuestMealsRaw = allGuestBookings.filter(
     (b) => b.meal_date === tomorrowStr && b.status === 'CONFIRMED'
   )
+  const tomorrowGuestMeals: typeof tomorrowGuestMealsRaw = []
+  const seenTomorrowSessions = new Set<string>()
+  for (const b of tomorrowGuestMealsRaw) {
+    if (!seenTomorrowSessions.has(b.session)) {
+      seenTomorrowSessions.add(b.session)
+      tomorrowGuestMeals.push(b)
+    }
+  }
   const totalTomorrowGuestCount = tomorrowGuestMeals.reduce((sum, b) => sum + b.guest_count, 0)
 
   // Calculate month meal count & cost from live selections
@@ -237,10 +245,19 @@ export const BoarderDashboardPage: React.FC = () => {
     }
   })
 
-  // Month guest meals calculation
-  const monthGuestBookings = allGuestBookings.filter(
+  // Month guest meals calculation (deduplicated by date and session)
+  const monthGuestBookingsRaw = allGuestBookings.filter(
     (b) => b.meal_date.startsWith(currentMonthStr) && b.meal_date <= todayStr && b.status === 'CONFIRMED'
   )
+  const monthGuestBookings: typeof monthGuestBookingsRaw = []
+  const seenMonthKeys = new Set<string>()
+  for (const b of monthGuestBookingsRaw) {
+    const key = `${b.meal_date}_${b.session}`
+    if (!seenMonthKeys.has(key)) {
+      seenMonthKeys.add(key)
+      monthGuestBookings.push(b)
+    }
+  }
   const monthGuestMealsCount = monthGuestBookings.reduce((sum, b) => sum + b.guest_count, 0)
   const monthGuestMealsCost = monthGuestBookings.reduce((sum, b) => sum + b.total_amount, 0)
 

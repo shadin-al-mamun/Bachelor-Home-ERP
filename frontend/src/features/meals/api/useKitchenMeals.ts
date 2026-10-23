@@ -313,7 +313,7 @@ export function useKitchenMealSummary(mealDate?: string) {
         console.warn('guest_meal_bookings query in kitchen summary:', err)
       }
 
-      // Also merge any local bookings
+      // Also merge any local bookings (strictly avoiding duplicates of remote bookings)
       try {
         if (typeof window !== 'undefined') {
           const raw = localStorage.getItem('bachelor_erp_guest_meal_bookings')
@@ -323,7 +323,13 @@ export function useKitchenMealSummary(mealDate?: string) {
               if (
                 lg.meal_date === targetDate &&
                 lg.status === 'CONFIRMED' &&
-                !guestBookings.some((gb) => gb.id === lg.id)
+                !guestBookings.some(
+                  (gb) =>
+                    gb.id === lg.id ||
+                    (gb.boarder_id === lg.boarder_id &&
+                      gb.meal_date === lg.meal_date &&
+                      gb.session === lg.session)
+                )
               ) {
                 guestBookings.push(lg)
               }
@@ -333,6 +339,18 @@ export function useKitchenMealSummary(mealDate?: string) {
       } catch (e) {
         // ignore
       }
+
+      // Deduplicate guest bookings by (boarder_id, meal_date, session)
+      const dedupedGuestBookings: any[] = []
+      const seenGuestKeys = new Set<string>()
+      for (const gb of guestBookings) {
+        const key = `${gb.boarder_id}_${gb.meal_date}_${gb.session}`
+        if (!seenGuestKeys.has(key)) {
+          seenGuestKeys.add(key)
+          dedupedGuestBookings.push(gb)
+        }
+      }
+      guestBookings = dedupedGuestBookings
 
       // Build flat summaries
       let grandBreakfast = 0

@@ -66,12 +66,24 @@ export function useGuestMealBookings(options?: { boarderId?: string; mealDate?: 
       const local = getLocalGuestMeals()
 
       if (!isSupabaseConfigured) {
-        return local.filter((item) => {
+        const filtered = local.filter((item) => {
           if (item.status === 'CANCELLED') return false
           if (options?.boarderId && item.boarder_id !== options.boarderId) return false
           if (options?.mealDate && item.meal_date !== options.mealDate) return false
           return true
         })
+
+        // Deduplicate local by session
+        const deduped: GuestMealBooking[] = []
+        const seen = new Set<string>()
+        for (const item of filtered) {
+          const key = `${item.boarder_id}_${item.meal_date}_${item.session}`
+          if (!seen.has(key)) {
+            seen.add(key)
+            deduped.push(item)
+          }
+        }
+        return deduped
       }
 
       try {
@@ -121,18 +133,42 @@ export function useGuestMealBookings(options?: { boarderId?: string; mealDate?: 
           created_at: row.created_at,
         }))
 
-        // Merge local active bookings if not in remote
-        const mergedMap = new Map<string, GuestMealBooking>()
-        remoteList.forEach((b) => mergedMap.set(b.id, b))
-        local.forEach((b) => {
-          if (b.status === 'CONFIRMED' && !mergedMap.has(b.id)) {
-            if (options?.boarderId && b.boarder_id !== options.boarderId) return
-            if (options?.mealDate && b.meal_date !== options.mealDate) return
-            mergedMap.set(b.id, b)
+        // Deduplicate remoteList by (boarder_id, meal_date, session) keeping the most recent
+        const dedupedRemote: GuestMealBooking[] = []
+        const seenRemoteKeys = new Set<string>()
+        for (const item of remoteList) {
+          const key = `${item.boarder_id}_${item.meal_date}_${item.session}`
+          if (!seenRemoteKeys.has(key)) {
+            seenRemoteKeys.add(key)
+            dedupedRemote.push(item)
           }
-        })
+        }
 
-        return Array.from(mergedMap.values())
+        // Only include local items if NOT already present in remote
+        const unsyncedLocal: GuestMealBooking[] = []
+        for (const locItem of local) {
+          if (locItem.status !== 'CONFIRMED') continue
+          if (options?.boarderId && locItem.boarder_id !== options.boarderId) continue
+          if (options?.mealDate && locItem.meal_date !== options.mealDate) continue
+
+          const key = `${locItem.boarder_id}_${locItem.meal_date}_${locItem.session}`
+          if (!seenRemoteKeys.has(key)) {
+            seenRemoteKeys.add(key)
+            unsyncedLocal.push(locItem)
+          }
+        }
+
+        // Clean up stale 'gmb-' items from localStorage that already exist in remote
+        const cleanedLocal = local.filter((locItem) => {
+          if (!locItem.id.startsWith('gmb-')) return true
+          const key = `${locItem.boarder_id}_${locItem.meal_date}_${locItem.session}`
+          return !seenRemoteKeys.has(key)
+        })
+        if (cleanedLocal.length !== local.length) {
+          saveLocalGuestMeals(cleanedLocal)
+        }
+
+        return [...dedupedRemote, ...unsyncedLocal]
       } catch (err) {
         console.warn('Error querying guest_meal_bookings:', err)
         return local
@@ -159,9 +195,72 @@ export function useBookGuestMealMutation() {
       }
 
       const totalAmount = Number((input.guestCount * input.unitRate).toFixed(2))
+      let finalId = `gmb-${Date.now()}`
+
+      if (isSupabaseConfigured && isUUID(input.boarderId)) {
+        try {
+          // Check if an active booking already exists for this boarder, date and session
+          const { data: existingRows } = await supabase
+            .from('guest_meal_bookings')
+            .select('id')
+            .eq('boarder_id', input.boarderId)
+            .eq('meal_date', input.mealDate)
+            .eq('session', input.session)
+            .eq('status', 'CONFIRMED')
+            .limit(1)
+
+          if (existingRows && existingRows.length > 0) {
+            // Update the existing booking instead of inserting a duplicate!
+            const existingId = existingRows[0].id
+            const { data: updated, error: updErr } = await supabase
+              .from('guest_meal_bookings')
+              .update({
+                guest_count: input.guestCount,
+                unit_rate: input.unitRate,
+                total_amount: totalAmount,
+                remarks: input.remarks || null,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', existingId)
+              .select('id')
+              .single()
+
+            if (!updErr && updated?.id) {
+              finalId = updated.id
+            }
+          } else {
+            // Insert new booking
+            const insertPayload: Record<string, any> = {
+              boarder_id: input.boarderId,
+              meal_date: input.mealDate,
+              session: input.session,
+              guest_count: input.guestCount,
+              unit_rate: input.unitRate,
+              total_amount: totalAmount,
+              remarks: input.remarks || null,
+              status: 'CONFIRMED',
+            }
+            if (isUUID(input.flatId)) {
+              insertPayload.flat_id = input.flatId
+            }
+
+            const { data, error } = await supabase
+              .from('guest_meal_bookings')
+              .insert(insertPayload)
+              .select('id')
+              .single()
+
+            if (!error && data?.id) {
+              finalId = data.id
+            }
+          }
+        } catch (err) {
+          console.warn('Could not sync guest meal to Supabase:', err)
+        }
+      }
 
       const newBooking: GuestMealBooking = {
-        id: `gmb-${Date.now()}`,
+        id: finalId,
         boarder_id: input.boarderId,
         flat_id: input.flatId || null,
         meal_date: input.mealDate,
@@ -174,44 +273,18 @@ export function useBookGuestMealMutation() {
         created_at: new Date().toISOString(),
       }
 
-      // Save to localStorage immediately
-      const local = getLocalGuestMeals()
-      saveLocalGuestMeals([newBooking, ...local])
-
-      if (isSupabaseConfigured) {
-        try {
-          const insertPayload: Record<string, any> = {
-            meal_date: input.mealDate,
-            session: input.session,
-            guest_count: input.guestCount,
-            unit_rate: input.unitRate,
-            total_amount: totalAmount,
-            remarks: input.remarks || null,
-            status: 'CONFIRMED',
-          }
-
-          if (isUUID(input.boarderId)) {
-            insertPayload.boarder_id = input.boarderId
-          }
-          if (isUUID(input.flatId)) {
-            insertPayload.flat_id = input.flatId
-          }
-
-          if (insertPayload.boarder_id) {
-            const { data, error } = await supabase
-              .from('guest_meal_bookings')
-              .insert(insertPayload)
-              .select('id')
-              .single()
-
-            if (!error && data?.id) {
-              newBooking.id = data.id
-            }
-          }
-        } catch (err) {
-          console.warn('Could not sync guest meal to Supabase:', err)
+      // Update localStorage cleanly: remove any existing entry for this boarder, date & session
+      const currentLocal = getLocalGuestMeals().filter((b) => {
+        if (
+          b.boarder_id === input.boarderId &&
+          b.meal_date === input.mealDate &&
+          b.session === input.session
+        ) {
+          return false
         }
-      }
+        return b.id !== finalId
+      })
+      saveLocalGuestMeals([newBooking, ...currentLocal])
 
       return newBooking
     },
@@ -239,17 +312,40 @@ export function useCancelGuestMealMutation() {
         throw new Error('কাটঅফ সময় অতিক্রান্ত হওয়ায় এই গেস্ট মিল বাতিল করা সম্ভব নয়।')
       }
 
-      // Update localStorage
+      // Update localStorage: mark cancelled for this ID and any matching (boarder_id, meal_date, session)
       const local = getLocalGuestMeals()
-      const updated = local.map((b) => (b.id === booking.id ? { ...b, status: 'CANCELLED' as const } : b))
+      const updated = local.map((b) => {
+        if (
+          b.id === booking.id ||
+          (b.boarder_id === booking.boarder_id &&
+            b.meal_date === booking.meal_date &&
+            b.session === booking.session)
+        ) {
+          return { ...b, status: 'CANCELLED' as const }
+        }
+        return b
+      })
       saveLocalGuestMeals(updated)
 
-      if (isSupabaseConfigured && isUUID(booking.id)) {
+      if (isSupabaseConfigured) {
         try {
-          await supabase
-            .from('guest_meal_bookings')
-            .update({ status: 'CANCELLED', updated_at: new Date().toISOString() })
-            .eq('id', booking.id)
+          if (isUUID(booking.id)) {
+            await supabase
+              .from('guest_meal_bookings')
+              .update({ status: 'CANCELLED', updated_at: new Date().toISOString() })
+              .eq('id', booking.id)
+          }
+
+          // If there were any other confirmed bookings for this same session on this date, cancel them as well
+          if (booking.boarder_id && isUUID(booking.boarder_id)) {
+            await supabase
+              .from('guest_meal_bookings')
+              .update({ status: 'CANCELLED', updated_at: new Date().toISOString() })
+              .eq('boarder_id', booking.boarder_id)
+              .eq('meal_date', booking.meal_date)
+              .eq('session', booking.session)
+              .eq('status', 'CONFIRMED')
+          }
         } catch (err) {
           console.warn('Could not update guest meal booking on Supabase:', err)
         }

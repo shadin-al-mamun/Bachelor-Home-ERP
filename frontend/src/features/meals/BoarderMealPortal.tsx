@@ -123,9 +123,17 @@ export const BoarderMealPortal: React.FC = () => {
   })
   const cancelGuestMealMutation = useCancelGuestMealMutation()
 
-  const selectedDateGuestMeals = allGuestBookings.filter(
+  const selectedDateGuestMealsRaw = allGuestBookings.filter(
     (b) => b.meal_date === selectedDate && b.status === 'CONFIRMED'
   )
+  const selectedDateGuestMeals: typeof selectedDateGuestMealsRaw = []
+  const seenDateSessions = new Set<string>()
+  for (const b of selectedDateGuestMealsRaw) {
+    if (!seenDateSessions.has(b.session)) {
+      seenDateSessions.add(b.session)
+      selectedDateGuestMeals.push(b)
+    }
+  }
   const selectedDateGuestCost = selectedDateGuestMeals.reduce((s, g) => s + g.total_amount, 0)
   const selectedDateGuestCount = selectedDateGuestMeals.reduce((s, g) => s + g.guest_count, 0)
 

@@ -89,8 +89,11 @@ export const BookGuestMealModal: React.FC<BookGuestMealModalProps> = ({
     },
   ]
 
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isSubmitting || bookMutation.isPending) return
     setErrorMessage(null)
 
     if (guestCount < 1) {
@@ -98,6 +101,7 @@ export const BookGuestMealModal: React.FC<BookGuestMealModalProps> = ({
       return
     }
 
+    setIsSubmitting(true)
     try {
       await bookMutation.mutateAsync({
         boarderId,
@@ -112,11 +116,13 @@ export const BookGuestMealModal: React.FC<BookGuestMealModalProps> = ({
       setSuccessToast(true)
       setTimeout(() => {
         setSuccessToast(false)
+        setIsSubmitting(false)
         setGuestCount(1)
         setRemarks('')
         onClose()
-      }, 1500)
+      }, 1200)
     } catch (err: any) {
+      setIsSubmitting(false)
       setErrorMessage(err.message || 'গেস্ট মিল বুক করতে সমস্যা হয়েছে।')
     }
   }
@@ -343,10 +349,10 @@ export const BookGuestMealModal: React.FC<BookGuestMealModalProps> = ({
 
             <Button
               type="submit"
-              disabled={bookMutation.isPending || guestCount < 1}
+              disabled={bookMutation.isPending || isSubmitting || guestCount < 1}
               className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold px-6 py-2.5 text-xs shadow-lg shadow-amber-500/20"
             >
-              {bookMutation.isPending ? 'বুকিং হচ্ছে...' : 'গেস্ট মিল কনফার্ম করুন'}
+              {bookMutation.isPending || isSubmitting ? 'বুকিং হচ্ছে...' : 'গেস্ট মিল কনফার্ম করুন'}
             </Button>
           </div>
         </form>
