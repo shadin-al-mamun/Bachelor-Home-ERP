@@ -1,6 +1,112 @@
 import { create } from 'zustand'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
 
+export interface DayMealMenu {
+  breakfast: string
+  lunch: string
+  dinner: string
+}
+
+export type DayKey =
+  | 'saturday'
+  | 'sunday'
+  | 'monday'
+  | 'tuesday'
+  | 'wednesday'
+  | 'thursday'
+  | 'friday'
+
+export interface WeeklyMealMenu {
+  saturday: DayMealMenu
+  sunday: DayMealMenu
+  monday: DayMealMenu
+  tuesday: DayMealMenu
+  wednesday: DayMealMenu
+  thursday: DayMealMenu
+  friday: DayMealMenu
+}
+
+export const DAY_ORDER: DayKey[] = [
+  'saturday',
+  'sunday',
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+]
+
+export const DAY_METADATA: Record<DayKey, { nameBn: string; shortBn: string }> = {
+  saturday: { nameBn: 'শনিবার', shortBn: 'শনি' },
+  sunday: { nameBn: 'রবিবার', shortBn: 'রবি' },
+  monday: { nameBn: 'সোমবার', shortBn: 'সোম' },
+  tuesday: { nameBn: 'মঙ্গলবার', shortBn: 'মঙ্গল' },
+  wednesday: { nameBn: 'বুধবার', shortBn: 'বুধ' },
+  thursday: { nameBn: 'বৃহস্পতিবার', shortBn: 'বৃহঃ' },
+  friday: { nameBn: 'শুক্রবার', shortBn: 'শুক্র' },
+}
+
+export const DEFAULT_WEEKLY_MEAL_MENU: WeeklyMealMenu = {
+  saturday: {
+    breakfast: 'ভুনা খিচুড়ি, ডিম ভাজি, আচার',
+    lunch: 'সাদা ভাত, রুই মাছের ঝোল, আলু ভর্তা, ডাল',
+    dinner: 'সাদা ভাত, মুরগির মাংস ভুনা, ঘন ডাল',
+  },
+  sunday: {
+    breakfast: 'পরোটা, ডিম ওমলেট, মিক্স সবজি',
+    lunch: 'সাদা ভাত, ডিম ভুনা, সবজি নিরামিষ, ডাল',
+    dinner: 'সাদা ভাত, পাবদা মাছের ঝোল, বেগুন ভাজা, ডাল',
+  },
+  monday: {
+    breakfast: 'রুটি, ডাল/সবজি, চা',
+    lunch: 'সাদা ভাত, পাঙ্গাশ/তেলাপিয়া ভুনা, শাক ভাজি, ডাল',
+    dinner: 'সাদা ভাত, মুরগির মাংসের ঝোল, মুগ ডাল',
+  },
+  tuesday: {
+    breakfast: 'পরোটা, ডিম পোচ, সবজি ভাজি',
+    lunch: 'সাদা ভাত, কই মাছের ঝোল, আলু-পটল ভাজি, ডাল',
+    dinner: 'সাদা ভাত, মুরগির কষা মাংস, সালাদ, ডাল',
+  },
+  wednesday: {
+    breakfast: 'লেবুর আচার দিয়ে নরম খিচুড়ি ও ডিম ভাজি',
+    lunch: 'সাদা ভাত, মাছের কারি, ফুলকপি সবজি, ডাল',
+    dinner: 'সাদা ভাত, ডিম ভুনা, ডাল চচ্চড়ি, ভর্তা',
+  },
+  thursday: {
+    breakfast: 'রুটি, মিক্স সবজি ভাজি, চা',
+    lunch: 'সাদা ভাত, কাতল মাছের ঝোল, ঢেঁড়শ ভাজি, ডাল',
+    dinner: 'সাদা ভাত, চিকেন কারি, পাতলা ডাল',
+  },
+  friday: {
+    breakfast: 'স্পেশাল পরোটা, বুটের ডাল, ডিম',
+    lunch: 'স্পেশাল মোরগ পোলাও / বিরিয়ানি, সালাদ',
+    dinner: 'সাদা ভাত, রুই মাছ ভুনা, ঘন ডাল, লেবু',
+  },
+}
+
+export function getDayKeyFromDayIndex(dayIndex: number): DayKey {
+  const map: Record<number, DayKey> = {
+    0: 'sunday',
+    1: 'monday',
+    2: 'tuesday',
+    3: 'wednesday',
+    4: 'thursday',
+    5: 'friday',
+    6: 'saturday',
+  }
+  return map[dayIndex] || 'saturday'
+}
+
+export function getDayKeyFromDate(date: Date): DayKey {
+  return getDayKeyFromDayIndex(date.getDay())
+}
+
+export function getDayKeyFromDateStr(dateStr: string): DayKey {
+  if (!dateStr) return 'saturday'
+  const d = new Date(dateStr.length === 10 ? `${dateStr}T12:00:00` : dateStr)
+  return isNaN(d.getTime()) ? 'saturday' : getDayKeyFromDayIndex(d.getDay())
+}
+
 export interface BrandingSettings {
   orgName: string
   shortName: string
@@ -16,6 +122,7 @@ export interface BrandingSettings {
   faviconUrl: string | null
   primaryColor: string
   hostelRules: string
+  weeklyMealMenu: WeeklyMealMenu
 }
 
 interface BrandingState extends BrandingSettings {
@@ -48,6 +155,7 @@ export const DEFAULT_BRANDING: BrandingSettings = {
 মাসের ১০ তারিখের মধ্যে মাসিক সিট ভাড়া ও মেস বিল পরিশোধ করতে হবে।
 হোস্টেলের মূল গেট রাত ১১:০০ টায় বন্ধ হয়ে যায়।
 বহিরাগত মেহমান নিয়ে আসার ক্ষেত্রে পূর্বানুমতি প্রযোজ্য।`,
+  weeklyMealMenu: DEFAULT_WEEKLY_MEAL_MENU,
 }
 
 function applyFaviconToDOM(iconUrl: string) {
@@ -84,7 +192,10 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
       const stored = localStorage.getItem(STORAGE_KEY)
       if (stored) {
         const parsed = JSON.parse(stored)
-        set((state) => ({ ...state, ...DEFAULT_BRANDING, ...parsed }))
+        const mergedWeeklyMenu = parsed.weeklyMealMenu
+          ? { ...DEFAULT_WEEKLY_MEAL_MENU, ...parsed.weeklyMealMenu }
+          : DEFAULT_WEEKLY_MEAL_MENU
+        set((state) => ({ ...state, ...DEFAULT_BRANDING, ...parsed, weeklyMealMenu: mergedWeeklyMenu }))
         if (parsed.faviconUrl || parsed.logoUrl) {
           applyFaviconToDOM(parsed.faviconUrl || parsed.logoUrl)
         }
@@ -104,6 +215,9 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
           .maybeSingle()
 
         if (!error && data) {
+          const mergedRemoteWeeklyMenu = data.weekly_meal_menu
+            ? { ...DEFAULT_WEEKLY_MEAL_MENU, ...data.weekly_meal_menu }
+            : (get().weeklyMealMenu || DEFAULT_WEEKLY_MEAL_MENU)
           set((state) => ({
             id: data.id || state.id,
             orgName: data.org_name || state.orgName,
@@ -120,6 +234,7 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
             faviconUrl: data.favicon_url || state.faviconUrl,
             primaryColor: data.primary_color || state.primaryColor,
             hostelRules: data.hostel_rules !== undefined && data.hostel_rules !== null ? data.hostel_rules : state.hostelRules,
+            weeklyMealMenu: mergedRemoteWeeklyMenu,
           }))
 
           const current = get()
@@ -152,6 +267,7 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
       faviconUrl: newSettings.faviconUrl !== undefined ? newSettings.faviconUrl : get().faviconUrl,
       primaryColor: newSettings.primaryColor ?? get().primaryColor,
       hostelRules: newSettings.hostelRules !== undefined ? newSettings.hostelRules : get().hostelRules,
+      weeklyMealMenu: newSettings.weeklyMealMenu !== undefined ? newSettings.weeklyMealMenu : get().weeklyMealMenu,
     }
 
     // Update state & localStorage
@@ -184,6 +300,7 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
           app_icon_url: updated.appIconUrl,
           favicon_url: updated.faviconUrl,
           hostel_rules: updated.hostelRules,
+          weekly_meal_menu: updated.weeklyMealMenu,
           updated_at: new Date().toISOString(),
         }
 

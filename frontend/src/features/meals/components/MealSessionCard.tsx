@@ -12,6 +12,7 @@ interface MealSessionCardProps {
   isActive: boolean
   price: number
   mealDate: string
+  menuText?: string
   isLocked: boolean
   lockReason?: string
   canOverride: boolean
@@ -24,6 +25,7 @@ export const MealSessionCard: React.FC<MealSessionCardProps> = ({
   session,
   isActive,
   price,
+  menuText,
   isLocked,
   lockReason,
   canOverride,
@@ -134,6 +136,16 @@ export const MealSessionCard: React.FC<MealSessionCardProps> = ({
               ৳{price.toFixed(2)}
             </span>
           </div>
+        </div>
+
+        {/* Menu Description */}
+        <div className="p-2.5 rounded-2xl bg-slate-950/70 border border-slate-800/80 flex items-start gap-2">
+          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
+            মেনু
+          </span>
+          <p className="text-xs text-slate-200 font-medium leading-snug">
+            {menuText || 'মেনু নির্ধারিত হয়নি'}
+          </p>
         </div>
       </div>
 

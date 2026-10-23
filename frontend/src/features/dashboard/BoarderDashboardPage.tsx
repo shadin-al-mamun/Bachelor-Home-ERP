@@ -19,7 +19,16 @@ import {
   Users,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
-import { useBrandingStore, DEFAULT_BRANDING } from '@/app/store/useBrandingStore'
+import {
+  useBrandingStore,
+  DEFAULT_BRANDING,
+  DAY_ORDER,
+  DAY_METADATA,
+  getDayKeyFromDate,
+  type WeeklyMealMenu,
+  type DayMealMenu,
+  DEFAULT_WEEKLY_MEAL_MENU,
+} from '@/app/store/useBrandingStore'
 import { useNotices } from '@/features/notices/api/useNotices'
 import {
   getDhakaNow,
@@ -60,6 +69,9 @@ export const BoarderDashboardPage: React.FC = () => {
   const tomorrow = new Date(dhakaNow)
   tomorrow.setDate(tomorrow.getDate() + 1)
   const tomorrowStr = formatDhakaDate(tomorrow)
+  const tomorrowDayKey = getDayKeyFromDate(tomorrow)
+  const tomorrowDayMeta = DAY_METADATA[tomorrowDayKey]
+  const tomorrowDayName = tomorrowDayMeta?.nameBn || 'আগামীকাল'
 
   const isStaffRole = profile?.role === 'SUPER_ADMIN' || profile?.role === 'ADMIN' || profile?.role === 'MANAGER'
   const { currentBoarder, activeBoarderId, hasActiveSeat, isLoading: isLoadingBoarder } = useCurrentBoarder()
@@ -71,9 +83,10 @@ export const BoarderDashboardPage: React.FC = () => {
     flatId: currentBoarder?.flat_id,
   })
 
-  // Modal state for viewing official receipts
+  // Modal state for viewing official receipts and weekly menu
   const [selectedReceipt, setSelectedReceipt] = React.useState<ExtendedReceipt | null>(null)
   const [isReceiptModalOpen, setIsReceiptModalOpen] = React.useState(false)
+  const [isWeeklyMenuModalOpen, setIsWeeklyMenuModalOpen] = React.useState(false)
 
   // Fetch live organization settings & hostel rules directly from database
   const { data: orgSettings } = useQuery({
@@ -97,6 +110,11 @@ export const BoarderDashboardPage: React.FC = () => {
 
   const liveHostelRules: string =
     (orgSettings?.hostel_rules as string) || branding.hostelRules || DEFAULT_BRANDING.hostelRules
+
+  const effectiveWeeklyMenu: WeeklyMealMenu =
+    orgSettings?.weekly_meal_menu || branding.weeklyMealMenu || DEFAULT_WEEKLY_MEAL_MENU
+  const tomorrowMenu: DayMealMenu =
+    effectiveWeeklyMenu[tomorrowDayKey] || DEFAULT_WEEKLY_MEAL_MENU[tomorrowDayKey]
 
   // Authenticated boarder or dynamic profile info (strictly from real data, zero hardcoded placeholders)
   const boarderName = currentBoarder?.full_name || profile?.full_name || (isStaffRole ? 'অ্যাডমিন ইউজার' : 'বর্ডার')
@@ -556,7 +574,7 @@ export const BoarderDashboardPage: React.FC = () => {
           <div>
             <h2 className="text-base font-bold text-white flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-amber-400" />
-              <span>আগামীকালের খাবার দ্রুত নির্ধারণ ({tomorrowStr})</span>
+              <span>আগামীকালের খাবার দ্রুত নির্ধারণ ({tomorrowStr} – {tomorrowDayName})</span>
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
               রাত ১০:০০ টার আগে অন/অফ নিশ্চিত করুন। বাবুর্চি এই তালিকা অনুযায়ী বাজার ও রান্না করবেন।
@@ -564,6 +582,16 @@ export const BoarderDashboardPage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setIsWeeklyMenuModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800/90 hover:bg-slate-700 text-amber-300 border border-slate-700/80 transition-all cursor-pointer shadow-sm"
+              title="পুরো সপ্তাহের খাবার তালিকা দেখুন"
+            >
+              <UtensilsCrossed className="w-3.5 h-3.5 text-amber-400" />
+              <span>সাপ্তাহিক রুটিন</span>
+            </button>
+
             <button
               type="button"
               onClick={() => setIsGuestMealModalOpen(true)}
@@ -613,78 +641,114 @@ export const BoarderDashboardPage: React.FC = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {/* Breakfast Toggle */}
-          <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="text-2xl">🍳</span>
-              <div>
-                <div className="text-xs font-bold text-white">সকালের নাস্তা</div>
-                <div className="text-[10px] text-slate-400">
-                  ০৭:৩০ − ০৯:০০ ({rates ? formatCurrencyBn(breakfastRate) : '...'})
+          <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col justify-between gap-3 shadow-sm hover:border-slate-700 transition-colors">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl">🍳</span>
+                <div>
+                  <div className="text-xs font-bold text-white">সকালের নাস্তা</div>
+                  <div className="text-[10px] text-slate-400">
+                    ০৭:৩০ − ০৯:০০ ({rates ? formatCurrencyBn(breakfastRate) : '...'})
+                  </div>
                 </div>
               </div>
+
+              <button
+                onClick={() => handleToggleTomorrow('BREAKFAST', tomorrowSelection?.breakfast ?? true)}
+                disabled={tomorrowDateStatus.isLockedForBoarder || toggleMutation.isPending}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  tomorrowSelection?.breakfast ?? true
+                    ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 hover:bg-amber-400'
+                    : 'bg-slate-900 text-slate-400 border border-slate-700 hover:text-white'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {tomorrowSelection?.breakfast ?? true ? 'খাব (ON)' : 'খাব না (OFF)'}
+              </button>
             </div>
 
-            <button
-              onClick={() => handleToggleTomorrow('BREAKFAST', tomorrowSelection?.breakfast ?? true)}
-              disabled={tomorrowDateStatus.isLockedForBoarder || toggleMutation.isPending}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                tomorrowSelection?.breakfast ?? true
-                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 hover:bg-amber-400'
-                  : 'bg-slate-900 text-slate-400 border border-slate-700 hover:text-white'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
-              {tomorrowSelection?.breakfast ?? true ? 'খাব (ON)' : 'খাব না (OFF)'}
-            </button>
+            {/* Morning Breakfast Menu Display */}
+            <div className="pt-2.5 border-t border-slate-800/80 flex items-start gap-1.5">
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 shrink-0">
+                সকালের মেনু
+              </span>
+              <p className="text-xs text-slate-200 font-medium leading-snug">
+                {tomorrowMenu?.breakfast || 'মেনু নির্ধারিত হয়নি'}
+              </p>
+            </div>
           </div>
 
           {/* Lunch Toggle */}
-          <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="text-2xl">🍛</span>
-              <div>
-                <div className="text-xs font-bold text-white">দুপুরের খাবার</div>
-                <div className="text-[10px] text-slate-400">
-                  ০১:০০ − ০২:৩০ ({rates ? formatCurrencyBn(lunchRate) : '...'})
+          <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col justify-between gap-3 shadow-sm hover:border-slate-700 transition-colors">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl">🍛</span>
+                <div>
+                  <div className="text-xs font-bold text-white">দুপুরের খাবার</div>
+                  <div className="text-[10px] text-slate-400">
+                    ০১:০০ − ০২:৩০ ({rates ? formatCurrencyBn(lunchRate) : '...'})
+                  </div>
                 </div>
               </div>
+
+              <button
+                onClick={() => handleToggleTomorrow('LUNCH', tomorrowSelection?.lunch ?? true)}
+                disabled={tomorrowDateStatus.isLockedForBoarder || toggleMutation.isPending}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  tomorrowSelection?.lunch ?? true
+                    ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20 hover:bg-emerald-400'
+                    : 'bg-slate-900 text-slate-400 border border-slate-700 hover:text-white'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {tomorrowSelection?.lunch ?? true ? 'খাব (ON)' : 'খাব না (OFF)'}
+              </button>
             </div>
 
-            <button
-              onClick={() => handleToggleTomorrow('LUNCH', tomorrowSelection?.lunch ?? true)}
-              disabled={tomorrowDateStatus.isLockedForBoarder || toggleMutation.isPending}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                tomorrowSelection?.lunch ?? true
-                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20 hover:bg-emerald-400'
-                  : 'bg-slate-900 text-slate-400 border border-slate-700 hover:text-white'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
-              {tomorrowSelection?.lunch ?? true ? 'খাব (ON)' : 'খাব না (OFF)'}
-            </button>
+            {/* Lunch Menu Display */}
+            <div className="pt-2.5 border-t border-slate-800/80 flex items-start gap-1.5">
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shrink-0">
+                দুপুরের মেনু
+              </span>
+              <p className="text-xs text-slate-200 font-medium leading-snug">
+                {tomorrowMenu?.lunch || 'মেনু নির্ধারিত হয়নি'}
+              </p>
+            </div>
           </div>
 
           {/* Dinner Toggle */}
-          <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="text-2xl">🍲</span>
-              <div>
-                <div className="text-xs font-bold text-white">রাতের খাবার</div>
-                <div className="text-[10px] text-slate-400">
-                  ০৮:৩০ − ১০:০০ ({rates ? formatCurrencyBn(dinnerRate) : '...'})
+          <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col justify-between gap-3 shadow-sm hover:border-slate-700 transition-colors">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl">🍲</span>
+                <div>
+                  <div className="text-xs font-bold text-white">রাতের খাবার</div>
+                  <div className="text-[10px] text-slate-400">
+                    ০৮:৩০ − ১০:০০ ({rates ? formatCurrencyBn(dinnerRate) : '...'})
+                  </div>
                 </div>
               </div>
+
+              <button
+                onClick={() => handleToggleTomorrow('DINNER', tomorrowSelection?.dinner ?? true)}
+                disabled={tomorrowDateStatus.isLockedForBoarder || toggleMutation.isPending}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  tomorrowSelection?.dinner ?? true
+                    ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/20 hover:bg-indigo-400'
+                    : 'bg-slate-900 text-slate-400 border border-slate-700 hover:text-white'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {tomorrowSelection?.dinner ?? true ? 'খাব (ON)' : 'খাব না (OFF)'}
+              </button>
             </div>
 
-            <button
-              onClick={() => handleToggleTomorrow('DINNER', tomorrowSelection?.dinner ?? true)}
-              disabled={tomorrowDateStatus.isLockedForBoarder || toggleMutation.isPending}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                tomorrowSelection?.dinner ?? true
-                  ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/20 hover:bg-indigo-400'
-                  : 'bg-slate-900 text-slate-400 border border-slate-700 hover:text-white'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
-              {tomorrowSelection?.dinner ?? true ? 'খাব (ON)' : 'খাব না (OFF)'}
-            </button>
+            {/* Dinner Menu Display */}
+            <div className="pt-2.5 border-t border-slate-800/80 flex items-start gap-1.5">
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 shrink-0">
+                রাতের মেনু
+              </span>
+              <p className="text-xs text-slate-200 font-medium leading-snug">
+                {tomorrowMenu?.dinner || 'মেনু নির্ধারিত হয়নি'}
+              </p>
+            </div>
           </div>
         </div>
 
@@ -968,6 +1032,106 @@ export const BoarderDashboardPage: React.FC = () => {
         flatId={currentBoarder?.flat_id}
         initialDate={tomorrowStr}
       />
+
+      {/* Weekly Menu Routine Modal for Boarders */}
+      {isWeeklyMenuModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-3xl rounded-3xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                  <UtensilsCrossed className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    সাপ্তাহিক খাবারের মেনু রুটিন
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    হোস্টেল বাবুর্চি কর্তৃক নির্ধারিত ৭ দিনের প্রাত্যহিক খাবারের তালিকা
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsWeeklyMenuModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="overflow-x-auto rounded-2xl border border-slate-800">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-slate-950 text-slate-300 border-b border-slate-800 text-[11px] font-semibold">
+                  <tr>
+                    <th className="p-3 w-28">বার / দিন</th>
+                    <th className="p-3 text-amber-300">🍳 সকালের নাস্তা</th>
+                    <th className="p-3 text-emerald-300">🍛 দুপুরের খাবার</th>
+                    <th className="p-3 text-indigo-300">🍲 রাতের খাবার</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/70 bg-slate-900/50">
+                  {DAY_ORDER.map((dayKey) => {
+                    const meta = DAY_METADATA[dayKey]
+                    const menu = effectiveWeeklyMenu[dayKey]
+                    const isTomorrowRow = tomorrowDayKey === dayKey
+
+                    return (
+                      <tr
+                        key={dayKey}
+                        className={`hover:bg-slate-800/40 transition-colors ${
+                          isTomorrowRow ? 'bg-amber-500/10' : ''
+                        }`}
+                      >
+                        <td className="p-3 font-bold text-white whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <span>{meta.nameBn}</span>
+                            {isTomorrowRow && (
+                              <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-500 text-slate-950 font-bold">
+                                আগামীকাল
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-3 text-slate-300 font-medium">
+                          {menu?.breakfast || (
+                            <span className="text-slate-600 italic">নির্ধারিত হয়নি</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-slate-300 font-medium">
+                          {menu?.lunch || (
+                            <span className="text-slate-600 italic">নির্ধারিত হয়নি</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-slate-300 font-medium">
+                          {menu?.dinner || (
+                            <span className="text-slate-600 italic">নির্ধারিত হয়নি</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-xs text-slate-400 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                <span>হলুদ রঙ চিহ্নিত সারিটি আগামীকালের মেনু নির্দেশ করছে।</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsWeeklyMenuModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-semibold text-xs shadow-md transition-all"
+              >
+                বন্ধ করুন
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

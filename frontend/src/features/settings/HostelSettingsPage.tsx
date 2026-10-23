@@ -19,10 +19,22 @@ import {
   Building,
   Save,
   Megaphone,
+  UtensilsCrossed,
+  CalendarDays,
+  ChefHat,
+  Eye,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { useBrandingStore, DEFAULT_BRANDING } from '@/app/store/useBrandingStore'
+import {
+  useBrandingStore,
+  DEFAULT_BRANDING,
+  DAY_ORDER,
+  DAY_METADATA,
+  DEFAULT_WEEKLY_MEAL_MENU,
+  type DayKey,
+  type WeeklyMealMenu,
+} from '@/app/store/useBrandingStore'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import Button from '@/components/common/Button'
 import Input from '@/components/common/Input'
@@ -42,6 +54,7 @@ export const HostelSettingsPage: React.FC = () => {
     receiptPrefix,
     logoUrl,
     hostelRules,
+    weeklyMealMenu,
     updateBranding,
     uploadCustomLogo,
     resetToDefault,
@@ -60,6 +73,13 @@ export const HostelSettingsPage: React.FC = () => {
   const [formReceiptFooterNote, setFormReceiptFooterNote] = useState(receiptFooterNote)
   const [formReceiptPrefix, setFormReceiptPrefix] = useState(receiptPrefix)
   const [formHostelRules, setFormHostelRules] = useState(hostelRules)
+  const [formWeeklyMealMenu, setFormWeeklyMealMenu] = useState<WeeklyMealMenu>(
+    weeklyMealMenu || DEFAULT_WEEKLY_MEAL_MENU
+  )
+  const [selectedDayTab, setSelectedDayTab] = useState<DayKey>('saturday')
+  const [showFullWeeklyMenuModal, setShowFullWeeklyMenuModal] = useState<boolean>(false)
+  const [rightPanelTab, setRightPanelTab] = useState<'receipt' | 'meal_card'>('receipt')
+
   const [previewLogo, setPreviewLogo] = useState<string | null>(logoUrl)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -80,6 +100,7 @@ export const HostelSettingsPage: React.FC = () => {
     setFormReceiptFooterNote(receiptFooterNote)
     setFormReceiptPrefix(receiptPrefix)
     setFormHostelRules(hostelRules)
+    setFormWeeklyMealMenu(weeklyMealMenu || DEFAULT_WEEKLY_MEAL_MENU)
     setPreviewLogo(logoUrl)
   }, [
     orgName,
@@ -92,8 +113,31 @@ export const HostelSettingsPage: React.FC = () => {
     receiptFooterNote,
     receiptPrefix,
     hostelRules,
+    weeklyMealMenu,
     logoUrl,
   ])
+
+  const handleDayMealChange = (
+    day: DayKey,
+    session: 'breakfast' | 'lunch' | 'dinner',
+    value: string
+  ) => {
+    setFormWeeklyMealMenu((prev) => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        [session]: value,
+      },
+    }))
+  }
+
+  const handleResetMenuToDefault = () => {
+    if (window.confirm('আপনি কি খাবারের মেনু স্ট্যান্ডার্ড পুষ্টিকর রুটিনে রিসেট করতে চান?')) {
+      setFormWeeklyMealMenu(DEFAULT_WEEKLY_MEAL_MENU)
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 3000)
+    }
+  }
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -125,6 +169,7 @@ export const HostelSettingsPage: React.FC = () => {
         receiptFooterNote: formReceiptFooterNote.trim() || DEFAULT_BRANDING.receiptFooterNote,
         receiptPrefix: formReceiptPrefix.trim() || DEFAULT_BRANDING.receiptPrefix,
         hostelRules: formHostelRules.trim() || DEFAULT_BRANDING.hostelRules,
+        weeklyMealMenu: formWeeklyMealMenu,
         logoUrl: previewLogo,
         appIconUrl: previewLogo,
         faviconUrl: previewLogo,
@@ -152,6 +197,7 @@ export const HostelSettingsPage: React.FC = () => {
       setFormReceiptFooterNote(DEFAULT_BRANDING.receiptFooterNote)
       setFormReceiptPrefix(DEFAULT_BRANDING.receiptPrefix)
       setFormHostelRules(DEFAULT_BRANDING.hostelRules)
+      setFormWeeklyMealMenu(DEFAULT_WEEKLY_MEAL_MENU)
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 3000)
     }
@@ -506,8 +552,174 @@ export const HostelSettingsPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Section 4: সাপ্তাহিক খাবারের মেনু রুটিন (Weekly Meal Menu Routine) */}
+            <div className="pt-4 border-t border-slate-800 space-y-4">
+              <div className="flex items-center justify-between pb-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-orange-400">
+                    <UtensilsCrossed className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <span>সাপ্তাহিক খাবারের মেনু রুটিন (Weekly Food Menu)</span>
+                      <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                        বোর্ডার আইডিতে লাইভ সিঙ্ক
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      সপ্তাহের ৭ দিনের সকালের নাস্তা, দুপুর এবং রাতের খাবারের মেনু নির্ধারণ করুন।
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowFullWeeklyMenuModal(true)}
+                    className="text-xs text-amber-400 hover:text-amber-300 font-medium flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 transition-colors"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>পুরো সপ্তাহের রুটিন</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetMenuToDefault}
+                    className="text-xs text-slate-400 hover:text-white flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-slate-800 transition-colors"
+                    title="ডিফল্ট পুষ্টিকর মেনু লোড করুন"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>ডিফল্ট মেনু</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-xs text-amber-300/90 leading-relaxed flex items-start gap-2.5">
+                <ChefHat className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-amber-300">এডমিন নিয়ন্ত্রণ বিজ্ঞপ্তি:</p>
+                  <p className="text-[11px] text-amber-300/80 mt-0.5">
+                    বর্ডার আইডির হোম ড্যাশবোর্ডের <strong className="text-white">"আগামীকালের খাবার দ্রুত নির্ধারণ"</strong> অপশনে সকালের নাস্তার নিচে সকালের মেনু, দুপুরের খাবারের নিচে দুপুরের মেনু এবং রাতের খাবারের নিচে রাতের মেনু স্বয়ংক্রিয়ভাবে দৃশ্যমান হবে।
+                  </p>
+                </div>
+              </div>
+
+              {/* 7 Days of the Week Selection Tabs */}
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                  <span>দিন নির্বাচন করুন:</span>
+                  <span className="text-[11px] text-primary-400 font-medium">
+                    বর্তমান দিন: {DAY_METADATA[selectedDayTab]?.nameBn}
+                  </span>
+                </label>
+
+                <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+                  {DAY_ORDER.map((dayKey) => {
+                    const meta = DAY_METADATA[dayKey]
+                    const isSelected = selectedDayTab === dayKey
+                    const dayData = formWeeklyMealMenu[dayKey]
+                    const hasData = Boolean(dayData?.breakfast || dayData?.lunch || dayData?.dinner)
+
+                    return (
+                      <button
+                        key={dayKey}
+                        type="button"
+                        onClick={() => setSelectedDayTab(dayKey)}
+                        className={`p-2 rounded-xl text-xs font-bold transition-all text-center flex flex-col items-center justify-center gap-0.5 border ${
+                          isSelected
+                            ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20 scale-[1.02]'
+                            : 'bg-slate-950/60 text-slate-300 hover:text-white border-slate-800 hover:bg-slate-800'
+                        }`}
+                      >
+                        <span className="text-xs font-bold">{meta.nameBn}</span>
+                        <span
+                          className={`text-[9px] font-mono px-1 rounded ${
+                            isSelected
+                              ? 'bg-slate-950/20 text-slate-950 font-bold'
+                              : hasData
+                              ? 'text-emerald-400'
+                              : 'text-slate-500'
+                          }`}
+                        >
+                          {hasData ? '✓ মেনু' : 'ফাঁকা'}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Day Inputs: Breakfast, Lunch, Dinner */}
+              <div className="p-4 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-xs">
+                  <div className="font-bold text-white flex items-center gap-2">
+                    <CalendarDays className="w-4 h-4 text-amber-400" />
+                    <span>{DAY_METADATA[selectedDayTab]?.nameBn}-এর খাবার মেনু নির্ধারণ</span>
+                  </div>
+                  <span className="text-[11px] text-slate-400">
+                    প্রতিটি বেলার পুষ্টিকর ও সুস্বাদু খাবারের বিবরণ লিখুন
+                  </span>
+                </div>
+
+                <div className="space-y-3.5">
+                  {/* Breakfast Menu Input */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-amber-300 flex items-center gap-1.5">
+                      <span className="text-base">🍳</span>
+                      <span>সকালের নাস্তার মেনু (Breakfast Menu)</span>
+                    </label>
+                    <Input
+                      type="text"
+                      value={formWeeklyMealMenu[selectedDayTab]?.breakfast || ''}
+                      onChange={(e) =>
+                        handleDayMealChange(selectedDayTab, 'breakfast', e.target.value)
+                      }
+                      placeholder="যেমন: ভুনা খিচুড়ি, ডিম ভাজি, আচার / পরোটা, সবজি"
+                      className="bg-slate-900 border-slate-700 text-sm focus:border-amber-500"
+                    />
+                  </div>
+
+                  {/* Lunch Menu Input */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-emerald-300 flex items-center gap-1.5">
+                      <span className="text-base">🍛</span>
+                      <span>দুপুরের খাবারের মেনু (Lunch Menu)</span>
+                    </label>
+                    <Input
+                      type="text"
+                      value={formWeeklyMealMenu[selectedDayTab]?.lunch || ''}
+                      onChange={(e) =>
+                        handleDayMealChange(selectedDayTab, 'lunch', e.target.value)
+                      }
+                      placeholder="যেমন: সাদা ভাত, রুই মাছের ঝোল, আলু ভর্তা, ডাল"
+                      className="bg-slate-900 border-slate-700 text-sm focus:border-emerald-500"
+                    />
+                  </div>
+
+                  {/* Dinner Menu Input */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-indigo-300 flex items-center gap-1.5">
+                      <span className="text-base">🍲</span>
+                      <span>রাতের খাবারের মেনু (Dinner Menu)</span>
+                    </label>
+                    <Input
+                      type="text"
+                      value={formWeeklyMealMenu[selectedDayTab]?.dinner || ''}
+                      onChange={(e) =>
+                        handleDayMealChange(selectedDayTab, 'dinner', e.target.value)
+                      }
+                      placeholder="যেমন: সাদা ভাত, মুরগির মাংস ভুনা, ঘন ডাল"
+                      className="bg-slate-900 border-slate-700 text-sm focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Submit Button */}
-            <div className="pt-4 flex items-center justify-end">
+            <div className="pt-4 flex items-center justify-between border-t border-slate-800">
+              <span className="text-xs text-slate-400">
+                পরিবর্তন সম্পন্ন হলে নিচের বাটনে ক্লিক করে ডেটাবেজে সংরক্ষণ করুন।
+              </span>
               <Button
                 type="submit"
                 variant="primary"
@@ -515,12 +727,12 @@ export const HostelSettingsPage: React.FC = () => {
                 className="bg-primary-600 hover:bg-primary-500 text-sm px-6 py-2.5"
               >
                 <Save className="w-4 h-4 mr-1.5" />
-                {isLoading ? 'সংরক্ষণ হচ্ছে...' : 'হোস্টেল তথ্য সংরক্ষণ করুন'}
+                {isLoading ? 'সংরক্ষণ হচ্ছে...' : 'সকল হোস্টেল সেটিংস সংরক্ষণ'}
               </Button>
             </div>
           </form>
 
-          {/* Section 3: Logo & App Branding Upload */}
+          {/* Section 5: Logo & App Branding Upload */}
           <div className="glass-card p-6 rounded-2xl border border-slate-800 bg-slate-900/50 space-y-5">
             <div className="flex items-center justify-between pb-4 border-b border-slate-800">
               <div className="flex items-center gap-2.5">
@@ -580,132 +792,255 @@ export const HostelSettingsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column: Live Real-Time Receipt Voucher Preview (5 cols) */}
+        {/* Right Column: Live Real-Time Preview (Receipt OR Boarder Meal Toggle) (5 cols) */}
         <div className="lg:col-span-5 space-y-4 lg:sticky lg:top-24">
+          {/* Preview Tab Selector */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Printer className="w-4 h-4 text-emerald-400" />
-              <h3 className="text-sm font-bold text-white">লাইভ মানি রিসিপ্ট ভাউচার প্রিভিউ</h3>
+            <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-900/80 border border-slate-800">
+              <button
+                type="button"
+                onClick={() => setRightPanelTab('receipt')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  rightPanelTab === 'receipt'
+                    ? 'bg-primary-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>মানি রিসিপ্ট</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setRightPanelTab('meal_card')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  rightPanelTab === 'meal_card'
+                    ? 'bg-amber-500 text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <UtensilsCrossed className="w-3.5 h-3.5" />
+                <span>বোর্ডার মিল প্রিভিউ</span>
+              </button>
             </div>
+
             <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-              রিয়েলটাইম সিঙ্ক
+              লাইভ প্রিভিউ
             </span>
           </div>
 
-          <p className="text-xs text-slate-400">
-            বামপাশের ফর্মে নাম বা ঠিকানা পরিবর্তন করার সাথে সাথে রিসিপ্টের ওপর রিয়েল-টাইমে আপডেট দেখতে পাবেন:
-          </p>
+          {rightPanelTab === 'receipt' ? (
+            <>
+              <p className="text-xs text-slate-400">
+                বামপাশের ফর্মে নাম বা ঠিকানা পরিবর্তন করার সাথে সাথে রিসিপ্টের ওপর রিয়েল-টাইমে আপডেট দেখতে পাবেন:
+              </p>
 
-          {/* Styled Paper Receipt Voucher Card mirroring the real modal */}
-          <div className="p-6 rounded-2xl bg-white text-slate-900 border border-slate-300 shadow-2xl space-y-5 animate-in fade-in select-none">
-            {/* Receipt Header */}
-            <div className="flex items-start justify-between border-b border-slate-200 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-xl shadow overflow-hidden shrink-0 border border-slate-800">
-                  {currentActiveLogo ? (
-                    <img src={currentActiveLogo} alt="Logo" className="w-full h-full object-contain p-1" />
-                  ) : (
-                    <Building className="w-5 h-5 text-indigo-400" />
-                  )}
-                </div>
-                <div>
-                  <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-tight">
-                    {formOrgName || 'ব্যাচেলর হোম ইআরপি'}
-                  </h2>
-                  <p className="text-[11px] text-slate-500 font-medium">
-                    {formTagline || 'স্মার্ট ব্যাচেলর হোস্টেল ও মেস ম্যানেজমেন্ট'}
-                  </p>
-                  {(formAddress || formPhone) ? (
-                    <p className="text-[10px] text-slate-600 font-semibold mt-0.5 bg-amber-50 px-1 py-0.5 rounded border border-amber-200/60 inline-block">
-                      {formAddress}
-                      {formAddress && formPhone ? ' • ' : ''}
-                      {formPhone ? `হটলাইন: ${formPhone}` : ''}
+              {/* Styled Paper Receipt Voucher Card mirroring the real modal */}
+              <div className="p-6 rounded-2xl bg-white text-slate-900 border border-slate-300 shadow-2xl space-y-5 animate-in fade-in select-none">
+                {/* Receipt Header */}
+                <div className="flex items-start justify-between border-b border-slate-200 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-xl shadow overflow-hidden shrink-0 border border-slate-800">
+                      {currentActiveLogo ? (
+                        <img src={currentActiveLogo} alt="Logo" className="w-full h-full object-contain p-1" />
+                      ) : (
+                        <Building className="w-5 h-5 text-indigo-400" />
+                      )}
+                    </div>
+                    <div>
+                      <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-tight">
+                        {formOrgName || 'ব্যাচেলর হোম ইআরপি'}
+                      </h2>
+                      <p className="text-[11px] text-slate-500 font-medium">
+                        {formTagline || 'স্মার্ট ব্যাচেলর হোস্টেল ও মেস ম্যানেজমেন্ট'}
+                      </p>
+                      {(formAddress || formPhone) ? (
+                        <p className="text-[10px] text-slate-600 font-semibold mt-0.5 bg-amber-50 px-1 py-0.5 rounded border border-amber-200/60 inline-block">
+                          {formAddress}
+                          {formAddress && formPhone ? ' • ' : ''}
+                          {formPhone ? `হটলাইন: ${formPhone}` : ''}
+                        </p>
+                      ) : (
+                        <p className="text-[10px] text-slate-400 italic mt-0.5">
+                          (ঠিকানা ও হটলাইন এখনো সেট করা হয়নি)
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <span className="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded text-[10px] font-bold uppercase tracking-wider mb-0.5">
+                      মানি রিসিপ্ট
+                    </span>
+                    <p className="text-xs font-mono font-black text-slate-800">
+                      {formReceiptPrefix || 'RCT'}-001004
                     </p>
-                  ) : (
-                    <p className="text-[10px] text-slate-400 italic mt-0.5">
-                      (ঠিকানা ও হটলাইন এখনো সেট করা হয়নি)
+                    <p className="text-[10px] text-slate-500">
+                      তারিখ: ২২ অক্টোবর ২০২৬
                     </p>
-                  )}
+                  </div>
+                </div>
+
+                {/* Boarder & Payment Metadata */}
+                <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100 text-[11px]">
+                  <div className="space-y-0.5">
+                    <span className="text-slate-400 font-semibold block text-[10px]">বর্ডার বিবরণী</span>
+                    <p className="font-bold text-slate-900 text-xs">অপূর্ব সাহা</p>
+                    <p className="font-mono text-slate-600">আইডি: BDR-2026-9803</p>
+                    <p className="text-slate-600">মোবাইল: ০১৮৭০৬৩১৯৬৯</p>
+                  </div>
+
+                  <div className="space-y-0.5 text-right">
+                    <span className="text-slate-400 font-semibold block text-[10px]">পেমেন্ট মাধ্যম ও একাউন্ট</span>
+                    <p className="font-bold text-slate-800">নগদ ক্যাশ (Cash)</p>
+                    <p className="text-slate-600">হিসাব: Manager Cash Box</p>
+                    <p className="text-slate-500">কালেক্টর: ম্যানেজার</p>
+                  </div>
+                </div>
+
+                {/* Table Mock */}
+                <div className="border border-slate-200 rounded-lg overflow-hidden text-[11px]">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-slate-100/80 border-b border-slate-200 text-slate-600 font-semibold text-[10px]">
+                      <tr>
+                        <th className="py-1.5 px-2">ক্রমিক</th>
+                        <th className="py-1.5 px-2">চার্জের বিবরণ</th>
+                        <th className="py-1.5 px-2 text-right">টাকা</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      <tr>
+                        <td className="py-1.5 px-2 text-slate-500 font-mono">১</td>
+                        <td className="py-1.5 px-2 font-medium text-slate-800">মাসিক সিট ভাড়া ফি</td>
+                        <td className="py-1.5 px-2 text-right font-bold text-slate-900">৳১,০০০.০০</td>
+                      </tr>
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-slate-50 font-black text-slate-900 border-t border-slate-200">
+                        <td colSpan={2} className="py-2 px-2 text-right text-[11px]">
+                          মোট গৃহীত টাকা (Total Paid):
+                        </td>
+                        <td className="py-2 px-2 text-right text-xs text-emerald-700 font-black">
+                          ৳১,০০০.০০
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                {/* Verification Stamp Footer */}
+                <div className="pt-3 flex items-center justify-between border-t border-slate-200 text-[10px]">
+                  <div className="flex items-center gap-1.5 text-slate-500">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span className="truncate max-w-[220px]">
+                      {formReceiptFooterNote || 'সফটওয়্যার জেনারেটেড ডিজিটাল ভাউচার। সিগনেচার প্রয়োজন নেই।'}
+                    </span>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="w-24 border-b border-dashed border-slate-400 pb-0.5 font-semibold text-slate-700 text-[10px]">
+                      ম্যানেজার
+                    </div>
+                    <span className="text-[9px] text-slate-500 block">আদায়কারীর স্বাক্ষর</span>
+                  </div>
                 </div>
               </div>
+            </>
+          ) : (
+            /* Boarder Dashboard Live Meal Card Preview */
+            <div className="space-y-4 animate-in fade-in">
+              <p className="text-xs text-slate-400">
+                বোর্ডার আইডির হোমপেজে <strong className="text-amber-400">{DAY_METADATA[selectedDayTab]?.nameBn}</strong>-এর খাবার অন/অফের নিচে মেনু যেভাবে হুবহু প্রদর্শিত হবে:
+              </p>
 
-              <div className="text-right shrink-0">
-                <span className="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded text-[10px] font-bold uppercase tracking-wider mb-0.5">
-                  মানি রিসিপ্ট
-                </span>
-                <p className="text-xs font-mono font-black text-slate-800">
-                  {formReceiptPrefix || 'RCT'}-001004
-                </p>
-                <p className="text-[10px] text-slate-500">
-                  তারিখ: ২২ অক্টোবর ২০২৬
-                </p>
-              </div>
-            </div>
-
-            {/* Boarder & Payment Metadata */}
-            <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100 text-[11px]">
-              <div className="space-y-0.5">
-                <span className="text-slate-400 font-semibold block text-[10px]">বর্ডার বিবরণী</span>
-                <p className="font-bold text-slate-900 text-xs">অপূর্ব সাহা</p>
-                <p className="font-mono text-slate-600">আইডি: BDR-2026-9803</p>
-                <p className="text-slate-600">মোবাইল: ০১৮৭০৬৩১৯৬৯</p>
-              </div>
-
-              <div className="space-y-0.5 text-right">
-                <span className="text-slate-400 font-semibold block text-[10px]">পেমেন্ট মাধ্যম ও একাউন্ট</span>
-                <p className="font-bold text-slate-800">নগদ ক্যাশ (Cash)</p>
-                <p className="text-slate-600">হিসাব: Manager Cash Box</p>
-                <p className="text-slate-500">কালেক্টর: ম্যানেজার</p>
-              </div>
-            </div>
-
-            {/* Table Mock */}
-            <div className="border border-slate-200 rounded-lg overflow-hidden text-[11px]">
-              <table className="w-full text-left border-collapse">
-                <thead className="bg-slate-100/80 border-b border-slate-200 text-slate-600 font-semibold text-[10px]">
-                  <tr>
-                    <th className="py-1.5 px-2">ক্রমিক</th>
-                    <th className="py-1.5 px-2">চার্জের বিবরণ</th>
-                    <th className="py-1.5 px-2 text-right">টাকা</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  <tr>
-                    <td className="py-1.5 px-2 text-slate-500 font-mono">১</td>
-                    <td className="py-1.5 px-2 font-medium text-slate-800">মাসিক সিট ভাড়া ফি</td>
-                    <td className="py-1.5 px-2 text-right font-bold text-slate-900">৳১,০০০.০০</td>
-                  </tr>
-                </tbody>
-                <tfoot>
-                  <tr className="bg-slate-50 font-black text-slate-900 border-t border-slate-200">
-                    <td colSpan={2} className="py-2 px-2 text-right text-[11px]">
-                      মোট গৃহীত টাকা (Total Paid):
-                    </td>
-                    <td className="py-2 px-2 text-right text-xs text-emerald-700 font-black">
-                      ৳১,০০০.০০
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-
-            {/* Verification Stamp Footer */}
-            <div className="pt-3 flex items-center justify-between border-t border-slate-200 text-[10px]">
-              <div className="flex items-center gap-1.5 text-slate-500">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                <span className="truncate max-w-[220px]">
-                  {formReceiptFooterNote || 'সফটওয়্যার জেনারেটেড ডিজিটাল ভাউচার। সিগনেচার প্রয়োজন নেই।'}
-                </span>
-              </div>
-
-              <div className="text-right">
-                <div className="w-24 border-b border-dashed border-slate-400 pb-0.5 font-semibold text-slate-700 text-[10px]">
-                  ম্যানেজার
+              <div className="p-5 rounded-3xl bg-slate-900/90 border border-slate-800 shadow-xl space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    <h4 className="text-sm font-bold text-white">
+                      খাবার দ্রুত নির্ধারণ ({DAY_METADATA[selectedDayTab]?.nameBn})
+                    </h4>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                    পরিবর্তন সক্রিয়
+                  </span>
                 </div>
-                <span className="text-[9px] text-slate-500 block">আদায়কারীর স্বাক্ষর</span>
+
+                <div className="space-y-3">
+                  {/* Breakfast Preview */}
+                  <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">🍳</span>
+                        <div>
+                          <div className="text-xs font-bold text-white">সকালের নাস্তা</div>
+                          <div className="text-[10px] text-slate-400">০৭:৩০ − ০৯:০০ (৳২৫.০০)</div>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-xl text-[10px] font-bold bg-amber-500 text-slate-950">
+                        খাব (ON)
+                      </span>
+                    </div>
+                    <div className="pt-2 border-t border-slate-800/80 flex items-start gap-1.5">
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 shrink-0">
+                        মেনু
+                      </span>
+                      <p className="text-xs text-slate-200 font-medium leading-snug">
+                        {formWeeklyMealMenu[selectedDayTab]?.breakfast || 'মেনু নির্ধারিত হয়নি'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Lunch Preview */}
+                  <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">🍛</span>
+                        <div>
+                          <div className="text-xs font-bold text-white">দুপুরের খাবার</div>
+                          <div className="text-[10px] text-slate-400">০১:০০ − ০২:৩০ (৳৬৫.০০)</div>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-xl text-[10px] font-bold bg-emerald-500 text-slate-950">
+                        খাব (ON)
+                      </span>
+                    </div>
+                    <div className="pt-2 border-t border-slate-800/80 flex items-start gap-1.5">
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shrink-0">
+                        মেনু
+                      </span>
+                      <p className="text-xs text-slate-200 font-medium leading-snug">
+                        {formWeeklyMealMenu[selectedDayTab]?.lunch || 'মেনু নির্ধারিত হয়নি'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Dinner Preview */}
+                  <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">🍲</span>
+                        <div>
+                          <div className="text-xs font-bold text-white">রাতের খাবার</div>
+                          <div className="text-[10px] text-slate-400">০৮:৩০ − ১০:০০ (৳৬৫.০০)</div>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-xl text-[10px] font-bold bg-indigo-500 text-white">
+                        খাব (ON)
+                      </span>
+                    </div>
+                    <div className="pt-2 border-t border-slate-800/80 flex items-start gap-1.5">
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 shrink-0">
+                        মেনু
+                      </span>
+                      <p className="text-xs text-slate-200 font-medium leading-snug">
+                        {formWeeklyMealMenu[selectedDayTab]?.dinner || 'মেনু নির্ধারিত হয়নি'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Info Card */}
           <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-400 space-y-1.5">
@@ -714,14 +1049,112 @@ export const HostelSettingsPage: React.FC = () => {
               <span>কোথায় কোথায় এই তথ্যগুলো কাজ করবে?</span>
             </div>
             <ul className="list-disc list-inside space-y-1 text-[11px] text-slate-300">
+              <li>বোর্ডার আইডির হোম ড্যাশবোর্ডে আগামীকালের মিল অন/অফের নিচে মেনু কার্ড</li>
+              <li>বোর্ডার মিল পোর্টালের প্রতিটি বেলার সিলেক্টরের ভেতরে</li>
               <li>অফিসিয়াল মানি রিসিপ্ট প্রিন্ট ও ডাউনলোড ভাউচার</li>
               <li>সফটওয়্যারের হেডার ব্র্যান্ডিং ও মোবাইল ড্রয়ার টাইটেল</li>
-              <li>বোর্ডার পোর্টালে সাপোর্ট হটলাইন ও যোগাযোগ তথ্য</li>
-              <li>মান্থলি বিলিং ও অডিট শিটের হেডার</li>
             </ul>
           </div>
         </div>
       </div>
+
+      {/* Full Weekly Menu Routine Overview Modal */}
+      {showFullWeeklyMenuModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-4xl rounded-3xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                  <CalendarDays className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    সাপ্তাহিক সামগ্রিক খাবার রুটিন চার্ট (Saturday – Friday)
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    ৭ দিনের সকাল, দুপুর ও রাতের সামগ্রিক খাবারের শিডিউল
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowFullWeeklyMenuModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="overflow-x-auto rounded-2xl border border-slate-800">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-slate-950 text-slate-300 border-b border-slate-800 text-[11px] font-semibold">
+                  <tr>
+                    <th className="p-3 w-28">বার / দিন</th>
+                    <th className="p-3 text-amber-300">🍳 সকালের নাস্তা</th>
+                    <th className="p-3 text-emerald-300">🍛 দুপুরের খাবার</th>
+                    <th className="p-3 text-indigo-300">🍲 রাতের খাবার</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/70 bg-slate-900/50">
+                  {DAY_ORDER.map((dayKey) => {
+                    const meta = DAY_METADATA[dayKey]
+                    const menu = formWeeklyMealMenu[dayKey]
+                    const isSelected = selectedDayTab === dayKey
+
+                    return (
+                      <tr
+                        key={dayKey}
+                        className={`hover:bg-slate-800/40 transition-colors ${
+                          isSelected ? 'bg-amber-500/5' : ''
+                        }`}
+                      >
+                        <td className="p-3 font-bold text-white whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <span>{meta.nameBn}</span>
+                            {isSelected && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-3 text-slate-300 font-medium">
+                          {menu?.breakfast || (
+                            <span className="text-slate-600 italic">নির্ধারিত হয়নি</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-slate-300 font-medium">
+                          {menu?.lunch || (
+                            <span className="text-slate-600 italic">নির্ধারিত হয়নি</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-slate-300 font-medium">
+                          {menu?.dinner || (
+                            <span className="text-slate-600 italic">নির্ধারিত হয়নি</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-xs text-slate-500">
+                মেনু সম্পাদনা করতে মডাল বন্ধ করে সংশ্লিষ্ট দিনে ক্লিক করুন।
+              </span>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => setShowFullWeeklyMenuModal(false)}
+                className="bg-primary-600 hover:bg-primary-500 text-xs px-5 py-2"
+              >
+                ঠিক আছে (বন্ধ করুন)
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -13,6 +13,13 @@ import {
   Users,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
+import {
+  useBrandingStore,
+  getDayKeyFromDateStr,
+  DEFAULT_WEEKLY_MEAL_MENU,
+  type WeeklyMealMenu,
+  type DayMealMenu,
+} from '@/app/store/useBrandingStore'
 import { isSupabaseConfigured } from '@/lib/supabaseClient'
 import { isPhoneMatch } from '@/utils/phone'
 import { formatCurrencyBn } from '@/utils/date'
@@ -41,6 +48,7 @@ import {
 
 export const BoarderMealPortal: React.FC = () => {
   const { profile } = useAuthStore()
+  const branding = useBrandingStore()
   const navigate = useNavigate()
   const isStaff = isMealManagerRole(profile?.role)
 
@@ -418,85 +426,97 @@ export const BoarderMealPortal: React.FC = () => {
           <p className="text-xs text-slate-400 font-medium">মিল ডেটা লোড হচ্ছে...</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Card 1: 🍳 Breakfast */}
-          <MealSessionCard
-            session="BREAKFAST"
-            isActive={breakfastActive}
-            price={breakfastRate}
-            mealDate={selectedDate}
-            isLocked={dateStatus.isLockedForBoarder}
-            lockReason={
-              dateStatus.isPast
-                ? 'অতীত দিনের খাবার পরিবর্তন অসম্ভব'
-                : dateStatus.isToday
-                ? 'আজকের খাবার পরিবর্তন লকড'
-                : 'রাত ১০:০০ টা কাটঅফ অতিক্রান্ত'
-            }
-            canOverride={isStaff}
-            onToggle={() => handleToggle('BREAKFAST', breakfastActive)}
-            onOpenOverride={() =>
-              setOverrideModal({
-                isOpen: true,
-                session: 'BREAKFAST',
-                currentState: breakfastActive,
-              })
-            }
-            isPending={toggleMutation.isPending}
-          />
+        (() => {
+          const selectedDayKey = getDayKeyFromDateStr(selectedDate)
+          const currentWeeklyMenu: WeeklyMealMenu = branding.weeklyMealMenu || DEFAULT_WEEKLY_MEAL_MENU
+          const selectedDayMenu: DayMealMenu =
+            currentWeeklyMenu[selectedDayKey] || DEFAULT_WEEKLY_MEAL_MENU[selectedDayKey]
 
-          {/* Card 2: 🍛 Lunch */}
-          <MealSessionCard
-            session="LUNCH"
-            isActive={lunchActive}
-            price={lunchRate}
-            mealDate={selectedDate}
-            isLocked={dateStatus.isLockedForBoarder}
-            lockReason={
-              dateStatus.isPast
-                ? 'অতীত দিনের খাবার পরিবর্তন অসম্ভব'
-                : dateStatus.isToday
-                ? 'আজকের খাবার পরিবর্তন লকড'
-                : 'রাত ১০:০০ টা কাটঅফ অতিক্রান্ত'
-            }
-            canOverride={isStaff}
-            onToggle={() => handleToggle('LUNCH', lunchActive)}
-            onOpenOverride={() =>
-              setOverrideModal({
-                isOpen: true,
-                session: 'LUNCH',
-                currentState: lunchActive,
-              })
-            }
-            isPending={toggleMutation.isPending}
-          />
+          return (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Card 1: 🍳 Breakfast */}
+              <MealSessionCard
+                session="BREAKFAST"
+                isActive={breakfastActive}
+                price={breakfastRate}
+                mealDate={selectedDate}
+                menuText={selectedDayMenu?.breakfast}
+                isLocked={dateStatus.isLockedForBoarder}
+                lockReason={
+                  dateStatus.isPast
+                    ? 'অতীত দিনের খাবার পরিবর্তন অসম্ভব'
+                    : dateStatus.isToday
+                    ? 'আজকের খাবার পরিবর্তন লকড'
+                    : 'রাত ১০:০০ টা কাটঅফ অতিক্রান্ত'
+                }
+                canOverride={isStaff}
+                onToggle={() => handleToggle('BREAKFAST', breakfastActive)}
+                onOpenOverride={() =>
+                  setOverrideModal({
+                    isOpen: true,
+                    session: 'BREAKFAST',
+                    currentState: breakfastActive,
+                  })
+                }
+                isPending={toggleMutation.isPending}
+              />
 
-          {/* Card 3: 🍲 Dinner */}
-          <MealSessionCard
-            session="DINNER"
-            isActive={dinnerActive}
-            price={dinnerRate}
-            mealDate={selectedDate}
-            isLocked={dateStatus.isLockedForBoarder}
-            lockReason={
-              dateStatus.isPast
-                ? 'অতীত দিনের খাবার পরিবর্তন অসম্ভব'
-                : dateStatus.isToday
-                ? 'আজকের খাবার পরিবর্তন লকড'
-                : 'রাত ১০:০০ টা কাটঅফ অতিক্রান্ত'
-            }
-            canOverride={isStaff}
-            onToggle={() => handleToggle('DINNER', dinnerActive)}
-            onOpenOverride={() =>
-              setOverrideModal({
-                isOpen: true,
-                session: 'DINNER',
-                currentState: dinnerActive,
-              })
-            }
-            isPending={toggleMutation.isPending}
-          />
-        </div>
+              {/* Card 2: 🍛 Lunch */}
+              <MealSessionCard
+                session="LUNCH"
+                isActive={lunchActive}
+                price={lunchRate}
+                mealDate={selectedDate}
+                menuText={selectedDayMenu?.lunch}
+                isLocked={dateStatus.isLockedForBoarder}
+                lockReason={
+                  dateStatus.isPast
+                    ? 'অতীত দিনের খাবার পরিবর্তন অসম্ভব'
+                    : dateStatus.isToday
+                    ? 'আজকের খাবার পরিবর্তন লকড'
+                    : 'রাত ১০:০০ টা কাটঅফ অতিক্রান্ত'
+                }
+                canOverride={isStaff}
+                onToggle={() => handleToggle('LUNCH', lunchActive)}
+                onOpenOverride={() =>
+                  setOverrideModal({
+                    isOpen: true,
+                    session: 'LUNCH',
+                    currentState: lunchActive,
+                  })
+                }
+                isPending={toggleMutation.isPending}
+              />
+
+              {/* Card 3: 🍲 Dinner */}
+              <MealSessionCard
+                session="DINNER"
+                isActive={dinnerActive}
+                price={dinnerRate}
+                mealDate={selectedDate}
+                menuText={selectedDayMenu?.dinner}
+                isLocked={dateStatus.isLockedForBoarder}
+                lockReason={
+                  dateStatus.isPast
+                    ? 'অতীত দিনের খাবার পরিবর্তন অসম্ভব'
+                    : dateStatus.isToday
+                    ? 'আজকের খাবার পরিবর্তন লকড'
+                    : 'রাত ১০:০০ টা কাটঅফ অতিক্রান্ত'
+                }
+                canOverride={isStaff}
+                onToggle={() => handleToggle('DINNER', dinnerActive)}
+                onOpenOverride={() =>
+                  setOverrideModal({
+                    isOpen: true,
+                    session: 'DINNER',
+                    currentState: dinnerActive,
+                  })
+                }
+                isPending={toggleMutation.isPending}
+              />
+            </div>
+          )
+        })()
       )}
 
       {/* Selected Date Guest Meals List */}
