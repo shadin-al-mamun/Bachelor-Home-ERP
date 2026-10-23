@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   X,
   Users,
@@ -43,9 +43,23 @@ export const BookGuestMealModal: React.FC<BookGuestMealModalProps> = ({
   const [remarks, setRemarks] = useState<string>('')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successToast, setSuccessToast] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const { data: rates } = useActiveMealRates()
   const bookMutation = useBookGuestMealMutation()
+
+  // Reset and synchronize inputs whenever modal opens or props change
+  useEffect(() => {
+    if (isOpen) {
+      setMealDate(initialDate || defaultDateStr)
+      setSession(initialSession || 'LUNCH')
+      setGuestCount(1)
+      setRemarks('')
+      setErrorMessage(null)
+      setSuccessToast(false)
+      setIsSubmitting(false)
+    }
+  }, [isOpen, initialDate, initialSession, defaultDateStr])
 
   if (!isOpen) return null
 
@@ -89,8 +103,6 @@ export const BookGuestMealModal: React.FC<BookGuestMealModalProps> = ({
     },
   ]
 
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (isSubmitting || bookMutation.isPending) return
@@ -98,6 +110,11 @@ export const BookGuestMealModal: React.FC<BookGuestMealModalProps> = ({
 
     if (guestCount < 1) {
       setErrorMessage('অনুগ্রহ করে কমপক্ষে ১টি গেস্ট মিল নির্বাচন করুন।')
+      return
+    }
+
+    if (!boarderId) {
+      setErrorMessage('বর্ডার আইডি পাওয়া যায়নি। অনুগ্রহ করে পেজটি রিফ্রেশ করুন।')
       return
     }
 
