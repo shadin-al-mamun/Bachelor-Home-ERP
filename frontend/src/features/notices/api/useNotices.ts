@@ -204,27 +204,37 @@ export const useCreateNotice = () => {
 
       if (isSupabaseConfigured) {
         try {
-          const { data, error } = await supabase
-            .from('hostel_notices')
-            .insert({
-              title: newNotice.title,
-              message: newNotice.message,
-              type: newNotice.type,
-              target_audience: newNotice.target_audience,
-              target_flat_id: newNotice.target_flat_id,
-              target_flat_name: newNotice.target_flat_name,
-              target_boarder_id: newNotice.target_boarder_id,
-              target_boarder_name: newNotice.target_boarder_name,
-              created_by: profile?.id || null,
-              created_by_name: profile?.full_name || 'সুপারএডমিন',
-              is_active: true,
-            })
-            .select()
-            .single()
+          const isValidUuid = (val?: string | null) =>
+          Boolean(val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val))
 
-          if (!error && data?.id) {
-            newNotice.id = data.id
-          }
+        const insertPayload: Record<string, any> = {
+          title: newNotice.title,
+          message: newNotice.message,
+          type: newNotice.type,
+          target_audience: newNotice.target_audience,
+          target_flat_id: isValidUuid(newNotice.target_flat_id) ? newNotice.target_flat_id : null,
+          target_flat_name: newNotice.target_flat_name || null,
+          target_boarder_id: isValidUuid(newNotice.target_boarder_id) ? newNotice.target_boarder_id : null,
+          target_boarder_name: newNotice.target_boarder_name || null,
+          created_by: isValidUuid(profile?.id) ? profile?.id : null,
+          created_by_name: profile?.full_name || 'সুপারএডমিন',
+          is_active: true,
+        }
+
+        const { data, error } = await supabase
+          .from('hostel_notices')
+          .insert(insertPayload)
+          .select()
+          .single()
+
+        if (error) {
+          console.error('hostel_notices insert error:', error)
+          throw new Error(`ডাটাবেজে নোটিশ সংরক্ষণ ব্যর্থ হয়েছে: ${error.message} (অনুগ্রহ করে Supabase SQL Editor-এ মাইগ্রেশন স্ক্রিপ্টটি রান করুন)`)
+        }
+
+        if (data?.id) {
+          newNotice.id = data.id
+        }
 
           // Dispatch in-app system notifications for the recipient boarder(s)
           if (payload.target_audience === 'SPECIFIC' && payload.target_boarder_id) {

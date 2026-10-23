@@ -21,12 +21,14 @@ import {
   Megaphone,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { useBrandingStore, DEFAULT_BRANDING } from '@/app/store/useBrandingStore'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import Button from '@/components/common/Button'
 import Input from '@/components/common/Input'
 
 export const HostelSettingsPage: React.FC = () => {
+  const queryClient = useQueryClient()
   const { profile } = useAuthStore()
   const {
     orgName,
@@ -127,6 +129,8 @@ export const HostelSettingsPage: React.FC = () => {
         appIconUrl: previewLogo,
         faviconUrl: previewLogo,
       })
+      queryClient.invalidateQueries({ queryKey: ['live-organization-settings'] })
+      queryClient.invalidateQueries({ queryKey: ['manager-helpline'] })
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 4000)
     } catch (err: any) {

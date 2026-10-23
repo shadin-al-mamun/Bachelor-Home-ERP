@@ -69,6 +69,29 @@ export const BoarderDashboardPage: React.FC = () => {
   const [selectedReceipt, setSelectedReceipt] = React.useState<ExtendedReceipt | null>(null)
   const [isReceiptModalOpen, setIsReceiptModalOpen] = React.useState(false)
 
+  // Fetch live organization settings & hostel rules directly from database
+  const { data: orgSettings } = useQuery({
+    queryKey: ['live-organization-settings'],
+    queryFn: async () => {
+      if (!isSupabaseConfigured) return null
+      const { data, error } = await supabase
+        .from('organization_settings')
+        .select('*')
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (error) {
+        console.warn('Error fetching live organization settings:', error.message)
+        return null
+      }
+      return data
+    },
+    staleTime: 5000,
+  })
+
+  const liveHostelRules: string =
+    (orgSettings?.hostel_rules as string) || branding.hostelRules || DEFAULT_BRANDING.hostelRules
+
   // Authenticated boarder or dynamic profile info (strictly from real data, zero hardcoded placeholders)
   const boarderName = currentBoarder?.full_name || profile?.full_name || (isStaffRole ? 'অ্যাডমিন ইউজার' : 'বর্ডার')
   const boarderCode = currentBoarder?.boarder_code || (isStaffRole ? 'STAFF' : 'BDR')
@@ -82,7 +105,7 @@ export const BoarderDashboardPage: React.FC = () => {
     rawBuilding.includes('মেইন ভবন')
 
   const boarderBuilding =
-    branding?.orgName || (!isDemoBuilding ? rawBuilding : 'প্রধান ক্যাম্পাস')
+    orgSettings?.org_name || branding?.orgName || (!isDemoBuilding ? rawBuilding : 'প্রধান ক্যাম্পাস')
 
   const boarderFlat = currentBoarder?.flat_name && currentBoarder.flat_name !== 'ফ্ল্যাট' ? currentBoarder.flat_name : ''
   const boarderRoom = currentBoarder?.room_name && currentBoarder.room_name !== 'রুম' ? currentBoarder.room_name : ''
@@ -215,8 +238,14 @@ export const BoarderDashboardPage: React.FC = () => {
     },
   })
 
-  const helplineName = managerContact?.full_name || branding?.orgName || 'হোস্টেল এডমিন'
-  const helplinePhone = managerContact?.phone_number || branding?.phone || branding?.emergencyContact || ''
+  const helplineName = managerContact?.full_name || orgSettings?.org_name || branding?.orgName || 'হোস্টেল এডমিন'
+  const helplinePhone =
+    managerContact?.phone_number ||
+    orgSettings?.phone ||
+    orgSettings?.emergency_contact ||
+    branding?.phone ||
+    branding?.emergencyContact ||
+    ''
 
   const handleToggleTomorrow = async (session: 'BREAKFAST' | 'LUNCH' | 'DINNER', currentState: boolean) => {
     if (tomorrowDateStatus.isLockedForBoarder) {
@@ -746,11 +775,11 @@ export const BoarderDashboardPage: React.FC = () => {
             <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80 space-y-2 text-slate-300 text-[11px]">
               <div className="font-semibold text-slate-200">আবাসিক নিয়মাবলি:</div>
               <ul className="space-y-1.5 list-disc list-inside text-slate-400">
-                {(branding.hostelRules || DEFAULT_BRANDING.hostelRules)
+                {liveHostelRules
                   .split('\n')
-                  .map((rule) => rule.trim().replace(/^[•\-\*]\s*/, ''))
+                  .map((rule: string) => rule.trim().replace(/^[•\-\*]\s*/, ''))
                   .filter(Boolean)
-                  .map((rule, idx) => (
+                  .map((rule: string, idx: number) => (
                     <li key={idx} className="leading-relaxed">
                       {rule}
                     </li>
