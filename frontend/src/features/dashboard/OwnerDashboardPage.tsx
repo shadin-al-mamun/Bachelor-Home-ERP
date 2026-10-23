@@ -243,16 +243,21 @@ export const OwnerDashboardPage: React.FC = () => {
                 ভাড়া ও রাজস্ব আদায়
               </span>
               <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                {kpis.collection_rate}% আদায়
+                {Math.min(100, Math.max(0, kpis.collection_rate || 0))}% আদায়
               </span>
             </div>
 
             <div className="text-2xl sm:text-3xl font-extrabold font-mono text-emerald-300 mt-2">
-              ৳{(kpis.total_collected_month / 1000).toFixed(1)}k
+              ৳{kpis.total_collected_month >= 1000
+                ? (kpis.total_collected_month / 1000).toFixed(1) + 'k'
+                : kpis.total_collected_month.toLocaleString('en-IN')}
             </div>
 
             <p className="text-[10px] text-slate-400 mt-1">
-              মোট বিল: ৳{kpis.total_billed_month.toLocaleString('en-IN')}
+              মোট বিল: ৳{Math.max(
+                kpis.total_billed_month,
+                kpis.total_collected_month + kpis.total_outstanding_dues
+              ).toLocaleString('en-IN')}
             </p>
 
             <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-[10px]">

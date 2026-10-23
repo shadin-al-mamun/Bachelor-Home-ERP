@@ -441,9 +441,38 @@ export function useOwnerDashboard() {
         const totalReceipts = (receiptsRes.data || []).reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
         const totalCollectedDirect = Math.max(totalReceipts, totalCollectedCharges)
 
-        const totalBilled = rpcKpis?.total_billed_month !== undefined ? Number(rpcKpis.total_billed_month) : totalBilledDirect
-        const totalCollected = rpcKpis?.total_collected_month !== undefined ? Number(rpcKpis.total_collected_month) : totalCollectedDirect
-        const totalDues = rpcKpis?.total_outstanding_dues !== undefined ? Number(rpcKpis.total_outstanding_dues) : Math.max(0, totalBilled - totalCollected)
+        const openChargesDues = charges
+          .filter((c: any) => c.status !== 'PAID')
+          .reduce(
+            (sum: number, c: any) =>
+              sum + Math.max(0, (Number(c.amount) || 0) - (Number(c.paid_amount) || 0)),
+            0
+          )
+
+        const rawBilled =
+          rpcKpis?.total_billed_month !== undefined
+            ? Number(rpcKpis.total_billed_month)
+            : totalBilledDirect
+        const totalCollected =
+          rpcKpis?.total_collected_month !== undefined
+            ? Number(rpcKpis.total_collected_month)
+            : totalCollectedDirect
+        const totalDues =
+          rpcKpis?.total_outstanding_dues !== undefined
+            ? Number(rpcKpis.total_outstanding_dues)
+            : openChargesDues
+
+        // Total billed demand must be at least equal to collected receipts plus outstanding dues.
+        // This eliminates the anomaly where receipts were collected before monthly batch charges were generated.
+        const totalBilled = Math.max(rawBilled, totalCollected + totalDues)
+
+        // Collection rate is always logically capped between 0% and 100%
+        const collectionRate =
+          totalBilled > 0
+            ? Math.min(100, Math.max(0, Math.round((totalCollected / totalBilled) * 1000) / 10))
+            : totalCollected > 0
+            ? 100
+            : 0
 
         const totalExpenses = rpcKpis?.operating_expenses_month !== undefined ? Number(rpcKpis.operating_expenses_month) : (expensesRes.data || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
         const totalIncomes = rpcKpis?.non_rent_incomes_month !== undefined ? Number(rpcKpis.non_rent_incomes_month) : (incomesRes.data || []).reduce((sum, i) => sum + (Number(i.amount) || 0), 0)
@@ -648,7 +677,7 @@ export function useOwnerDashboard() {
             occupancy_rate: Math.round(occupancyRate * 10) / 10,
             total_billed_month: totalBilled,
             total_collected_month: totalCollected,
-            collection_rate: totalBilled > 0 ? Math.round((totalCollected / totalBilled) * 1000) / 10 : 0,
+            collection_rate: collectionRate,
             total_outstanding_dues: totalDues,
             operating_expenses_month: totalExpenses,
             non_rent_incomes_month: totalIncomes,
