@@ -151,6 +151,8 @@ DECLARE
     v_description TEXT;
     v_existing_charge_id UUID;
     v_existing_status charge_status;
+    v_effective_utility NUMERIC(12,2);
+    v_effective_grand_total NUMERIC(12,2);
 BEGIN
     v_norm_month := DATE_TRUNC('month', COALESCE(p_billing_month, CURRENT_DATE))::DATE;
     v_month_label := to_char(v_norm_month, 'FMMonth YYYY');
@@ -178,6 +180,10 @@ BEGIN
             CONTINUE;
         END IF;
 
+        -- ভগ্নাংশ আসলে পরবর্তী টাকায় কনভার্ট (Ceil to next whole Taka)
+        v_effective_utility := CEIL(COALESCE(v_flat_item.utility_per_head, 0.00));
+        v_effective_grand_total := v_effective_utility + COALESCE(v_flat_item.cook_bill, 0.00) + COALESCE(v_flat_item.other_bill, 0.00);
+
         -- Record/Update Flat Monthly Distribution for permanent audit trail
         INSERT INTO public.flat_monthly_distributions (
             flat_id,
@@ -196,16 +202,16 @@ BEGIN
             v_norm_month,
             COALESCE(v_flat_item.total_voucher_amount, 0.00),
             GREATEST(1, COALESCE(v_flat_item.total_seats, 1)),
-            COALESCE(v_flat_item.grand_total_per_head, 0.00),
+            v_effective_grand_total,
             true,
             timezone('Asia/Dhaka', now()),
             v_current_user,
             jsonb_build_object(
                 'vouchers_total', COALESCE(v_flat_item.total_voucher_amount, 0.00),
-                'utility_per_head', COALESCE(v_flat_item.utility_per_head, 0.00),
+                'utility_per_head', v_effective_utility,
                 'cook_bill', COALESCE(v_flat_item.cook_bill, 0.00),
                 'other_bill', COALESCE(v_flat_item.other_bill, 0.00),
-                'grand_total_per_head', COALESCE(v_flat_item.grand_total_per_head, 0.00)
+                'grand_total_per_head', v_effective_grand_total
             ),
             timezone('Asia/Dhaka', now())
         )
@@ -220,7 +226,7 @@ BEGIN
             updated_at = timezone('Asia/Dhaka', now());
 
         -- If per-head amount <= 0, no charges need to be created for this flat
-        IF COALESCE(v_flat_item.grand_total_per_head, 0.00) <= 0 THEN
+        IF v_effective_grand_total <= 0 THEN
             CONTINUE;
         END IF;
 
@@ -229,7 +235,7 @@ BEGIN
             '%s — %s বিবিধ বিল (ইউটিলিটি: ৳%s, বাবুর্চি: ৳%s%s)',
             v_month_label,
             COALESCE(v_flat.name, v_flat.flat_code),
-            ROUND(COALESCE(v_flat_item.utility_per_head, 0.00), 2),
+            ROUND(v_effective_utility, 2),
             ROUND(COALESCE(v_flat_item.cook_bill, 0.00), 2),
             CASE WHEN COALESCE(v_flat_item.other_bill, 0.00) > 0 
                  THEN format(', অন্যান্য: ৳%s', ROUND(v_flat_item.other_bill, 2)) 
@@ -267,14 +273,14 @@ BEGIN
                 -- If charge already exists and is unpaid, update with new calculated amount
                 IF v_existing_status IN ('UNPAID') THEN
                     UPDATE public.boarder_charges
-                    SET amount = v_flat_item.grand_total_per_head,
+                    SET amount = v_effective_grand_total,
                         due_date = v_due_date,
                         description = v_description,
                         updated_at = timezone('Asia/Dhaka', now())
                     WHERE id = v_existing_charge_id;
 
                     v_updated := v_updated + 1;
-                    v_total_amount_billed := v_total_amount_billed + v_flat_item.grand_total_per_head;
+                    v_total_amount_billed := v_total_amount_billed + v_effective_grand_total;
                 ELSE
                     -- Already paid or partially paid, preserve existing ledger
                     v_skipped := v_skipped + 1;
@@ -297,7 +303,7 @@ BEGIN
                     v_alloc.allocation_id,
                     'UTILITY',
                     v_norm_month,
-                    v_flat_item.grand_total_per_head,
+                    v_effective_grand_total,
                     0.00,
                     'UNPAID',
                     v_due_date,
@@ -306,7 +312,7 @@ BEGIN
                 );
 
                 v_generated := v_generated + 1;
-                v_total_amount_billed := v_total_amount_billed + v_flat_item.grand_total_per_head;
+                v_total_amount_billed := v_total_amount_billed + v_effective_grand_total;
             END IF;
         END LOOP;
     END LOOP;

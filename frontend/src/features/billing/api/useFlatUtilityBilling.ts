@@ -298,7 +298,10 @@ export function useGenerateBatchFlatUtilityBills() {
 
         if (!allocations || allocations.length === 0) continue
 
-        const desc = `${normMonth.slice(0, 7)} — ফ্ল্যাট বিবিধ বিল (ইউটিলিটি: ৳${config.utility_per_head}, বাবুর্চি: ৳${config.cook_bill}${
+        const effectiveUtility = Math.ceil(config.utility_per_head)
+        const effectiveGrandTotal = effectiveUtility + Number(config.cook_bill || 0) + Number(config.other_bill || 0)
+
+        const desc = `${normMonth.slice(0, 7)} — ফ্ল্যাট বিবিধ বিল (ইউটিলিটি: ৳${effectiveUtility}, বাবুর্চি: ৳${config.cook_bill}${
           config.other_bill > 0 ? `, অন্যান্য: ৳${config.other_bill}` : ''
         })`
 
@@ -317,7 +320,7 @@ export function useGenerateBatchFlatUtilityBills() {
               await supabase
                 .from('boarder_charges')
                 .update({
-                  amount: config.grand_total_per_head,
+                  amount: effectiveGrandTotal,
                   due_date: params.dueDate,
                   description: desc,
                   updated_at: new Date().toISOString(),
@@ -325,7 +328,7 @@ export function useGenerateBatchFlatUtilityBills() {
                 .eq('id', existing.id)
 
               updated++
-              totalAmount += config.grand_total_per_head
+              totalAmount += effectiveGrandTotal
             }
           } else {
             await supabase.from('boarder_charges').insert({
@@ -333,7 +336,7 @@ export function useGenerateBatchFlatUtilityBills() {
               allocation_id: alloc.id,
               charge_type: 'UTILITY',
               billing_month: normMonth,
-              amount: config.grand_total_per_head,
+              amount: effectiveGrandTotal,
               paid_amount: 0,
               status: 'UNPAID',
               due_date: params.dueDate,
@@ -341,7 +344,7 @@ export function useGenerateBatchFlatUtilityBills() {
             })
 
             generated++
-            totalAmount += config.grand_total_per_head
+            totalAmount += effectiveGrandTotal
           }
         }
       }

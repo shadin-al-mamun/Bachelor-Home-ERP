@@ -116,7 +116,9 @@ export const GenerateFlatUtilityBillsModal: React.FC<GenerateFlatUtilityBillsMod
 
       const voucherTotal = flat.total_voucher_amount || 0
       const seatCount = state.seatCount > 0 ? state.seatCount : 1
-      const utilityPerHead = Math.round((voucherTotal / seatCount) * 100) / 100
+      // ভগ্নাংশ আসলে পরবর্তী টাকায় কনভার্ট (Ceil to next whole Taka if fraction exists)
+      const rawUtility = voucherTotal / seatCount
+      const utilityPerHead = Math.ceil(rawUtility)
       const cookBill = Number(state.cookBill) || 0
       const otherBill = Number(state.otherBill) || 0
       const grandTotalPerHead = utilityPerHead + cookBill + otherBill
@@ -322,6 +324,9 @@ export const GenerateFlatUtilityBillsModal: React.FC<GenerateFlatUtilityBillsMod
                   </th>
                   <th className="p-3 text-center border-r border-slate-800 whitespace-nowrap bg-indigo-950/30 text-indigo-300">
                     ৭ (৫/৬)<br />জনপ্রতি বিবিধ<br />বিলের পরিমাণ
+                    <span className="block text-[9px] font-normal text-indigo-200/80 mt-0.5">
+                      (ভগ্নাংশে পরবর্তী টাকা)
+                    </span>
                   </th>
                   <th className="p-3 text-center border-r border-slate-800 whitespace-nowrap bg-amber-950/30 text-amber-300">
                     ৮<br />বাবুর্চি বিল<br />
