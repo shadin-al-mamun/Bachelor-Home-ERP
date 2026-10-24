@@ -403,7 +403,6 @@ export function useOwnerDashboard() {
           receiptsRes,
           expensesRes,
           incomesRes,
-          cashSessionsRes,
           managerAccountsRes,
           activeBoardersRes,
           mealsTodayRes,
@@ -414,11 +413,6 @@ export function useOwnerDashboard() {
           supabase.from('receipts').select('amount, is_void').eq('is_void', false),
           supabase.from('expenses').select('amount, approval_status').eq('approval_status', 'APPROVED'),
           supabase.from('incomes').select('amount'),
-          supabase
-            .from('manager_cash_sessions')
-            .select('manager_id, session_date, expected_closing_cash, status')
-            .eq('status', 'OPEN')
-            .order('session_date', { ascending: false }),
           supabase
             .from('financial_accounts')
             .select('id, account_name, account_number, account_type, opening_balance, current_balance, is_active')
@@ -477,59 +471,26 @@ export function useOwnerDashboard() {
         const totalExpenses = rpcKpis?.operating_expenses_month !== undefined ? Number(rpcKpis.operating_expenses_month) : (expensesRes.data || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
         const totalIncomes = rpcKpis?.non_rent_incomes_month !== undefined ? Number(rpcKpis.non_rent_incomes_month) : (incomesRes.data || []).reduce((sum, i) => sum + (Number(i.amount) || 0), 0)
 
-        // Find Manager Cash account(s) matching by type, known ID, account number, or name
+        // 5. Manager Cash in Custody (Single Source of Truth: Live Manager Cash Account Balance)
+        // Strictly identify active manager cash drawer account(s), excluding owner vault and bank
         const managerAccounts = (managerAccountsRes.data || []).filter((a: any) =>
           a.account_type === 'CASH_MANAGER' ||
           a.id === '11111111-0000-0000-0000-000000000002' ||
           a.account_number === 'MGR-CASH-01' ||
-          (a.account_name && (
-            a.account_name.toLowerCase().includes('manager') ||
-            a.account_name.includes('ম্যানেজার') ||
-            a.account_name.includes('ক্যাশ ড্রয়ার') ||
-            a.account_name.includes('ক্যাশ বক্স')
+          (a.account_type !== 'CASH_OWNER' && a.account_type !== 'BANK' && (
+            a.account_name?.toLowerCase().includes('manager cash') ||
+            a.account_name?.includes('ম্যানেজার ক্যাশ') ||
+            a.account_name?.includes('ক্যাশ ড্রয়ার')
           ))
         )
 
-        // Calculate live effective balance for Manager Cash accounts
-        const accountCash = managerAccounts.reduce((sum, a) => {
-          const cur = Number(a.current_balance) || 0
-          const open = Number(a.opening_balance) || 0
-          // If current balance >= opening balance, it represents live status (e.g. 4,700 >= 3,000)
-          // If current balance is just the receipt movements (1,700 < 3,000), combine open + cur (4,700)
-          const effective = cur >= open ? cur : (cur > 0 && open > 0 ? cur + open : Math.max(cur, open))
-          return sum + effective
+        // Live balance directly from financial_accounts table
+        // Both Super Admin and Manager see 100% the exact same account balance
+        const liveManagerCash = managerAccounts.reduce((sum: number, a: any) => {
+          return sum + (Number(a.current_balance) || 0)
         }, 0)
 
-        // Prevent multi-counting across unclosed historical sessions:
-        // Take only the latest active session per manager. If no session exists, fall back to financial_accounts
-        const latestSessionByManager = new Map<string, number>()
-        for (const s of (cashSessionsRes.data || [])) {
-          const mgrId = s.manager_id || 'default'
-          if (!latestSessionByManager.has(mgrId)) {
-            latestSessionByManager.set(mgrId, Number(s.expected_closing_cash) || 0)
-          }
-        }
-
-        const sessionCash = Array.from(latestSessionByManager.values()).reduce((sum, v) => sum + v, 0)
-
-        // Auto-heal active open sessions in database if session opening_cash was 0 but account opening_balance exists
-        const openSessions = cashSessionsRes.data || []
-        const primaryManagerAccount = managerAccounts[0]
-        const openBal = Number(primaryManagerAccount?.opening_balance) || 0
-        if (openBal > 0) {
-          for (const s of openSessions) {
-            if (Number((s as any).opening_cash) === 0) {
-              supabase
-                .from('manager_cash_sessions')
-                .update({ opening_cash: openBal })
-                .eq('id', (s as any).id)
-                .then()
-            }
-          }
-        }
-
-        // Cash custody displays the true live funds in manager custody (guaranteed to match Accounts page ৳4,700)
-        const cashCustody = Math.max(accountCash, sessionCash)
+        const cashCustody = liveManagerCash
 
         // Calculate meals using Hostel Mess Opt-Out Policy:
         // Active residents who have NOT opted out have their meals ON by default (3 meals/day)
@@ -682,7 +643,7 @@ export function useOwnerDashboard() {
             operating_expenses_month: totalExpenses,
             non_rent_incomes_month: totalIncomes,
             cash_in_custody: cashCustody,
-            cash_in_custody_source: accountCash > 0 ? 'ম্যানেজার ক্যাশ বক্স (লাইভ ব্যালেন্স)' : (latestSessionByManager.size > 0 ? 'সক্রিয় সেশনসমূহ' : 'ম্যানেজার ক্যাশ ড্রয়ার'),
+            cash_in_custody_source: 'ম্যানেজার ক্যাশ বক্স (লাইভ ব্যালেন্স)',
             net_operating_income: totalCollected + totalIncomes - totalExpenses,
             active_meals_today: countToday,
             active_meals_tomorrow: countTomorrow,

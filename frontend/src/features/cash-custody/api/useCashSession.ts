@@ -15,6 +15,7 @@ import { uploadVoucherFile } from '@/features/expenses/api/useExpenses'
 export interface ExtendedCashSession extends ManagerCashSession {
   manager_name: string
   account_name: string
+  account_current_balance?: number
 }
 
 export interface ExtendedCashHandover extends CashHandover {
@@ -339,7 +340,7 @@ export function useManagerCashSession(managerId?: string, sessionDate?: string) 
         console.error('Error initializing cash session:', initErr)
       }
 
-      const { data: sessionData, error: sessionErr } = await supabase
+      const { data: sessionData } = await supabase
         .from('manager_cash_sessions')
         .select(`
           *,
@@ -348,14 +349,56 @@ export function useManagerCashSession(managerId?: string, sessionDate?: string) 
         `)
         .eq('manager_id', targetManager)
         .eq('session_date', targetDate)
-        .single()
+        .maybeSingle()
 
-      if (sessionErr) {
-        throw new Error(sessionErr.message)
+      if (!sessionData) {
+        // Fallback directly to the manager's live financial account as the single source of truth
+        const { data: accData } = await supabase
+          .from('financial_accounts')
+          .select('id, account_name, opening_balance, current_balance')
+          .or(`assigned_manager_id.eq.${targetManager},account_type.eq.CASH_MANAGER`)
+          .eq('is_active', true)
+          .order('assigned_manager_id', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        const currentBal = Number(accData?.current_balance) || 0
+        const extendedSession: ExtendedCashSession = {
+          id: `virtual-${targetDate}`,
+          manager_id: targetManager,
+          account_id: accData?.id || '',
+          session_date: targetDate,
+          opening_cash: currentBal,
+          cash_receipts: 0,
+          cash_expenses: 0,
+          cash_deposited_to_owner: 0,
+          cash_handed_over_out: 0,
+          cash_handed_over_in: 0,
+          expected_closing_cash: currentBal,
+          actual_counted_cash: null,
+          cash_variance: null,
+          variance_explanation: null,
+          status: 'OPEN',
+          submitted_at: null,
+          reviewed_by: null,
+          reviewed_at: null,
+          reopen_reason: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          manager_name: 'হোস্টেল ম্যানেজার',
+          account_name: accData?.account_name || 'ম্যানেজার ক্যাশ বক্স',
+          account_current_balance: currentBal,
+        }
+
+        return {
+          session: extendedSession,
+          movements: [],
+        }
       }
 
-      const accountOpening = Number(sessionData.account?.opening_balance) || 0
-      const sessionOpening = Number(sessionData.opening_cash) || 0
+      const accountCurrent = Number(sessionData.account?.current_balance) ?? 0
+      const accountOpening = Number(sessionData.account?.opening_balance) ?? 0
+      const sessionOpening = Number(sessionData.opening_cash) ?? 0
 
       // Auto-heal in background if open session has zero opening cash but account has opening balance
       if (sessionOpening === 0 && accountOpening > 0 && sessionData.status === 'OPEN') {
@@ -366,13 +409,14 @@ export function useManagerCashSession(managerId?: string, sessionDate?: string) 
           .then()
       }
 
-      const effectiveOpening = sessionOpening > 0 ? sessionOpening : accountOpening
+      const effectiveOpening = sessionOpening >= 0 ? sessionOpening : Math.max(0, accountCurrent)
 
       const extendedSession: ExtendedCashSession = {
         ...sessionData,
         opening_cash: effectiveOpening,
         manager_name: sessionData.manager?.full_name || 'ম্যানেজার',
         account_name: sessionData.account?.account_name || 'ম্যানেজার ক্যাশ',
+        account_current_balance: accountCurrent,
       }
 
       return {

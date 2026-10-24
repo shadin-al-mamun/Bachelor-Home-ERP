@@ -141,10 +141,10 @@ export const ManagerCashDashboard: React.FC = () => {
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-                ম্যানেজার ক্যাশ হেফাজত ও ক্লোজিং ককপিট
+                ম্যানেজার ক্যাশ হিসাব ও নগদ বিবরণী
               </h1>
               <p className="text-xs text-slate-400">
-                রিয়েল-টাইম নগদ প্রবাহ, টু-পার্টি হ্যান্ডওভার ও দিনশেষে ক্যাশ ভ্যারিয়েন্স অডিট
+                ম্যানেজার ক্যাশ বক্সের লাইভ ব্যালেন্স, চলমান নগদ আদায়-ব্যয় ও মালিককে হস্তান্তর
               </p>
             </div>
           </div>
@@ -454,23 +454,23 @@ export const ManagerCashDashboard: React.FC = () => {
               </p>
             </div>
 
-            {/* Card 5: 💼 Expected Closing Cash (Master Spotlight Card) */}
+            {/* Card 5: 💼 Live Cash in Hand (Master Spotlight Card) */}
             <div className="p-4 rounded-3xl bg-gradient-to-br from-amber-950/40 via-slate-900 to-indigo-950/40 border-2 border-amber-500/40 shadow-2xl relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-28 h-28 bg-amber-500/20 rounded-full blur-2xl group-hover:bg-amber-500/30 transition-all pointer-events-none" />
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
                   <Banknote className="w-4 h-4 text-amber-400" />
-                  প্রত্যাশিত ক্যাশ (Expected)
+                  ক্যাশ ব্যালেন্স (Cash in Hand)
                 </span>
                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
                   লাইভ
                 </span>
               </div>
               <div className="text-2xl sm:text-3xl font-extrabold font-mono text-amber-400 mt-1.5">
-                ৳{calculatedExpected.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                ৳{(session.account_current_balance ?? calculatedExpected).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </div>
               <p className="text-[10px] text-amber-200/80 mt-1 font-medium">
-                ম্যানেজারের হাতে ফিজিক্যালি থাকতে হবে
+                ম্যানেজার ক্যাশ বক্সের বর্তমান মোট ব্যালেন্স
               </p>
             </div>
           </div>
@@ -629,11 +629,10 @@ export const ManagerCashDashboard: React.FC = () => {
               </span>
             </button>
 
-            {/* Button 2: Deposit to Owner */}
+            {/* Button 2: Settle / Deposit to Owner */}
             <button
               onClick={() => setActiveModal('DEPOSIT')}
-              disabled={session.status === 'APPROVED'}
-              className="p-4 rounded-3xl bg-slate-900/70 hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700 flex items-center justify-between group transition-all text-left disabled:opacity-40"
+              className="p-4 rounded-3xl bg-slate-900/70 hover:bg-slate-800/80 border border-cyan-500/30 hover:border-cyan-500/60 flex items-center justify-between group transition-all text-left"
             >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 group-hover:scale-110 transition-transform">
@@ -641,10 +640,10 @@ export const ManagerCashDashboard: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-xs font-bold text-white group-hover:text-cyan-300 transition-colors">
-                    ওনারের নিকট জমা (Deposit)
+                    মালিককে হিসাব বুঝিয়ে দেওয়া / ক্যাশ জমা
                   </h3>
                   <p className="text-[11px] text-slate-400">
-                    হোস্টেল মালিকের নিকট ক্যাশ হ্যান্ডওভার
+                    মালিকের ব্যাংক/বিকাশ বা ক্যাশে টাকা হস্তান্তর
                   </p>
                 </div>
               </div>
@@ -653,11 +652,11 @@ export const ManagerCashDashboard: React.FC = () => {
               </span>
             </button>
 
-            {/* Button 3: Day-End Cash Closing */}
+            {/* Button 3: Optional Cash Audit & Counting */}
             <button
               onClick={() => setActiveModal('CLOSE')}
-              disabled={session.status === 'APPROVED' || session.status === 'SUBMITTED'}
-              className="p-4 rounded-3xl bg-gradient-to-r from-amber-600/20 to-orange-600/20 hover:from-amber-600/30 hover:to-orange-600/30 border border-amber-500/40 flex items-center justify-between group transition-all text-left disabled:opacity-50"
+              disabled={session.status === 'APPROVED'}
+              className="p-4 rounded-3xl bg-gradient-to-r from-amber-600/10 to-orange-600/10 hover:from-amber-600/20 hover:to-orange-600/20 border border-amber-500/30 flex items-center justify-between group transition-all text-left disabled:opacity-50"
             >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 group-hover:scale-110 transition-transform">
@@ -666,11 +665,11 @@ export const ManagerCashDashboard: React.FC = () => {
                 <div>
                   <h3 className="text-xs font-bold text-amber-300">
                     {session.status === 'SUBMITTED'
-                      ? 'ক্লোজিং জমা দেওয়া হয়েছে (Submitted)'
-                      : 'দিনশেষে ক্যাশ ক্লোজিং (Closing)'}
+                      ? 'অডিট রিপোর্ট জমা দেওয়া হয়েছে'
+                      : 'ক্যাশ অডিট ও কাউন্টিং (ঐচ্ছিক)'}
                   </h3>
                   <p className="text-[11px] text-slate-300">
-                    গণনাকৃত টাকা এন্ট্রি ও ভ্যারিয়েন্স সাবমিট
+                    ফিজিক্যাল ক্যাশ গুনে মেলানোর ঐচ্ছিক ফিচার
                   </p>
                 </div>
               </div>
