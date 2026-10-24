@@ -7,6 +7,7 @@ import {
 } from './api/useBilling'
 import { useFlats } from '@/features/accommodation/api/useAccommodation'
 import { GenerateMonthlyChargesModal } from './components/GenerateMonthlyChargesModal'
+import { GenerateFlatUtilityBillsModal } from './components/GenerateFlatUtilityBillsModal'
 import { AddManualChargeModal } from './components/AddManualChargeModal'
 import { CollectReceiptModal } from './components/CollectReceiptModal'
 import { Button } from '@/components/common/Button'
@@ -24,6 +25,7 @@ import {
   User,
   CreditCard,
   Building,
+  Building2,
   RefreshCw,
   ExternalLink,
 } from 'lucide-react'
@@ -35,6 +37,7 @@ export const BoarderDuesPage: React.FC = () => {
 
   // Modals state
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false)
+  const [isFlatUtilityModalOpen, setIsFlatUtilityModalOpen] = useState(false)
   const [isAddChargeModalOpen, setIsAddChargeModalOpen] = useState(false)
   const [isCollectModalOpen, setIsCollectModalOpen] = useState(false)
   const [collectBoarderId, setCollectBoarderId] = useState<string | undefined>(undefined)
@@ -107,6 +110,16 @@ export const BoarderDuesPage: React.FC = () => {
           >
             <Zap className="w-3.5 h-3.5 mr-1.5 text-amber-300" />
             মাসিক ভাড়া জেনারেট
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsFlatUtilityModalOpen(true)}
+            className="text-xs border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 shadow-lg shadow-amber-500/10 font-bold"
+          >
+            <Building2 className="w-3.5 h-3.5 mr-1.5 text-amber-400" />
+            মাসিক ফ্ল্যাট ভিত্তিক বিবিধ বিল জেনারেট
           </Button>
 
           <Button
@@ -421,6 +434,14 @@ export const BoarderDuesPage: React.FC = () => {
         isOpen={isGenerateModalOpen}
         onClose={() => {
           setIsGenerateModalOpen(false)
+          refetch()
+        }}
+      />
+
+      <GenerateFlatUtilityBillsModal
+        isOpen={isFlatUtilityModalOpen}
+        onClose={() => {
+          setIsFlatUtilityModalOpen(false)
           refetch()
         }}
       />
