@@ -529,11 +529,11 @@ export const BoarderDetailPage: React.FC = () => {
       {activeTab === 'ledger' && (
         <div className="space-y-6">
           {/* Summary Metric Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="glass-card p-4 rounded-xl border border-slate-800 bg-slate-900/40">
               <span className="text-xs text-slate-500 block mb-1">মোট বিল / চার্জ</span>
               <span className="text-2xl font-bold text-white">
-                {formatCurrencyBn(Number(boarder.total_paid || 0) + Number(boarder.total_due || 0))}
+                {formatCurrencyBn(boarder.total_billed ?? (boarder.charges || []).reduce((acc, c) => acc + Number(c.amount || 0), 0))}
               </span>
             </div>
             <div className="glass-card p-4 rounded-xl border border-slate-800 bg-slate-900/40">
@@ -542,10 +542,18 @@ export const BoarderDetailPage: React.FC = () => {
                 {formatCurrencyBn(boarder.total_paid || 0)}
               </span>
             </div>
-            <div className="glass-card p-4 rounded-xl border border-rose-500/20 bg-rose-500/5">
-              <span className="text-xs text-rose-400 block mb-1">বর্তমান বকেয়া (Total Due)</span>
-              <span className="text-2xl font-bold text-rose-400">
+            <div className={`glass-card p-4 rounded-xl border ${Number(boarder.total_due || 0) > 0 ? 'border-rose-500/20 bg-rose-500/5' : 'border-emerald-500/20 bg-emerald-500/5'}`}>
+              <span className={`text-xs block mb-1 ${Number(boarder.total_due || 0) > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                বর্তমান বকেয়া (Total Due)
+              </span>
+              <span className={`text-2xl font-bold ${Number(boarder.total_due || 0) > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
                 {formatCurrencyBn(boarder.total_due || 0)}
+              </span>
+            </div>
+            <div className="glass-card p-4 rounded-xl border border-cyan-500/20 bg-cyan-500/5">
+              <span className="text-xs text-cyan-400 block mb-1">অগ্রিম জমা (Advance)</span>
+              <span className="text-2xl font-bold text-cyan-400">
+                {formatCurrencyBn(boarder.advance_balance || 0)}
               </span>
             </div>
           </div>
@@ -583,37 +591,59 @@ export const BoarderDetailPage: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
                   {boarder.charges && boarder.charges.length > 0 ? (
-                    boarder.charges.map((charge) => (
-                      <tr key={charge.id} className="hover:bg-slate-800/30">
-                        <td className="py-3 px-4 font-mono font-medium text-slate-200">
-                          {charge.billing_month}
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="px-2 py-0.5 rounded text-[11px] bg-slate-800 text-slate-300">
-                            {charge.charge_type === 'RENT' ? 'মাসিক ভাড়া' : 'মিল বিল'}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-slate-400">{charge.description || '—'}</td>
-                        <td className="py-3 px-4 font-semibold text-white">
-                          {formatCurrencyBn(charge.amount)}
-                        </td>
-                        <td className="py-3 px-4 text-emerald-400 font-medium">
-                          {formatCurrencyBn(charge.paid_amount)}
-                        </td>
-                        <td className="py-3 px-4 font-semibold text-rose-400">
-                          {formatCurrencyBn(charge.due_amount)}
-                        </td>
-                        <td className="py-3 px-4">
-                          {charge.status === 'PAID' ? (
-                            <Badge status="PAID">পরিশোধিত</Badge>
-                          ) : charge.status === 'PARTIALLY_PAID' ? (
-                            <Badge status="PENDING">আংশিক</Badge>
-                          ) : (
-                            <Badge status="REJECTED">অপরিশোধিত</Badge>
-                          )}
-                        </td>
-                      </tr>
-                    ))
+                    boarder.charges.map((charge) => {
+                      const chargeTypeLabel = (() => {
+                        switch (charge.charge_type) {
+                          case 'RENT':
+                            return 'মাসিক ভাড়া'
+                          case 'MEAL':
+                            return 'মিল বিল'
+                          case 'UTILITY':
+                            return 'বিবিধ ইউটিলিটি'
+                          case 'ADMISSION_FEE':
+                            return 'ভর্তি ফি'
+                          case 'OTHER':
+                            return 'অন্যান্য'
+                          default:
+                            return charge.charge_type
+                        }
+                      })()
+
+                      const isPaid = charge.status === 'PAID' || Number(charge.due_amount || 0) <= 0
+                      const isPartial = !isPaid && (charge.status === 'PARTIALLY_PAID' || Number(charge.paid_amount || 0) > 0)
+
+                      return (
+                        <tr key={charge.id} className="hover:bg-slate-800/30">
+                          <td className="py-3 px-4 font-mono font-medium text-slate-200">
+                            {charge.billing_month}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="px-2 py-0.5 rounded text-[11px] bg-slate-800 text-slate-300">
+                              {chargeTypeLabel}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-slate-400">{charge.description || '—'}</td>
+                          <td className="py-3 px-4 font-semibold text-white">
+                            {formatCurrencyBn(charge.amount)}
+                          </td>
+                          <td className="py-3 px-4 text-emerald-400 font-medium">
+                            {formatCurrencyBn(charge.paid_amount)}
+                          </td>
+                          <td className="py-3 px-4 font-semibold text-rose-400">
+                            {formatCurrencyBn(charge.due_amount)}
+                          </td>
+                          <td className="py-3 px-4">
+                            {isPaid ? (
+                              <Badge status="PAID">পরিশোধিত</Badge>
+                            ) : isPartial ? (
+                              <Badge status="PENDING">আংশিক</Badge>
+                            ) : (
+                              <Badge status="REJECTED">অপরিশোধিত</Badge>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })
                   ) : (
                     <tr>
                       <td colSpan={7} className="py-8 text-center text-slate-500">

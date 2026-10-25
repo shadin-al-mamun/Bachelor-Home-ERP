@@ -39,8 +39,10 @@ export interface BoarderWithRelations extends Boarder {
     new_seat_code?: string
   })[]
   charges?: BoarderCharge[]
+  total_billed?: number
   total_due?: number
   total_paid?: number
+  advance_balance?: number
   meal_summary?: {
     total_meals: number
     estimated_meal_cost: number
@@ -898,9 +900,26 @@ export function useBoarder(id?: string) {
         ? data.active_allocation.find((a: any) => a.status === 'ACTIVE') || null
         : data.active_allocation
 
+      // Fetch non-void receipts to calculate accurate totalPaid and advance credit
+      let boarderReceipts: any[] = []
+      try {
+        const { data: recData } = await supabase
+          .from('receipts')
+          .select('id, amount, is_void')
+          .eq('boarder_id', data.id)
+          .eq('is_void', false)
+        boarderReceipts = recData || []
+      } catch (err) {
+        console.warn('Error fetching boarder receipts in useBoarder:', err)
+      }
+
+      const totalReceipts = boarderReceipts.reduce((acc: number, r: any) => acc + Number(r.amount || 0), 0)
       const charges = data.charges || []
-      const totalDue = charges.reduce((acc: number, c: any) => acc + Number(c.due_amount || 0), 0)
-      const totalPaid = charges.reduce((acc: number, c: any) => acc + Number(c.paid_amount || 0), 0)
+      const totalBilled = charges.reduce((acc: number, c: any) => acc + Number(c.amount || 0), 0)
+      const totalPaidCharges = charges.reduce((acc: number, c: any) => acc + Number(c.paid_amount || 0), 0)
+      const totalPaid = Math.max(totalReceipts, totalPaidCharges)
+      const totalDue = Math.max(0, totalBilled - totalPaid)
+      const advanceBalance = Math.max(0, totalPaid - totalBilled)
 
       // Compute real-time Opt-Out meal summary for the current month
       const todayStr = new Date().toISOString().slice(0, 10)
@@ -967,8 +986,10 @@ export function useBoarder(id?: string) {
         ...data,
         active_allocation: activeAlloc,
         charges,
+        total_billed: totalBilled,
         total_due: totalDue,
         total_paid: totalPaid,
+        advance_balance: advanceBalance,
         meal_summary: mealSummary,
       }
     },

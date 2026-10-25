@@ -104,8 +104,9 @@ export const BoarderDuesPage: React.FC = () => {
   const totalBilled = charges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
   const totalPaidCharges = charges.reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
   const totalReceipts = allReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
-  const totalPaid = totalReceipts || totalPaidCharges
-  const outstandingDue = Math.max(0, totalBilled - totalPaidCharges)
+  const totalPaid = Math.max(totalReceipts, totalPaidCharges)
+  const outstandingDue = Math.max(0, totalBilled - totalPaid)
+  const advanceBalance = Math.max(0, totalPaid - totalBilled)
 
   const mealCharges = charges
     .filter((c) => c.charge_type === 'MEAL')
@@ -113,8 +114,9 @@ export const BoarderDuesPage: React.FC = () => {
 
   // Filter charges by status tab
   const filteredCharges = charges.filter((c) => {
-    if (chargeFilter === 'UNPAID') return c.status === 'UNPAID' || c.status === 'PARTIALLY_PAID'
-    if (chargeFilter === 'PAID') return c.status === 'PAID'
+    const isPaid = c.status === 'PAID' || Number(c.due_amount || 0) <= 0
+    if (chargeFilter === 'UNPAID') return !isPaid
+    if (chargeFilter === 'PAID') return isPaid
     return true
   })
 
@@ -235,7 +237,7 @@ export const BoarderDuesPage: React.FC = () => {
       {/* 2. Top Metric Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Outstanding Due */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/60 border border-slate-800 relative overflow-hidden space-y-2">
+        <div className={`p-4 sm:p-5 rounded-2xl bg-slate-900/60 border ${outstandingDue > 0 ? 'border-amber-500/30' : 'border-emerald-500/30'} relative overflow-hidden space-y-2`}>
           <div className="flex items-center justify-between text-slate-400 text-xs">
             <span>সর্বমোট বকেয়া</span>
             <AlertCircle className={`w-4 h-4 ${outstandingDue > 0 ? 'text-amber-400' : 'text-emerald-400'}`} />
@@ -243,11 +245,14 @@ export const BoarderDuesPage: React.FC = () => {
           <div className={`text-xl sm:text-2xl font-black font-mono ${outstandingDue > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
             {formatCurrencyBn(outstandingDue)}
           </div>
-          <div className="text-[11px] text-slate-400 flex items-center gap-1">
+          <div className="text-[11px] text-slate-400 flex items-center justify-between gap-2">
             {outstandingDue > 0 ? (
               <span className="text-amber-400 font-medium">পরিশোধ বাকি রয়েছে</span>
             ) : (
               <span className="text-emerald-400 font-medium">কোনো বকেয়া নেই</span>
+            )}
+            {advanceBalance > 0 && (
+              <span className="text-cyan-400 font-semibold font-mono">অগ্রিম: {formatCurrencyBn(advanceBalance)}</span>
             )}
           </div>
         </div>
@@ -405,7 +410,9 @@ export const BoarderDuesPage: React.FC = () => {
                     </tr>
                   ) : (
                     filteredCharges.map((c) => {
-                      const due = Number(c.due_amount ?? (Number(c.amount) - Number(c.paid_amount))) || 0
+                      const isPaid = c.status === 'PAID' || Number(c.due_amount || 0) <= 0
+                      const due = isPaid ? 0 : Number(c.due_amount ?? (Number(c.amount) - Number(c.paid_amount))) || 0
+                      const paidAmt = isPaid ? (Number(c.paid_amount) > 0 ? Number(c.paid_amount) : Number(c.amount)) : Number(c.paid_amount || 0)
                       return (
                         <tr key={c.id} className="hover:bg-slate-800/30 transition-colors">
                           <td className="py-3.5 px-3 font-semibold text-white whitespace-nowrap">
@@ -421,7 +428,7 @@ export const BoarderDuesPage: React.FC = () => {
                             {formatCurrencyBn(c.amount)}
                           </td>
                           <td className="py-3.5 px-3 text-right font-mono font-bold text-emerald-400 whitespace-nowrap">
-                            {formatCurrencyBn(c.paid_amount)}
+                            {formatCurrencyBn(paidAmt)}
                           </td>
                           <td className="py-3.5 px-3 text-right font-mono font-bold whitespace-nowrap">
                             <span className={due > 0 ? 'text-amber-400' : 'text-slate-500'}>
@@ -432,7 +439,7 @@ export const BoarderDuesPage: React.FC = () => {
                             {c.due_date ? formatDateBn(c.due_date) : '-'}
                           </td>
                           <td className="py-3.5 px-3 text-right whitespace-nowrap">
-                            {getStatusBadge(c.status)}
+                            {getStatusBadge(isPaid ? 'PAID' : c.status)}
                           </td>
                         </tr>
                       )

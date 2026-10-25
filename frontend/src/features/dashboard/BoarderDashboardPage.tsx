@@ -199,8 +199,9 @@ export const BoarderDashboardPage: React.FC = () => {
   const totalBilled = boarderCharges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
   const totalPaidCharges = boarderCharges.reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
   const totalReceipts = boarderReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
-  const totalPaid = totalReceipts || totalPaidCharges
-  const outstandingDue = Math.max(0, totalBilled - totalPaidCharges)
+  const totalPaid = Math.max(totalReceipts, totalPaidCharges)
+  const outstandingDue = Math.max(0, totalBilled - totalPaid)
+  const advanceBalance = Math.max(0, totalPaid - totalBilled)
 
   const mealBillCharges = boarderCharges
     .filter((c) => c.charge_type === 'MEAL')
@@ -512,10 +513,10 @@ export const BoarderDashboardPage: React.FC = () => {
         </div>
 
         {/* Card 3: 💳 My Due & Billing */}
-        <div className="p-4 sm:p-5 rounded-3xl bg-slate-900/80 border border-rose-500/30 backdrop-blur-sm relative overflow-hidden">
+        <div className={`p-4 sm:p-5 rounded-3xl bg-slate-900/80 border ${outstandingDue > 0 ? 'border-rose-500/30' : 'border-emerald-500/30'} backdrop-blur-sm relative overflow-hidden`}>
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
-              <DollarSign className="w-4 h-4 text-rose-400" />
+            <span className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${outstandingDue > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+              <DollarSign className={`w-4 h-4 ${outstandingDue > 0 ? 'text-rose-400' : 'text-emerald-400'}`} />
               চলতি মাসের বকেয়া
             </span>
             <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
@@ -537,6 +538,13 @@ export const BoarderDashboardPage: React.FC = () => {
             <span>পরিশোধিত: <strong className="text-emerald-400 font-mono">{formatCurrencyBn(totalPaid)}</strong></span>
             <span>মোট বিল: <strong className="text-slate-300 font-mono">{formatCurrencyBn(totalBilled)}</strong></span>
           </div>
+
+          {advanceBalance > 0 && (
+            <div className="mt-1.5 pt-1.5 border-t border-slate-800/60 flex items-center justify-between text-[10px]">
+              <span className="text-cyan-400 font-medium">অগ্রিম জমা ব্যালেন্স:</span>
+              <strong className="text-cyan-300 font-mono">{formatCurrencyBn(advanceBalance)}</strong>
+            </div>
+          )}
         </div>
 
         {/* Card 4: 📊 Month Meal Summary */}

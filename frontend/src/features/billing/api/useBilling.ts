@@ -19,6 +19,7 @@ export interface BoarderDueSummary {
   total_billed: number
   total_paid: number
   outstanding_due: number
+  advance_balance?: number
   overdue_amount: number
   last_payment_date?: string | null
 }
