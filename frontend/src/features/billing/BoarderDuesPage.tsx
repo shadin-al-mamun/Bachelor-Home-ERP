@@ -2,13 +2,9 @@ import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   useBoarderDuesSummary,
-  type BoarderDueSummary,
   type DuesFilters,
 } from './api/useBilling'
 import { useFlats } from '@/features/accommodation/api/useAccommodation'
-import { GenerateMonthlyChargesModal } from './components/GenerateMonthlyChargesModal'
-import { GenerateFlatUtilityBillsModal } from './components/GenerateFlatUtilityBillsModal'
-import { AddManualChargeModal } from './components/AddManualChargeModal'
 import { CollectReceiptModal } from './components/CollectReceiptModal'
 import { Button } from '@/components/common/Button'
 import { Badge } from '@/components/common/Badge'
@@ -36,12 +32,8 @@ export const BoarderDuesPage: React.FC = () => {
   const [overdueOnly, setOverdueOnly] = useState(false)
 
   // Modals state
-  const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false)
-  const [isFlatUtilityModalOpen, setIsFlatUtilityModalOpen] = useState(false)
-  const [isAddChargeModalOpen, setIsAddChargeModalOpen] = useState(false)
   const [isCollectModalOpen, setIsCollectModalOpen] = useState(false)
   const [collectBoarderId, setCollectBoarderId] = useState<string | undefined>(undefined)
-  const [selectedBoarderForAction, setSelectedBoarderForAction] = useState<BoarderDueSummary | null>(null)
 
   const filters: DuesFilters = {
     search: search.trim() || undefined,
@@ -89,38 +81,29 @@ export const BoarderDuesPage: React.FC = () => {
             রিফ্রেশ
           </Button>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setSelectedBoarderForAction(null)
-              setIsAddChargeModalOpen(true)
-            }}
-            className="text-xs border-slate-700 hover:border-slate-600"
+          <Link
+            to="/billing/generate?tab=other"
+            className="px-3 py-1.5 rounded-xl border border-slate-700 hover:border-slate-600 bg-slate-900/60 text-slate-300 hover:text-white text-xs font-medium flex items-center transition-colors"
           >
             <PlusCircle className="w-3.5 h-3.5 mr-1.5 text-indigo-400" />
             অন্যান্য চার্জ যুক্ত করুন
-          </Button>
+          </Link>
 
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => setIsGenerateModalOpen(true)}
-            className="text-xs shadow-lg shadow-primary-500/20"
+          <Link
+            to="/billing/generate?tab=rent"
+            className="px-3.5 py-1.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white text-xs font-bold shadow-lg shadow-primary-500/20 flex items-center transition-colors"
           >
             <Zap className="w-3.5 h-3.5 mr-1.5 text-amber-300" />
             মাসিক ভাড়া জেনারেট
-          </Button>
+          </Link>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsFlatUtilityModalOpen(true)}
-            className="text-xs border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 shadow-lg shadow-amber-500/10 font-bold"
+          <Link
+            to="/billing/generate?tab=flat-utility"
+            className="px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 shadow-lg shadow-amber-500/10 text-xs font-bold flex items-center transition-colors"
           >
             <Building2 className="w-3.5 h-3.5 mr-1.5 text-amber-400" />
             মাসিক ফ্ল্যাট ভিত্তিক বিবিধ বিল জেনারেট
-          </Button>
+          </Link>
 
           <Button
             variant="primary"
@@ -153,6 +136,13 @@ export const BoarderDuesPage: React.FC = () => {
         >
           <Receipt className="w-4 h-4 text-emerald-400" />
           মানি রিসিপ্ট ভাউচার
+        </Link>
+        <Link
+          to="/billing/generate"
+          className="px-4 py-2 rounded-xl bg-amber-500/10 text-amber-300 hover:text-amber-200 hover:bg-amber-500/20 font-bold text-xs border border-amber-500/30 flex items-center gap-2 transition-colors"
+        >
+          <Zap className="w-4 h-4 text-amber-400" />
+          মাসিক বিল জেনারেট হাব
         </Link>
       </div>
 
@@ -430,31 +420,6 @@ export const BoarderDuesPage: React.FC = () => {
       </div>
 
       {/* Modals */}
-      <GenerateMonthlyChargesModal
-        isOpen={isGenerateModalOpen}
-        onClose={() => {
-          setIsGenerateModalOpen(false)
-          refetch()
-        }}
-      />
-
-      <GenerateFlatUtilityBillsModal
-        isOpen={isFlatUtilityModalOpen}
-        onClose={() => {
-          setIsFlatUtilityModalOpen(false)
-          refetch()
-        }}
-      />
-
-      <AddManualChargeModal
-        isOpen={isAddChargeModalOpen}
-        onClose={() => {
-          setIsAddChargeModalOpen(false)
-          refetch()
-        }}
-        preSelectedBoarderId={selectedBoarderForAction?.boarder_id}
-      />
-
       <CollectReceiptModal
         isOpen={isCollectModalOpen}
         onClose={() => {

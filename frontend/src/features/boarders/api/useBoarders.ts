@@ -902,12 +902,74 @@ export function useBoarder(id?: string) {
       const totalDue = charges.reduce((acc: number, c: any) => acc + Number(c.due_amount || 0), 0)
       const totalPaid = charges.reduce((acc: number, c: any) => acc + Number(c.paid_amount || 0), 0)
 
+      // Compute real-time Opt-Out meal summary for the current month
+      const todayStr = new Date().toISOString().slice(0, 10)
+      const startOfMonth = todayStr.slice(0, 7) + '-01'
+      const admitDate = data.admission_date || activeAlloc?.start_date || startOfMonth
+      const effectiveStart = admitDate > startOfMonth ? admitDate : startOfMonth
+
+      let mealSummary = {
+        total_meals: 0,
+        estimated_meal_cost: 0,
+        active_today: {
+          breakfast: true,
+          lunch: true,
+          dinner: true,
+        },
+      }
+
+      if (data.status === 'ACTIVE' && todayStr >= effectiveStart) {
+        try {
+          const { data: selections } = await supabase
+            .from('meal_selections')
+            .select('*')
+            .eq('boarder_id', data.id)
+            .gte('meal_date', effectiveStart)
+            .lte('meal_date', todayStr)
+
+          const selMap = new Map((selections || []).map((s: any) => [s.meal_date, s]))
+          const [curY, curM, curD] = todayStr.split('-').map(Number)
+          const [, , stD] = effectiveStart.split('-').map(Number)
+
+          let mealsCount = 0
+          let estimatedCost = 0
+          for (let d = stD; d <= curD; d++) {
+            const dStr = `${curY}-${String(curM).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+            const sel: any = selMap.get(dStr)
+            const b = sel ? Boolean(sel.breakfast) : true
+            const l = sel ? Boolean(sel.lunch) : true
+            const din = sel ? Boolean(sel.dinner) : true
+
+            if (b) { mealsCount += 0.5; estimatedCost += 26 }
+            if (l) { mealsCount += 1.0; estimatedCost += 52 }
+            if (din) { mealsCount += 1.0; estimatedCost += 52 }
+          }
+
+          mealsCount = Math.round(mealsCount * 10) / 10
+          estimatedCost = Math.round(estimatedCost * 100) / 100
+
+          const todaySel: any = selMap.get(todayStr)
+          mealSummary = {
+            total_meals: mealsCount,
+            estimated_meal_cost: estimatedCost,
+            active_today: {
+              breakfast: todaySel ? Boolean(todaySel.breakfast) : true,
+              lunch: todaySel ? Boolean(todaySel.lunch) : true,
+              dinner: todaySel ? Boolean(todaySel.dinner) : true,
+            },
+          }
+        } catch (e) {
+          console.warn('Error calculating meal_summary in useBoarder:', e)
+        }
+      }
+
       return {
         ...data,
         active_allocation: activeAlloc,
         charges,
         total_due: totalDue,
         total_paid: totalPaid,
+        meal_summary: mealSummary,
       }
     },
   })

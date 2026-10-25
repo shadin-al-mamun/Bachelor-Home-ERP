@@ -511,39 +511,42 @@ export function useOwnerDashboard() {
           for (const b of activeBoardersList) {
             const todaySel = todaySelMap.get(b.id)
             if (todaySel) {
-              countToday += (todaySel.breakfast ? 1 : 0) + (todaySel.lunch ? 1 : 0) + (todaySel.dinner ? 1 : 0)
+              countToday += (todaySel.breakfast ? 0.5 : 0) + (todaySel.lunch ? 1.0 : 0) + (todaySel.dinner ? 1.0 : 0)
             } else {
-              // Opt-Out default: active meals
-              countToday += 3
+              // Opt-Out default: active meals (daily 2.5 meals: 0.5+1+1)
+              countToday += 2.5
             }
 
             const tomorrowSel = tomorrowSelMap.get(b.id)
             if (tomorrowSel) {
-              countTomorrow += (tomorrowSel.breakfast ? 1 : 0) + (tomorrowSel.lunch ? 1 : 0) + (tomorrowSel.dinner ? 1 : 0)
+              countTomorrow += (tomorrowSel.breakfast ? 0.5 : 0) + (tomorrowSel.lunch ? 1.0 : 0) + (tomorrowSel.dinner ? 1.0 : 0)
             } else {
-              // Opt-Out default: active meals
-              countTomorrow += 3
+              // Opt-Out default: active meals (daily 2.5 meals: 0.5+1+1)
+              countTomorrow += 2.5
             }
           }
         } else if (occupiedSeats > 0) {
           let turnedOffToday = 0
           for (const s of (mealsTodayRes.data || [])) {
-            if (!s.breakfast) turnedOffToday++
-            if (!s.lunch) turnedOffToday++
-            if (!s.dinner) turnedOffToday++
+            if (!s.breakfast) turnedOffToday += 0.5
+            if (!s.lunch) turnedOffToday += 1.0
+            if (!s.dinner) turnedOffToday += 1.0
           }
-          countToday = Math.max(0, occupiedSeats * 3 - turnedOffToday)
+          countToday = Math.max(0, occupiedSeats * 2.5 - turnedOffToday)
 
           let turnedOffTomorrow = 0
           for (const s of (mealsTomorrowRes.data || [])) {
-            if (!s.breakfast) turnedOffTomorrow++
-            if (!s.lunch) turnedOffTomorrow++
-            if (!s.dinner) turnedOffTomorrow++
+            if (!s.breakfast) turnedOffTomorrow += 0.5
+            if (!s.lunch) turnedOffTomorrow += 1.0
+            if (!s.dinner) turnedOffTomorrow += 1.0
           }
-          countTomorrow = Math.max(0, occupiedSeats * 3 - turnedOffTomorrow)
+          countTomorrow = Math.max(0, occupiedSeats * 2.5 - turnedOffTomorrow)
         }
 
-        const maxPossibleMealsToday = effectiveResidentsCount * 3
+        countToday = Math.round(countToday * 10) / 10
+        countTomorrow = Math.round(countTomorrow * 10) / 10
+
+        const maxPossibleMealsToday = effectiveResidentsCount * 2.5
         const mealAttendanceRate = maxPossibleMealsToday > 0
           ? Math.min(100, Math.round((countToday / maxPossibleMealsToday) * 1000) / 10)
           : (effectiveResidentsCount > 0 ? 100 : 0)

@@ -59,6 +59,7 @@ import BoarderListPage from '@/features/boarders/BoarderListPage'
 import BoarderDetailPage from '@/features/boarders/BoarderDetailPage'
 import BoarderDuesPage from '@/features/billing/BoarderDuesPage'
 import ReceiptListPage from '@/features/billing/ReceiptListPage'
+import MonthlyBillGenerationPage from '@/features/billing/MonthlyBillGenerationPage'
 import ExpenseListPage from '@/features/expenses/ExpenseListPage'
 import IncomeListPage from '@/features/finance/IncomeListPage'
 import AccountTransfersPage from '@/features/finance/AccountTransfersPage'
@@ -173,6 +174,10 @@ export const router = createBrowserRouter([
         element: <ReceiptListPage />,
       },
       {
+        path: 'billing/generate',
+        element: <MonthlyBillGenerationPage />,
+      },
+      {
         path: 'billing/*',
         element: <BoarderDuesPage />,
       },
@@ -234,7 +239,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'meals/billing',
-        element: <MealSettingsPage />,
+        element: <Navigate to="/billing/generate?tab=meals" replace />,
       },
       {
         path: 'meals/audit',

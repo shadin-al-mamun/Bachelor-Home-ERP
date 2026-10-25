@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { useBoarder, getDocumentSignedUrl } from './api/useBoarders'
 import ApplicantReviewModal from './components/ApplicantReviewModal'
 import EditBoarderModal from './components/EditBoarderModal'
+import { BoarderMealRecordsTab } from './components/BoarderMealRecordsTab'
 import Badge from '@/components/common/Badge'
 import Button from '@/components/common/Button'
 import { formatDateBn, formatCurrencyBn } from '@/utils/date'
@@ -24,7 +25,6 @@ import {
   ShieldAlert,
   AlertCircle,
   Receipt,
-  Clock,
   SlidersHorizontal,
   Megaphone,
 } from 'lucide-react'
@@ -35,10 +35,21 @@ import { isMealManagerRole } from '@/features/meals/api/useMeals'
 
 export const BoarderDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
+  const [searchParams] = useSearchParams()
   const { data: boarder, isLoading, error } = useBoarder(id)
   const { profile } = useAuthStore()
   const canManageMeals = isMealManagerRole(profile?.role)
-  const [activeTab, setActiveTab] = useState<'bio' | 'seat' | 'ledger' | 'meals'>('bio')
+  const initialTab = (searchParams.get('tab') as 'bio' | 'seat' | 'ledger' | 'meals') || 'bio'
+  const [activeTab, setActiveTab] = useState<'bio' | 'seat' | 'ledger' | 'meals'>(
+    ['bio', 'seat', 'ledger', 'meals'].includes(initialTab) ? initialTab : 'bio'
+  )
+
+  useEffect(() => {
+    const tab = searchParams.get('tab')
+    if (tab && ['bio', 'seat', 'ledger', 'meals'].includes(tab)) {
+      setActiveTab(tab as any)
+    }
+  }, [searchParams])
   const [docUrl, setDocUrl] = useState<string | null>(null)
   const [isLoadingDoc, setIsLoadingDoc] = useState(false)
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false)
@@ -619,86 +630,7 @@ export const BoarderDetailPage: React.FC = () => {
 
       {/* Tab 4: Meals Record */}
       {activeTab === 'meals' && (
-        <div className="space-y-6">
-          <div className="glass-card p-6 rounded-2xl border border-slate-800 bg-slate-900/40">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-              <h3 className="text-sm font-semibold text-white uppercase tracking-wider flex items-center gap-2">
-                <Utensils className="w-4 h-4 text-amber-400" />
-                চলতি মাসের মিল অংশগ্রহণ ও সারাংশ
-              </h3>
-
-              {canManageMeals && (
-                <button
-                  type="button"
-                  onClick={() => setIsMealControlOpen(true)}
-                  className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-indigo-600 hover:from-amber-600 hover:to-indigo-700 text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-amber-500/20 transition-all self-start sm:self-auto"
-                >
-                  <SlidersHorizontal className="w-3.5 h-3.5" />
-                  <span>মিল অন/অফ পরিবর্তন (Staff Override)</span>
-                </button>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs mb-6">
-              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800">
-                <span className="text-slate-500 block mb-1">মোট গৃহীত মিল</span>
-                <span className="text-2xl font-bold text-white">
-                  {boarder.meal_summary?.total_meals || 0} টি
-                </span>
-                <span className="text-slate-400 text-[11px]">চলতি মাসে রেকর্ডকৃত</span>
-              </div>
-
-              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800">
-                <span className="text-slate-500 block mb-1">আনুমানিক মিল খরচ</span>
-                <span className="text-2xl font-bold text-amber-400">
-                  {formatCurrencyBn(boarder.meal_summary?.estimated_meal_cost || 0)}
-                </span>
-                <span className="text-slate-400 text-[11px]">বর্তমান গড় রেট অনুযায়ী</span>
-              </div>
-
-              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800">
-                <span className="text-slate-500 block mb-1">আজকের মিল স্ট্যাটাস</span>
-                <div className="flex items-center gap-2 mt-2">
-                  <span
-                    className={`px-2 py-0.5 rounded text-[11px] font-medium ${
-                      boarder.meal_summary?.active_today?.breakfast
-                        ? 'bg-emerald-500/20 text-emerald-400'
-                        : 'bg-slate-800 text-slate-500'
-                    }`}
-                  >
-                    সকাল {boarder.meal_summary?.active_today?.breakfast ? '✓' : '✗'}
-                  </span>
-                  <span
-                    className={`px-2 py-0.5 rounded text-[11px] font-medium ${
-                      boarder.meal_summary?.active_today?.lunch
-                        ? 'bg-emerald-500/20 text-emerald-400'
-                        : 'bg-slate-800 text-slate-500'
-                    }`}
-                  >
-                    দুপুর {boarder.meal_summary?.active_today?.lunch ? '✓' : '✗'}
-                  </span>
-                  <span
-                    className={`px-2 py-0.5 rounded text-[11px] font-medium ${
-                      boarder.meal_summary?.active_today?.dinner
-                        ? 'bg-emerald-500/20 text-emerald-400'
-                        : 'bg-slate-800 text-slate-500'
-                    }`}
-                  >
-                    রাত {boarder.meal_summary?.active_today?.dinner ? '✓' : '✗'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-800/80 text-xs text-slate-400 flex items-center gap-3">
-              <Clock className="w-5 h-5 text-amber-400 flex-shrink-0" />
-              <span>
-                মিল অন/অফ নিয়ম: প্রতিদিন রাত ১০:০০ টার মধ্যে পরবর্তী দিনের মিল নির্বাচন বা পরিবর্তন করতে হয়।
-                পরবর্তী মডিউলে (Prompt 21 ও 22) পূর্ণাঙ্গ রিয়েলটাইম কিচেন কাউন্ট ভিউ যুক্ত থাকবে।
-              </span>
-            </div>
-          </div>
-        </div>
+        <BoarderMealRecordsTab boarder={boarder} canManageMeals={canManageMeals} />
       )}
 
       {/* Review Modal */}

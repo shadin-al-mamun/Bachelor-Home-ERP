@@ -14,6 +14,8 @@ import {
   AlertCircle,
   Sparkles,
   UtensilsCrossed,
+  ExternalLink,
+  Info,
 } from 'lucide-react'
 import { useLocation, Link } from 'react-router-dom'
 import { useMealSettings } from './api/useMeals'
@@ -92,13 +94,23 @@ export const MealSettingsPage: React.FC = () => {
   const [dueDate, setDueDate] = useState<string>(
     new Date(Date.now() + 86400000 * 10).toISOString().slice(0, 10)
   )
+  const [defaultMinMeals, setDefaultMinMeals] = useState<number>(45)
+  const [boarderMinOverrides, setBoarderMinOverrides] = useState<Record<string, number>>({})
   const [billingSuccessMsg, setBillingSuccessMsg] = useState<string | null>(null)
   const {
     data: billingPreview,
     isLoading: isBillingLoading,
     refetch: refetchBilling,
-  } = useMonthlyMealBillingPreview(billingMonth)
+  } = useMonthlyMealBillingPreview(billingMonth, defaultMinMeals, boarderMinOverrides)
   const generateChargesMutation = useGenerateMonthlyMealChargesMutation()
+
+  const handleMinMealsChange = (boarderId: string, val: string) => {
+    const num = parseFloat(val)
+    setBoarderMinOverrides((prev) => ({
+      ...prev,
+      [boarderId]: isNaN(num) ? 0 : Math.max(0, num),
+    }))
+  }
 
   // Audit Logs State
   const [auditSearch, setAuditSearch] = useState<string>('')
@@ -185,6 +197,8 @@ export const MealSettingsPage: React.FC = () => {
       const res = await generateChargesMutation.mutateAsync({
         billingMonth,
         dueDate,
+        defaultMinMeals,
+        boarderMinOverrides,
       })
       setBillingSuccessMsg(res.message || 'মাসিক খাবার বিল সফলভাবে জেনারেট হয়েছে।')
       refetchBilling()
@@ -658,6 +672,21 @@ export const MealSettingsPage: React.FC = () => {
                   />
                 </div>
 
+                <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5">
+                  <span className="text-xs text-slate-400 flex items-center gap-1.5" title="ডিফল্ট সর্বনিম্ন মিল (কোনো বর্ডার এর চেয়ে কম খেলে তাকে এই পরিমাণ মিলের চার্জ দিতে হবে)">
+                    বাধ্যতামূলক মিল:
+                  </span>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    value={defaultMinMeals}
+                    onChange={(e) => setDefaultMinMeals(Math.max(0, parseFloat(e.target.value) || 0))}
+                    className="w-12 bg-transparent text-amber-300 text-xs font-mono font-bold focus:outline-none text-center"
+                  />
+                  <span className="text-[10px] text-slate-500 font-bold">টি</span>
+                </div>
+
                 <button
                   onClick={handleGenerateMealCharges}
                   disabled={generateChargesMutation.isPending || isBillingLoading}
@@ -670,6 +699,15 @@ export const MealSettingsPage: React.FC = () => {
                       : 'মাসিক খাবার বিল তৈরি করুন'}
                   </span>
                 </button>
+              </div>
+            </div>
+
+            {/* Notice / Rule Banner */}
+            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 flex items-start gap-2.5">
+              <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div className="leading-relaxed">
+                <span className="font-bold text-amber-300">মিল নীতিমালা ও কোটা নিয়ম:</span>{' '}
+                মাসে সর্বনিম্ন ৪৫টি মিলের নিয়ম প্রযোজ্য। কোনো বোর্ডার ৪৫ মিলের কম খেলেও তাকে সর্বনিম্ন কোটার চার্জ দিতে হবে (মিল কাউন্ট: দুপুর ১.০ মিল, রাত ১.০ মিল, সকাল ০.৫ মিল = দৈনিক ২.৫ মিল)। কোনো বোর্ডারের ক্ষেত্রে কোটা কমবেশি হলে টেবিলে <strong className="text-white underline">বাধ্যতামূলক মিল</strong> ঘরে সরাসরি হাতে লিখে পরিবর্তন করা যায়।
               </div>
             </div>
 
@@ -688,54 +726,99 @@ export const MealSettingsPage: React.FC = () => {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-950/70 border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
                     <tr>
-                      <th className="py-3 px-3">বর্ডার</th>
-                      <th className="py-3 px-3">ফ্ল্যাট</th>
-                      <th className="py-3 px-3 text-center">নাস্তা</th>
-                      <th className="py-3 px-3 text-center">দুপুর</th>
-                      <th className="py-3 px-3 text-center">রাত</th>
-                      <th className="py-3 px-3 text-center">মোট মিল</th>
+                      <th className="py-3 px-3">বর্ডার তথ্য</th>
+                      <th className="py-3 px-2">ফ্ল্যাট</th>
+                      <th className="py-3 px-2 text-center" title="সকালের নাস্তা (০.৫ মিল)">নাস্তা (০.৫)</th>
+                      <th className="py-3 px-2 text-center" title="দুপুরের খাবার (১.০ মিল)">দুপুর (১.০)</th>
+                      <th className="py-3 px-2 text-center" title="রাতের খাবার (১.০ মিল)">রাত (১.০)</th>
+                      <th className="py-3 px-3 text-center" title="বাস্তবে মোট খাওয়া মিলের সংখ্যা">গৃহীত মিল</th>
+                      <th className="py-3 px-3 text-center" title="এই বর্ডারের জন্য বাধ্যতামূলক সর্বনিম্ন মিল (কমবেশি হলে হাতে লিখে পরিবর্তন করতে পারেন)">বাধ্যতামূলক মিল</th>
+                      <th className="py-3 px-3 text-center" title="বিলযোগ্য মিল = গৃহীত মিল + শর্টফল">বিলযোগ্য মিল</th>
                       <th className="py-3 px-3 text-right">মোট বিল</th>
                       <th className="py-3 px-3 text-center">স্ট্যাটাস</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60">
-                    {billingPreview.preview_items.map((item) => (
-                      <tr key={item.boarder_id} className="hover:bg-slate-900/40">
-                        <td className="py-3 px-3">
-                          <div className="font-bold text-white">{item.boarder_name}</div>
-                          <div className="text-[10px] text-slate-400 font-mono">
-                            {item.boarder_code}
-                          </div>
-                        </td>
-                        <td className="py-3 px-3 text-slate-300">{item.flat_name}</td>
-                        <td className="py-3 px-3 text-center font-mono font-semibold text-amber-400">
-                          {item.breakfast_count}
-                        </td>
-                        <td className="py-3 px-3 text-center font-mono font-semibold text-emerald-400">
-                          {item.lunch_count}
-                        </td>
-                        <td className="py-3 px-3 text-center font-mono font-semibold text-indigo-400">
-                          {item.dinner_count}
-                        </td>
-                        <td className="py-3 px-3 text-center font-mono font-bold text-white">
-                          {item.total_meals}টি
-                        </td>
-                        <td className="py-3 px-3 text-right font-mono font-extrabold text-amber-300">
-                          ৳{item.total_amount.toLocaleString('en-IN')}
-                        </td>
-                        <td className="py-3 px-3 text-center">
-                          {item.already_billed ? (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                              বিল তৈরি সম্পন্ন
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                              অপেক্ষমান
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                    {billingPreview.preview_items.map((item) => {
+                      const consumed = Number(item.consumed_meals ?? item.total_meals) || 0
+                      const minVal = boarderMinOverrides[item.boarder_id] !== undefined
+                        ? boarderMinOverrides[item.boarder_id]
+                        : (item.min_meals ?? defaultMinMeals)
+                      const shortfall = Math.max(0, Math.round((minVal - consumed) * 10) / 10)
+                      const billable = Math.round((consumed + shortfall) * 10) / 10
+
+                      return (
+                        <tr key={item.boarder_id} className="hover:bg-slate-900/40">
+                          <td className="py-3 px-3">
+                            <Link
+                              to={`/boarders/${item.boarder_id}?tab=meals`}
+                              className="font-bold text-white hover:text-amber-400 transition-colors inline-flex items-center gap-1 group"
+                              title="বোর্ডারের বিস্তারিত মিল রেকর্ড ও উপস্থিতি লেজার দেখুন"
+                            >
+                              <span>{item.boarder_name}</span>
+                              <ExternalLink className="w-3 h-3 text-slate-500 group-hover:text-amber-400 opacity-60 group-hover:opacity-100 transition-opacity" />
+                            </Link>
+                            <div className="text-[10px] text-slate-400 font-mono">
+                              {item.boarder_code}
+                            </div>
+                          </td>
+                          <td className="py-3 px-2 text-slate-300">{item.flat_name}</td>
+                          <td className="py-3 px-2 text-center font-mono font-semibold text-amber-400">
+                            {item.breakfast_count}
+                          </td>
+                          <td className="py-3 px-2 text-center font-mono font-semibold text-emerald-400">
+                            {item.lunch_count}
+                          </td>
+                          <td className="py-3 px-2 text-center font-mono font-semibold text-indigo-400">
+                            {item.dinner_count}
+                          </td>
+                          <td className="py-3 px-3 text-center font-mono font-bold text-white">
+                            {consumed.toFixed(1)}টি
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <div className="inline-flex items-center justify-center gap-1 bg-slate-900 border border-slate-700/80 rounded-lg px-2 py-0.5 focus-within:border-amber-400 focus-within:ring-1 focus-within:ring-amber-400">
+                              <input
+                                type="number"
+                                step="0.5"
+                                min="0"
+                                value={minVal}
+                                onChange={(e) => handleMinMealsChange(item.boarder_id, e.target.value)}
+                                className="w-12 bg-transparent text-center font-mono font-bold text-amber-300 text-xs focus:outline-none"
+                                title="বাধ্যতামূলক মিল সংখ্যা হাতে লিখে পরিবর্তন করতে পারেন"
+                              />
+                              <span className="text-[10px] text-slate-500 font-bold">টি</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <div className="font-mono font-bold text-emerald-300">
+                              {billable.toFixed(1)}টি
+                            </div>
+                            {shortfall > 0 && (
+                              <span
+                                className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                                title={`বাধ্যতামূলক ${minVal}টি থেকে শর্টফল ${shortfall}টি`}
+                              >
+                                +{shortfall.toFixed(1)} শর্টফল
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 text-right font-mono font-extrabold text-amber-300">
+                            ৳{item.total_amount.toLocaleString('en-IN')}
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            {item.already_billed ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                                বিল তৈরি সম্পন্ন
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                                অপেক্ষমান
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               )}

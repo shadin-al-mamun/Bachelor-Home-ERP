@@ -168,7 +168,7 @@ export const BoarderMealPortal: React.FC = () => {
     const bOn = sel ? sel.breakfast : true
     const lOn = sel ? sel.lunch : true
     const dOn = sel ? sel.dinner : true
-    const mealCount = (bOn ? 1 : 0) + (lOn ? 1 : 0) + (dOn ? 1 : 0)
+    const mealCount = Math.round(((bOn ? 0.5 : 0) + (lOn ? 1.0 : 0) + (dOn ? 1.0 : 0)) * 10) / 10
 
     const dayNameBn = d.toLocaleDateString('bn-BD', { weekday: 'short' })
     const dayDateBn = d.toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })
@@ -341,8 +341,8 @@ export const BoarderMealPortal: React.FC = () => {
                   {item.dayDateBn}
                 </div>
                 <div className="text-[9px] mt-1 font-semibold flex items-center justify-center gap-0.5">
-                  {item.mealCount === 3 ? (
-                    <span className="text-emerald-400">🍳🍛🍲 ৩টি</span>
+                  {item.mealCount === 2.5 ? (
+                    <span className="text-emerald-400">🍳🍛🍲 ২.৫টি</span>
                   ) : item.mealCount > 0 ? (
                     <span className="text-amber-400">{item.mealCount}টি মিল</span>
                   ) : (

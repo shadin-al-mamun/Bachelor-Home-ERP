@@ -3755,9 +3755,11 @@ BEGIN
 END;
 $$;
 
--- 3. PREVIEW MONTHLY MEAL BILLING (Aggregates without mutating)
+-- 3. PREVIEW MONTHLY MEAL BILLING (Opt-Out Mess Engine with Minimum 45 Meals & 0.5 Breakfast)
 CREATE OR REPLACE FUNCTION public.fn_get_monthly_meal_billing_preview(
-    p_billing_month DATE
+    p_billing_month DATE,
+    p_default_min_meals NUMERIC DEFAULT 45.0,
+    p_boarder_min_overrides JSONB DEFAULT NULL
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -3768,6 +3770,10 @@ DECLARE
     v_start_date DATE;
     v_end_date DATE;
     v_rate RECORD;
+    v_b_enabled BOOLEAN := true;
+    v_l_enabled BOOLEAN := true;
+    v_d_enabled BOOLEAN := true;
+    v_configured_min NUMERIC := 45.0;
     v_results JSONB;
 BEGIN
     v_start_date := DATE_TRUNC('month', p_billing_month)::DATE;
@@ -3783,65 +3789,178 @@ BEGIN
     LIMIT 1;
 
     IF v_rate IS NULL THEN
-        v_rate.breakfast_rate := 30.00;
-        v_rate.lunch_rate := 65.00;
-        v_rate.dinner_rate := 60.00;
+        v_rate.breakfast_rate := 26.00;
+        v_rate.lunch_rate := 52.00;
+        v_rate.dinner_rate := 52.00;
     END IF;
 
-    WITH meal_counts AS (
+    -- Fetch meal session enabled settings and default min meals
+    SELECT 
+        COALESCE(breakfast_enabled, true),
+        COALESCE(lunch_enabled, true),
+        COALESCE(dinner_enabled, true),
+        COALESCE(min_monthly_meals, 45.0)
+    INTO v_b_enabled, v_l_enabled, v_d_enabled, v_configured_min
+    FROM public.meal_settings
+    LIMIT 1;
+
+    IF p_default_min_meals IS NOT NULL AND p_default_min_meals >= 0 THEN
+        v_configured_min := p_default_min_meals;
+    END IF;
+
+    WITH date_series AS (
+        SELECT generate_series(v_start_date, v_end_date, '1 day'::interval)::date AS day_date
+    ),
+    boarder_active_days AS (
         SELECT 
             b.id AS boarder_id,
             b.full_name AS boarder_name,
             b.boarder_code,
             b.phone_number,
+            b.admission_date,
             f.name AS flat_name,
             a.id AS allocation_id,
-            COUNT(ms.id) FILTER (WHERE ms.breakfast = true) AS breakfast_count,
-            COUNT(ms.id) FILTER (WHERE ms.lunch = true) AS lunch_count,
-            COUNT(ms.id) FILTER (WHERE ms.dinner = true) AS dinner_count
+            ds.day_date
         FROM public.boarders b
         LEFT JOIN public.allocations a ON a.boarder_id = b.id AND a.status = 'ACTIVE'
         LEFT JOIN public.seats s ON s.id = a.seat_id
         LEFT JOIN public.rooms r ON r.id = s.room_id
         LEFT JOIN public.flats f ON f.id = r.flat_id
-        LEFT JOIN public.meal_selections ms 
-               ON ms.boarder_id = b.id 
-              AND ms.meal_date >= v_start_date 
-              AND ms.meal_date <= v_end_date
+        CROSS JOIN date_series ds
         WHERE b.status = 'ACTIVE'
-        GROUP BY b.id, b.full_name, b.boarder_code, b.phone_number, f.name, a.id
-    )
-    SELECT jsonb_agg(
-        jsonb_build_object(
-            'boarder_id', mc.boarder_id,
-            'boarder_name', mc.boarder_name,
-            'boarder_code', mc.boarder_code,
-            'phone_number', mc.phone_number,
-            'flat_name', COALESCE(mc.flat_name, 'অনির্ধারিত'),
-            'allocation_id', mc.allocation_id,
-            'breakfast_count', mc.breakfast_count,
-            'lunch_count', mc.lunch_count,
-            'dinner_count', mc.dinner_count,
-            'total_meals', (mc.breakfast_count + mc.lunch_count + mc.dinner_count),
-            'breakfast_cost', ROUND((mc.breakfast_count * v_rate.breakfast_rate)::numeric, 2),
-            'lunch_cost', ROUND((mc.lunch_count * v_rate.lunch_rate)::numeric, 2),
-            'dinner_cost', ROUND((mc.dinner_count * v_rate.dinner_rate)::numeric, 2),
-            'total_amount', ROUND((
-                mc.breakfast_count * v_rate.breakfast_rate +
-                mc.lunch_count * v_rate.lunch_rate +
-                mc.dinner_count * v_rate.dinner_rate
-            )::numeric, 2),
-            'already_billed', EXISTS (
+          AND ds.day_date >= GREATEST(v_start_date, COALESCE(a.start_date, b.admission_date, v_start_date))
+          AND (a.end_date IS NULL OR ds.day_date <= a.end_date)
+    ),
+    daily_meals AS (
+        SELECT 
+            bad.boarder_id,
+            bad.boarder_name,
+            bad.boarder_code,
+            bad.phone_number,
+            bad.flat_name,
+            bad.allocation_id,
+            bad.admission_date,
+            bad.day_date,
+            (COALESCE(ms.breakfast, true) AND v_b_enabled) AS b_active,
+            (COALESCE(ms.lunch, true) AND v_l_enabled) AS l_active,
+            (COALESCE(ms.dinner, true) AND v_d_enabled) AS d_active
+        FROM boarder_active_days bad
+        LEFT JOIN public.meal_selections ms 
+               ON ms.boarder_id = bad.boarder_id 
+              AND ms.meal_date = bad.day_date
+    ),
+    boarder_resident_summary AS (
+        SELECT 
+            dm.boarder_id,
+            dm.boarder_name,
+            dm.boarder_code,
+            dm.phone_number,
+            dm.flat_name,
+            dm.allocation_id,
+            COUNT(dm.day_date) AS active_days_count,
+            COUNT(dm.day_date) FILTER (WHERE dm.b_active = true) AS breakfast_sessions,
+            COUNT(dm.day_date) FILTER (WHERE dm.l_active = true) AS lunch_sessions,
+            COUNT(dm.day_date) FILTER (WHERE dm.d_active = true) AS dinner_sessions
+        FROM daily_meals dm
+        GROUP BY dm.boarder_id, dm.boarder_name, dm.boarder_code, dm.phone_number, dm.flat_name, dm.allocation_id
+    ),
+    guest_summary AS (
+        SELECT 
+            gmb.boarder_id,
+            COALESCE(SUM(CASE WHEN UPPER(gmb.session) = 'BREAKFAST' THEN gmb.guest_count ELSE 0 END), 0) AS guest_breakfast,
+            COALESCE(SUM(CASE WHEN UPPER(gmb.session) = 'LUNCH' THEN gmb.guest_count ELSE 0 END), 0) AS guest_lunch,
+            COALESCE(SUM(CASE WHEN UPPER(gmb.session) = 'DINNER' THEN gmb.guest_count ELSE 0 END), 0) AS guest_dinner,
+            COALESCE(SUM(gmb.total_amount), 0) AS guest_amount
+        FROM public.guest_meal_bookings gmb
+        WHERE gmb.meal_date >= v_start_date 
+          AND gmb.meal_date <= v_end_date
+          AND gmb.status = 'CONFIRMED'
+        GROUP BY gmb.boarder_id
+    ),
+    all_active_boarders AS (
+        SELECT 
+            b.id AS boarder_id,
+            b.full_name AS boarder_name,
+            b.boarder_code,
+            b.phone_number,
+            COALESCE(f.name, 'অনির্ধারিত') AS flat_name,
+            a.id AS allocation_id
+        FROM public.boarders b
+        LEFT JOIN public.allocations a ON a.boarder_id = b.id AND a.status = 'ACTIVE'
+        LEFT JOIN public.seats s ON s.id = a.seat_id
+        LEFT JOIN public.rooms r ON r.id = s.room_id
+        LEFT JOIN public.flats f ON f.id = r.flat_id
+        WHERE b.status = 'ACTIVE'
+    ),
+    calculated_items AS (
+        SELECT 
+            aab.boarder_id,
+            aab.boarder_name,
+            aab.boarder_code,
+            aab.phone_number,
+            aab.flat_name,
+            aab.allocation_id,
+            COALESCE(brs.breakfast_sessions, 0) + COALESCE(gs.guest_breakfast, 0) AS breakfast_sessions,
+            COALESCE(brs.lunch_sessions, 0) + COALESCE(gs.guest_lunch, 0) AS lunch_sessions,
+            COALESCE(brs.dinner_sessions, 0) + COALESCE(gs.guest_dinner, 0) AS dinner_sessions,
+            ROUND((
+                (COALESCE(brs.breakfast_sessions, 0) + COALESCE(gs.guest_breakfast, 0)) * 0.5 +
+                (COALESCE(brs.lunch_sessions, 0) + COALESCE(gs.guest_lunch, 0)) * 1.0 +
+                (COALESCE(brs.dinner_sessions, 0) + COALESCE(gs.guest_dinner, 0)) * 1.0
+            )::numeric, 1) AS consumed_meals,
+            COALESCE(
+                CASE 
+                    WHEN p_boarder_min_overrides IS NOT NULL AND p_boarder_min_overrides ? aab.boarder_id::text
+                    THEN (p_boarder_min_overrides->>aab.boarder_id::text)::numeric
+                    ELSE v_configured_min
+                END, 
+                v_configured_min
+            ) AS min_meals_quota,
+            COALESCE(gs.guest_amount, 0) AS guest_amount,
+            EXISTS (
                 SELECT 1 FROM public.boarder_charges bc
-                WHERE bc.boarder_id = mc.boarder_id
+                WHERE bc.boarder_id = aab.boarder_id
                   AND bc.charge_type = 'MEAL'
                   AND bc.billing_month = v_start_date
                   AND bc.status <> 'VOID'
-            )
+            ) AS already_billed
+        FROM all_active_boarders aab
+        LEFT JOIN boarder_resident_summary brs ON brs.boarder_id = aab.boarder_id
+        LEFT JOIN guest_summary gs ON gs.boarder_id = aab.boarder_id
+    )
+    SELECT jsonb_agg(
+        jsonb_build_object(
+            'boarder_id', ci.boarder_id,
+            'boarder_name', ci.boarder_name,
+            'boarder_code', ci.boarder_code,
+            'phone_number', ci.phone_number,
+            'flat_name', ci.flat_name,
+            'allocation_id', ci.allocation_id,
+            'breakfast_count', ci.breakfast_sessions,
+            'lunch_count', ci.lunch_sessions,
+            'dinner_count', ci.dinner_sessions,
+            'consumed_meals', ci.consumed_meals,
+            'min_meals', ci.min_meals_quota,
+            'shortfall_meals', GREATEST(0, ROUND((ci.min_meals_quota - ci.consumed_meals)::numeric, 1)),
+            'billable_meals', GREATEST(ci.consumed_meals, ci.min_meals_quota),
+            'total_meals', GREATEST(ci.consumed_meals, ci.min_meals_quota),
+            'breakfast_cost', ROUND((ci.breakfast_sessions * v_rate.breakfast_rate)::numeric, 2),
+            'lunch_cost', ROUND((ci.lunch_sessions * v_rate.lunch_rate)::numeric, 2),
+            'dinner_cost', ROUND((ci.dinner_sessions * v_rate.dinner_rate)::numeric, 2),
+            'shortfall_cost', ROUND((GREATEST(0, (ci.min_meals_quota - ci.consumed_meals)) * v_rate.lunch_rate)::numeric, 2),
+            'total_amount', ROUND((
+                ci.breakfast_sessions * v_rate.breakfast_rate +
+                ci.lunch_sessions * v_rate.lunch_rate +
+                ci.dinner_sessions * v_rate.dinner_rate +
+                ci.guest_amount +
+                GREATEST(0, (ci.min_meals_quota - ci.consumed_meals)) * v_rate.lunch_rate
+            )::numeric, 2),
+            'already_billed', ci.already_billed
         )
+        ORDER BY ci.boarder_name ASC
     )
     INTO v_results
-    FROM meal_counts mc;
+    FROM calculated_items ci;
 
     RETURN jsonb_build_object(
         'billing_month', v_start_date,
@@ -3852,15 +3971,18 @@ BEGIN
             'lunch', v_rate.lunch_rate,
             'dinner', v_rate.dinner_rate
         ),
+        'min_monthly_meals', v_configured_min,
         'preview_items', COALESCE(v_results, '[]'::jsonb)
     );
 END;
 $$;
 
--- 4. ATOMIC GENERATION OF MONTHLY MEAL CHARGES
+-- 4. ATOMIC GENERATION OF MONTHLY MEAL CHARGES (Opt-Out Mess Engine with Minimum 45 Meals)
 CREATE OR REPLACE FUNCTION public.fn_generate_monthly_meal_charges(
     p_billing_month DATE,
-    p_due_date DATE DEFAULT NULL
+    p_due_date DATE DEFAULT NULL,
+    p_default_min_meals NUMERIC DEFAULT 45.0,
+    p_boarder_min_overrides JSONB DEFAULT NULL
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -3874,12 +3996,23 @@ DECLARE
     v_end_date DATE;
     v_month_label TEXT;
     v_rate RECORD;
+    v_b_enabled BOOLEAN := true;
+    v_l_enabled BOOLEAN := true;
+    v_d_enabled BOOLEAN := true;
+    v_configured_min NUMERIC := 45.0;
     v_row RECORD;
+    v_consumed_meals NUMERIC;
+    v_min_meals NUMERIC;
+    v_shortfall NUMERIC;
+    v_billable_meals NUMERIC;
+    v_actual_cost NUMERIC(12,2);
+    v_shortfall_cost NUMERIC(12,2);
     v_total_cost NUMERIC(12,2);
-    v_total_meals INT;
+    v_description TEXT;
     v_generated INT := 0;
     v_skipped INT := 0;
     v_total_amount_billed NUMERIC(12,2) := 0.00;
+    v_existing_charge RECORD;
 BEGIN
     SELECT role INTO v_caller_role
     FROM public.profiles
@@ -3907,48 +4040,143 @@ BEGIN
     LIMIT 1;
 
     IF v_rate IS NULL THEN
-        v_rate.breakfast_rate := 30.00;
-        v_rate.lunch_rate := 65.00;
-        v_rate.dinner_rate := 60.00;
+        v_rate.breakfast_rate := 26.00;
+        v_rate.lunch_rate := 52.00;
+        v_rate.dinner_rate := 52.00;
     END IF;
 
-    -- Loop through all boarders with meals in this month
+    -- Fetch meal session settings and min meals
+    SELECT 
+        COALESCE(breakfast_enabled, true),
+        COALESCE(lunch_enabled, true),
+        COALESCE(dinner_enabled, true),
+        COALESCE(min_monthly_meals, 45.0)
+    INTO v_b_enabled, v_l_enabled, v_d_enabled, v_configured_min
+    FROM public.meal_settings
+    LIMIT 1;
+
+    IF p_default_min_meals IS NOT NULL AND p_default_min_meals >= 0 THEN
+        v_configured_min := p_default_min_meals;
+    END IF;
+
+    -- Loop through each active boarder with Opt-Out & Min-45 meals calculation
     FOR v_row IN
+        WITH date_series AS (
+            SELECT generate_series(v_start_date, v_end_date, '1 day'::interval)::date AS day_date
+        ),
+        boarder_active_days AS (
+            SELECT 
+                b.id AS boarder_id,
+                b.full_name AS boarder_name,
+                b.boarder_code,
+                a.id AS allocation_id,
+                ds.day_date
+            FROM public.boarders b
+            LEFT JOIN public.allocations a ON a.boarder_id = b.id AND a.status = 'ACTIVE'
+            CROSS JOIN date_series ds
+            WHERE b.status = 'ACTIVE'
+              AND ds.day_date >= GREATEST(v_start_date, COALESCE(a.start_date, b.admission_date, v_start_date))
+              AND (a.end_date IS NULL OR ds.day_date <= a.end_date)
+        ),
+        daily_meals AS (
+            SELECT 
+                bad.boarder_id,
+                bad.boarder_name,
+                bad.boarder_code,
+                bad.allocation_id,
+                (COALESCE(ms.breakfast, true) AND v_b_enabled) AS b_active,
+                (COALESCE(ms.lunch, true) AND v_l_enabled) AS l_active,
+                (COALESCE(ms.dinner, true) AND v_d_enabled) AS d_active
+            FROM boarder_active_days bad
+            LEFT JOIN public.meal_selections ms 
+                   ON ms.boarder_id = bad.boarder_id 
+                  AND ms.meal_date = bad.day_date
+        ),
+        guest_summary AS (
+            SELECT 
+                gmb.boarder_id,
+                COALESCE(SUM(CASE WHEN UPPER(gmb.session) = 'BREAKFAST' THEN gmb.guest_count ELSE 0 END), 0) AS guest_breakfast,
+                COALESCE(SUM(CASE WHEN UPPER(gmb.session) = 'LUNCH' THEN gmb.guest_count ELSE 0 END), 0) AS guest_lunch,
+                COALESCE(SUM(CASE WHEN UPPER(gmb.session) = 'DINNER' THEN gmb.guest_count ELSE 0 END), 0) AS guest_dinner,
+                COALESCE(SUM(gmb.total_amount), 0) AS guest_amount
+            FROM public.guest_meal_bookings gmb
+            WHERE gmb.meal_date >= v_start_date 
+              AND gmb.meal_date <= v_end_date
+              AND gmb.status = 'CONFIRMED'
+            GROUP BY gmb.boarder_id
+        )
         SELECT 
-            b.id AS boarder_id,
-            b.full_name AS boarder_name,
-            b.boarder_code,
-            a.id AS allocation_id,
-            COUNT(ms.id) FILTER (WHERE ms.breakfast = true) AS breakfast_count,
-            COUNT(ms.id) FILTER (WHERE ms.lunch = true) AS lunch_count,
-            COUNT(ms.id) FILTER (WHERE ms.dinner = true) AS dinner_count
-        FROM public.boarders b
-        LEFT JOIN public.allocations a ON a.boarder_id = b.id AND a.status = 'ACTIVE'
-        JOIN public.meal_selections ms 
-          ON ms.boarder_id = b.id 
-         AND ms.meal_date >= v_start_date 
-         AND ms.meal_date <= v_end_date
-        WHERE b.status = 'ACTIVE'
-        GROUP BY b.id, b.full_name, b.boarder_code, a.id
+            dm.boarder_id,
+            dm.boarder_name,
+            dm.boarder_code,
+            dm.allocation_id,
+            (COUNT(dm.boarder_id) FILTER (WHERE dm.b_active = true) + COALESCE(gs.guest_breakfast, 0)) AS breakfast_sessions,
+            (COUNT(dm.boarder_id) FILTER (WHERE dm.l_active = true) + COALESCE(gs.guest_lunch, 0)) AS lunch_sessions,
+            (COUNT(dm.boarder_id) FILTER (WHERE dm.d_active = true) + COALESCE(gs.guest_dinner, 0)) AS dinner_sessions,
+            COALESCE(gs.guest_amount, 0) AS guest_amount
+        FROM daily_meals dm
+        LEFT JOIN guest_summary gs ON gs.boarder_id = dm.boarder_id
+        GROUP BY dm.boarder_id, dm.boarder_name, dm.boarder_code, dm.allocation_id, gs.guest_breakfast, gs.guest_lunch, gs.guest_dinner, gs.guest_amount
     LOOP
-        v_total_meals := v_row.breakfast_count + v_row.lunch_count + v_row.dinner_count;
-        v_total_cost := ROUND((
-            v_row.breakfast_count * v_rate.breakfast_rate +
-            v_row.lunch_count * v_rate.lunch_rate +
-            v_row.dinner_count * v_rate.dinner_rate
+        -- Breakfast = 0.5 meal, Lunch = 1.0 meal, Dinner = 1.0 meal
+        v_consumed_meals := ROUND((v_row.breakfast_sessions * 0.5 + v_row.lunch_sessions * 1.0 + v_row.dinner_sessions * 1.0)::numeric, 1);
+
+        -- Determine custom minimum quota override if provided
+        v_min_meals := v_configured_min;
+        IF p_boarder_min_overrides IS NOT NULL AND p_boarder_min_overrides ? v_row.boarder_id::text THEN
+            v_min_meals := (p_boarder_min_overrides->>v_row.boarder_id::text)::numeric;
+        END IF;
+
+        v_shortfall := GREATEST(0, (v_min_meals - v_consumed_meals));
+        v_billable_meals := GREATEST(v_consumed_meals, v_min_meals);
+
+        v_actual_cost := ROUND((
+            v_row.breakfast_sessions * v_rate.breakfast_rate +
+            v_row.lunch_sessions * v_rate.lunch_rate +
+            v_row.dinner_sessions * v_rate.dinner_rate +
+            v_row.guest_amount
         )::numeric, 2);
 
-        -- Skip if 0 meals or charge already exists
+        v_shortfall_cost := ROUND((v_shortfall * v_rate.lunch_rate)::numeric, 2);
+        v_total_cost := v_actual_cost + v_shortfall_cost;
+
         IF v_total_cost > 0 THEN
-            IF EXISTS (
-                SELECT 1 FROM public.boarder_charges bc
-                WHERE bc.boarder_id = v_row.boarder_id
-                  AND bc.charge_type = 'MEAL'
-                  AND bc.billing_month = v_start_date
-                  AND bc.status <> 'VOID'
-            ) THEN
-                v_skipped := v_skipped + 1;
+            IF v_shortfall > 0 THEN
+                v_description := format('মাসিক খাবার বিল (%s) — গৃহীত: %s মিল, সর্বনিম্ন কোটা: %s মিল (+%s মিল শর্টফল) (নাস্তা: %s, দুপুর: %s, রাত: %s)', 
+                    v_month_label, v_consumed_meals, v_min_meals, v_shortfall, v_row.breakfast_sessions, v_row.lunch_sessions, v_row.dinner_sessions);
             ELSE
+                v_description := format('মাসিক খাবার বিল (%s) — মোট %sটি মিল (নাস্তা: %s, দুপুর: %s, রাত: %s)', 
+                    v_month_label, v_billable_meals, v_row.breakfast_sessions, v_row.lunch_sessions, v_row.dinner_sessions);
+            END IF;
+
+            -- Check for existing charge for this month
+            SELECT id, status, paid_amount INTO v_existing_charge
+            FROM public.boarder_charges
+            WHERE boarder_id = v_row.boarder_id
+              AND charge_type = 'MEAL'
+              AND billing_month = v_start_date
+              AND status <> 'VOID'
+            LIMIT 1;
+
+            IF v_existing_charge.id IS NOT NULL THEN
+                -- If charge exists and has NOT been paid yet (status = 'UNPAID' and paid_amount = 0), update it!
+                IF v_existing_charge.status = 'UNPAID' AND COALESCE(v_existing_charge.paid_amount, 0) = 0 THEN
+                    UPDATE public.boarder_charges
+                    SET amount = v_total_cost,
+                        due_amount = v_total_cost,
+                        description = v_description,
+                        due_date = p_due_date,
+                        updated_at = timezone('Asia/Dhaka', now())
+                    WHERE id = v_existing_charge.id;
+
+                    v_generated := v_generated + 1;
+                    v_total_amount_billed := v_total_amount_billed + v_total_cost;
+                ELSE
+                    -- Already paid, keep untouched
+                    v_skipped := v_skipped + 1;
+                END IF;
+            ELSE
+                -- Insert new charge
                 INSERT INTO public.boarder_charges (
                     boarder_id,
                     allocation_id,
@@ -3956,6 +4184,7 @@ BEGIN
                     billing_month,
                     amount,
                     paid_amount,
+                    due_amount,
                     status,
                     due_date,
                     description,
@@ -3967,10 +4196,10 @@ BEGIN
                     v_start_date,
                     v_total_cost,
                     0.00,
+                    v_total_cost,
                     'UNPAID',
                     p_due_date,
-                    format('মাসিক খাবার বিল (%s) — মোট %sটি মিল (নাস্তা: %s, দুপুর: %s, রাত: %s)', 
-                        v_month_label, v_total_meals, v_row.breakfast_count, v_row.lunch_count, v_row.dinner_count),
+                    v_description,
                     v_caller_id
                 );
 
@@ -3986,7 +4215,7 @@ BEGIN
         'generated', v_generated,
         'skipped', v_skipped,
         'total_amount_billed', v_total_amount_billed,
-        'message', format('মাসিক খাবার বিল তৈরি সম্পন্ন: %s টি বিল তৈরি হয়েছে (মোট ৳%s), %s টি পূর্বে তৈরিকৃত ছিল।', 
+        'message', format('মাসিক খাবার বিল সম্পন্ন: %s টি বিল তৈরি বা আপডেট হয়েছে (মোট ৳%s), %s টি পূর্বে পরিশোধিত থাকায় অপরিবর্তিত রাখা হয়েছে।', 
             v_generated, v_total_amount_billed, v_skipped)
     );
 END;

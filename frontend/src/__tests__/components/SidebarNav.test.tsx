@@ -57,11 +57,12 @@ describe('Sidebar.test.tsx - Hierarchical Navigation & Submenu System', () => {
     expect(screen.getByText('খাবার ইঞ্জিন (কিচেন)')).toBeInTheDocument()
   })
 
-  it('displays all 5 financial sub-items under বিলিং ও ফাইনান্স', () => {
+  it('displays all financial sub-items under বিলিং ও ফাইনান্স including মাসিক বিল জেনারেট', () => {
     renderSidebar()
 
     // Child items of Billing & Finance
     expect(screen.getByText('১. বিল আদায়')).toBeInTheDocument()
+    expect(screen.getByText('মাসিক বিল জেনারেট')).toBeInTheDocument()
     expect(screen.getByText('২. খরচ (Expenses)')).toBeInTheDocument()
     expect(screen.getByText('৩. অ্যাকাউন্ট (Accounts)')).toBeInTheDocument()
     expect(screen.getByText('৪. টাকা ট্রান্সফার')).toBeInTheDocument()

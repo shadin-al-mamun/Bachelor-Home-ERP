@@ -21,6 +21,7 @@ import {
   KeyRound,
   ShieldAlert,
   Megaphone,
+  Zap,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import { useBrandingStore } from '@/app/store/useBrandingStore'
@@ -178,6 +179,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: <Receipt className="w-4 h-4 shrink-0 text-emerald-400" />,
           roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'AUDITOR'],
           permissionKey: 'billing',
+        },
+        {
+          id: 'monthly_bills',
+          titleKey: 'nav.monthly_bills',
+          defaultTitle: 'মাসিক বিল জেনারেট',
+          href: '/billing/generate',
+          icon: <Zap className="w-4 h-4 shrink-0 text-amber-400" />,
+          roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'AUDITOR'],
+          permissionKey: 'billing',
+          badge: 'হাব',
         },
         {
           id: 'expenses',

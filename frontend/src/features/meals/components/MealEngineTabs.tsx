@@ -70,11 +70,12 @@ export const MealEngineTabs: React.FC<MealEngineTabsProps> = ({
       badge: 'মেনু',
     },
     {
-      to: '/meals/billing',
+      to: '/billing/generate?tab=meals',
       label: 'মাসিক মিল বিলিং ও চার্জেস',
       icon: <Receipt className="w-4 h-4 text-emerald-400" />,
-      exact: true,
+      exact: false,
       description: 'মাসের মিল হিসাব ও চার্জ জেনারেট',
+      badge: 'বিলিং',
     },
     {
       to: '/meals/audit',

@@ -24,6 +24,7 @@ import {
   CreditCard,
   Ban,
   Calendar,
+  Zap,
 } from 'lucide-react'
 
 
@@ -131,6 +132,13 @@ export const ReceiptListPage: React.FC = () => {
         >
           <Receipt className="w-4 h-4" />
           মানি রিসিপ্ট ভাউচার
+        </Link>
+        <Link
+          to="/billing/generate"
+          className="px-4 py-2 rounded-xl bg-amber-500/10 text-amber-300 hover:text-amber-200 hover:bg-amber-500/20 font-bold text-xs border border-amber-500/30 flex items-center gap-2 transition-colors"
+        >
+          <Zap className="w-4 h-4 text-amber-400" />
+          মাসিক বিল জেনারেট হাব
         </Link>
       </div>
 
