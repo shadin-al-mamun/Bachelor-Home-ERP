@@ -120,8 +120,9 @@ export const GenerateFlatUtilityBillsModal: React.FC<GenerateFlatUtilityBillsMod
       const rawUtility = voucherTotal / seatCount
       const utilityPerHead = Math.ceil(rawUtility)
       const cookBill = Number(state.cookBill) || 0
-      const otherBill = Number(state.otherBill) || 0
-      const grandTotalPerHead = utilityPerHead + cookBill + otherBill
+      const otherBillTotal = Number(state.otherBill) || 0
+      const otherBillPerHead = Math.round(otherBillTotal / seatCount)
+      const grandTotalPerHead = utilityPerHead + cookBill + otherBillPerHead
 
       return {
         flat,
@@ -129,7 +130,8 @@ export const GenerateFlatUtilityBillsModal: React.FC<GenerateFlatUtilityBillsMod
         seatCount,
         utilityPerHead,
         cookBill,
-        otherBill,
+        otherBill: otherBillTotal,
+        otherBillPerHead,
         grandTotalPerHead,
       }
     })
@@ -167,6 +169,7 @@ export const GenerateFlatUtilityBillsModal: React.FC<GenerateFlatUtilityBillsMod
       utility_per_head: row.utilityPerHead,
       cook_bill: row.cookBill,
       other_bill: row.otherBill,
+      other_bill_per_head: row.otherBillPerHead,
       grand_total_per_head: row.grandTotalPerHead,
     }))
 
@@ -492,6 +495,11 @@ export const GenerateFlatUtilityBillsModal: React.FC<GenerateFlatUtilityBillsMod
                               className="w-20 px-2 py-1 bg-slate-900 border border-cyan-500/40 focus:border-cyan-400 rounded-lg text-center font-mono font-bold text-cyan-300 text-xs"
                               title="অন্যান্য বিল"
                             />
+                            {row.otherBill > 0 && (
+                              <div className="text-[10px] text-cyan-300 font-mono mt-0.5">
+                                (মাথাপিছু: ৳{row.otherBillPerHead})
+                              </div>
+                            )}
                           </td>
 
                           {/* Col 10: Grand Total Per Head (Col 7 + Col 8 + Col 9) */}

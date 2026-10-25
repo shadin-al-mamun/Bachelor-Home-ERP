@@ -45,6 +45,7 @@ export interface FlatConfigPayload {
   utility_per_head: number
   cook_bill: number
   other_bill: number
+  other_bill_per_head?: number
   grand_total_per_head: number
 }
 
@@ -298,11 +299,19 @@ export function useGenerateBatchFlatUtilityBills() {
 
         if (!allocations || allocations.length === 0) continue
 
-        const effectiveUtility = Math.ceil(config.utility_per_head)
-        const effectiveGrandTotal = effectiveUtility + Number(config.cook_bill || 0) + Number(config.other_bill || 0)
+        const effectiveUtility = Math.round(config.utility_per_head)
+        const seatCount = config.total_seats > 0 ? config.total_seats : 1
+        const otherBillPerHead =
+          config.other_bill_per_head !== undefined
+            ? config.other_bill_per_head
+            : Math.round(Number(config.other_bill || 0) / seatCount)
+        const effectiveGrandTotal =
+          config.grand_total_per_head > 0
+            ? config.grand_total_per_head
+            : effectiveUtility + Number(config.cook_bill || 0) + otherBillPerHead
 
         const desc = `${normMonth.slice(0, 7)} — ফ্ল্যাট বিবিধ বিল (ইউটিলিটি: ৳${effectiveUtility}, বাবুর্চি: ৳${config.cook_bill}${
-          config.other_bill > 0 ? `, অন্যান্য: ৳${config.other_bill}` : ''
+          otherBillPerHead > 0 ? `, অন্যান্য: ৳${otherBillPerHead}` : ''
         })`
 
         for (const alloc of allocations) {

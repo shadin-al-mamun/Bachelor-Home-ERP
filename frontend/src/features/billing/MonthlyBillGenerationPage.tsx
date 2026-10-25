@@ -236,7 +236,9 @@ export const MonthlyBillGenerationPage: React.FC = () => {
       }
       const seatCount = state.seatCount > 0 ? state.seatCount : 1
       const utilityPerHead = Math.round(flat.total_voucher_amount / seatCount)
-      const grandTotalPerHead = utilityPerHead + Number(state.cookBill || 0) + Number(state.otherBill || 0)
+      const otherBillTotal = Number(state.otherBill || 0)
+      const otherBillPerHead = Math.round(otherBillTotal / seatCount)
+      const grandTotalPerHead = utilityPerHead + Number(state.cookBill || 0) + otherBillPerHead
 
       return {
         flat_id: flat.flat_id,
@@ -244,7 +246,8 @@ export const MonthlyBillGenerationPage: React.FC = () => {
         total_voucher_amount: flat.total_voucher_amount,
         utility_per_head: utilityPerHead,
         cook_bill: Number(state.cookBill || 0),
-        other_bill: Number(state.otherBill || 0),
+        other_bill: otherBillTotal,
+        other_bill_per_head: otherBillPerHead,
         grand_total_per_head: grandTotalPerHead,
       }
     })
@@ -366,8 +369,8 @@ export const MonthlyBillGenerationPage: React.FC = () => {
           <button
             onClick={() => handleTabChange('rent')}
             className={`flex items-center gap-2.5 px-4 py-3 rounded-xl text-left transition-all cursor-pointer ${activeTab === 'rent'
-                ? 'bg-gradient-to-r from-amber-500/20 via-amber-500/15 to-transparent border border-amber-500/40 text-amber-200 shadow-lg shadow-amber-500/10'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/50 border border-transparent'
+              ? 'bg-gradient-to-r from-amber-500/20 via-amber-500/15 to-transparent border border-amber-500/40 text-amber-200 shadow-lg shadow-amber-500/10'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/50 border border-transparent'
               }`}
           >
             <div
@@ -386,8 +389,8 @@ export const MonthlyBillGenerationPage: React.FC = () => {
           <button
             onClick={() => handleTabChange('meals')}
             className={`flex items-center gap-2.5 px-4 py-3 rounded-xl text-left transition-all cursor-pointer ${activeTab === 'meals'
-                ? 'bg-gradient-to-r from-emerald-500/20 via-emerald-500/15 to-transparent border border-emerald-500/40 text-emerald-200 shadow-lg shadow-emerald-500/10'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/50 border border-transparent'
+              ? 'bg-gradient-to-r from-emerald-500/20 via-emerald-500/15 to-transparent border border-emerald-500/40 text-emerald-200 shadow-lg shadow-emerald-500/10'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/50 border border-transparent'
               }`}
           >
             <div
@@ -406,8 +409,8 @@ export const MonthlyBillGenerationPage: React.FC = () => {
           <button
             onClick={() => handleTabChange('flat-utility')}
             className={`flex items-center gap-2.5 px-4 py-3 rounded-xl text-left transition-all cursor-pointer ${activeTab === 'flat-utility'
-                ? 'bg-gradient-to-r from-indigo-500/20 via-indigo-500/15 to-transparent border border-indigo-500/40 text-indigo-200 shadow-lg shadow-indigo-500/10'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/50 border border-transparent'
+              ? 'bg-gradient-to-r from-indigo-500/20 via-indigo-500/15 to-transparent border border-indigo-500/40 text-indigo-200 shadow-lg shadow-indigo-500/10'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/50 border border-transparent'
               }`}
           >
             <div
@@ -426,8 +429,8 @@ export const MonthlyBillGenerationPage: React.FC = () => {
           <button
             onClick={() => handleTabChange('other')}
             className={`flex items-center gap-2.5 px-4 py-3 rounded-xl text-left transition-all cursor-pointer ${activeTab === 'other'
-                ? 'bg-gradient-to-r from-rose-500/20 via-rose-500/15 to-transparent border border-rose-500/40 text-rose-200 shadow-lg shadow-rose-500/10'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/50 border border-transparent'
+              ? 'bg-gradient-to-r from-rose-500/20 via-rose-500/15 to-transparent border border-rose-500/40 text-rose-200 shadow-lg shadow-rose-500/10'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/50 border border-transparent'
               }`}
           >
             <div
@@ -453,8 +456,8 @@ export const MonthlyBillGenerationPage: React.FC = () => {
           {rentStatus && (
             <div
               className={`p-4 rounded-2xl text-xs flex items-center gap-2.5 shadow-lg border ${rentStatus.type === 'success'
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                  : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
                 }`}
             >
               {rentStatus.type === 'success' ? (
@@ -637,8 +640,8 @@ export const MonthlyBillGenerationPage: React.FC = () => {
           {mealStatus && (
             <div
               className={`p-4 rounded-2xl text-xs flex items-center gap-2.5 shadow-lg border ${mealStatus.type === 'success'
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                  : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
                 }`}
             >
               {mealStatus.type === 'success' ? (
@@ -912,8 +915,8 @@ export const MonthlyBillGenerationPage: React.FC = () => {
           {utilityStatus && (
             <div
               className={`p-4 rounded-2xl text-xs flex items-center gap-2.5 shadow-lg border ${utilityStatus.type === 'success'
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                  : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
                 }`}
             >
               {utilityStatus.type === 'success' ? (
@@ -1043,8 +1046,10 @@ export const MonthlyBillGenerationPage: React.FC = () => {
                     }
                     const seatCount = row.seatCount > 0 ? row.seatCount : 1
                     const utilityPerHead = Math.round(flat.total_voucher_amount / seatCount)
+                    const otherBillTotal = Number(row.otherBill || 0)
+                    const otherBillPerHead = Math.round(otherBillTotal / seatCount)
                     const grandTotalPerHead =
-                      utilityPerHead + Number(row.cookBill || 0) + Number(row.otherBill || 0)
+                      utilityPerHead + Number(row.cookBill || 0) + otherBillPerHead
 
                     return (
                       <div
@@ -1147,7 +1152,14 @@ export const MonthlyBillGenerationPage: React.FC = () => {
                           </div>
 
                           <div>
-                            <label className="text-[10px] text-slate-400 block mb-1">অন্যান্য বিল (৳)</label>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-[10px] text-slate-400">অন্যান্য বিল (৳)</label>
+                              {otherBillTotal > 0 && (
+                                <span className="text-[9px] text-amber-300 font-mono font-medium">
+                                  (মাথাপিছু: ৳{otherBillPerHead})
+                                </span>
+                              )}
+                            </div>
                             <input
                               type="number"
                               min="0"
@@ -1182,8 +1194,8 @@ export const MonthlyBillGenerationPage: React.FC = () => {
           {manualStatus && (
             <div
               className={`p-4 rounded-2xl text-xs flex items-center gap-2.5 shadow-lg border ${manualStatus.type === 'success'
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                  : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
                 }`}
             >
               {manualStatus.type === 'success' ? (
