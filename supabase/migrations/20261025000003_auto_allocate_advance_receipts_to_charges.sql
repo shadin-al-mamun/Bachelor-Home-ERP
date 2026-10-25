@@ -2,6 +2,9 @@
 -- Description: Automatic allocation of unallocated receipts (advance balance) to boarder charges (FIFO)
 --              Prevents new/unpaid charges from showing as due when boarder has deposited sufficient advance funds.
 
+-- Clean up any overloaded fn_record_unified_collection signature if partially created
+DROP FUNCTION IF EXISTS public.fn_record_unified_collection(UUID, UUID, payment_method, JSONB, VARCHAR, TIMESTAMPTZ, TEXT);
+
 -- 1. Create or replace public.fn_auto_allocate_boarder_receipts
 CREATE OR REPLACE FUNCTION public.fn_auto_allocate_boarder_receipts(p_boarder_id UUID)
 RETURNS JSONB
@@ -140,178 +143,7 @@ AFTER INSERT OR UPDATE OF amount, is_void ON public.receipts
 FOR EACH ROW
 EXECUTE FUNCTION public.trg_fn_auto_allocate_on_receipt();
 
--- 4. Enhance fn_record_unified_collection to ensure FIFO auto-allocation
-CREATE OR REPLACE FUNCTION public.fn_record_unified_collection(
-    p_boarder_id UUID,
-    p_destination_account_id UUID,
-    p_payment_method payment_method,
-    p_items JSONB,
-    p_transaction_reference VARCHAR(100) DEFAULT NULL,
-    p_collection_date TIMESTAMPTZ DEFAULT NULL,
-    p_remarks TEXT DEFAULT NULL
-)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, auth
-AS $$
-DECLARE
-    v_current_user UUID := auth.uid();
-    v_today DATE := timezone('Asia/Dhaka', now())::DATE;
-    v_receipt_id UUID;
-    v_receipt_no VARCHAR(50);
-    v_seq_num BIGINT;
-    v_total_amount NUMERIC(12,2) := 0.00;
-    v_item RECORD;
-    v_matched_charge RECORD;
-    v_account RECORD;
-BEGIN
-    -- Validate boarder exists and active
-    IF NOT EXISTS (SELECT 1 FROM public.boarders WHERE id = p_boarder_id) THEN
-        RAISE EXCEPTION 'বোর্ডার প্রোফাইল খুঁজে পাওয়া যায়নি (Invalid Boarder ID).';
-    END IF;
-
-    -- Validate destination account
-    SELECT * INTO v_account FROM public.financial_accounts WHERE id = p_destination_account_id;
-    IF NOT FOUND THEN
-        RAISE EXCEPTION 'গন্তব্য হিসাব (Financial Account) নির্বাচন করা আবশ্যক।';
-    END IF;
-
-    -- Validate items array
-    IF p_items IS NULL OR jsonb_array_length(p_items) = 0 THEN
-        RAISE EXCEPTION 'অন্তত একটি আদায়ের খাত ও পরিমাণ উল্লেখ করুন।';
-    END IF;
-
-    -- Sum total amount from items
-    SELECT COALESCE(SUM((x.amount)::NUMERIC), 0.00)
-    INTO v_total_amount
-    FROM jsonb_to_recordset(p_items) AS x(amount NUMERIC(12,2));
-
-    IF v_total_amount <= 0 THEN
-        RAISE EXCEPTION 'আদায়ের মোট পরিমাণ ০ টাকার বেশি হতে হবে।';
-    END IF;
-
-    -- Generate official Receipt Number
-    v_seq_num := nextval('receipt_seq');
-    v_receipt_no := 'RCT-' || lpad(v_seq_num::TEXT, 6, '0');
-
-    -- Insert Master Receipt Header
-    INSERT INTO public.receipts (
-        receipt_number,
-        boarder_id,
-        received_by,
-        destination_account_id,
-        amount,
-        payment_method,
-        transaction_reference,
-        receipt_date,
-        remarks
-    )
-    VALUES (
-        v_receipt_no,
-        p_boarder_id,
-        COALESCE(v_current_user, (SELECT id FROM public.profiles WHERE role IN ('SUPER_ADMIN', 'ADMIN') LIMIT 1)),
-        p_destination_account_id,
-        v_total_amount,
-        p_payment_method,
-        p_transaction_reference,
-        COALESCE(p_collection_date, timezone('Asia/Dhaka', now())),
-        p_remarks
-    )
-    RETURNING id INTO v_receipt_id;
-
-    -- Credit Destination Account Balance
-    UPDATE public.financial_accounts
-    SET current_balance = current_balance + v_total_amount,
-        updated_at = timezone('Asia/Dhaka', now())
-    WHERE id = p_destination_account_id;
-
-    -- Update manager cash session if cash received by manager
-    IF p_payment_method = 'CASH' AND v_current_user IS NOT NULL THEN
-        PERFORM public.fn_initialize_daily_cash_session(v_current_user, v_today);
-
-        UPDATE public.manager_cash_sessions
-        SET cash_receipts = cash_receipts + v_total_amount,
-            updated_at = timezone('Asia/Dhaka', now())
-        WHERE manager_id = v_current_user AND session_date = v_today;
-    END IF;
-
-    -- Insert itemized breakdown and link with boarder_charges where applicable
-    FOR v_item IN SELECT * FROM jsonb_to_recordset(p_items) AS x(
-        head_code VARCHAR(50), 
-        head_name VARCHAR(100), 
-        amount NUMERIC(12,2),
-        billing_month DATE,
-        description TEXT
-    )
-    LOOP
-        -- Look for unpaid charge matching this boarder and head type
-        SELECT * INTO v_matched_charge
-        FROM public.boarder_charges
-        WHERE boarder_id = p_boarder_id
-          AND status IN ('UNPAID', 'PARTIALLY_PAID')
-          AND due_amount > 0
-          AND (
-              (v_item.head_code = 'SEAT_RENT' AND charge_type = 'RENT') OR
-              (v_item.head_code = 'MEAL_BILL' AND charge_type = 'MEAL') OR
-              (v_item.head_code = 'MISC_BILL' AND charge_type IN ('UTILITY', 'OTHER'))
-          )
-        ORDER BY due_date ASC
-        LIMIT 1;
-
-        -- Record receipt item
-        INSERT INTO public.receipt_items (
-            receipt_id,
-            head_code,
-            head_name,
-            amount,
-            billing_month,
-            description,
-            charge_id
-        )
-        VALUES (
-            v_receipt_id,
-            v_item.head_code,
-            COALESCE(v_item.head_name, v_item.head_code),
-            v_item.amount,
-            v_item.billing_month,
-            v_item.description,
-            v_matched_charge.id
-        );
-
-        -- If matched charge found, also add allocation to sync charge paid amount
-        IF v_matched_charge.id IS NOT NULL THEN
-            INSERT INTO public.receipt_allocations (
-                receipt_id,
-                charge_id,
-                allocated_amount
-            )
-            VALUES (
-                v_receipt_id,
-                v_matched_charge.id,
-                LEAST(v_item.amount, v_matched_charge.due_amount)
-            );
-        END IF;
-    END LOOP;
-
-    -- Also perform FIFO auto-allocation for any remaining unallocated receipt funds
-    PERFORM public.fn_auto_allocate_boarder_receipts(p_boarder_id);
-
-    RETURN jsonb_build_object(
-        'success', true,
-        'receipt_id', v_receipt_id,
-        'receipt_number', v_receipt_no,
-        'amount', v_total_amount,
-        'payment_method', p_payment_method,
-        'account_name', v_account.account_name,
-        'message', format('রসিদ %s সফলভাবে তৈরি ও সংরক্ষিত হয়েছে (মোট: ৳%s)।', v_receipt_no, v_total_amount)
-    );
-END;
-$$;
-
-GRANT EXECUTE ON FUNCTION public.fn_record_unified_collection TO authenticated;
-
--- 5. Recreate View: vw_boarder_dues_summary with accurate advance_balance and outstanding_due
+-- 4. Recreate View: vw_boarder_dues_summary with accurate advance_balance and outstanding_due
 DROP VIEW IF EXISTS public.vw_boarder_dues_summary CASCADE;
 CREATE OR REPLACE VIEW public.vw_boarder_dues_summary AS
 WITH last_payments AS (
@@ -370,7 +202,7 @@ LEFT JOIN last_payments lp ON lp.boarder_id = b.id;
 GRANT SELECT ON public.vw_boarder_dues_summary TO authenticated;
 GRANT SELECT ON public.vw_boarder_dues_summary TO anon;
 
--- 6. Retroactively run auto-allocation for all existing boarders (including Maruf Billah)
+-- 5. Retroactively run auto-allocation for all existing boarders (including Maruf Billah)
 DO $$
 DECLARE
     v_b RECORD;
