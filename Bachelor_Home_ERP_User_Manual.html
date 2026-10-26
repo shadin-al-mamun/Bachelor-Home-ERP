@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bachelor Home ERP - ব্যবহারকারী নির্দেশিকা ও শর্ট নোটবুক</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&family=Noto+Sans+Bengali:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
+    @page {
+      size: A4;
+      margin: 14mm 12mm 14mm 12mm;
+      @bottom-right {
+        content: counter(page);
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Hind Siliguri', 'Noto Sans Bengali', 'SolaimanLipi', 'Segoe UI', Arial, sans-serif;
+      color: #1e293b;
+      background-color: #ffffff;
+      line-height: 1.5;
+      font-size: 13px;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .page-break {
+      page-break-before: always;
+      break-before: page;
+    }
+
+    .avoid-break {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    /* Cover Page */
+    .cover-container {
+      height: 94vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border: 2px solid #0f172a;
+      border-radius: 16px;
+      padding: 40px;
+      background: linear-gradient(145deg, #0f172a 0%, #1e1b4b 60%, #0f172a 100%);
+      color: #ffffff;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cover-badge {
+      display: inline-block;
+      padding: 6px 14px;
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid #10b981;
+      border-radius: 20px;
+      color: #34d399;
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+
+    .cover-title {
+      font-size: 32px;
+      font-weight: 800;
+      line-height: 1.3;
+      margin-bottom: 12px;
+      background: linear-gradient(to right, #ffffff, #93c5fd);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .cover-subtitle {
+      font-size: 16px;
+      color: #cbd5e1;
+      line-height: 1.6;
+      max-width: 90%;
+    }
+
+    .cover-roles {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-top: 30px;
+    }
+
+    .role-badge-box {
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .role-badge-box.admin { border-top: 4px solid #6366f1; }
+    .role-badge-box.manager { border-top: 4px solid #10b981; }
+    .role-badge-box.boarder { border-top: 4px solid #f59e0b; }
+
+    .role-badge-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 4px;
+    }
+
+    .role-badge-desc {
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    .cover-footer {
+      border-top: 1px solid rgba(255, 255, 255, 0.15);
+      padding-top: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    /* Content Styling */
+    h1, h2, h3, h4 {
+      font-family: 'Noto Sans Bengali', 'Hind Siliguri', sans-serif;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .section-header {
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 10px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .section-title {
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .tag-pill {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 12px;
+    }
+
+    .tag-admin { background: #e0e7ff; color: #4338ca; }
+    .tag-manager { background: #d1fae5; color: #065f46; }
+    .tag-boarder { background: #fef3c7; color: #92400e; }
+
+    /* Module Card */
+    .module-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-bottom: 14px;
+    }
+
+    .module-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .module-title .num {
+      background: #0f172a;
+      color: #ffffff;
+      width: 20px;
+      height: 20px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      font-size: 11px;
+    }
+
+    .steps-list {
+      list-style-type: none;
+      padding-left: 0;
+      margin-top: 6px;
+    }
+
+    .steps-list li {
+      position: relative;
+      padding-left: 20px;
+      margin-bottom: 5px;
+      font-size: 12.5px;
+      color: #334155;
+    }
+
+    .steps-list li::before {
+      content: "•";
+      position: absolute;
+      left: 6px;
+      top: -1px;
+      color: #6366f1;
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    .tip-box {
+      background: #eff6ff;
+      border-left: 4px solid #3b82f6;
+      padding: 8px 12px;
+      border-radius: 0 8px 8px 0;
+      font-size: 11.5px;
+      color: #1e40af;
+      margin-top: 8px;
+    }
+
+    .alert-box {
+      background: #fffbeb;
+      border-left: 4px solid #f59e0b;
+      padding: 8px 12px;
+      border-radius: 0 8px 8px 0;
+      font-size: 11.5px;
+      color: #92400e;
+      margin-top: 8px;
+    }
+
+    /* Table styling */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 12px;
+    }
+
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 7px 10px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #f1f5f9;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    tr:nth-child(even) td {
+      background-color: #f8fafc;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .btn-badge {
+      display: inline-block;
+      padding: 2px 6px;
+      background: #e2e8f0;
+      border-radius: 4px;
+      font-weight: 600;
+      font-size: 10.5px;
+      color: #0f172a;
+      border: 1px solid #cbd5e1;
+    }
+    @media print {
+      .no-print {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Floating Toolbar for Easy Printing / Saving to PDF -->
+  <div class="no-print" style="position: sticky; top: 0; z-index: 1000; background: #0f172a; color: white; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-bottom: 2px solid #3b82f6;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span style="font-size: 16px;">📘</span>
+      <span style="font-weight: 700; font-size: 14px;">Bachelor Home ERP — ব্যবহারকারী নির্দেশিকা ও নোটবুক</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <button onclick="window.print()" style="background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; padding: 8px 18px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(16,185,129,0.3);">
+        🖨️ প্রিন্ট করুন বা PDF হিসেবে সেভ করুন
+      </button>
+    </div>
+  </div>
+
+  <!-- ==================== COVER PAGE ==================== -->
+  <div class="cover-container">
+    <div>
+      <span class="cover-badge">অফিসিয়াল ইউজার গাইড ও শর্ট নোটবুক</span>
+      <h1 class="cover-title">Bachelor Home ERP<br><span style="font-size: 26px; font-weight: 600; color: #a5b4fc;">স্মার্ট মেস ও হোস্টেল ম্যানেজমেন্ট সিস্টেম</span></h1>
+      <p class="cover-subtitle">
+        হোস্টেল প্রশাসন, দৈনিক ম্যানেজারিয়ান অপারেশন এবং বোর্ডারদের মিল ও বিলিং ব্যবস্থাপনার প্রতিটি মেনুর সহজ, ধাপে ধাপে ব্যবহার নির্দেশিকা।
+      </p>
+
+      <div class="cover-roles">
+        <div class="role-badge-box admin">
+          <div class="role-badge-title">এডমিন ও ওনার গাইড</div>
+          <div class="role-badge-desc">সিট বরাদ্দ, রাজস্ব, তহবিল অডিট, বিল জেনারেশন ও সার্বিক নিয়ন্ত্রণ</div>
+        </div>
+        <div class="role-badge-box manager">
+          <div class="role-badge-title">ম্যানেজার গাইড</div>
+          <div class="role-badge-desc">দৈনিক বিল আদায়, কিচেন মিল গণনা, বাজার খরচ এন্ট্রি ও ক্যাশ ড্রয়ার</div>
+        </div>
+        <div class="role-badge-box boarder">
+          <div class="role-badge-title">বোর্ডার পোর্টাল</div>
+          <div class="role-badge-desc">মিল অন/অফ, বকেয়া বিল যাচাই, মানি রশিদ ডাউনলোড ও মেনু দেখা</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div style="background: rgba(255,255,255,0.05); padding: 14px; border-radius: 10px; margin-bottom: 20px; font-size: 11.5px; color: #e2e8f0; border: 1px solid rgba(255,255,255,0.1);">
+        <strong>📌 এই নির্দেশিকাটি কীভাবে ব্যবহার করবেন?</strong><br>
+        যেকোনো নতুন কর্মকর্তা বা বোর্ডারকে এই পিডিএফ ফাইলটি দিলে তিনি তার নির্ধারিত সেকশনটি দেখে কোনো প্রশিক্ষণ ছাড়াই সফটওয়্যারটি স্বাচ্ছন্দ্যে পরিচালনা করতে পারবেন।
+      </div>
+      <div class="cover-footer">
+        <div>সিস্টেম সংস্করণ: <strong>Hostel ERP v1.0 • PWA Cloud Ready</strong></div>
+        <div>ওয়েবসাইট: <strong>bachelorhomebd.com</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SECTION 1: ADMIN GUIDE ==================== -->
+  <div class="page-break"></div>
+
+  <div class="section-header">
+    <div class="section-title">
+      <span>অংশ ১: এডমিন / ওনার ইউজার গাইড (Super Admin / Admin)</span>
+    </div>
+    <span class="tag-pill tag-admin">সম্পূর্ণ নিয়ন্ত্রণ</span>
+  </div>
+
+  <p style="margin-bottom: 12px; color: #475569; font-size: 12px;">
+    এডমিন হলেন হোস্টেলের প্রধান নিয়ন্ত্রক। তিনি সফটওয়্যারের প্রতিটি মডিউল কনফিগার, আর্থিক তহবিল অডিট এবং সার্বিক নিরাপত্তা পরিচালনা করতে পারেন।
+  </p>
+
+  <div class="module-card">
+    <div class="module-title"><span class="num">১</span> ড্যাশবোর্ড (Dashboard Overview)</div>
+    <div style="font-size: 12px; color: #475569; margin-bottom: 6px;">
+      সফটওয়্যারে লগইন করলেই এডমিন ড্যাশবোর্ডে পুরো হোস্টেলের লাইভ অবস্থা এক নজরে দেখতে পারবেন:
+    </div>
+    <ul class="steps-list">
+      <li><strong>সিট পরিসংখ্যান:</strong> মোট কতটি সিট আছে, কতটিতে বোর্ডার রয়েছে এবং কতটি সিট বর্তমানে ফাঁকা।</li>
+      <li><strong>লাইভ ক্যাশ ও তহবিল:</strong> মেইন অ্যাকাউন্ট, ম্যানেজার ক্যাশ ও এডমিন অ্যাকাউন্টের সর্বমোট তহবিল।</li>
+      <li><strong>চলতি মাসের রানিং হিসাব:</strong> মোট আদায়কৃত বিল, বাকি থাকা বকেয়া এবং মোট অনুমোদিত খরচের রিয়েল-টাইম ব্যালেন্স।</li>
+    </ul>
+  </div>
+
+  <div class="module-card">
+    <div class="module-title"><span class="num">২</span> আবাসন ও সিট বরাদ্দ (Accommodations)</div>
+    <div style="font-size: 12px; color: #475569; margin-bottom: 6px;">হোস্টেলের অবকাঠামো ও রুম/সিট সেটআপ করার মেনু:</div>
+    <ul class="steps-list">
+      <li><strong>বিল্ডিং ও ফ্ল্যাট তৈরি:</strong> <span class="btn-badge">+ নতুন ফ্ল্যাট/রুম</span> বাটনে ক্লিক করে বিল্ডিং ও ফ্ল্যাটের নাম দিন।</li>
+      <li><strong>সিট যুক্ত ও ভাড়া নির্ধারণ:</strong> প্রতিটি রুমে কতটি সিট/বেড থাকবে এবং তার মাসিক বেসিক সিট ভাড়া কত তা নির্ধারণ করে সেভ করুন।</li>
+      <li><strong>লাইভ সিট ম্যাপিং:</strong> গ্রিড ভিউতে সবুজ (ফাঁকা) ও নীল (বরাদ্দকৃত) আইকন দেখে সহজে সিট বরাদ্দ দিন।</li>
+    </ul>
+  </div>
+
+  <div class="module-card">
+    <div class="module-title"><span class="num">৩</span> আবাসিক বোর্ডার তালিকা (Boarders Management)</div>
+    <ul class="steps-list">
+      <li><strong>নতুন বোর্ডার এন্ট্রি:</strong> <span class="btn-badge">+ নতুন বোর্ডার যোগ করুন</span> এ ক্লিক করে নাম, মোবাইল, এনআইডি নম্বর, অভিভাবকের ফোন এবং খালি সিট সিলেক্ট করে যুক্ত করুন।</li>
+      <li><strong>সিকিউরিটি ডিপোজিট:</strong> বর্ডার প্রবেশের সময় নেওয়া অগ্রিম জামানতের টাকা এন্ট্রি দিন।</li>
+      <li><strong>সিট পরিবর্তন বা চেক-আউট:</strong> কোনো বর্ডার রুম বা সিট পরিবর্তন করতে চাইলে তার প্রোফাইল থেকে "সিট ট্রান্সফার" অথবা হোস্টেল ছেড়ে দিলে "চেক-আউট / রিলিজ" করুন।</li>
+    </ul>
+  </div>
+
+  <div class="module-card">
+    <div class="module-title"><span class="num">৪</span> মাসিক বিল জেনারেট (Monthly Bill Generation Hub)</div>
+    <div style="font-size: 12px; color: #475569; margin-bottom: 6px;">প্রতি মাসের শেষে বা ১ তারিখে সকল বর্ডারের স্বয়ংক্রিয় বিল তৈরির নিয়ম:</div>
+    <ul class="steps-list">
+      <li>মেনু থেকে <strong>"মাসিক বিল জেনারেট"</strong> এ যান।</li>
+      <li>বিলিং মাস সিলেক্ট করুন (যেমন: অক্টোবর ২০২৬)।</li>
+      <li>সিস্টেম স্বয়ংক্রিয়ভাবে প্রতিটি বর্ডারের সিট ভাড়া + তার মাসিক খাওয়া মিলের হিসাব + ইউটিলিটি চার্জ যোগ করে হিসাব দেখাবে।</li>
+      <li><strong>"সকল বর্ডারের বিল কনফার্ম ও পাবলিশ করুন"</strong> চাপুন। সাথে সাথে বর্ডারদের পোর্টালে ডিউ নোটিশ চলে যাবে।</li>
+    </ul>
+    <div class="tip-box">
+      💡 <strong>টিপস:</strong> কোনো বর্ডারের বিশেষ ছাড় (Discount) বা জরিমানা থাকলে বিল পাবলিশ করার আগে নির্দিষ্ট লাইনে এডিট করে নেওয়া যায়।
+    </div>
+  </div>
+
+  <div class="module-card">
+    <div class="module-title"><span class="num">৫</span> অ্যাকাউন্টস ও আর্থিক তহবিল (৩. একাউন্ট - Accounts)</div>
+    <div style="font-size: 12px; color: #475569; margin-bottom: 6px;">হোস্টেলের ৩টি প্রধান ক্যাশ লেয়ার নিয়ন্ত্রণ:</div>
+    <ul class="steps-list">
+      <li><strong>১. হোস্টেল মেইন অ্যাকাউন্ট (Main Vault):</strong> কেন্দ্রীয় সংরক্ষিত তহবিল ও ব্যাংক হিসাব।</li>
+      <li><strong>২. ম্যানেজার ক্যাশ বক্স (Cash Drawer):</strong> ম্যানেজারের কাছে থাকা দৈনিক খরচের নগদ ব্যালেন্স।</li>
+      <li><strong>৩. ওনার/এডমিন অ্যাকাউন্ট (Admin Bank):</strong> মালিকের নিয়ন্ত্রণাধীন ব্যাংক বা অনলাইন অ্যাকাউন্ট।</li>
+      <li><strong>প্রারম্ভিক সেট (Opening Balance):</strong> যেকোনো অ্যাকাউন্টের ওপরের পেন্সিল আইকনে ক্লিক করে শুরুর ক্যাশ নির্ধারণ বা অ্যাডজাস্ট করা যায়।</li>
+      <li><strong>রানিং লেজার (Running Ledger):</strong> প্রতিটি আয়ের ক্রেডিট ও খরচের ডেবিট ট্রানজ্যাকশন তারিখ অনুযায়ী স্ক্রল করে অডিট করুন।</li>
+    </ul>
+    <div class="alert-box">
+      ⚠️ <strong>গুরুত্বপূর্ণ:</strong> মালিক যদি হোস্টেল ব্যবসা থেকে টাকা অন্য কোনো ব্যবসায় নিয়ে যান, তবে তা "খরচ" মেনু থেকে 'মালিকের উত্তোলন' ক্যাটাগরিতে এন্ট্রি দিলে এই অ্যাকাউন্ট থেকে টাকা সমন্বয় হয়ে সঠিক ব্যালেন্স থাকবে।
+    </div>
+  </div>
+
+  <div class="module-card">
+    <div class="module-title"><span class="num">৬</span> সিস্টেম সেটিংস ও ইউজার কন্ট্রোল (System Settings)</div>
+    <ul class="steps-list">
+      <li><strong>কর্মকর্তা ও পদবী ব্যবস্থাপনা:</strong> নতুন ম্যানেজার, একাউন্ট্যান্ট বা বাবুর্চির আইডি তৈরি করুন এবং রোল নির্ধারণ করে দিন।</li>
+      <li><strong>হোস্টেল সেটিংস:</strong> হোস্টেলের নাম, মোবাইল, কিচেন রুলস এবং লোগো আপডেট করুন।</li>
+      <li><strong>নোটিশ ও ঘোষণা:</strong> সাধারণ বিজ্ঞপ্তি বা বকেয়া পরিশোধের নোটিশ বোর্ডে পোস্ট করুন।</li>
+      <li><strong>অডিট ট্রেইল (Audit Logs):</strong> কোনো ভাউচার বা ডেটা পরিবর্তন হলে কে কখন করেছে তা টাইমস্ট্যাম্প সহ নিরীক্ষা করুন।</li>
+    </ul>
+  </div>
+
+  <!-- ==================== SECTION 2: MANAGER GUIDE ==================== -->
+  <div class="page-break"></div>
+
+  <div class="section-header">
+    <div class="section-title">
+      <span>অংশ ২: ম্যানেজার ইউজার গাইড (Hostel Manager Guide)</span>
+    </div>
+    <span class="tag-pill tag-manager">দৈনিক অপারেশন</span>
+  </div>
+
+  <p style="margin-bottom: 12px; color: #475569; font-size: 12px;">
+    ম্যানেজার হোস্টেলের মাঠপর্যায়ের সমস্ত কাজ পরিচালনা করেন। ম্যানেজার কেবলমাত্র তার নিজস্ব ক্যাশ ও দায়িত্বপ্রাপ্ত মডিউলগুলোতেই কাজ করবেন।
+  </p>
+
+  <div class="module-card">
+    <div class="module-title"><span class="num">১</span> ম্যানেজারের দৈনিক চেকলিস্ট (Daily Morning Checklist)</div>
+    <ul class="steps-list">
+      <li><strong>সকাল ০৭:০০ টা:</strong> <strong>"খাবার ইঞ্জিন (কিচেন)"</strong> মেনুতে গিয়ে আজকের সকাল, দুপুর ও রাতের মোট মিল কাউন্ট দেখে বাবুর্চিকে বাজার ও রান্নার পরিমাণ বুঝিয়ে দেওয়া।</li>
+      <li><strong>সারাদিন:</strong> বোর্ডারদের কাছ থেকে বিল আদায় এবং কিচেন ও মেসের দৈনন্দিন খরচের ভাউচার এন্ট্রি করা।</li>
+      <li><strong>রাত ১০:০০ টা:</strong> দিনের আদায়কৃত ক্যাশ ও খরচের মেমো মিলিয়ে ক্যাশ ড্রয়ারের ব্যালেন্স চেক করা।</li>
+    </ul>
+  </div>
+
+  <div class="module-card">
+    <div class="module-title"><span class="num">২</span> খাবার ইঞ্জিন ও কিচেন টোকেন (Kitchen Meal Engine)</div>
+    <div style="font-size: 12px; color: #475569; margin-bottom: 6px;">মেনু: <strong>মিল ব্যবস্থাপনা ➔ খাবার ইঞ্জিন (কিচেন)</strong></div>
+    <ul class="steps-list">
+      <li><strong>লাইভ মিল কাউন্টার:</strong> আজ ব্রেকফাস্ট, লাঞ্চ এবং ডিনারে কতটি মিল সচল আছে তা বড় বড় কার্ডে দেখতে পারবেন।</li>
+      <li><strong>গেস্ট মিল / ইনস্ট্যান্ট মিল এন্ট্রি:</strong> কোনো বোর্ডার বা হোস্টেলে মেহমান আসলে <span class="btn-badge">+ মেহমান মিল</span> চেপে সাথে সাথে খাবার সংখ্যা বাড়াতে পারবেন।</li>
+      <li><strong>ফ্ল্যাট অনুযায়ী কিচেন শিট:</strong> বাবুর্চির সুবিধার জন্য কোন ফ্ল্যাটে কয়টি মিল যাবে তা প্রিন্ট বা মোবাইলে দেখে সরবরাহ নিশ্চিত করুন।</li>
+    </ul>
+  </div>
+
+  <div class="module-card">
+    <div class="module-title"><span class="num">৩</span> বিল আদায় ও তাৎক্ষণিক ডিজিটাল মানি রশিদ (১. বিল আদায়)</div>
+    <div style="font-size: 12px; color: #475569; margin-bottom: 6px;">মেনু: <strong>বিলিং ও ফাইনান্স ➔ ১. বিল আদায়</strong></div>
+    <ul class="steps-list">
+      <li>উপরে থাকা <strong>"+ বিল আদায় করুন (Collect Bill)"</strong> বাটনে ক্লিক করুন।</li>
+      <li><strong>বোর্ডার সিলেক্ট:</strong> ড্রপডাউন থেকে নির্দিষ্ট বোর্ডারের নাম বা রুম নম্বর বেছে নিন। তার বর্তমান বকেয়া স্বয়ংক্রিয়ভাবে ভেসে উঠবে।</li>
+      <li><strong>টাকার পরিমাণ:</strong> বর্ডার যত টাকা পরিশোধ করছেন তা লিখুন।</li>
+      <li><strong>পেমেন্ট মাধ্যম:</strong> ক্যাশ (Cash), বিকাশ/নগদ (MFS) বা ব্যাংক সিলেক্ট করুন।</li>
+      <li><strong>সংরক্ষণ ও প্রিন্ট:</strong> সাবমিট করার সাথে সাথে ডিজিটাল মানি রিসিপ্ট তৈরি হবে। <span class="btn-badge">রশিদ প্রিন্ট / PDF</span> এ চাপ দিয়ে রিসিট প্রিন্ট করুন অথবা বর্ডারের হোয়াটসঅ্যাপে পাঠিয়ে দিন।</li>
+    </ul>
+    <div class="tip-box">
+      💡 <strong>টিপস:</strong> ক্যাশে টাকা নেওয়া হলে তা সরাসরি আপনার "Manager Cash Box"-এ যোগ হয়ে যাবে।
+    </div>
+  </div>
+
+  <div class="module-card">
+    <div class="module-title"><span class="num">৪</span> দৈনন্দিন মেস ও বাজার খরচ এন্ট্রি (২. খরচ - Expenses)</div>
+    <div style="font-size: 12px; color: #475569; margin-bottom: 6px;">মেনু: <strong>বিলিং ও ফাইনান্স ➔ ২. খরচ (Expenses)</strong></div>
+    <ul class="steps-list">
+      <li><strong>"+ নতুন খরচ যুক্ত করুন"</strong> বাটনে ক্লিক করুন।</li>
+      <li><strong>খরচের ধরন বা ক্যাটাগরি:</strong> চাল-ডাল-তেল, মাছ-মাংস-ডিম, বাবুর্চির বেতন, গ্যাস সিলিন্ডার বা মেরামত ইত্যাদি সিলেক্ট করুন।</li>
+      <li><strong>টাকা পরিশোধের একাউন্ট:</strong> আপনার <strong>"Manager Cash Box (ম্যানেজার ক্যাশ)"</strong> সিলেক্ট করুন।</li>
+      <li><strong>মেমো/রশিদ ছবি আপলোড:</strong> বাজারের রসিদের ছবি ক্যামেরা দিয়ে তুলে বা ফাইল থেকে আপলোড করে দিতে পারেন।</li>
+      <li><strong>সংরক্ষণ:</strong> সেভ করলে ম্যানেজার ক্যাশ থেকে এই পরিমাণ টাকা স্বয়ংক্রিয়ভাবে কমে যাবে।</li>
+    </ul>
+  </div>
+
+  <div class="module-card">
+    <div class="module-title"><span class="num">৫</span> টাকা হ্যান্ডওভার ও ফান্ড স্থানান্তর (৪. টাকা ট্রান্সফার)</div>
+    <div style="font-size: 12px; color: #475569; margin-bottom: 6px;">ম্যানেজারের ক্যাশ বক্সে অতিরিক্ত টাকা জমলে তা ওনার বা মেইন ভল্টে জমা দেওয়ার নিয়ম:</div>
+    <ul class="steps-list">
+      <li>মেনু: <strong>বিলিং ও ফাইনান্স ➔ ৪. টাকা ট্রান্সফার</strong> ➔ <span class="btn-badge">+ নতুন ট্রান্সফার</span> বাটনে যান।</li>
+      <li><strong>উৎস (From Account):</strong> Manager Cash Box.</li>
+      <li><strong>গন্তব্য (To Account):</strong> Hostel Main Account অথবা Owner Account.</li>
+      <li><strong>টাকার পরিমাণ ও বিবরণ:</strong> যত টাকা বুঝিয়ে দিচ্ছেন তা লিখে সাবমিট করুন। এর ফলে ক্যাশ ড্রয়ার রিসেট থাকবে এবং ওনারের হিসাবে টাকা যোগ হবে।</li>
+    </ul>
+  </div>
+
+  <!-- ==================== SECTION 3: BOARDER GUIDE ==================== -->
+  <div class="page-break"></div>
+
+  <div class="section-header">
+    <div class="section-title">
+      <span>অংশ ৩: বোর্ডার সেলফ-সার্ভিস গাইড (Boarder Portal Guide)</span>
+    </div>
+    <span class="tag-pill tag-boarder">বোর্ডারদের জন্য</span>
+  </div>
+
+  <p style="margin-bottom: 12px; color: #475569; font-size: 12px;">
+    বোর্ডাররা তাদের মোবাইল বা কম্পিউটারের ব্রাউজার দিয়ে নিজ অ্যাকাউন্টে লগইন করে মিল চালু/বন্ধ, বকেয়া বিল দেখা এবং রিসিট ডাউনলোড করতে পারেন।
+  </p>
+
+  <div class="module-card">
+    <div class="module-title"><span class="num">১</span> বোর্ডার লগইন পদ্ধতি (Login to Portal)</div>
+    <ul class="steps-list">
+      <li>যেকোনো ব্রাউজারে (Chrome, Safari ইত্যাদি) <strong>bachelorhomebd.com</strong> ওপেন করুন।</li>
+      <li>আপনার রেজিস্ট্রেশনকৃত <strong>মোবাইল নম্বর / ইমেইল</strong> এবং পাসওয়ার্ড দিন।</li>
+      <li>লগইন করলেই আপনি সরাসরি <strong>"বোর্ডার সেলফ-সার্ভিস পোর্টালে"</strong> প্রবেশ করবেন।</li>
+    </ul>
+  </div>
+
+  <div class="module-card">
+    <div class="module-title"><span class="num">২</span> আমার ড্যাশবোর্ড (My Dashboard)</div>
+    <div style="font-size: 12px; color: #475569; margin-bottom: 6px;">পোর্টালের হোমপেজে নিজের সম্পূর্ণ রানিং স্ট্যাটাস:</div>
+    <ul class="steps-list">
+      <li><strong>সিট ও রুমের তথ্য:</strong> আপনার ফ্ল্যাট নম্বর, রুম নম্বর ও নির্দিষ্ট বেড কোড।</li>
+      <li><strong>চলতি মাসের মোট মিল:</strong> এই মাসে আপনি কতটি ব্রেকফাস্ট, লাঞ্চ ও ডিনার খেয়েছেন তার সরাসরি হিসাব।</li>
+      <li><strong>বর্তমান ব্যালেন্স:</strong> আপনার কোনো বকেয়া (Due) আছে কিনা, অথবা অগ্রিম জমা থাকলে তাও দেখতে পাবেন।</li>
+    </ul>
+  </div>
+
+  <div class="module-card">
+    <div class="module-title"><span class="num">৩</span> মিল অন/অফ করার নিয়ম (আমার মিল নির্বাচন - My Meals)</div>
+    <div style="font-size: 12px; color: #475569; margin-bottom: 6px;">মেনু: <strong>আমার মিল নির্বাচন (My Meals)</strong></div>
+    <ul class="steps-list">
+      <li>পেইজে ক্যালেন্ডার আকারে পুরো মাসের সকাল, দুপুর ও রাতের মিলের তালিকা দেখতে পাবেন।</li>
+      <li><strong>মিল বন্ধ বা চালু করা:</strong> যে বেলার খাবার খেতে চান না (যেমন: আগামীকাল দুপুরের খাবার), সেই বেলার পাশে থাকা টগল বাটনে ক্লিক করে <strong>"অফ (OFF)"</strong> করে দিন।</li>
+      <li><strong>সবুজ চিহ্ন = মিল চালু (ON)</strong>, <strong>ধূসর বা লাল চিহ্ন = মিল বন্ধ (OFF)</strong>।</li>
+      <li>পরিবর্তন করার পর নিচে থাকা <strong>"মিল সেভ করুন"</strong> বাটনে ক্লিক করতে হবে।</li>
+    </ul>
+    <div class="alert-box">
+      ⏰ <strong>কাট-অফ টাইম (Cut-off Time) সতর্কতা:</strong><br>
+      হোস্টেলের নির্ধারিত সময়ের (যেমন: দুপুরের মিল সকাল ০৯:০০ টা এবং রাতের মিল বিকেল ০৫:০০ টা) পূর্বে মিল অন বা অফ করতে হবে। কাট-অফ টাইম পার হয়ে গেলে কিচেনের প্রস্তুতির সুবিধার্থে সিস্টেম স্বয়ংক্রিয়ভাবে লক হয়ে যাবে।
+    </div>
+  </div>
+
+  <div class="module-card">
+    <div class="module-title"><span class="num">৪</span> বিল পরিশোধ ও মানি রশিদ দেখা (আমার বকেয়া ও রশিদ - My Dues)</div>
+    <div style="font-size: 12px; color: #475569; margin-bottom: 6px;">মেনু: <strong>আমার বকেয়া ও রশিদ (My Dues & Receipts)</strong></div>
+    <ul class="steps-list">
+      <li><strong>মাসিক বিলের ব্রেকডাউন:</strong> আপনার সিট ভাড়া কত, মিল চার্জ কত এবং অন্যান্য চার্জ কত তার পুঙ্খানুপুঙ্খ বিবরণ দেখুন।</li>
+      <li><strong>অনলাইন পেমেন্ট:</strong> পোর্টালে বিকাশ বা ব্যাংকের মাধ্যমে সরাসরি বিল পরিশোধের তথ্য পাওয়া যাবে।</li>
+      <li><strong>মানি রশিদ (Money Receipt) ডাউনলোড:</strong> ম্যানেজারের কাছে যতবার টাকা জমা দিয়েছেন, প্রতিটির ডিজিটাল রিসিট এখানে সংরক্ষিত থাকে। <span class="btn-badge">রশিদ দেখুন / ডাউনলোড</span> এ চাপ দিয়ে নিজের ফোনে সেভ করে রাখতে পারেন।</li>
+    </ul>
+  </div>
+
+  <!-- ==================== SECTION 4: ROLES COMPARISON & FAQ ==================== -->
+  <div class="page-break"></div>
+
+  <div class="section-header">
+    <div class="section-title">
+      <span>অংশ ৪: ভূমিকা অনুযায়ী অ্যাক্সেস তুলনা ও সচরাচর প্রশ্ন (FAQ)</span>
+    </div>
+    <span class="tag-pill" style="background:#f1f5f9; color:#334155;">কুইক রেফারেন্স</span>
+  </div>
+
+  <table class="avoid-break">
+    <thead>
+      <tr>
+        <th style="width: 28%;">ফিচার / মেনু</th>
+        <th style="width: 24%; text-align: center;">এডমিন (Admin)</th>
+        <th style="width: 24%; text-align: center;">ম্যানেজার (Manager)</th>
+        <th style="width: 24%; text-align: center;">বোর্ডার (Boarder)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>সিট ও অবকাঠামো সেটআপ</strong></td>
+        <td style="text-align: center; color: #16a34a; font-weight: bold;">সম্পূর্ণ নিয়ন্ত্রণ</td>
+        <td style="text-align: center; color: #475569;">শুধুমাত্র দেখা</td>
+        <td style="text-align: center; color: #94a3b8;">অনুমতি নেই</td>
+      </tr>
+      <tr>
+        <td><strong>বোর্ডার যুক্ত ও সিট বরাদ্দ</strong></td>
+        <td style="text-align: center; color: #16a34a; font-weight: bold;">হ্যাঁ (সম্পূর্ণ)</td>
+        <td style="text-align: center; color: #16a34a; font-weight: bold;">হ্যাঁ (দৈনিক)</td>
+        <td style="text-align: center; color: #94a3b8;">অনুমতি নেই</td>
+      </tr>
+      <tr>
+        <td><strong>মাসিক বিল জেনারেশন</strong></td>
+        <td style="text-align: center; color: #16a34a; font-weight: bold;">হ্যাঁ (এক ক্লিকে)</td>
+        <td style="text-align: center; color: #dc2626;">অনুমতি নেই</td>
+        <td style="text-align: center; color: #94a3b8;">অনুমতি নেই</td>
+      </tr>
+      <tr>
+        <td><strong>বিল আদায় ও মানি রশিদ</strong></td>
+        <td style="text-align: center; color: #16a34a; font-weight: bold;">হ্যাঁ</td>
+        <td style="text-align: center; color: #16a34a; font-weight: bold;">হ্যাঁ (ক্যাশ বক্স)</td>
+        <td style="text-align: center; color: #3b82f6;">নিজের রসিদ দেখা</td>
+      </tr>
+      <tr>
+        <td><strong>দৈনন্দিন মেস খরচ এন্ট্রি</strong></td>
+        <td style="text-align: center; color: #16a34a; font-weight: bold;">হ্যাঁ (সকল অ্যাকাউন্ট)</td>
+        <td style="text-align: center; color: #16a34a; font-weight: bold;">হ্যাঁ (ক্যাশ ড্রয়ার)</td>
+        <td style="text-align: center; color: #94a3b8;">অনুমতি নেই</td>
+      </tr>
+      <tr>
+        <td><strong>মিল কাউন্ট ও কিচেন শিট</strong></td>
+        <td style="text-align: center; color: #16a34a; font-weight: bold;">হ্যাঁ</td>
+        <td style="text-align: center; color: #16a34a; font-weight: bold;">হ্যাঁ</td>
+        <td style="text-align: center; color: #3b82f6;">নিজের মিল দেখা</td>
+      </tr>
+      <tr>
+        <td><strong>মিল অন/অফ পরিচালনা</strong></td>
+        <td style="text-align: center; color: #16a34a; font-weight: bold;">সবার জন্য সম্ভব</td>
+        <td style="text-align: center; color: #16a34a; font-weight: bold;">জরুরি প্রয়োজনে</td>
+        <td style="text-align: center; color: #16a34a; font-weight: bold;">নিজের মিল নিজে</td>
+      </tr>
+      <tr>
+        <td><strong>কর্মকর্তা নিয়োগ ও অডিট লগ</strong></td>
+        <td style="text-align: center; color: #16a34a; font-weight: bold;">হ্যাঁ (একচ্ছত্র)</td>
+        <td style="text-align: center; color: #dc2626;">অনুমতি নেই</td>
+        <td style="text-align: center; color: #94a3b8;">অনুমতি নেই</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 style="margin-top: 20px; margin-bottom: 10px; font-size: 15px;">সচরাচর জিজ্ঞাস্য প্রশ্ন (FAQ) ও সমাধান:</h3>
+
+  <div class="module-card">
+    <div style="font-weight: 700; color: #0f172a; margin-bottom: 4px;">১. প্রশ্ন: কোনো বোর্ডার যদি নির্ধারিত সময়ের পর মিল অফ করতে চায় তখন কী করণীয়?</div>
+    <div style="font-size: 12px; color: #475569;">
+      <strong>উত্তর:</strong> নির্ধারিত কাট-অফ টাইমের পর বোর্ডার নিজে থেকে মিল অফ করতে পারবেন না। তবে যৌক্তিক কারণে ম্যানেজারের সাথে যোগাযোগ করলে ম্যানেজার স্পেশাল পারমিশন নিয়ে কিচেন ইঞ্জিন থেকে অফ বা অ্যাডজাস্ট করে দিতে পারবেন।
+    </div>
+  </div>
+
+  <div class="module-card">
+    <div style="font-weight: 700; color: #0f172a; margin-bottom: 4px;">২. প্রশ্ন: বর্ডার টাকা দেওয়ার পর মানি রশিদ প্রিন্ট করতে ভুলে গেলে কি তা পরে পাওয়া যাবে?</div>
+    <div style="font-size: 12px; color: #475569;">
+      <strong>উত্তর:</strong> হ্যাঁ, অবশ্যই! "বিলিং ও ফাইনান্স" এর <strong>রশিদ তালিকা (Receipts)</strong> মেনুতে সবসময় সব রসিদ সংরক্ষিত থাকে। সেখানে গিয়ে যেকোনো সময় পুনরায় প্রিন্ট বা পিডিএফ ডাউনলোড করা যাবে।
+    </div>
+  </div>
+
+  <div class="module-card">
+    <div style="font-weight: 700; color: #0f172a; margin-bottom: 4px;">৩. প্রশ্ন: এডমিন কীভাবে নিশ্চিত হবেন যে ম্যানেজারের ক্যাশ বক্সের হিসাব সঠিক আছে?</div>
+    <div style="font-size: 12px; color: #475569;">
+      <strong>উত্তর:</strong> এডমিন "৩. একাউন্ট (Accounts)" মেনুতে গিয়ে <strong>"Manager Cash Box"</strong> এর রানিং খতিয়ান (Ledger) দেখতে পারেন। সেখানে ম্যানেজারের প্রতিটি বিল কালেকশন (+) এবং খরচের ভাউচার (-) স্বয়ংক্রিয়ভাবে অডিট ট্রেইলে প্রদর্শিত হয়।
+    </div>
+  </div>
+
+  <div style="margin-top: 30px; text-align: center; padding: 16px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 10px;">
+    <div style="font-weight: 700; font-size: 13px; color: #0f172a;">প্রয়োজনে কারিগরি সহায়তা বা সিস্টেম তথ্যের জন্য</div>
+    <div style="font-size: 12px; color: #64748b; margin-top: 4px;">সিস্টেম এডমিন পোর্টাল • ব্যাচেলর হোম ইআরপি (Bachelor Home ERP)</div>
+    <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">ওয়েবসাইট: bachelorhomebd.com</div>
+  </div>
+
+</body>
+</html>

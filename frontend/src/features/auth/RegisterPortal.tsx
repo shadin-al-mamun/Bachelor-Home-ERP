@@ -12,6 +12,8 @@ import {
   Building2,
   Upload,
   Check,
+  Camera,
+  Trash2,
 } from 'lucide-react'
 import {
   Button,
@@ -54,16 +56,71 @@ export const RegisterPortal: React.FC = () => {
 
   // Step 3: Identity & Document
   const [nidNumber, setNidNumber] = useState('')
-  const [fileName, setFileName] = useState<string | null>(null)
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [photoFileName, setPhotoFileName] = useState<string | null>(null)
+
+  const [documentFile, setDocumentFile] = useState<File | null>(null)
+  const [documentPreview, setDocumentPreview] = useState<string | null>(null)
+  const [documentFileName, setDocumentFileName] = useState<string | null>(null)
+  const [documentFileType, setDocumentFileType] = useState<'image' | 'pdf' | null>(null)
 
   // Step 4: Password
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setErrorMessage(null)
     if (e.target.files && e.target.files[0]) {
-      setFileName(e.target.files[0].name)
+      const file = e.target.files[0]
+      if (!file.type.startsWith('image/')) {
+        setErrorMessage('অনুগ্রহ করে শুধুমাত্র ছবি ফাইল (JPG, PNG, WEBP) আপলোড করুন।')
+        return
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        setErrorMessage('ছবির সাইজ সর্বোচ্চ ৫ মেগাবাইট হতে পারবে।')
+        return
+      }
+      setPhotoFile(file)
+      setPhotoFileName(file.name)
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
     }
+  }
+
+  const handleRemovePhoto = () => {
+    setPhotoFile(null)
+    setPhotoPreview(null)
+    setPhotoFileName(null)
+  }
+
+  const handleDocumentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setErrorMessage(null)
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0]
+      if (file.size > 10 * 1024 * 1024) {
+        setErrorMessage('ডকুমেন্টের সাইজ সর্বোচ্চ ১০ মেগাবাইট হতে পারবে।')
+        return
+      }
+      setDocumentFile(file)
+      setDocumentFileName(file.name)
+      setDocumentFileType(file.type === 'application/pdf' ? 'pdf' : 'image')
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setDocumentPreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleRemoveDocument = () => {
+    setDocumentFile(null)
+    setDocumentPreview(null)
+    setDocumentFileName(null)
+    setDocumentFileType(null)
   }
 
   const validateStep = (currentStep: number) => {
@@ -154,12 +211,54 @@ export const RegisterPortal: React.FC = () => {
         }
       }
 
+      // Upload photo & document if provided
+      let finalPhotoUrl: string | undefined = photoPreview || undefined
+      let finalDocUrl: string | undefined = documentPreview || undefined
+
+      if (isSupabaseConfigured) {
+        // Upload photo to avatars bucket
+        if (photoFile) {
+          try {
+            const ext = photoFile.name.split('.').pop() || 'jpg'
+            const pPath = `avatars/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`
+            const { data: pData, error: pErr } = await supabase.storage
+              .from('avatars')
+              .upload(pPath, photoFile, { upsert: true, cacheControl: '3600' })
+            if (!pErr && pData) {
+              const { data: pubData } = supabase.storage.from('avatars').getPublicUrl(pData.path)
+              if (pubData?.publicUrl) {
+                finalPhotoUrl = pubData.publicUrl
+              }
+            }
+          } catch (e) {
+            console.warn('Avatar storage upload failed, using data URL fallback:', e)
+          }
+        }
+
+        // Upload NID document to boarder-documents bucket
+        if (documentFile) {
+          try {
+            const cleanName = documentFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+            const dPath = `nid_${Date.now()}_${cleanName}`
+            const { data: dData, error: dErr } = await supabase.storage
+              .from('boarder-documents')
+              .upload(dPath, documentFile, { upsert: true, cacheControl: '3600' })
+            if (!dErr && dData) {
+              finalDocUrl = dData.path
+            }
+          } catch (e) {
+            console.warn('Document storage upload failed, using data URL fallback:', e)
+          }
+        }
+      }
+
       // 2. Create boarder application in database with the linked user_id
       const createdBoarder = await createBoarderApplication({
         user_id: createdUserId,
         full_name: fullName,
         phone_number: phoneNumber,
         email,
+        photo_url: finalPhotoUrl,
         guardian_name: guardianName,
         guardian_phone: guardianPhone,
         guardian_relation: guardianRelation,
@@ -170,7 +269,7 @@ export const RegisterPortal: React.FC = () => {
         student_id: studentId,
         session,
         nid_passport_number: nidNumber,
-        nid_document_url: fileName ? `boarder-docs/${fileName}` : undefined,
+        nid_document_url: finalDocUrl,
       })
 
       // Store application reference for tracking
@@ -386,6 +485,69 @@ export const RegisterPortal: React.FC = () => {
               {/* STEP 3: NID & Documents */}
               {step === 3 && (
                 <div className="space-y-4">
+                  {/* Photo Upload Option */}
+                  <div className="space-y-2 p-4 rounded-2xl border border-slate-800 bg-slate-900/40">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold text-slate-200 flex items-center gap-2">
+                        <Camera className="w-4 h-4 text-primary-400" />
+                        বোর্ডারের ছবি আপলোড (পাসপোর্ট সাইজ)
+                      </label>
+                      <span className="text-[11px] text-slate-400">রঙিন ও স্পষ্ট ছবি</span>
+                    </div>
+
+                    {photoPreview ? (
+                      <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/80 border border-slate-800">
+                        <div className="relative w-14 h-14 rounded-xl overflow-hidden ring-2 ring-primary-500/40 bg-slate-900 flex-shrink-0">
+                          <img
+                            src={photoPreview}
+                            alt="Boarder Photo"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-emerald-400 flex items-center gap-1 truncate">
+                            <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                            {photoFileName || 'ছবি নির্বাচন করা হয়েছে'}
+                          </p>
+                          <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                            বোর্ডারের প্রোফাইল ও সিস্টেমে আইডি হিসেবে সংরক্ষিত হবে
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleRemovePhoto}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                          title="ছবি মুছুন"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="border-2 border-dashed border-slate-700/80 hover:border-primary-500/50 rounded-xl p-4 text-center cursor-pointer transition-colors bg-slate-950/40 relative group">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handlePhotoUpload}
+                          className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                        />
+                        <div className="flex items-center justify-center gap-3 text-slate-400 group-hover:text-slate-300">
+                          <div className="w-9 h-9 rounded-xl bg-primary-600/10 text-primary-400 flex items-center justify-center flex-shrink-0">
+                            <Camera className="w-4 h-4" />
+                          </div>
+                          <div className="text-left">
+                            <p className="text-xs font-medium text-slate-300">
+                              পাসপোর্ট সাইজ ছবি নির্বাচন করতে ক্লিক করুন
+                            </p>
+                            <p className="text-[11px] text-slate-500">
+                              JPG, PNG বা WEBP (সর্বোচ্চ ৫ MB)
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* NID / Passport Number */}
                   <Input
                     label="জাতীয় পরিচয়পত্র (NID) বা পাসপোর্ট নম্বর"
                     placeholder="১০ বা ১৭ ডিজিটের NID নম্বর"
@@ -394,38 +556,72 @@ export const RegisterPortal: React.FC = () => {
                     required
                   />
 
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-medium text-slate-300">
-                      NID / স্টুডেন্ট আইডি ডকুমেন্টের কপি আপলোড করুন
-                    </label>
-                    <div className="border-2 border-dashed border-slate-700 hover:border-primary-500/50 rounded-2xl p-6 text-center cursor-pointer transition-colors bg-slate-900/40 relative">
-                      <input
-                        type="file"
-                        accept="image/*,application/pdf"
-                        onChange={handleFileUpload}
-                        className="absolute inset-0 opacity-0 cursor-pointer"
-                      />
-                      <div className="flex flex-col items-center justify-center gap-2 text-slate-400">
-                        <div className="w-10 h-10 rounded-xl bg-primary-600/10 text-primary-400 flex items-center justify-center">
-                          <Upload className="w-5 h-5" />
-                        </div>
-                        {fileName ? (
-                          <div className="text-xs font-semibold text-emerald-400 flex items-center gap-1">
-                            <CheckCircle2 className="w-4 h-4" />
-                            {fileName}
+                  {/* NID / Student ID Document File Upload */}
+                  <div className="space-y-2 p-4 rounded-2xl border border-slate-800 bg-slate-900/40">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold text-slate-200 flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-amber-400" />
+                        NID / স্টুডেন্ট আইডি ডকুমেন্টের কপি আপলোড
+                      </label>
+                      <span className="text-[11px] text-slate-400">ছবি বা PDF</span>
+                    </div>
+
+                    {documentPreview ? (
+                      <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/80 border border-slate-800">
+                        {documentFileType === 'pdf' ? (
+                          <div className="w-14 h-14 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center flex-shrink-0 border border-rose-500/20">
+                            <FileText className="w-6 h-6" />
                           </div>
                         ) : (
-                          <>
-                            <span className="text-xs font-medium text-slate-300">
+                          <div className="relative w-14 h-14 rounded-xl overflow-hidden ring-2 ring-amber-500/40 bg-slate-900 flex-shrink-0">
+                            <img
+                              src={documentPreview}
+                              alt="NID Document"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-emerald-400 flex items-center gap-1 truncate">
+                            <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                            {documentFileName || 'ডকুমেন্ট নির্বাচন করা হয়েছে'}
+                          </p>
+                          <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                            {documentFileType === 'pdf' ? 'PDF ডকুমেন্ট' : 'আইডি কার্ডের ছবি'} (সুপাবেজ ভল্টে সুরক্ষিত)
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleRemoveDocument}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                          title="ডকুমেন্ট মুছুন"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="border-2 border-dashed border-slate-700/80 hover:border-amber-500/50 rounded-xl p-5 text-center cursor-pointer transition-colors bg-slate-950/40 relative group">
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          onChange={handleDocumentUpload}
+                          className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                        />
+                        <div className="flex flex-col items-center justify-center gap-2 text-slate-400 group-hover:text-slate-300">
+                          <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
+                            <Upload className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <span className="text-xs font-medium text-slate-300 block">
                               ফাইল ব্রাউজ করতে ক্লিক করুন (PNG, JPG, PDF)
                             </span>
-                            <span className="text-[11px] text-slate-500">
-                              সর্বোচ্চ সাইজ: ৫ মেগাবাইট (Supabase Vault Encrypted)
+                            <span className="text-[11px] text-slate-500 block mt-0.5">
+                              সর্বোচ্চ সাইজ: ১০ মেগাবাইট (Supabase Vault Protected)
                             </span>
-                          </>
-                        )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               )}

@@ -61,9 +61,11 @@ export const BoarderDetailPage: React.FC = () => {
     if (boarder?.nid_document_url) {
       setIsLoadingDoc(true)
       getDocumentSignedUrl(boarder.nid_document_url)
-        .then((url) => setDocUrl(url))
+        .then((url) => setDocUrl(url || null))
         .catch(() => setDocUrl(null))
         .finally(() => setIsLoadingDoc(false))
+    } else {
+      setDocUrl(null)
     }
   }, [boarder?.nid_document_url])
 
@@ -386,23 +388,47 @@ export const BoarderDetailPage: React.FC = () => {
               <div className="text-[11px] text-slate-400 bg-slate-950/80 p-3 rounded-xl border border-slate-800/80 flex items-start gap-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
                 <span>
-                  সুরক্ষিত স্টোরেজ: গোপনীয় নথিপত্র শুধুমাত্র অনুমোদিত অ্যাডমিন ও ম্যানেজার দেখতে পারেন।
+                  {docUrl
+                    ? 'সুরক্ষিত স্টোরেজ: গোপনীয় নথিপত্র শুধুমাত্র অনুমোদিত অ্যাডমিন ও ম্যানেজার দেখতে পারেন।'
+                    : 'সুরক্ষিত ভেরিফিকেশন: কোনো ডিজিটাল কপি সংযুক্ত নেই।'}
                 </span>
               </div>
 
-              {/* Document Image */}
-              <div className="relative min-h-[220px] max-h-[340px] overflow-hidden rounded-xl border border-slate-800 bg-slate-950 flex items-center justify-center">
+              {/* Document Image / PDF */}
+              <div className="relative min-h-[220px] max-h-[340px] overflow-hidden rounded-xl border border-slate-800 bg-slate-950 flex items-center justify-center p-2">
                 {isLoadingDoc ? (
                   <div className="flex flex-col items-center gap-2 text-slate-400 text-xs">
                     <div className="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
                     <span>ডকুমেন্ট লোড হচ্ছে...</span>
                   </div>
                 ) : docUrl ? (
-                  <img
-                    src={docUrl}
-                    alt="Boarder Document"
-                    className="w-full h-full object-contain hover:scale-105 transition-transform duration-300"
-                  />
+                  docUrl.startsWith('data:application/pdf') ||
+                  docUrl.includes('.pdf') ||
+                  boarder.nid_document_url?.toLowerCase().endsWith('.pdf') ? (
+                    <div className="flex flex-col items-center justify-center p-6 text-center space-y-3">
+                      <div className="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center border border-rose-500/20">
+                        <FileText className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-slate-200">পিডিএফ ডকুমেন্ট সংযুক্ত রয়েছে</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">সম্পূর্ণ ডকুমেন্ট দেখতে নিচের বাটনে ক্লিক করুন</p>
+                      </div>
+                      <a
+                        href={docUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-600 hover:bg-primary-500 text-white text-xs font-medium transition-colors"
+                      >
+                        পিডিএফ ভিউয়ারে খুলুন <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+                  ) : (
+                    <img
+                      src={docUrl}
+                      alt="Boarder Document"
+                      className="w-full h-full object-contain hover:scale-105 transition-transform duration-300 rounded-lg"
+                    />
+                  )
                 ) : (
                   <div className="text-center p-6 text-slate-500 text-xs space-y-1">
                     <FileText className="w-8 h-8 mx-auto text-slate-600 mb-2" />

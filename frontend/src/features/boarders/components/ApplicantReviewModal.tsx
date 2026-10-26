@@ -54,7 +54,7 @@ export const ApplicantReviewModal: React.FC<ApplicantReviewModalProps> = ({
       if (applicant.nid_document_url) {
         setIsLoadingDoc(true)
         getDocumentSignedUrl(applicant.nid_document_url)
-          .then((url) => setDocUrl(url))
+          .then((url) => setDocUrl(url || null))
           .catch(() => setDocUrl(null))
           .finally(() => setIsLoadingDoc(false))
       } else {
@@ -359,7 +359,9 @@ export const ApplicantReviewModal: React.FC<ApplicantReviewModalProps> = ({
               <div className="text-xs text-slate-400 bg-slate-950/60 p-2.5 rounded-lg border border-slate-800 flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                 <span>
-                  সুরক্ষিত প্রিভিউ: সুপাবেজ প্রাইভেট বাকেট থেকে ১৫ মিনিটের সাইনড ইউআরএল তৈরি করা হয়েছে।
+                  {docUrl
+                    ? 'সুরক্ষিত প্রিভিউ: সুপাবেজ প্রাইভেট বাকেট থেকে ১৫ মিনিটের সাইনড ইউআরএল তৈরি করা হয়েছে।'
+                    : 'সুরক্ষিত ভেরিফিকেশন: কোনো ডিজিটাল কপি পাওয়া যায়নি বা অফলাইনে জমা হতে পারে।'}
                 </span>
               </div>
 
@@ -371,18 +373,40 @@ export const ApplicantReviewModal: React.FC<ApplicantReviewModalProps> = ({
               )}
 
               {/* Document Display Canvas */}
-              <div className="relative min-h-[200px] max-h-[280px] overflow-hidden rounded-xl border border-slate-800 bg-slate-950 flex items-center justify-center">
+              <div className="relative min-h-[200px] max-h-[280px] overflow-hidden rounded-xl border border-slate-800 bg-slate-950 flex items-center justify-center p-2">
                 {isLoadingDoc ? (
                   <div className="flex flex-col items-center gap-2 text-slate-400 text-xs">
                     <div className="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
                     <span>ডকুমেন্ট লোড হচ্ছে...</span>
                   </div>
                 ) : docUrl ? (
-                  <img
-                    src={docUrl}
-                    alt="NID/Student Document"
-                    className="w-full h-full object-contain hover:scale-105 transition-transform duration-300"
-                  />
+                  docUrl.startsWith('data:application/pdf') ||
+                  docUrl.includes('.pdf') ||
+                  applicant.nid_document_url?.toLowerCase().endsWith('.pdf') ? (
+                    <div className="flex flex-col items-center justify-center p-6 text-center space-y-3">
+                      <div className="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center border border-rose-500/20">
+                        <FileText className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-slate-200">পিডিএফ ডকুমেন্ট সংযুক্ত রয়েছে</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">সম্পূর্ণ ডকুমেন্ট দেখতে নিচের বাটনে ক্লিক করুন</p>
+                      </div>
+                      <a
+                        href={docUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-600 hover:bg-primary-500 text-white text-xs font-medium transition-colors"
+                      >
+                        পিডিএফ ভিউয়ারে খুলুন <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+                  ) : (
+                    <img
+                      src={docUrl}
+                      alt="NID/Student Document"
+                      className="w-full h-full object-contain hover:scale-105 transition-transform duration-300 rounded-lg"
+                    />
+                  )
                 ) : (
                   <div className="text-center p-6 text-slate-500 text-xs space-y-1">
                     <FileText className="w-8 h-8 mx-auto text-slate-600 mb-2" />

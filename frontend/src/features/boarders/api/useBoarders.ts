@@ -473,9 +473,9 @@ export async function createBoarderApplication(input: CreateBoarderInput): Promi
     full_name: input.full_name,
     phone_number: input.phone_number,
     email: input.email,
-    photo_url: input.photo_url || `https://images.unsplash.com/photo-${1535713875000 + (randomSuffix % 500)}?w=150`,
+    photo_url: input.photo_url || undefined,
     nid_passport_number: input.nid_passport_number,
-    nid_document_url: input.nid_document_url || 'boarder-docs/application-nid.jpg',
+    nid_document_url: input.nid_document_url || undefined,
     student_id: input.student_id || '',
     institution: input.institution,
     department: input.department || '',
@@ -517,8 +517,7 @@ export async function createBoarderApplication(input: CreateBoarderInput): Promi
       const isValidUuid = typeof rawUserId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawUserId)
       const validUserId = isValidUuid ? rawUserId : null
 
-      // Try RPC first (SECURITY DEFINER, ensures code generation & profile sync)
-      const { data: rpcData, error: rpcError } = await supabase.rpc('submit_boarder_application', {
+      const rpcParams: Record<string, any> = {
         p_user_id: validUserId,
         p_full_name: input.full_name,
         p_phone_number: input.phone_number,
@@ -535,10 +534,40 @@ export async function createBoarderApplication(input: CreateBoarderInput): Promi
         p_session: input.session || null,
         p_nid_document_url: input.nid_document_url || null,
         p_remarks: input.remarks || 'অনলাইন রেজিস্ট্রেশন পোর্টাল থেকে নতুন আবেদন জমা পড়েছে।',
-      })
+      }
+
+      // Try calling RPC with photo_url first
+      let rpcData: any = null
+      let rpcError: any = null
+
+      try {
+        const res = await supabase.rpc('submit_boarder_application', {
+          ...rpcParams,
+          p_photo_url: input.photo_url || null,
+        })
+        rpcData = res.data
+        rpcError = res.error
+      } catch (err: any) {
+        rpcError = err
+      }
+
+      // If failed due to extra parameter on older RPC schema, retry without p_photo_url
+      if (rpcError && (rpcError.message?.includes('p_photo_url') || rpcError.code === 'PGRST202')) {
+        const retryRes = await supabase.rpc('submit_boarder_application', rpcParams)
+        rpcData = retryRes.data
+        rpcError = retryRes.error
+      }
 
       if (!rpcError && rpcData) {
-        const merged = { ...newBoarder, ...rpcData }
+        // Sync photo_url directly to boarders table if provided
+        if (input.photo_url && rpcData.id) {
+          try {
+            await supabase.from('boarders').update({ photo_url: input.photo_url }).eq('id', rpcData.id)
+          } catch (updateErr) {
+            console.warn('Could not update photo_url after RPC:', updateErr)
+          }
+        }
+        const merged = { ...newBoarder, ...rpcData, photo_url: input.photo_url || rpcData.photo_url }
         saveStoredBoarders([merged, ...getStoredBoarders().filter(b => b.id !== merged.id)])
         return merged
       }
@@ -553,7 +582,9 @@ export async function createBoarderApplication(input: CreateBoarderInput): Promi
         full_name: input.full_name,
         phone_number: input.phone_number,
         email: input.email || null,
+        photo_url: input.photo_url || null,
         nid_passport_number: input.nid_passport_number,
+        nid_document_url: input.nid_document_url || null,
         institution: input.institution,
         department: input.department,
         student_id: input.student_id,
@@ -1001,9 +1032,34 @@ export function useBoarder(id?: string) {
 // ------------------------------------------------------------------------------
 
 export async function getDocumentSignedUrl(filePath: string): Promise<string> {
-  if (!isSupabaseConfigured || !filePath) {
-    // Return sample document visual for development/mock mode
-    return 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800'
+  if (!filePath) {
+    return ''
+  }
+
+  // 1. If already a Data URL (base64) or Blob URL, return directly for instant preview
+  if (filePath.startsWith('data:') || filePath.startsWith('blob:')) {
+    return filePath
+  }
+
+  // 2. If already an HTTP/HTTPS URL
+  if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+    // If it's the old hardcoded Unsplash sample demo image, filter it out
+    if (filePath.includes('unsplash.com/photo-1554224155-6726b3ff858f')) {
+      return ''
+    }
+    return filePath
+  }
+
+  // 3. If it's the old hardcoded mock fallback path, filter it out
+  if (
+    filePath === 'boarder-docs/application-nid.jpg' ||
+    filePath === 'boarder-docs/application-nid.png'
+  ) {
+    return ''
+  }
+
+  if (!isSupabaseConfigured) {
+    return ''
   }
 
   try {
@@ -1012,14 +1068,14 @@ export async function getDocumentSignedUrl(filePath: string): Promise<string> {
       .createSignedUrl(filePath, 900) // 15 minutes (900 seconds)
 
     if (error || !data?.signedUrl) {
-      console.warn('Could not generate signed URL, using fallback:', error)
-      return 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800'
+      console.warn('Could not generate signed URL, document not found in storage:', error?.message || 'No signed URL')
+      return ''
     }
 
     return data.signedUrl
   } catch (err) {
     console.error('Storage signed URL error:', err)
-    return 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800'
+    return ''
   }
 }
 
