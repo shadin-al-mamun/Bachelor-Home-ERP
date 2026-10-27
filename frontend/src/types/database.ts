@@ -147,6 +147,20 @@ export interface Boarder {
   created_by?: string | null
   created_at: string
   updated_at: string
+
+  // Police Verification & Tenant Form Fields
+  father_name?: string | null
+  date_of_birth?: string | null
+  marital_status?: string | null
+  religion?: string | null
+  educational_qualification?: string | null
+  occupation?: string | null
+  workplace_address?: string | null
+  passport_number?: string | null
+  emergency_contact_name?: string | null
+  emergency_contact_relation?: string | null
+  emergency_contact_address?: string | null
+  emergency_contact_phone?: string | null
 }
 
 export interface Allocation {

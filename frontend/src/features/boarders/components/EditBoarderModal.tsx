@@ -16,6 +16,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Trash2,
+  FileText,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
@@ -49,6 +50,19 @@ export const EditBoarderModal: React.FC<EditBoarderModalProps> = ({
   const [status, setStatus] = useState<BoarderStatus>('ACTIVE')
   const [remarks, setRemarks] = useState('')
 
+  const [fatherName, setFatherName] = useState('')
+  const [dateOfBirth, setDateOfBirth] = useState('')
+  const [maritalStatus, setMaritalStatus] = useState('অবিবাহিত')
+  const [religion, setReligion] = useState('ইসলাম')
+  const [educationalQualification, setEducationalQualification] = useState('')
+  const [occupation, setOccupation] = useState('')
+  const [workplaceAddress, setWorkplaceAddress] = useState('')
+  const [passportNumber, setPassportNumber] = useState('')
+  const [emergencyContactName, setEmergencyContactName] = useState('')
+  const [emergencyContactRelation, setEmergencyContactRelation] = useState('')
+  const [emergencyContactPhone, setEmergencyContactPhone] = useState('')
+  const [emergencyContactAddress, setEmergencyContactAddress] = useState('')
+
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [isSuccess, setIsSuccess] = useState(false)
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false)
@@ -69,6 +83,21 @@ export const EditBoarderModal: React.FC<EditBoarderModalProps> = ({
       setPresentAddress(boarder.present_address || '')
       setStatus(boarder.status || 'ACTIVE')
       setRemarks(boarder.remarks || '')
+
+      // Police verification & tenant form fields
+      setFatherName(boarder.father_name || boarder.guardian_name || '')
+      setDateOfBirth(boarder.date_of_birth || '')
+      setMaritalStatus(boarder.marital_status || 'অবিবাহিত')
+      setReligion(boarder.religion || 'ইসলাম')
+      setEducationalQualification(boarder.educational_qualification || '')
+      setOccupation(boarder.occupation || 'শিক্ষার্থী')
+      setWorkplaceAddress(boarder.workplace_address || boarder.institution || '')
+      setPassportNumber(boarder.passport_number || '')
+      setEmergencyContactName(boarder.emergency_contact_name || boarder.guardian_name || '')
+      setEmergencyContactRelation(boarder.emergency_contact_relation || boarder.guardian_relation || 'পিতা')
+      setEmergencyContactPhone(boarder.emergency_contact_phone || boarder.guardian_phone || '')
+      setEmergencyContactAddress(boarder.emergency_contact_address || boarder.permanent_address || '')
+
       setErrorMsg(null)
       setIsSuccess(false)
       setIsConfirmDeleteOpen(false)
@@ -103,6 +132,18 @@ export const EditBoarderModal: React.FC<EditBoarderModalProps> = ({
         presentAddress,
         status,
         remarks,
+        fatherName,
+        dateOfBirth,
+        maritalStatus,
+        religion,
+        educationalQualification,
+        occupation,
+        workplaceAddress,
+        passportNumber,
+        emergencyContactName,
+        emergencyContactRelation,
+        emergencyContactPhone,
+        emergencyContactAddress,
       })
 
       setIsSuccess(true)
@@ -292,6 +333,105 @@ export const EditBoarderModal: React.FC<EditBoarderModalProps> = ({
             onChange={(e) => setRemarks(e.target.value)}
             placeholder="বোর্ডার সংক্রান্ত কোনো বিশেষ তথ্য..."
           />
+        </div>
+
+        {/* Section 5: Police Verification & Tenant Registration Form Details */}
+        <div className="space-y-3 pt-1 p-3.5 rounded-2xl bg-cyan-950/20 border border-cyan-500/20">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5 border-b border-cyan-500/20 pb-1.5">
+            <FileText className="w-3.5 h-3.5 text-cyan-400" />
+            ডিএমপি ভাড়াটিয়া নিবন্ধন ফরম সংক্রান্ত তথ্য
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label="পিতার নাম"
+              value={fatherName}
+              onChange={(e) => setFatherName(e.target.value)}
+              placeholder="পিতার নাম"
+            />
+            <Input
+              label="জন্ম তারিখ"
+              type="date"
+              value={dateOfBirth}
+              onChange={(e) => setDateOfBirth(e.target.value)}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label="বৈবাহিক অবস্থা"
+              value={maritalStatus}
+              onChange={(e) => setMaritalStatus(e.target.value)}
+              placeholder="যেমন: অবিবাহিত / বিবাহিত"
+            />
+            <Input
+              label="ধর্ম"
+              value={religion}
+              onChange={(e) => setReligion(e.target.value)}
+              placeholder="যেমন: ইসলাম / হিন্দু"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label="পেশা"
+              value={occupation}
+              onChange={(e) => setOccupation(e.target.value)}
+              placeholder="যেমন: শিক্ষার্থী / চাকুরীজীবী"
+            />
+            <Input
+              label="শিক্ষাগত যোগ্যতা"
+              value={educationalQualification}
+              onChange={(e) => setEducationalQualification(e.target.value)}
+              placeholder="যেমন: স্নাতক (সম্মান)"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label="প্রতিষ্ঠান / কর্মস্থলের পূর্ণ ঠিকানা"
+              value={workplaceAddress}
+              onChange={(e) => setWorkplaceAddress(e.target.value)}
+              placeholder="অফিস বা প্রতিষ্ঠানের ঠিকানা"
+            />
+            <Input
+              label="পাসপোর্ট নম্বর (যদি থাকে)"
+              value={passportNumber}
+              onChange={(e) => setPassportNumber(e.target.value)}
+              placeholder="পাসপোর্ট নম্বর"
+            />
+          </div>
+
+          <div className="pt-2 border-t border-cyan-500/20">
+            <p className="text-[11px] font-semibold text-cyan-300 mb-2">জরুরী যোগাযোগ (ক্রমিক ১০):</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <Input
+                label="নাম"
+                value={emergencyContactName}
+                onChange={(e) => setEmergencyContactName(e.target.value)}
+                placeholder="জরুরী ব্যক্তির নাম"
+              />
+              <Input
+                label="সম্পর্ক"
+                value={emergencyContactRelation}
+                onChange={(e) => setEmergencyContactRelation(e.target.value)}
+                placeholder="যেমন: পিতা / ভাই"
+              />
+              <Input
+                label="মোবাইল নম্বর"
+                value={emergencyContactPhone}
+                onChange={(e) => setEmergencyContactPhone(e.target.value)}
+                placeholder="017xxxxxxxx"
+              />
+            </div>
+            <div className="mt-2.5">
+              <Input
+                label="জরুরী যোগাযোগের ঠিকানা"
+                value={emergencyContactAddress}
+                onChange={(e) => setEmergencyContactAddress(e.target.value)}
+                placeholder="ঠিকানা"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Actions Footer */}

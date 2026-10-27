@@ -263,7 +263,15 @@ export const ApplicantReviewModal: React.FC<ApplicantReviewModalProps> = ({
                 </div>
                 <div>
                   <span className="text-slate-500 block">বিভাগ / পদবী</span>
-                  <span className="text-slate-200 font-medium">{applicant.department || 'উল্লেখ নেই'}</span>
+                  <span className="text-slate-200 font-medium">{applicant.department || applicant.occupation || 'উল্লেখ নেই'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">শিক্ষাগত যোগ্যতা</span>
+                  <span className="text-slate-200 font-medium">{applicant.educational_qualification || 'স্নাতক'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">পেশা</span>
+                  <span className="text-slate-200 font-medium">{applicant.occupation || 'শিক্ষার্থী'}</span>
                 </div>
                 <div>
                   <span className="text-slate-500 block">আইডি নম্বর</span>
@@ -280,16 +288,30 @@ export const ApplicantReviewModal: React.FC<ApplicantReviewModalProps> = ({
             <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/40 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
                 <User className="w-4 h-4 text-indigo-400" />
-                অভিভাবক ও জরুরি যোগাযোগ
+                ব্যক্তিগত, অভিভাবক ও জরুরী তথ্য
               </h4>
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div>
-                  <span className="text-slate-500 block">অভিভাবকের নাম</span>
-                  <span className="text-slate-200 font-medium">{applicant.guardian_name}</span>
+                  <span className="text-slate-500 block">পিতার নাম</span>
+                  <span className="text-slate-200 font-medium">{applicant.father_name || applicant.guardian_name}</span>
                 </div>
                 <div>
-                  <span className="text-slate-500 block">সম্পর্ক</span>
-                  <span className="text-slate-200 font-medium">{applicant.guardian_relation || 'অভিভাবক'}</span>
+                  <span className="text-slate-500 block">জন্ম তারিখ</span>
+                  <span className="text-slate-200 font-medium">{applicant.date_of_birth || 'উল্লেখ নেই'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">বৈবাহিক অবস্থা / ধর্ম</span>
+                  <span className="text-slate-200 font-medium">{applicant.marital_status || 'অবিবাহিত'} • {applicant.religion || 'ইসলাম'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">জরুরি যোগাযোগ</span>
+                  <span className="text-slate-200 font-medium">
+                    {applicant.emergency_contact_name ? `${applicant.emergency_contact_name} (${applicant.emergency_contact_relation || 'অভিভাবক'})` : (applicant.emergency_contact || 'উল্লেখ নেই')}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">অভিভাবকের নাম</span>
+                  <span className="text-slate-200 font-medium">{applicant.guardian_name}</span>
                 </div>
                 <div>
                   <span className="text-slate-500 block">অভিভাবকের ফোন</span>
@@ -300,10 +322,6 @@ export const ApplicantReviewModal: React.FC<ApplicantReviewModalProps> = ({
                     <Phone className="w-3 h-3" />
                     {applicant.guardian_phone}
                   </a>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">জরুরি যোগাযোগ</span>
-                  <span className="text-slate-200 font-medium">{applicant.emergency_contact || 'উল্লেখ নেই'}</span>
                 </div>
               </div>
             </div>

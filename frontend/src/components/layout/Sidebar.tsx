@@ -22,6 +22,7 @@ import {
   ShieldAlert,
   Megaphone,
   Zap,
+  FileText,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import { useBrandingStore } from '@/app/store/useBrandingStore'
@@ -264,6 +265,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: <Megaphone className="w-4 h-4 shrink-0 text-amber-400" />,
           roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
           permissionKey: 'notices',
+        },
+        {
+          id: 'tenant_form',
+          titleKey: 'nav.tenant_form',
+          defaultTitle: 'ভাড়াটিয়া নিবন্ধন ফরম',
+          href: '/settings/tenant-form',
+          icon: <FileText className="w-4 h-4 shrink-0 text-cyan-400" />,
+          roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
+          permissionKey: 'hostel_settings',
+          badge: 'DMP',
         },
         {
           id: 'access_control',

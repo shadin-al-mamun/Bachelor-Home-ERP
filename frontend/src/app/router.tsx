@@ -75,6 +75,7 @@ import HostelSettingsPage from '@/features/settings/HostelSettingsPage'
 import AccessControlPage from '@/features/governance/AccessControlPage'
 import NoticesPage from '@/features/notices/NoticesPage'
 import BoarderPortalDuesPage from '@/features/portal/BoarderDuesPage'
+import TenantRegistrationFormPage from '@/features/settings/TenantRegistrationFormPage'
 
 
 export const router = createBrowserRouter([
@@ -276,6 +277,10 @@ export const router = createBrowserRouter([
       {
         path: 'settings/notices',
         element: <NoticesPage />,
+      },
+      {
+        path: 'settings/tenant-form',
+        element: <TenantRegistrationFormPage />,
       },
       {
         path: 'settings/access-control',

@@ -77,6 +77,18 @@ export const INITIAL_MOCK_BOARDERS: BoarderWithRelations[] = [
     remarks: 'কর্মজীবী আবাসিক সদস্য।',
     created_at: '2026-10-19T10:00:00Z',
     updated_at: '2026-10-19T10:00:00Z',
+    father_name: 'মোবারক হোসেন',
+    date_of_birth: '1995-05-12',
+    marital_status: 'অবিবাহিত',
+    religion: 'ইসলাম',
+    educational_qualification: 'স্নাতক (সম্মান)',
+    occupation: 'ব্যক্তিগত কর্মকর্তা',
+    workplace_address: 'নির্বাচন কমিশন সচিবালয়, আগারগাঁও, ঢাকা',
+    passport_number: 'A04567891',
+    emergency_contact_name: 'মোবারক হোসেন',
+    emergency_contact_relation: 'পিতা',
+    emergency_contact_phone: '01711998877',
+    emergency_contact_address: 'মিরপুর, ঢাকা',
     active_allocation: null,
     total_due: 0,
     total_paid: 0,
@@ -108,6 +120,18 @@ export const INITIAL_MOCK_BOARDERS: BoarderWithRelations[] = [
     remarks: 'নিয়মিত ও সুশৃঙ্খল বর্ডার',
     created_at: '2026-01-01T10:00:00Z',
     updated_at: '2026-10-15T08:00:00Z',
+    father_name: 'আব্দুল কাদের',
+    date_of_birth: '1998-09-14',
+    marital_status: 'অবিবাহিত',
+    religion: 'ইসলাম',
+    educational_qualification: 'স্নাতক (সিএসই)',
+    occupation: 'শিক্ষার্থী',
+    workplace_address: 'ঢাকা বিশ্ববিদ্যালয়, নীলক্ষেত, ঢাকা',
+    passport_number: 'B01239874',
+    emergency_contact_name: 'আব্দুল কাদের',
+    emergency_contact_relation: 'পিতা',
+    emergency_contact_phone: '01811223344',
+    emergency_contact_address: 'গ্রাম: চরপাড়া, ডাকঘর: ফুলপুর, ময়মনসিংহ',
     active_allocation: {
       id: 'alloc-1',
       boarder_id: 'b-101',
@@ -214,6 +238,18 @@ export const INITIAL_MOCK_BOARDERS: BoarderWithRelations[] = [
     remarks: 'সময়মত পেমেন্ট সম্পন্নকারী',
     created_at: '2026-02-15T11:00:00Z',
     updated_at: '2026-10-15T08:00:00Z',
+    father_name: 'নুরুল ইসলাম',
+    date_of_birth: '1999-11-20',
+    marital_status: 'অবিবাহিত',
+    religion: 'ইসলাম',
+    educational_qualification: 'বিবিএ',
+    occupation: 'শিক্ষার্থী',
+    workplace_address: 'ব্র্যাক বিশ্ববিদ্যালয়, মেরুল বাড্ডা, ঢাকা',
+    passport_number: '',
+    emergency_contact_name: 'নুরুল ইসলাম',
+    emergency_contact_relation: 'পিতা',
+    emergency_contact_phone: '01712345678',
+    emergency_contact_address: 'বাসা নং ১২, রোড ৪, পুলিশ লাইন, সিলেট',
     active_allocation: {
       id: 'alloc-2',
       boarder_id: 'b-102',
@@ -457,6 +493,20 @@ export interface CreateBoarderInput {
   photo_url?: string
   nid_document_url?: string
   remarks?: string
+
+  // Police Verification & Tenant Form Fields
+  father_name?: string
+  date_of_birth?: string
+  marital_status?: string
+  religion?: string
+  educational_qualification?: string
+  occupation?: string
+  workplace_address?: string
+  passport_number?: string
+  emergency_contact_name?: string
+  emergency_contact_relation?: string
+  emergency_contact_address?: string
+  emergency_contact_phone?: string
 }
 
 export async function createBoarderApplication(input: CreateBoarderInput): Promise<BoarderWithRelations> {
@@ -485,12 +535,29 @@ export async function createBoarderApplication(input: CreateBoarderInput): Promi
     guardian_relation: input.guardian_relation || 'অভিভাবক',
     present_address: input.present_address || '',
     permanent_address: input.permanent_address,
-    emergency_contact: `${input.guardian_phone} (${input.guardian_relation || 'অভিভাবক'})`,
+    emergency_contact: input.emergency_contact_phone
+      ? `${input.emergency_contact_phone} (${input.emergency_contact_relation || 'অভিভাবক'})`
+      : `${input.guardian_phone} (${input.guardian_relation || 'অভিভাবক'})`,
     admission_date: todayDate,
     status: 'PENDING',
     remarks: input.remarks || 'অনলাইন রেজিস্ট্রেশন পোর্টাল থেকে নতুন আবেদন জমা পড়েছে। ভেরিফিকেশন সাপেক্ষে সিট বরাদ্দ প্রয়োজন।',
     created_at: nowIso,
     updated_at: nowIso,
+
+    // Police Verification & Tenant Registration Form Fields
+    father_name: input.father_name || input.guardian_name,
+    date_of_birth: input.date_of_birth || '',
+    marital_status: input.marital_status || 'অবিবাহিত',
+    religion: input.religion || 'ইসলাম',
+    educational_qualification: input.educational_qualification || '',
+    occupation: input.occupation || 'শিক্ষার্থী',
+    workplace_address: input.workplace_address || input.institution,
+    passport_number: input.passport_number || '',
+    emergency_contact_name: input.emergency_contact_name || input.guardian_name,
+    emergency_contact_relation: input.emergency_contact_relation || input.guardian_relation || 'পিতা',
+    emergency_contact_address: input.emergency_contact_address || input.permanent_address,
+    emergency_contact_phone: input.emergency_contact_phone || input.guardian_phone,
+
     active_allocation: null,
     total_due: 0,
     total_paid: 0,
@@ -595,12 +662,40 @@ export async function createBoarderApplication(input: CreateBoarderInput): Promi
         present_address: input.present_address,
         permanent_address: input.permanent_address,
         status: 'PENDING',
+        father_name: input.father_name || input.guardian_name,
+        date_of_birth: input.date_of_birth || null,
+        marital_status: input.marital_status || 'অবিবাহিত',
+        religion: input.religion || 'ইসলাম',
+        educational_qualification: input.educational_qualification || null,
+        occupation: input.occupation || null,
+        workplace_address: input.workplace_address || null,
+        passport_number: input.passport_number || null,
+        emergency_contact_name: input.emergency_contact_name || null,
+        emergency_contact_relation: input.emergency_contact_relation || null,
+        emergency_contact_address: input.emergency_contact_address || null,
+        emergency_contact_phone: input.emergency_contact_phone || null,
       }
       if (validUserId) {
         insertData.user_id = validUserId
       }
 
       let { data, error } = await supabase.from('boarders').insert(insertData).select().single()
+
+      // If failed due to extra columns on an older table schema, retry without the extra columns
+      if (error && (error.message?.includes('column') || error.code === 'PGRST204' || error.message?.includes('schema'))) {
+        console.warn('Direct insert failed on extra columns, retrying with core fields only:', error.message)
+        const coreData = { ...insertData }
+        const extraKeys = [
+          'father_name', 'date_of_birth', 'marital_status', 'religion',
+          'educational_qualification', 'occupation', 'workplace_address',
+          'passport_number', 'emergency_contact_name', 'emergency_contact_relation',
+          'emergency_contact_address', 'emergency_contact_phone'
+        ]
+        extraKeys.forEach(k => delete coreData[k])
+        const retryRes = await supabase.from('boarders').insert(coreData).select().single()
+        data = retryRes.data
+        error = retryRes.error
+      }
 
       // If failed (e.g. foreign key violation on user_id), retry without user_id
       if (error && validUserId) {
@@ -826,6 +921,8 @@ export function useBoarders(filters?: BoarderFilters) {
     refetchOnWindowFocus: true,
   })
 }
+
+export const useBoardersQuery = useBoarders
 
 export function useBoarder(id?: string) {
   return useQuery({
@@ -1275,6 +1372,20 @@ export interface UpdateBoarderParams {
   nidPassportNumber?: string
   remarks?: string
   status?: BoarderStatus
+
+  // Police Verification / Tenant Form Fields
+  fatherName?: string
+  dateOfBirth?: string
+  maritalStatus?: string
+  religion?: string
+  educationalQualification?: string
+  occupation?: string
+  workplaceAddress?: string
+  passportNumber?: string
+  emergencyContactName?: string
+  emergencyContactRelation?: string
+  emergencyContactAddress?: string
+  emergencyContactPhone?: string
 }
 
 export function useUpdateBoarderMutation() {
@@ -1283,28 +1394,62 @@ export function useUpdateBoarderMutation() {
   return useMutation({
     mutationFn: async (params: UpdateBoarderParams) => {
       if (isSupabaseConfigured) {
-        const { data, error } = await supabase
+        const updatePayload: Record<string, any> = {
+          full_name: params.fullName.trim(),
+          phone_number: params.phoneNumber.trim(),
+          email: params.email?.trim() || null,
+          guardian_name: params.guardianName?.trim() || null,
+          guardian_phone: params.guardianPhone?.trim() || null,
+          guardian_relation: params.guardianRelation?.trim() || null,
+          permanent_address: params.permanentAddress?.trim() || null,
+          present_address: params.presentAddress?.trim() || null,
+          institution: params.institution?.trim() || null,
+          department: params.department?.trim() || null,
+          student_id: params.studentId?.trim() || null,
+          nid_passport_number: params.nidPassportNumber?.trim() || null,
+          remarks: params.remarks?.trim() || null,
+          ...(params.status ? { status: params.status } : {}),
+          updated_at: new Date().toISOString(),
+          father_name: params.fatherName?.trim() || null,
+          date_of_birth: params.dateOfBirth?.trim() || null,
+          marital_status: params.maritalStatus?.trim() || null,
+          religion: params.religion?.trim() || null,
+          educational_qualification: params.educationalQualification?.trim() || null,
+          occupation: params.occupation?.trim() || null,
+          workplace_address: params.workplaceAddress?.trim() || null,
+          passport_number: params.passportNumber?.trim() || null,
+          emergency_contact_name: params.emergencyContactName?.trim() || null,
+          emergency_contact_relation: params.emergencyContactRelation?.trim() || null,
+          emergency_contact_address: params.emergencyContactAddress?.trim() || null,
+          emergency_contact_phone: params.emergencyContactPhone?.trim() || null,
+        }
+
+        let { data, error } = await supabase
           .from('boarders')
-          .update({
-            full_name: params.fullName.trim(),
-            phone_number: params.phoneNumber.trim(),
-            email: params.email?.trim() || null,
-            guardian_name: params.guardianName?.trim() || null,
-            guardian_phone: params.guardianPhone?.trim() || null,
-            guardian_relation: params.guardianRelation?.trim() || null,
-            permanent_address: params.permanentAddress?.trim() || null,
-            present_address: params.presentAddress?.trim() || null,
-            institution: params.institution?.trim() || null,
-            department: params.department?.trim() || null,
-            student_id: params.studentId?.trim() || null,
-            nid_passport_number: params.nidPassportNumber?.trim() || null,
-            remarks: params.remarks?.trim() || null,
-            ...(params.status ? { status: params.status } : {}),
-            updated_at: new Date().toISOString(),
-          })
+          .update(updatePayload)
           .eq('id', params.boarderId)
           .select()
           .single()
+
+        // Fallback if DB doesn't have the new columns yet
+        if (error && (error.message?.includes('column') || error.code === 'PGRST204')) {
+          const corePayload = { ...updatePayload }
+          const extraKeys = [
+            'father_name', 'date_of_birth', 'marital_status', 'religion',
+            'educational_qualification', 'occupation', 'workplace_address',
+            'passport_number', 'emergency_contact_name', 'emergency_contact_relation',
+            'emergency_contact_address', 'emergency_contact_phone'
+          ]
+          extraKeys.forEach(k => delete corePayload[k])
+          const retryRes = await supabase
+            .from('boarders')
+            .update(corePayload)
+            .eq('id', params.boarderId)
+            .select()
+            .single()
+          data = retryRes.data
+          error = retryRes.error
+        }
 
         if (error) {
           throw new Error(error.message || 'বোর্ডার তথ্য আপডেট করা সম্ভব হয়নি।')
@@ -1338,6 +1483,7 @@ export function useUpdateBoarderMutation() {
             email: params.email?.trim() || list[idx].email,
             guardian_name: params.guardianName?.trim() || list[idx].guardian_name,
             guardian_phone: params.guardianPhone?.trim() || list[idx].guardian_phone,
+            guardian_relation: params.guardianRelation?.trim() || list[idx].guardian_relation,
             permanent_address: params.permanentAddress?.trim() || list[idx].permanent_address,
             present_address: params.presentAddress?.trim() || list[idx].present_address,
             institution: params.institution?.trim() || list[idx].institution,
@@ -1346,6 +1492,18 @@ export function useUpdateBoarderMutation() {
             nid_passport_number: params.nidPassportNumber?.trim() || list[idx].nid_passport_number,
             remarks: params.remarks?.trim() || list[idx].remarks,
             status: params.status || list[idx].status,
+            father_name: params.fatherName ?? list[idx].father_name,
+            date_of_birth: params.dateOfBirth ?? list[idx].date_of_birth,
+            marital_status: params.maritalStatus ?? list[idx].marital_status,
+            religion: params.religion ?? list[idx].religion,
+            educational_qualification: params.educationalQualification ?? list[idx].educational_qualification,
+            occupation: params.occupation ?? list[idx].occupation,
+            workplace_address: params.workplaceAddress ?? list[idx].workplace_address,
+            passport_number: params.passportNumber ?? list[idx].passport_number,
+            emergency_contact_name: params.emergencyContactName ?? list[idx].emergency_contact_name,
+            emergency_contact_relation: params.emergencyContactRelation ?? list[idx].emergency_contact_relation,
+            emergency_contact_address: params.emergencyContactAddress ?? list[idx].emergency_contact_address,
+            emergency_contact_phone: params.emergencyContactPhone ?? list[idx].emergency_contact_phone,
             updated_at: new Date().toISOString(),
           }
           saveStoredBoarders(list)
@@ -1365,6 +1523,7 @@ export function useUpdateBoarderMutation() {
           email: params.email?.trim() || list[idx].email,
           guardian_name: params.guardianName?.trim() || list[idx].guardian_name,
           guardian_phone: params.guardianPhone?.trim() || list[idx].guardian_phone,
+          guardian_relation: params.guardianRelation?.trim() || list[idx].guardian_relation,
           permanent_address: params.permanentAddress?.trim() || list[idx].permanent_address,
           present_address: params.presentAddress?.trim() || list[idx].present_address,
           institution: params.institution?.trim() || list[idx].institution,
@@ -1373,6 +1532,18 @@ export function useUpdateBoarderMutation() {
           nid_passport_number: params.nidPassportNumber?.trim() || list[idx].nid_passport_number,
           remarks: params.remarks?.trim() || list[idx].remarks,
           status: params.status || list[idx].status,
+          father_name: params.fatherName ?? list[idx].father_name,
+          date_of_birth: params.dateOfBirth ?? list[idx].date_of_birth,
+          marital_status: params.maritalStatus ?? list[idx].marital_status,
+          religion: params.religion ?? list[idx].religion,
+          educational_qualification: params.educationalQualification ?? list[idx].educational_qualification,
+          occupation: params.occupation ?? list[idx].occupation,
+          workplace_address: params.workplaceAddress ?? list[idx].workplace_address,
+          passport_number: params.passportNumber ?? list[idx].passport_number,
+          emergency_contact_name: params.emergencyContactName ?? list[idx].emergency_contact_name,
+          emergency_contact_relation: params.emergencyContactRelation ?? list[idx].emergency_contact_relation,
+          emergency_contact_address: params.emergencyContactAddress ?? list[idx].emergency_contact_address,
+          emergency_contact_phone: params.emergencyContactPhone ?? list[idx].emergency_contact_phone,
           updated_at: new Date().toISOString(),
         }
         saveStoredBoarders(list)

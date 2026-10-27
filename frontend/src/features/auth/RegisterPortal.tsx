@@ -42,6 +42,10 @@ export const RegisterPortal: React.FC = () => {
   const [fullName, setFullName] = useState('')
   const [phoneNumber, setPhoneNumber] = useState('')
   const [email, setEmail] = useState('')
+  const [fatherName, setFatherName] = useState('')
+  const [dateOfBirth, setDateOfBirth] = useState('')
+  const [maritalStatus, setMaritalStatus] = useState('অবিবাহিত')
+  const [religion, setReligion] = useState('ইসলাম')
   const [guardianName, setGuardianName] = useState('')
   const [guardianPhone, setGuardianPhone] = useState('')
   const [guardianRelation, setGuardianRelation] = useState('পিতা (Father)')
@@ -49,13 +53,22 @@ export const RegisterPortal: React.FC = () => {
   const [permanentAddress, setPermanentAddress] = useState('')
 
   // Step 2: Institution / Work
+  const [educationalQualification, setEducationalQualification] = useState('স্নাতক (চলমান)')
+  const [occupation, setOccupation] = useState('শিক্ষার্থী')
   const [institution, setInstitution] = useState('')
+  const [workplaceAddress, setWorkplaceAddress] = useState('')
   const [department, setDepartment] = useState('')
   const [studentId, setStudentId] = useState('')
   const [session, setSession] = useState('')
 
-  // Step 3: Identity & Document
+  // Step 3: Identity & Document & Emergency Contact
   const [nidNumber, setNidNumber] = useState('')
+  const [passportNumber, setPassportNumber] = useState('')
+  const [emergencyContactName, setEmergencyContactName] = useState('')
+  const [emergencyContactRelation, setEmergencyContactRelation] = useState('পিতা')
+  const [emergencyContactPhone, setEmergencyContactPhone] = useState('')
+  const [emergencyContactAddress, setEmergencyContactAddress] = useState('')
+
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [photoFileName, setPhotoFileName] = useState<string | null>(null)
@@ -68,6 +81,13 @@ export const RegisterPortal: React.FC = () => {
   // Step 4: Password
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+
+  const handleCopyGuardianToEmergency = () => {
+    setEmergencyContactName(guardianName || fatherName)
+    setEmergencyContactRelation(guardianRelation ? guardianRelation.split(' ')[0] : 'পিতা')
+    setEmergencyContactPhone(guardianPhone)
+    setEmergencyContactAddress(permanentAddress || presentAddress)
+  }
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     setErrorMessage(null)
@@ -270,6 +290,20 @@ export const RegisterPortal: React.FC = () => {
         session,
         nid_passport_number: nidNumber,
         nid_document_url: finalDocUrl,
+
+        // Police Verification & Tenant Form Fields
+        father_name: fatherName || guardianName,
+        date_of_birth: dateOfBirth,
+        marital_status: maritalStatus,
+        religion: religion,
+        educational_qualification: educationalQualification,
+        occupation: occupation,
+        workplace_address: workplaceAddress,
+        passport_number: passportNumber,
+        emergency_contact_name: emergencyContactName || guardianName || fatherName,
+        emergency_contact_relation: emergencyContactRelation || 'পিতা',
+        emergency_contact_phone: emergencyContactPhone || guardianPhone,
+        emergency_contact_address: emergencyContactAddress || permanentAddress || presentAddress,
       })
 
       // Store application reference for tracking
@@ -383,22 +417,61 @@ export const RegisterPortal: React.FC = () => {
                       required
                     />
                     <Input
+                      label="পিতার নাম"
+                      placeholder="পিতার পূর্ণ নাম"
+                      value={fatherName}
+                      onChange={(e) => setFatherName(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <Input
                       label="মোবাইল নম্বর"
                       placeholder="017xxxxxxxx"
                       value={phoneNumber}
                       onChange={(e) => setPhoneNumber(e.target.value)}
                       required
                     />
+                    <Input
+                      label="ইমেইল অ্যাড্রেস"
+                      type="email"
+                      placeholder="student@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
                   </div>
 
-                  <Input
-                    label="ইমেইল অ্যাড্রেস"
-                    type="email"
-                    placeholder="student@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                    <Input
+                      label="জন্ম তারিখ"
+                      type="date"
+                      value={dateOfBirth}
+                      onChange={(e) => setDateOfBirth(e.target.value)}
+                    />
+                    <Select
+                      label="বৈবাহিক অবস্থা"
+                      value={maritalStatus}
+                      onChange={(e) => setMaritalStatus(e.target.value)}
+                      options={[
+                        { value: 'অবিবাহিত', label: 'অবিবাহিত (Unmarried)' },
+                        { value: 'বিবাহিত', label: 'বিবাহিত (Married)' },
+                        { value: 'অন্যান্য', label: 'অন্যান্য (Other)' },
+                      ]}
+                    />
+                    <Select
+                      label="ধর্ম"
+                      value={religion}
+                      onChange={(e) => setReligion(e.target.value)}
+                      options={[
+                        { value: 'ইসলাম', label: 'ইসলাম (Islam)' },
+                        { value: 'হিন্দু', label: 'হিন্দু (Hinduism)' },
+                        { value: 'খ্রিস্টান', label: 'খ্রিস্টান (Christianity)' },
+                        { value: 'বৌদ্ধ', label: 'বৌদ্ধ (Buddhism)' },
+                        { value: 'অন্যান্য', label: 'অন্যান্য (Other)' },
+                      ]}
+                    />
+                  </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                     <Input
@@ -450,12 +523,47 @@ export const RegisterPortal: React.FC = () => {
               {/* STEP 2: Institution / Job Details */}
               {step === 2 && (
                 <div className="space-y-3.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <Select
+                      label="পেশা (Occupation)"
+                      value={occupation}
+                      onChange={(e) => setOccupation(e.target.value)}
+                      options={[
+                        { value: 'শিক্ষার্থী', label: 'শিক্ষার্থী (Student)' },
+                        { value: 'চাকুরীজীবী', label: 'চাকুরীজীবী (Job/Service)' },
+                        { value: 'ব্যবসায়ী', label: 'ব্যবসায়ী (Business)' },
+                        { value: 'ফ্রিল্যান্সার', label: 'ফ্রিল্যান্সার (Freelancer)' },
+                        { value: 'অন্যান্য', label: 'অন্যান্য (Other)' },
+                      ]}
+                    />
+                    <Select
+                      label="সর্বোচ্চ শিক্ষাগত যোগ্যতা"
+                      value={educationalQualification}
+                      onChange={(e) => setEducationalQualification(e.target.value)}
+                      options={[
+                        { value: 'স্নাতক (চলমান)', label: 'স্নাতক (চলমান / Undergraduate)' },
+                        { value: 'স্নাতক (পাস)', label: 'স্নাতক (পাস / Graduate)' },
+                        { value: 'স্নাতকোত্তর', label: 'স্নাতকোত্তর (Post-Graduate)' },
+                        { value: 'এইচ.এস.সি', label: 'এইচ.এস.সি (HSC / Equivalent)' },
+                        { value: 'এস.এস.সি', label: 'এস.এস.সি (SSC / Equivalent)' },
+                        { value: 'অন্যান্য', label: 'অন্যান্য (Other)' },
+                      ]}
+                    />
+                  </div>
+
                   <Input
                     label="শিক্ষা প্রতিষ্ঠান বা কর্মস্থলের নাম"
                     placeholder="যেমন: ঢাকা বিশ্ববিদ্যালয় / সফটওয়্যার ফার্ম"
                     value={institution}
                     onChange={(e) => setInstitution(e.target.value)}
                     required
+                  />
+
+                  <Input
+                    label="প্রতিষ্ঠান বা কর্মস্থলের ঠিকানা"
+                    placeholder="অফিস বা ক্যাম্পাসের ঠিকানা"
+                    value={workplaceAddress}
+                    onChange={(e) => setWorkplaceAddress(e.target.value)}
                   />
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -482,7 +590,7 @@ export const RegisterPortal: React.FC = () => {
                 </div>
               )}
 
-              {/* STEP 3: NID & Documents */}
+              {/* STEP 3: NID & Documents & Emergency Contact */}
               {step === 3 && (
                 <div className="space-y-4">
                   {/* Photo Upload Option */}
@@ -490,9 +598,9 @@ export const RegisterPortal: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-semibold text-slate-200 flex items-center gap-2">
                         <Camera className="w-4 h-4 text-primary-400" />
-                        বোর্ডারের ছবি আপলোড (পাসপোর্ট সাইজ)
+                        বোর্ডারের ছবি আপলোড (ভাড়াটিয়া নিবন্ধন ফরম ও আইডি কার্ডের জন্য)
                       </label>
-                      <span className="text-[11px] text-slate-400">রঙিন ও স্পষ্ট ছবি</span>
+                      <span className="text-[11px] text-slate-400">পাসপোর্ট সাইজ</span>
                     </div>
 
                     {photoPreview ? (
@@ -510,7 +618,7 @@ export const RegisterPortal: React.FC = () => {
                             {photoFileName || 'ছবি নির্বাচন করা হয়েছে'}
                           </p>
                           <p className="text-[11px] text-slate-400 mt-0.5 truncate">
-                            বোর্ডারের প্রোফাইল ও সিস্টেমে আইডি হিসেবে সংরক্ষিত হবে
+                            ভাড়াটিয়া পুলিশ ভেরিফিকেশন ফরমে এই ছবি প্রদর্শিত হবে
                           </p>
                         </div>
                         <button
@@ -547,14 +655,70 @@ export const RegisterPortal: React.FC = () => {
                     )}
                   </div>
 
-                  {/* NID / Passport Number */}
-                  <Input
-                    label="জাতীয় পরিচয়পত্র (NID) বা পাসপোর্ট নম্বর"
-                    placeholder="১০ বা ১৭ ডিজিটের NID নম্বর"
-                    value={nidNumber}
-                    onChange={(e) => setNidNumber(e.target.value)}
-                    required
-                  />
+                  {/* NID & Passport */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <Input
+                      label="জাতীয় পরিচয়পত্র নম্বর (NID)"
+                      placeholder="১০ বা ১৭ ডিজিটের NID নম্বর"
+                      value={nidNumber}
+                      onChange={(e) => setNidNumber(e.target.value)}
+                      required
+                    />
+                    <Input
+                      label="পাসপোর্ট নম্বর (যদি থাকে)"
+                      placeholder="পাসপোর্ট নম্বর"
+                      value={passportNumber}
+                      onChange={(e) => setPassportNumber(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Emergency Contact Section */}
+                  <div className="p-4 rounded-2xl border border-slate-800 bg-slate-900/40 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h4 className="text-xs font-semibold text-slate-200">
+                          ১০. জরুরী যোগাযোগ (Emergency Contact)
+                        </h4>
+                        <p className="text-[11px] text-slate-400">
+                          ভাড়াটিয়া নিবন্ধন ফরমের জন্য আবশ্যক জরুরী যোগাযোগের তথ্য
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCopyGuardianToEmergency}
+                        className="text-xs text-primary-400 hover:text-primary-300 bg-primary-500/10 hover:bg-primary-500/20 px-2.5 py-1 rounded-lg border border-primary-500/30 transition-colors w-fit"
+                      >
+                        অভিভাবকের তথ্য কপি করুন
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <Input
+                        label="নাম"
+                        placeholder="জরুরী ব্যক্তির নাম"
+                        value={emergencyContactName}
+                        onChange={(e) => setEmergencyContactName(e.target.value)}
+                      />
+                      <Input
+                        label="সম্পর্ক"
+                        placeholder="যেমন: পিতা / ভাই"
+                        value={emergencyContactRelation}
+                        onChange={(e) => setEmergencyContactRelation(e.target.value)}
+                      />
+                      <Input
+                        label="মোবাইল নম্বর"
+                        placeholder="017xxxxxxxx"
+                        value={emergencyContactPhone}
+                        onChange={(e) => setEmergencyContactPhone(e.target.value)}
+                      />
+                    </div>
+                    <Input
+                      label="ঠিকানা"
+                      placeholder="জরুরী যোগাযোগের পূর্ণ ঠিকানা"
+                      value={emergencyContactAddress}
+                      onChange={(e) => setEmergencyContactAddress(e.target.value)}
+                    />
+                  </div>
 
                   {/* NID / Student ID Document File Upload */}
                   <div className="space-y-2 p-4 rounded-2xl border border-slate-800 bg-slate-900/40">

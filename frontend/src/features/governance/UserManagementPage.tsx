@@ -10,6 +10,7 @@ import {
   Sparkles,
   UserPlus,
   KeyRound,
+  FileText,
 } from 'lucide-react'
 import {
   useUsersList,
@@ -147,6 +148,16 @@ export const UserManagementPage: React.FC = () => {
         >
           <Sparkles className="w-4 h-4" />
           <span>হোস্টেল লোগো ও ব্র্যান্ডিং ব্যবস্থাপনা</span>
+        </Link>
+        <Link
+          to="/settings/tenant-form"
+          className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900/60 hover:bg-slate-800 text-cyan-300 hover:text-white border border-slate-800 flex items-center gap-2 transition-colors whitespace-nowrap"
+        >
+          <FileText className="w-4 h-4 text-cyan-400" />
+          <span>ভাড়াটিয়া নিবন্ধন ফরম</span>
+          <span className="px-1.5 py-0.2 rounded text-[9px] bg-cyan-950 text-cyan-300 border border-cyan-500/30 font-mono">
+            DMP
+          </span>
         </Link>
         <Link
           to="/settings/audit-logs"
