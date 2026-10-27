@@ -35,7 +35,7 @@ import { downloadTenantFormPDF, printTenantForm } from './utils/tenantFormPdfGen
 
 export const TenantRegistrationFormPage: React.FC = () => {
   const { profile } = useAuthStore()
-  const { orgName, phone: brandingPhone, address: brandingAddress } = useBrandingStore()
+  const { address: brandingAddress } = useBrandingStore()
 
   // Query all boarders
   const { data: boarders = [], isLoading } = useBoarders()
@@ -77,11 +77,10 @@ export const TenantRegistrationFormPage: React.FC = () => {
       setCustomHouseHolding(defaultFlat.houseHolding)
       setCustomRoad(defaultFlat.road)
       setCustomArea(defaultFlat.area)
-      setCustomPostCode(defaultFlat.postCode)
-      setCustomLandlordName(orgName || 'সানফ্লাওয়ার হোস্টেল কর্তৃপক্ষ')
-      setCustomLandlordPhone(brandingPhone || '01711223344')
+      setCustomLandlordName('মোঃ আব্দুস সাত্তার')
+      setCustomLandlordPhone('01718246365')
     }
-  }, [selectedBoarder, brandingAddress, orgName, brandingPhone])
+  }, [selectedBoarder, brandingAddress])
 
   // Roommates for item 11 (roommates in the same room, or other rooms in the flat)
   const roommates = useMemo(() => {
@@ -106,11 +105,11 @@ export const TenantRegistrationFormPage: React.FC = () => {
         selectedBoarder?.active_allocation?.start_date ||
         selectedBoarder?.admission_date ||
         new Date().toISOString().split('T')[0],
-      landlordName: customLandlordName || orgName || 'হোস্টেল কর্তৃপক্ষ',
-      landlordPhone: customLandlordPhone || brandingPhone || '01700000000',
+      landlordName: customLandlordName || 'মোঃ আব্দুস সাত্তার',
+      landlordPhone: customLandlordPhone || '01718246365',
       issueDate: new Date().toISOString().split('T')[0],
     }
-  }, [selectedBoarder, customLandlordName, customLandlordPhone, orgName, brandingPhone])
+  }, [selectedBoarder, customLandlordName, customLandlordPhone])
 
   // PDF Download Handler
   const handleDownloadPdf = async (boarderToDownload: BoarderWithRelations | null = selectedBoarder) => {

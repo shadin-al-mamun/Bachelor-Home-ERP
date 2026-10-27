@@ -141,9 +141,9 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
     boarder?.emergency_contact_phone || boarder?.guardian_phone || boarder?.emergency_contact || ''
   )
 
-  // Current Landlord (Item 16)
-  const landlordName = meta?.landlordName || 'ব্যাচেলর হোম মেস কর্তৃপক্ষ'
-  const landlordPhone = toBengaliNumerals(meta?.landlordPhone || '01700000000')
+  // Serial 16: Fixed landlord info for all boarders as specifically requested
+  const FIXED_LANDLORD_NAME = 'মোঃ আব্দুস সাত্তার'
+  const FIXED_LANDLORD_PHONE = toBengaliNumerals('01718246365')
 
   return (
     <div
@@ -153,7 +153,7 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
         width: '100%',
         maxWidth: '794px', // A4 standard width at 96 DPI
         minHeight: '1123px', // A4 standard height
-        fontFamily: "'Nikosh', 'SolaimanLipi', 'Kalpurush', 'Noto Sans Bengali', Arial, sans-serif",
+        fontFamily: "'Nikosh', 'SolaimanLipi', 'Kalpurush', 'Hind Siliguri', 'Noto Sans Bengali', Arial, sans-serif",
         color: '#000000',
         lineHeight: 1.35,
         backgroundColor: '#ffffff',
@@ -162,7 +162,7 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
       {/* ============================================================== */}
       {/* 1. TOP HEADER SECTION */}
       {/* ============================================================== */}
-      <div className="flex items-start justify-between gap-3 mb-3.5">
+      <div className="flex items-start justify-between gap-3 mb-4">
         {/* Left: Photo Box */}
         <div className="w-[125px] h-[150px] border-[1.5px] border-black rounded-[14px] p-1 flex flex-col items-center justify-center text-center flex-shrink-0 bg-white overflow-hidden shadow-sm">
           {boarder?.photo_url ? (
@@ -173,7 +173,7 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
               className="w-full h-full object-cover rounded-[10px]"
             />
           ) : (
-            <div className="text-[11px] font-medium leading-tight text-slate-700 px-1 py-4 flex flex-col items-center justify-center h-full">
+            <div className="text-[12px] font-semibold leading-relaxed text-black px-1 py-4 flex flex-col items-center justify-center h-full">
               <span>ভাড়াটিয়ার এক কপি</span>
               <span className="mt-1">পাসপোর্ট সাইজ ছবি</span>
             </div>
@@ -182,31 +182,31 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
 
         {/* Center: Emblem, Title & Police Station */}
         <div className="flex-1 text-center pt-0 px-2 flex flex-col items-center justify-center">
-          <div className="flex items-center justify-center gap-2 mb-1">
-            <DhakaPoliceLogo size={52} className="w-13 h-13 inline-block" />
-            <h1 className="text-xl sm:text-[22px] font-extrabold tracking-tight text-black inline-block">
+          <div className="flex items-center justify-center gap-2.5 mb-1.5">
+            <DhakaPoliceLogo size={56} className="w-14 h-14 inline-block" />
+            <h1 className="text-xl sm:text-[23px] font-extrabold tracking-tight text-black inline-block">
               ঢাকা মেট্রোপলিটন পুলিশ
             </h1>
           </div>
 
-          <div className="text-xs sm:text-[13px] font-medium space-y-0.5 mt-0.5 text-slate-900">
+          <div className="text-xs sm:text-[13px] font-medium space-y-1 mt-0.5 text-black">
             <div className="flex items-center justify-center gap-1">
-              <span>বিভাগ :</span>
-              <span className="font-bold border-b border-black/80 px-4 min-w-[140px] inline-block text-center">
-                {displayDivision}
-              </span>
+              <span className="font-semibold">বিভাগ :</span>
+              <div className="border-b border-dotted border-black/80 px-2 min-w-[150px] inline-flex justify-center items-end pb-[2px]">
+                <span className="font-bold text-black leading-none mb-[2px]">{displayDivision}</span>
+              </div>
             </div>
             <div className="flex items-center justify-center gap-1">
-              <span>থানা :</span>
-              <span className="font-bold border-b border-black/80 px-4 min-w-[140px] inline-block text-center">
-                {displayThana}
-              </span>
+              <span className="font-semibold">থানা :</span>
+              <div className="border-b border-dotted border-black/80 px-2 min-w-[150px] inline-flex justify-center items-end pb-[2px]">
+                <span className="font-bold text-black leading-none mb-[2px]">{displayThana}</span>
+              </div>
             </div>
           </div>
 
           <div className="mt-2.5">
             <h2
-              className="text-base sm:text-[17px] font-extrabold inline-block text-black px-2 tracking-wide"
+              className="text-base sm:text-[18px] font-extrabold inline-block text-black px-3 tracking-wide"
               style={{
                 borderBottom: '3px double #000000',
                 paddingBottom: '2px',
@@ -218,27 +218,27 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
         </div>
 
         {/* Right: Flat / Holding Information Box */}
-        <div className="w-[185px] border-[1.5px] border-black rounded-[14px] p-2 text-[11px] leading-tight flex-shrink-0 bg-white">
-          <div className="space-y-1.5 divide-y divide-slate-300">
-            <div className="flex items-center justify-between pt-0.5">
-              <span className="font-semibold text-slate-900 whitespace-nowrap">ফ্ল্যাট/তলা :</span>
-              <span className="font-bold text-black text-right truncate pl-1">{displayFlatFloor}</span>
+        <div className="w-[195px] border-[1.5px] border-black rounded-[14px] overflow-hidden text-[11px] leading-tight flex-shrink-0 bg-white shadow-sm">
+          <div className="divide-y divide-slate-300">
+            <div className="flex items-center justify-between py-1.5 px-2">
+              <span className="font-semibold text-black whitespace-nowrap">ফ্ল্যাট/তলা :</span>
+              <span className="font-bold text-black text-right truncate pl-1 mb-[1px]">{displayFlatFloor}</span>
             </div>
-            <div className="flex items-center justify-between pt-1">
-              <span className="font-semibold text-slate-900 whitespace-nowrap">বাড়ী/হোল্ডিং :</span>
-              <span className="font-bold text-black text-right truncate pl-1">{displayHouseHolding}</span>
+            <div className="flex items-center justify-between py-1.5 px-2">
+              <span className="font-semibold text-black whitespace-nowrap">বাড়ী/হোল্ডিং :</span>
+              <span className="font-bold text-black text-right truncate pl-1 mb-[1px]">{displayHouseHolding}</span>
             </div>
-            <div className="flex items-center justify-between pt-1">
-              <span className="font-semibold text-slate-900 whitespace-nowrap">রাস্তা :</span>
-              <span className="font-bold text-black text-right truncate pl-1">{displayRoad}</span>
+            <div className="flex items-center justify-between py-1.5 px-2">
+              <span className="font-semibold text-black whitespace-nowrap">রাস্তা :</span>
+              <span className="font-bold text-black text-right truncate pl-1 mb-[1px]">{displayRoad}</span>
             </div>
-            <div className="flex items-center justify-between pt-1">
-              <span className="font-semibold text-slate-900 whitespace-nowrap">এলাকা :</span>
-              <span className="font-bold text-black text-right truncate pl-1">{displayArea}</span>
+            <div className="flex items-center justify-between py-1.5 px-2">
+              <span className="font-semibold text-black whitespace-nowrap">এলাকা :</span>
+              <span className="font-bold text-black text-right truncate pl-1 mb-[1px]">{displayArea}</span>
             </div>
-            <div className="flex items-center justify-between pt-1">
-              <span className="font-semibold text-slate-900 whitespace-nowrap">পোস্ট কোড :</span>
-              <span className="font-bold text-black text-right truncate pl-1">{displayPostCode}</span>
+            <div className="flex items-center justify-between py-1.5 px-2">
+              <span className="font-semibold text-black whitespace-nowrap">পোস্ট কোড :</span>
+              <span className="font-bold text-black text-right truncate pl-1 mb-[1px]">{displayPostCode}</span>
             </div>
           </div>
         </div>
@@ -246,142 +246,175 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
 
       {/* ============================================================== */}
       {/* 2. BODY FORM FIELDS (১ to ১৭) */}
+      {/* Text elevated ~2.5px above dotted line to prevent font-line merging */}
       {/* ============================================================== */}
-      <div className="text-[12px] sm:text-[12.5px] text-black space-y-1.5">
+      <div className="text-[12.5px] sm:text-[13px] text-black space-y-2">
         {/* Item 1 */}
-        <div className="flex items-end gap-1.5">
-          <span className="font-semibold whitespace-nowrap">১. ভাড়াটিয়া/বাড়ীওয়ালার নাম :</span>
-          <span className="flex-1 font-bold border-b border-black pb-0.5 px-2 min-h-[20px]">
-            {fullName}
-          </span>
+        <div className="flex items-end">
+          <span className="font-semibold whitespace-nowrap text-black">১. ভাড়াটিয়া/বাড়ীওয়ালার নাম :</span>
+          <div className="flex-1 relative flex items-end border-b border-dotted border-black/80 ml-1.5 pb-[2px] min-h-[22px]">
+            <span className="font-bold text-black leading-none mb-[2.5px] px-1 truncate">
+              {fullName}
+            </span>
+          </div>
         </div>
 
         {/* Item 2 */}
-        <div className="flex items-end gap-1.5">
-          <span className="font-semibold whitespace-nowrap">২. পিতার নাম :</span>
-          <span className="flex-1 font-bold border-b border-black pb-0.5 px-2 min-h-[20px]">
-            {fatherName}
-          </span>
+        <div className="flex items-end">
+          <span className="font-semibold whitespace-nowrap text-black">২. পিতার নাম :</span>
+          <div className="flex-1 relative flex items-end border-b border-dotted border-black/80 ml-1.5 pb-[2px] min-h-[22px]">
+            <span className="font-bold text-black leading-none mb-[2.5px] px-1 truncate">
+              {fatherName}
+            </span>
+          </div>
         </div>
 
         {/* Item 3 */}
         <div className="flex items-end gap-3">
-          <div className="flex items-end gap-1.5 flex-1 min-w-0">
-            <span className="font-semibold whitespace-nowrap">৩. জন্ম তারিখ :</span>
-            <span className="flex-1 font-bold border-b border-black pb-0.5 px-2 min-h-[20px]">
-              {dob}
-            </span>
+          <div className="flex items-end flex-1 min-w-0">
+            <span className="font-semibold whitespace-nowrap text-black">৩. জন্ম তারিখ :</span>
+            <div className="flex-1 relative flex items-end border-b border-dotted border-black/80 ml-1.5 pb-[2px] min-h-[22px]">
+              <span className="font-bold text-black leading-none mb-[2.5px] px-1 truncate">
+                {dob}
+              </span>
+            </div>
           </div>
-          <div className="flex items-end gap-1.5 w-[220px]">
-            <span className="font-semibold whitespace-nowrap">বৈবাহিক অবস্থা :</span>
-            <span className="flex-1 font-bold border-b border-black pb-0.5 px-2 min-h-[20px] text-center">
-              {maritalStatus}
-            </span>
+          <div className="flex items-end w-[240px]">
+            <span className="font-semibold whitespace-nowrap text-black">বৈবাহিক অবস্থা :</span>
+            <div className="flex-1 relative flex items-end justify-center border-b border-dotted border-black/80 ml-1.5 pb-[2px] min-h-[22px]">
+              <span className="font-bold text-black leading-none mb-[2.5px] px-1 text-center truncate">
+                {maritalStatus}
+              </span>
+            </div>
           </div>
         </div>
 
         {/* Item 4 */}
-        <div className="flex items-end gap-1.5">
-          <span className="font-semibold whitespace-nowrap">৪. স্থায়ী ঠিকানা :</span>
-          <span className="flex-1 font-medium border-b border-black pb-0.5 px-2 min-h-[20px]">
-            {permanentAddress}
-          </span>
+        <div className="flex items-end">
+          <span className="font-semibold whitespace-nowrap text-black">৪. স্থায়ী ঠিকানা :</span>
+          <div className="flex-1 relative flex items-end border-b border-dotted border-black/80 ml-1.5 pb-[2px] min-h-[22px]">
+            <span className="font-medium text-black leading-none mb-[2.5px] px-1 truncate">
+              {permanentAddress}
+            </span>
+          </div>
         </div>
 
         {/* Item 5 */}
-        <div className="flex items-end gap-1.5">
-          <span className="font-semibold whitespace-nowrap">৫. পেশা ও প্রতিষ্ঠান/কর্মস্থলের ঠিকানা :</span>
-          <span className="flex-1 font-medium border-b border-black pb-0.5 px-2 min-h-[20px]">
-            {occupationAndWorkplace}
-          </span>
+        <div className="flex items-end">
+          <span className="font-semibold whitespace-nowrap text-black">৫. পেশা ও প্রতিষ্ঠান/কর্মস্থলের ঠিকানা :</span>
+          <div className="flex-1 relative flex items-end border-b border-dotted border-black/80 ml-1.5 pb-[2px] min-h-[22px]">
+            <span className="font-medium text-black leading-none mb-[2.5px] px-1 truncate">
+              {occupationAndWorkplace}
+            </span>
+          </div>
         </div>
 
         {/* Item 6 */}
         <div className="flex items-end gap-3">
-          <div className="flex items-end gap-1.5 flex-1 min-w-0">
-            <span className="font-semibold whitespace-nowrap">৬. ধর্ম :</span>
-            <span className="flex-1 font-bold border-b border-black pb-0.5 px-2 min-h-[20px]">
-              {religion}
-            </span>
+          <div className="flex items-end flex-1 min-w-0">
+            <span className="font-semibold whitespace-nowrap text-black">৬. ধর্ম :</span>
+            <div className="flex-1 relative flex items-end border-b border-dotted border-black/80 ml-1.5 pb-[2px] min-h-[22px]">
+              <span className="font-bold text-black leading-none mb-[2.5px] px-1 truncate">
+                {religion}
+              </span>
+            </div>
           </div>
-          <div className="flex items-end gap-1.5 flex-1 min-w-0">
-            <span className="font-semibold whitespace-nowrap">শিক্ষাগত যোগ্যতা :</span>
-            <span className="flex-1 font-bold border-b border-black pb-0.5 px-2 min-h-[20px] text-center">
-              {educationalQualification}
-            </span>
+          <div className="flex items-end flex-1 min-w-0">
+            <span className="font-semibold whitespace-nowrap text-black">শিক্ষাগত যোগ্যতা :</span>
+            <div className="flex-1 relative flex items-end justify-center border-b border-dotted border-black/80 ml-1.5 pb-[2px] min-h-[22px]">
+              <span className="font-bold text-black leading-none mb-[2.5px] px-1 text-center truncate">
+                {educationalQualification}
+              </span>
+            </div>
           </div>
         </div>
 
         {/* Item 7 */}
         <div className="flex items-end gap-3">
-          <div className="flex items-end gap-1.5 flex-1 min-w-0">
-            <span className="font-semibold whitespace-nowrap">৭. মোবাইল নম্বর :</span>
-            <span className="flex-1 font-bold border-b border-black pb-0.5 px-2 min-h-[20px] tracking-wider">
-              {phone}
-            </span>
+          <div className="flex items-end flex-1 min-w-0">
+            <span className="font-semibold whitespace-nowrap text-black">৭. মোবাইল নম্বর :</span>
+            <div className="flex-1 relative flex items-end border-b border-dotted border-black/80 ml-1.5 pb-[2px] min-h-[22px]">
+              <span className="font-bold text-black leading-none mb-[2.5px] px-1 tracking-wider truncate">
+                {phone}
+              </span>
+            </div>
           </div>
-          <div className="flex items-end gap-1.5 flex-1 min-w-0">
-            <span className="font-semibold whitespace-nowrap">ই-মেইল আইডি :</span>
-            <span className="flex-1 font-medium border-b border-black pb-0.5 px-2 min-h-[20px]">
-              {email}
-            </span>
+          <div className="flex items-end flex-1 min-w-0">
+            <span className="font-semibold whitespace-nowrap text-black">ই-মেইল আইডি :</span>
+            <div className="flex-1 relative flex items-end border-b border-dotted border-black/80 ml-1.5 pb-[2px] min-h-[22px]">
+              <span className="font-medium text-black leading-none mb-[2.5px] px-1 truncate">
+                {email}
+              </span>
+            </div>
           </div>
         </div>
 
         {/* Item 8 */}
-        <div className="flex items-end gap-1.5">
-          <span className="font-semibold whitespace-nowrap">৮. জাতীয় পরিচয়পত্র নম্বর :</span>
-          <span className="flex-1 font-bold border-b border-black pb-0.5 px-2 min-h-[20px] tracking-wider">
-            {nidNumber}
-          </span>
+        <div className="flex items-end">
+          <span className="font-semibold whitespace-nowrap text-black">৮. জাতীয় পরিচয়পত্র নম্বর :</span>
+          <div className="flex-1 relative flex items-end border-b border-dotted border-black/80 ml-1.5 pb-[2px] min-h-[22px]">
+            <span className="font-bold text-black leading-none mb-[2.5px] px-1 tracking-wider truncate">
+              {nidNumber}
+            </span>
+          </div>
         </div>
 
         {/* Item 9 */}
-        <div className="flex items-end gap-1.5">
-          <span className="font-semibold whitespace-nowrap">৯. পাসপোর্ট নম্বর (যদি থাকে) :</span>
-          <span className="flex-1 font-medium border-b border-black pb-0.5 px-2 min-h-[20px] tracking-wider">
-            {passportNumber}
-          </span>
+        <div className="flex items-end">
+          <span className="font-semibold whitespace-nowrap text-black">৯. পাসপোর্ট নম্বর (যদি থাকে) :</span>
+          <div className="flex-1 relative flex items-end border-b border-dotted border-black/80 ml-1.5 pb-[2px] min-h-[22px]">
+            <span className="font-medium text-black leading-none mb-[2.5px] px-1 tracking-wider truncate">
+              {passportNumber}
+            </span>
+          </div>
         </div>
 
         {/* Item 10 */}
-        <div className="space-y-1 pt-0.5">
-          <div className="font-semibold">১০. জরুরী যোগাযোগ :</div>
+        <div className="space-y-1.5 pt-0.5">
+          <div className="font-semibold text-black">১০. জরুরী যোগাযোগ :</div>
           <div className="grid grid-cols-2 gap-3 pl-3">
-            <div className="flex items-end gap-1.5 min-w-0">
-              <span className="font-medium whitespace-nowrap">(ক) নাম :</span>
-              <span className="flex-1 font-bold border-b border-black pb-0.5 px-2 min-h-[19px]">
-                {emergencyName}
-              </span>
+            <div className="flex items-end min-w-0">
+              <span className="font-medium whitespace-nowrap text-black">(ক) নাম :</span>
+              <div className="flex-1 relative flex items-end border-b border-dotted border-black/80 ml-1.5 pb-[2px] min-h-[21px]">
+                <span className="font-bold text-black leading-none mb-[2.5px] px-1 truncate">
+                  {emergencyName}
+                </span>
+              </div>
             </div>
-            <div className="flex items-end gap-1.5 min-w-0">
-              <span className="font-medium whitespace-nowrap">(খ) সম্পর্ক :</span>
-              <span className="flex-1 font-bold border-b border-black pb-0.5 px-2 min-h-[19px]">
-                {emergencyRelation}
-              </span>
+            <div className="flex items-end min-w-0">
+              <span className="font-medium whitespace-nowrap text-black">(খ) সম্পর্ক :</span>
+              <div className="flex-1 relative flex items-end border-b border-dotted border-black/80 ml-1.5 pb-[2px] min-h-[21px]">
+                <span className="font-bold text-black leading-none mb-[2.5px] px-1 truncate">
+                  {emergencyRelation}
+                </span>
+              </div>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3 pl-3">
-            <div className="flex items-end gap-1.5 min-w-0">
-              <span className="font-medium whitespace-nowrap">(গ) ঠিকানা :</span>
-              <span className="flex-1 font-medium border-b border-black pb-0.5 px-2 min-h-[19px] truncate">
-                {emergencyAddress}
-              </span>
+            <div className="flex items-end min-w-0">
+              <span className="font-medium whitespace-nowrap text-black">(গ) ঠিকানা :</span>
+              <div className="flex-1 relative flex items-end border-b border-dotted border-black/80 ml-1.5 pb-[2px] min-h-[21px]">
+                <span className="font-medium text-black leading-none mb-[2.5px] px-1 truncate">
+                  {emergencyAddress}
+                </span>
+              </div>
             </div>
-            <div className="flex items-end gap-1.5 min-w-0">
-              <span className="font-medium whitespace-nowrap">(ঘ) মোবাইল নম্বর :</span>
-              <span className="flex-1 font-bold border-b border-black pb-0.5 px-2 min-h-[19px] tracking-wider">
-                {emergencyPhone}
-              </span>
+            <div className="flex items-end min-w-0">
+              <span className="font-medium whitespace-nowrap text-black">(ঘ) মোবাইল নম্বর :</span>
+              <div className="flex-1 relative flex items-end border-b border-dotted border-black/80 ml-1.5 pb-[2px] min-h-[21px]">
+                <span className="font-bold text-black leading-none mb-[2.5px] px-1 tracking-wider truncate">
+                  {emergencyPhone}
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Item 11: Table for Roommates / Mess Mates */}
-        <div className="space-y-1 pt-1">
-          <div className="font-semibold">১১. পরিবার / মেসের সঙ্গীয় সদস্যদের বিবরণ :</div>
+        <div className="space-y-1.5 pt-1">
+          <div className="font-semibold text-black">১১. পরিবার / মেসের সঙ্গীয় সদস্যদের বিবরণ :</div>
           <div className="w-full overflow-hidden border border-black rounded-[4px]">
-            <table className="w-full text-center border-collapse text-[11px]">
+            <table className="w-full text-center border-collapse text-[11.5px]">
               <thead>
                 <tr className="border-b border-black bg-slate-100 font-semibold text-black">
                   <th className="py-1 px-1.5 border-r border-black w-14">ক্রঃ নং</th>
@@ -395,17 +428,17 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
                 {filledRoommates.map((m, idx) => (
                   <tr
                     key={idx}
-                    className="border-b border-black last:border-b-0 h-6.5 text-black hover:bg-slate-50 transition-colors"
+                    className="border-b border-black last:border-b-0 h-7 text-black hover:bg-slate-50 transition-colors"
                   >
-                    <td className="py-0.5 px-1 border-r border-black font-semibold text-center">{m.sl}</td>
-                    <td className="py-0.5 px-2 border-r border-black text-left font-medium truncate max-w-[200px]">
+                    <td className="py-1 px-1 border-r border-black font-semibold text-center">{m.sl}</td>
+                    <td className="py-1 px-2 border-r border-black text-left font-medium truncate max-w-[200px]">
                       {m.name}
                     </td>
-                    <td className="py-0.5 px-2 border-r border-black">{m.age}</td>
-                    <td className="py-0.5 px-2 border-r border-black text-left truncate max-w-[120px]">
+                    <td className="py-1 px-2 border-r border-black">{m.age}</td>
+                    <td className="py-1 px-2 border-r border-black text-left truncate max-w-[120px]">
                       {m.occupation}
                     </td>
-                    <td className="py-0.5 px-2 font-mono text-center tracking-wide">{m.phone}</td>
+                    <td className="py-1 px-2 font-mono text-center tracking-wide">{m.phone}</td>
                   </tr>
                 ))}
               </tbody>
@@ -414,120 +447,128 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
         </div>
 
         {/* Item 12 */}
-        <div className="space-y-1 pt-1">
+        <div className="space-y-1.5 pt-0.5">
           <div className="grid grid-cols-2 gap-3">
-            <div className="flex items-end gap-1.5 min-w-0">
-              <span className="font-semibold whitespace-nowrap">১২. গৃহকর্মীর নাম :</span>
-              <span className="flex-1 border-b border-black pb-0.5 min-h-[19px]"></span>
+            <div className="flex items-end min-w-0">
+              <span className="font-semibold whitespace-nowrap text-black">১২. গৃহকর্মীর নাম :</span>
+              <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 min-h-[21px]"></div>
             </div>
-            <div className="flex items-end gap-1.5 min-w-0">
-              <span className="font-semibold whitespace-nowrap">জাতীয় পরিচয়পত্র নং :</span>
-              <span className="flex-1 border-b border-black pb-0.5 min-h-[19px]"></span>
+            <div className="flex items-end min-w-0">
+              <span className="font-semibold whitespace-nowrap text-black">জাতীয় পরিচয়পত্র নং :</span>
+              <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 min-h-[21px]"></div>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3 pl-4">
-            <div className="flex items-end gap-1.5 min-w-0">
-              <span className="font-semibold whitespace-nowrap">মোবাইল নম্বর :</span>
-              <span className="flex-1 border-b border-black pb-0.5 min-h-[19px]"></span>
+            <div className="flex items-end min-w-0">
+              <span className="font-semibold whitespace-nowrap text-black">মোবাইল নম্বর :</span>
+              <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 min-h-[21px]"></div>
             </div>
-            <div className="flex items-end gap-1.5 min-w-0">
-              <span className="font-semibold whitespace-nowrap">স্থায়ী ঠিকানা :</span>
-              <span className="flex-1 border-b border-black pb-0.5 min-h-[19px]"></span>
+            <div className="flex items-end min-w-0">
+              <span className="font-semibold whitespace-nowrap text-black">স্থায়ী ঠিকানা :</span>
+              <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 min-h-[21px]"></div>
             </div>
           </div>
         </div>
 
         {/* Item 13 */}
-        <div className="space-y-1 pt-0.5">
+        <div className="space-y-1.5 pt-0.5">
           <div className="grid grid-cols-2 gap-3">
-            <div className="flex items-end gap-1.5 min-w-0">
-              <span className="font-semibold whitespace-nowrap">১৩. ড্রাইভারের নাম :</span>
-              <span className="flex-1 border-b border-black pb-0.5 min-h-[19px]"></span>
+            <div className="flex items-end min-w-0">
+              <span className="font-semibold whitespace-nowrap text-black">১৩. ড্রাইভারের নাম :</span>
+              <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 min-h-[21px]"></div>
             </div>
-            <div className="flex items-end gap-1.5 min-w-0">
-              <span className="font-semibold whitespace-nowrap">জাতীয় পরিচয়পত্র নং :</span>
-              <span className="flex-1 border-b border-black pb-0.5 min-h-[19px]"></span>
+            <div className="flex items-end min-w-0">
+              <span className="font-semibold whitespace-nowrap text-black">জাতীয় পরিচয়পত্র নং :</span>
+              <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 min-h-[21px]"></div>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3 pl-4">
-            <div className="flex items-end gap-1.5 min-w-0">
-              <span className="font-semibold whitespace-nowrap">মোবাইল নম্বর :</span>
-              <span className="flex-1 border-b border-black pb-0.5 min-h-[19px]"></span>
+            <div className="flex items-end min-w-0">
+              <span className="font-semibold whitespace-nowrap text-black">মোবাইল নম্বর :</span>
+              <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 min-h-[21px]"></div>
             </div>
-            <div className="flex items-end gap-1.5 min-w-0">
-              <span className="font-semibold whitespace-nowrap">স্থায়ী ঠিকানা :</span>
-              <span className="flex-1 border-b border-black pb-0.5 min-h-[19px]"></span>
+            <div className="flex items-end min-w-0">
+              <span className="font-semibold whitespace-nowrap text-black">স্থায়ী ঠিকানা :</span>
+              <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 min-h-[21px]"></div>
             </div>
           </div>
         </div>
 
         {/* Item 14 */}
-        <div className="space-y-1 pt-0.5">
+        <div className="space-y-1.5 pt-0.5">
           <div className="grid grid-cols-2 gap-3">
-            <div className="flex items-end gap-1.5 min-w-0">
-              <span className="font-semibold whitespace-nowrap">১৪. পূর্ববর্তী বাড়িওয়ালার নাম :</span>
-              <span className="flex-1 border-b border-black pb-0.5 min-h-[19px]"></span>
+            <div className="flex items-end min-w-0">
+              <span className="font-semibold whitespace-nowrap text-black">১৪. পূর্ববর্তী বাড়িওয়ালার নাম :</span>
+              <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 min-h-[21px]"></div>
             </div>
-            <div className="flex items-end gap-1.5 min-w-0">
-              <span className="font-semibold whitespace-nowrap">মোবাইল নম্বর :</span>
-              <span className="flex-1 border-b border-black pb-0.5 min-h-[19px]"></span>
+            <div className="flex items-end min-w-0">
+              <span className="font-semibold whitespace-nowrap text-black">মোবাইল নম্বর :</span>
+              <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 min-h-[21px]"></div>
             </div>
           </div>
-          <div className="flex items-end gap-1.5 pl-4">
-            <span className="font-semibold whitespace-nowrap">ঠিকানা :</span>
-            <span className="flex-1 border-b border-black pb-0.5 min-h-[19px]"></span>
+          <div className="flex items-end pl-4">
+            <span className="font-semibold whitespace-nowrap text-black">ঠিকানা :</span>
+            <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 min-h-[21px]"></div>
           </div>
         </div>
 
         {/* Item 15 */}
-        <div className="flex items-end gap-1.5 pt-0.5">
-          <span className="font-semibold whitespace-nowrap">১৫. পূর্ববর্তী বাসা ছাড়ার কারণ :</span>
-          <span className="flex-1 border-b border-black pb-0.5 min-h-[19px]"></span>
+        <div className="flex items-end pt-0.5">
+          <span className="font-semibold whitespace-nowrap text-black">১৫. পূর্ববর্তী বাসা ছাড়ার কারণ :</span>
+          <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 min-h-[21px]"></div>
         </div>
 
-        {/* Item 16 */}
+        {/* Item 16: Fixed Landlord Name & Phone as specifically required */}
         <div className="grid grid-cols-2 gap-3 pt-0.5">
-          <div className="flex items-end gap-1.5 min-w-0">
-            <span className="font-semibold whitespace-nowrap">১৬. বর্তমান বাড়িওয়ালার নাম :</span>
-            <span className="flex-1 font-bold border-b border-black pb-0.5 px-2 min-h-[19px]">
-              {landlordName}
-            </span>
+          <div className="flex items-end min-w-0">
+            <span className="font-semibold whitespace-nowrap text-black">১৬. বর্তমান বাড়িওয়ালার নাম :</span>
+            <div className="flex-1 relative flex items-end border-b border-dotted border-black/80 ml-1.5 pb-[2px] min-h-[21px]">
+              <span className="font-bold text-black leading-none mb-[2.5px] px-1 truncate">
+                {FIXED_LANDLORD_NAME}
+              </span>
+            </div>
           </div>
-          <div className="flex items-end gap-1.5 min-w-0">
-            <span className="font-semibold whitespace-nowrap">মোবাইল নম্বর :</span>
-            <span className="flex-1 font-bold border-b border-black pb-0.5 px-2 min-h-[19px]">
-              {landlordPhone}
-            </span>
+          <div className="flex items-end min-w-0">
+            <span className="font-semibold whitespace-nowrap text-black">মোবাইল নম্বর :</span>
+            <div className="flex-1 relative flex items-end border-b border-dotted border-black/80 ml-1.5 pb-[2px] min-h-[21px]">
+              <span className="font-bold text-black leading-none mb-[2.5px] px-1 tracking-wider truncate">
+                {FIXED_LANDLORD_PHONE}
+              </span>
+            </div>
           </div>
         </div>
 
         {/* Item 17 */}
-        <div className="flex items-end gap-1.5 pt-0.5">
-          <span className="font-semibold whitespace-nowrap">১৭. বর্তমান বাড়ীতে কোন তারিখ থেকে বসবাস :</span>
-          <span className="flex-1 font-bold border-b border-black pb-0.5 px-2 min-h-[19px]">
-            {displayAllotmentDate}
-          </span>
+        <div className="flex items-end pt-0.5">
+          <span className="font-semibold whitespace-nowrap text-black">১৭. বর্তমান বাড়ীতে কোন তারিখ থেকে বসবাস :</span>
+          <div className="flex-1 relative flex items-end border-b border-dotted border-black/80 ml-1.5 pb-[2px] min-h-[21px]">
+            <span className="font-bold text-black leading-none mb-[2.5px] px-1 truncate">
+              {displayAllotmentDate}
+            </span>
+          </div>
         </div>
       </div>
 
       {/* ============================================================== */}
       {/* 3. SIGNATURE & FOOTER SECTION */}
       {/* ============================================================== */}
-      <div className="mt-8 pt-4 flex items-end justify-between text-xs sm:text-[13px] text-black">
+      <div className="mt-7 pt-3 flex items-end justify-between text-xs sm:text-[13px] text-black">
         <div className="min-w-[160px] text-center">
-          <div className="border-b border-black mb-1.5 pb-0.5 font-bold">
-            {displayToday}
+          <div className="border-b border-dotted border-black/80 mb-1 pb-[2px] flex justify-center items-end min-h-[22px]">
+            <span className="font-bold text-black leading-none mb-[2.5px]">
+              {displayToday}
+            </span>
           </div>
-          <div className="font-semibold">তারিখ</div>
+          <div className="font-semibold text-black">তারিখ</div>
         </div>
 
         <div className="min-w-[200px] text-center">
-          <div className="border-b border-black mb-1.5 pb-0.5 h-6"></div>
-          <div className="font-semibold">ভাড়াটিয়ার স্বাক্ষর</div>
+          <div className="border-b border-dotted border-black/80 mb-1 pb-[2px] h-6"></div>
+          <div className="font-semibold text-black">ভাড়াটিয়ার স্বাক্ষর</div>
         </div>
       </div>
 
-      <div className="mt-5 text-center text-[11px] sm:text-[11.5px] font-bold text-black border-t border-slate-300 pt-2.5">
+      <div className="mt-4 text-center text-[11px] sm:text-[11.5px] font-bold text-black border-t border-slate-300 pt-2">
         বিঃদ্রঃ এই ফরমের একটি কপি বাড়ির মালিক অবশ্যই সংরক্ষণ করবেন।
       </div>
     </div>

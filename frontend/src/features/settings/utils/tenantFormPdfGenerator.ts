@@ -74,6 +74,7 @@ export function printTenantForm(elementId: string): void {
     <html lang="bn">
       <head>
         <meta charset="utf-8" />
+        <base href="${window.location.origin}/" />
         <title>ভাড়াটিয়া নিবন্ধন ফরম — ঢাকা মেট্রোপলিটন পুলিশ</title>
         ${styleSheets}
         <style>
