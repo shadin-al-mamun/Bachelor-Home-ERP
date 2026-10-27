@@ -9,7 +9,6 @@ import {
   KeyRound,
   Download,
   Printer,
-  Search,
   CheckCircle2,
   ArrowLeft,
   SlidersHorizontal,

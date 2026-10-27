@@ -101,7 +101,7 @@ export function resolveFlatInfoForBoarder(
     .join(' / ') || 'ফ্ল্যাট ৪এ (৪র্থ তলা)'
 
   const buildingName = building?.name || 'সানফ্লাওয়ার হোস্টেল'
-  const houseHolding = `${buildingName}, বাড়ি #৪২`
+  const houseHolding = fallbackBuildingAddress || `${buildingName}, বাড়ি #৪২`
   const road = 'রোড #১১, সেক্টর #৪'
   const area = 'উত্তরা / শেরে বাংলা নগর'
   const postCode = '১২৩০'

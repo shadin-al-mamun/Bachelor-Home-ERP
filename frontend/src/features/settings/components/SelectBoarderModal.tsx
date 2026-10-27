@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { Modal } from '@/components/common/Modal'
 import { Button } from '@/components/common/Button'
-import { Input } from '@/components/common/Input'
 import type { BoarderWithRelations } from '@/features/boarders/api/useBoarders'
 import {
   Search,
@@ -11,13 +10,10 @@ import {
   Printer,
   Eye,
   Building2,
-  Calendar,
   Phone,
-  FileCheck,
   ShieldCheck,
   Loader2,
 } from 'lucide-react'
-import { toBengaliNumerals, formatBengaliDate } from './TenantPoliceForm'
 
 interface SelectBoarderModalProps {
   isOpen: boolean
@@ -95,8 +91,7 @@ export const SelectBoarderModal: React.FC<SelectBoarderModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="ভাড়াটিয়া নিবন্ধন ফরম — বর্ডার নির্বাচন"
-      size="lg"
-      className="max-w-3xl"
+      maxWidth="3xl"
     >
       <div className="space-y-4">
         {/* Search & Filter Bar */}

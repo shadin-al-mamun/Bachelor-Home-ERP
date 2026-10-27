@@ -26,6 +26,7 @@ export interface BoarderWithRelations extends Boarder {
           id: string
           flat_code: string
           name: string
+          floor_number?: number
           building?: {
             id: string
             name: string
