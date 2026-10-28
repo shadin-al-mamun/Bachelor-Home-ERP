@@ -129,6 +129,7 @@ interface BrandingState extends BrandingSettings {
   id: string | null
   isLoading: boolean
   isSaved: boolean
+  isDatabaseMenuColumnMissing: boolean
   updateBranding: (settings: Partial<BrandingSettings>) => Promise<void>
   uploadCustomLogo: (file: File) => Promise<string>
   resetToDefault: () => Promise<void>
@@ -185,6 +186,7 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
   id: null,
   isLoading: false,
   isSaved: false,
+  isDatabaseMenuColumnMissing: false,
 
   initializeBranding: async () => {
     // 1. Try loading from localStorage first for instantaneous render
@@ -215,11 +217,13 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
           .maybeSingle()
 
         if (!error && data) {
+          const hasMenuColumn = Boolean(data && 'weekly_meal_menu' in data)
           const mergedRemoteWeeklyMenu = data.weekly_meal_menu
             ? { ...DEFAULT_WEEKLY_MEAL_MENU, ...data.weekly_meal_menu }
             : (get().weeklyMealMenu || DEFAULT_WEEKLY_MEAL_MENU)
           set((state) => ({
             id: data.id || state.id,
+            isDatabaseMenuColumnMissing: !hasMenuColumn,
             orgName: data.org_name || state.orgName,
             shortName: data.short_name || state.shortName,
             tagline: data.tagline || state.tagline,
@@ -316,6 +320,7 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
 
           if (error) {
             console.warn('organization_settings update error with payload:', error.message)
+            set({ isDatabaseMenuColumnMissing: true })
             // Fallback: update only core columns if migration not run yet
             await supabase
               .from('organization_settings')
@@ -329,6 +334,9 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
                 updated_at: new Date().toISOString(),
               })
               .eq('id', currentId)
+            throw new Error(`ডাটাবেজে 'weekly_meal_menu' কলামটি তৈরি করা নেই (${error.message})। বর্ডার আইডিতে মেনু দেখাতে Supabase SQL Editor-এ মাইগ্রেশন রান করতে হবে।`)
+          } else {
+            set({ isDatabaseMenuColumnMissing: false })
           }
         } else {
           const { data: existing } = await supabase
@@ -346,6 +354,7 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
 
             if (updateErr) {
               console.warn('organization_settings update error with payload:', updateErr.message)
+              set({ isDatabaseMenuColumnMissing: true })
               await supabase
                 .from('organization_settings')
                 .update({
@@ -358,6 +367,9 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
                   updated_at: new Date().toISOString(),
                 })
                 .eq('id', existing.id)
+              throw new Error(`ডাটাবেজে 'weekly_meal_menu' কলামটি তৈরি করা নেই (${updateErr.message})। বর্ডার আইডিতে মেনু দেখাতে Supabase SQL Editor-এ মাইগ্রেশন রান করতে হবে।`)
+            } else {
+              set({ isDatabaseMenuColumnMissing: false })
             }
           } else {
             const { data: inserted, error: insertErr } = await supabase
@@ -367,14 +379,17 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
               .maybeSingle()
 
             if (inserted?.id) {
-              set({ id: inserted.id })
+              set({ id: inserted.id, isDatabaseMenuColumnMissing: false })
             } else if (insertErr) {
               console.warn('organization_settings insert error:', insertErr.message)
+              set({ isDatabaseMenuColumnMissing: true })
+              throw new Error(`ডাটাবেজে নতুন রো তৈরি করা যায়নি (${insertErr.message})।`)
             }
           }
         }
-      } catch (err) {
+      } catch (err: any) {
         console.warn('Could not sync branding settings to Supabase table:', err)
+        throw err
       }
     }
   },

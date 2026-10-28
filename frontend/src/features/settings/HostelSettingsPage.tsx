@@ -24,6 +24,7 @@ import {
   ChefHat,
   Eye,
   Copy,
+  AlertTriangle,
 } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
@@ -61,6 +62,7 @@ export const HostelSettingsPage: React.FC = () => {
     logoUrl,
     hostelRules,
     weeklyMealMenu,
+    isDatabaseMenuColumnMissing,
     updateBranding,
     uploadCustomLogo,
     resetToDefault,
@@ -852,6 +854,31 @@ export const HostelSettingsPage: React.FC = () => {
                 </button>
               </div>
             </div>
+
+            {isDatabaseMenuColumnMissing && (
+              <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs space-y-2">
+                <div className="flex items-center gap-2 font-bold text-rose-200">
+                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span>ডাটাবেজ মাইগ্রেশন প্রয়োজন (বর্ডার আইডিতে মেনু লাইভ করার জন্য)</span>
+                </div>
+                <p className="text-[11px] text-rose-300/90 leading-relaxed">
+                  আপনার Supabase ডাটাবেজের <code className="bg-rose-950/60 px-1.5 py-0.5 rounded text-rose-200 font-mono">organization_settings</code> টেবিলে <code className="bg-rose-950/60 px-1.5 py-0.5 rounded text-rose-200 font-mono">weekly_meal_menu</code> কলামটি পাওয়া যায়নি। ফলে এডমিন থেকে সেভ করলেও ডাটাবেজে আপডেট না হয়ে বর্ডার আইডিতে ডেমো রুটিন শো করতেছে। নিচের কমান্ডটি কপি করে Supabase Dashboard-এর <strong>SQL Editor</strong>-এ পেস্ট করে <strong>Run</strong> বাটনে চাপ দিন:
+                </p>
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950 border border-slate-800 font-mono text-[11px] text-amber-300 overflow-x-auto gap-2">
+                  <span className="truncate">ALTER TABLE public.organization_settings ADD COLUMN IF NOT EXISTS weekly_meal_menu JSONB DEFAULT NULL;</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText('ALTER TABLE public.organization_settings ADD COLUMN IF NOT EXISTS weekly_meal_menu JSONB DEFAULT NULL;')
+                      alert('SQL কমান্ড কপি হয়েছে! Supabase SQL Editor-এ পেস্ট করে Run করুন।')
+                    }}
+                    className="px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-bold shrink-0 cursor-pointer transition-colors"
+                  >
+                    SQL কপি করুন
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-300 leading-relaxed space-y-1.5">
               <div className="flex items-start gap-2.5">
