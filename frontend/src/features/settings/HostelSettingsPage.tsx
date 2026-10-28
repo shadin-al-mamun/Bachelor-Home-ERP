@@ -23,6 +23,7 @@ import {
   CalendarDays,
   ChefHat,
   Eye,
+  Copy,
 } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
@@ -32,9 +33,11 @@ import {
   DAY_ORDER,
   DAY_METADATA,
   DEFAULT_WEEKLY_MEAL_MENU,
+  getDayKeyFromDate,
   type DayKey,
   type WeeklyMealMenu,
 } from '@/app/store/useBrandingStore'
+import { getDhakaNow } from '@/features/meals/api/useMeals'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import Button from '@/components/common/Button'
 import Input from '@/components/common/Input'
@@ -96,11 +99,54 @@ export const HostelSettingsPage: React.FC = () => {
   const [formWeeklyMealMenu, setFormWeeklyMealMenu] = useState<WeeklyMealMenu>(
     weeklyMealMenu || DEFAULT_WEEKLY_MEAL_MENU
   )
-  const [selectedDayTab, setSelectedDayTab] = useState<DayKey>('saturday')
+
+  // Asia/Dhaka day baseline for menu management
+  const dhakaNow = getDhakaNow()
+  const todayDayKey = getDayKeyFromDate(dhakaNow)
+  const tomorrow = new Date(dhakaNow)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  const tomorrowDayKey = getDayKeyFromDate(tomorrow)
+  const todayDayMeta = DAY_METADATA[todayDayKey]
+  const tomorrowDayMeta = DAY_METADATA[tomorrowDayKey]
+
+  // Default to tomorrow's day tab because tomorrow's menu is what is actively chosen on boarder dashboards
+  const [selectedDayTab, setSelectedDayTab] = useState<DayKey>(() => tomorrowDayKey)
   const [showFullWeeklyMenuModal, setShowFullWeeklyMenuModal] = useState<boolean>(false)
   const [rightPanelTab, setRightPanelTab] = useState<'receipt' | 'meal_card'>(
     tabParam === 'menu' ? 'meal_card' : 'receipt'
   )
+
+  const handleCopyCurrentToTomorrow = () => {
+    const currentMenu = formWeeklyMealMenu[selectedDayTab]
+    setFormWeeklyMealMenu((prev) => ({
+      ...prev,
+      [tomorrowDayKey]: {
+        breakfast: currentMenu?.breakfast || '',
+        lunch: currentMenu?.lunch || '',
+        dinner: currentMenu?.dinner || '',
+      },
+    }))
+    setSelectedDayTab(tomorrowDayKey)
+  }
+
+  const handleApplyToAllDays = () => {
+    if (
+      window.confirm(
+        `আপনি কি ${DAY_METADATA[selectedDayTab]?.nameBn}-এর এই মেনুটি সপ্তাহের সকল ৭ দিনের জন্যই নির্ধারণ করতে চান?`
+      )
+    ) {
+      const currentMenu = formWeeklyMealMenu[selectedDayTab]
+      setFormWeeklyMealMenu({
+        saturday: { ...currentMenu },
+        sunday: { ...currentMenu },
+        monday: { ...currentMenu },
+        tuesday: { ...currentMenu },
+        wednesday: { ...currentMenu },
+        thursday: { ...currentMenu },
+        friday: { ...currentMenu },
+      })
+    }
+  }
 
   // Sync tabParam on route change
   useEffect(() => {
@@ -807,29 +853,49 @@ export const HostelSettingsPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-xs text-amber-300/90 leading-relaxed flex items-start gap-2.5">
-              <ChefHat className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold text-amber-300">এডমিন নিয়ন্ত্রণ বিজ্ঞপ্তি:</p>
-                <p className="text-[11px] text-amber-300/80 mt-0.5">
-                  বর্ডার আইডির হোম ড্যাশবোর্ডের <strong className="text-white">"আগামীকালের খাবার দ্রুত নির্ধারণ"</strong> অপশনে সকালের নাস্তার নিচে সকালের মেনু, দুপুরের খাবারের নিচে দুপুরের মেনু এবং রাতের খাবারের নিচে রাতের মেনু স্বয়ংক্রিয়ভাবে দৃশ্যমান হবে। ডানপাশের লাইভ প্রিভিউ প্যানেলে তাৎক্ষণিক চেক করতে পারেন।
-                </p>
+            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-300 leading-relaxed space-y-1.5">
+              <div className="flex items-start gap-2.5">
+                <ChefHat className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-amber-200">এডমিন নিয়ন্ত্রণ নির্দেশিকা ও সময়সূচি:</p>
+                  <p className="text-[11px] text-amber-300/80 mt-0.5">
+                    আজ <strong className="text-white">{todayDayMeta?.nameBn}</strong>। বর্ডাররা রাত ১০:০০ টা পর্যন্ত আগামীকালের (<strong className="text-amber-300">{tomorrowDayMeta?.nameBn}</strong>) মিল অন/অফ করে, তাই বর্ডার আইডির হোম ড্যাশবোর্ডে আগামীকালের (<strong className="text-amber-300">{tomorrowDayMeta?.nameBn}</strong>) মেনু সক্রিয় থাকে। পুরো সপ্তাহের রুটিন পরিবর্তন করতে নিচের দিনগুলোর ট্যাবে ক্লিক করে প্রতিটি বেলার পুষ্টিকর খাবার সংরক্ষণ করুন।
+                  </p>
+                </div>
               </div>
             </div>
 
             {/* 7 Days of the Week Selection Tabs */}
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-                <span>দিন নির্বাচন করুন:</span>
-                <span className="text-[11px] text-primary-400 font-medium">
-                  বর্তমান দিন: {DAY_METADATA[selectedDayTab]?.nameBn}
-                </span>
-              </label>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                  <span>সপ্তাহের দিন নির্বাচন করুন:</span>
+                  <span className="text-[11px] text-slate-400 font-normal">
+                    (আজ: <span className="text-white font-medium">{todayDayMeta?.nameBn}</span> | আগামীকাল: <span className="text-amber-400 font-bold">{tomorrowDayMeta?.nameBn}</span>)
+                  </span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-primary-300 font-semibold bg-primary-500/10 px-2.5 py-0.5 rounded-md border border-primary-500/20">
+                    এডিট করছেন: {DAY_METADATA[selectedDayTab]?.nameBn}
+                  </span>
+                  {selectedDayTab !== tomorrowDayKey && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDayTab(tomorrowDayKey)}
+                      className="text-[10px] font-bold text-amber-300 hover:text-amber-200 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 px-2 py-0.5 rounded-md transition-colors cursor-pointer"
+                    >
+                      ★ আগামীকাল ({tomorrowDayMeta?.nameBn})-এ যান
+                    </button>
+                  )}
+                </div>
+              </div>
 
               <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
                 {DAY_ORDER.map((dayKey) => {
                   const meta = DAY_METADATA[dayKey]
                   const isSelected = selectedDayTab === dayKey
+                  const isToday = dayKey === todayDayKey
+                  const isTomorrow = dayKey === tomorrowDayKey
                   const dayData = formWeeklyMealMenu[dayKey]
                   const hasData = Boolean(dayData?.breakfast || dayData?.lunch || dayData?.dinner)
 
@@ -838,9 +904,13 @@ export const HostelSettingsPage: React.FC = () => {
                       key={dayKey}
                       type="button"
                       onClick={() => setSelectedDayTab(dayKey)}
-                      className={`p-2 rounded-xl text-xs font-bold transition-all text-center flex flex-col items-center justify-center gap-0.5 border cursor-pointer ${
+                      className={`p-2 rounded-xl text-xs font-bold transition-all text-center flex flex-col items-center justify-center gap-0.5 border cursor-pointer relative ${
                         isSelected
                           ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20 scale-[1.02]'
+                          : isTomorrow
+                          ? 'bg-amber-500/10 text-amber-300 border-amber-500/40 hover:bg-amber-500/20'
+                          : isToday
+                          ? 'bg-slate-900 text-white border-slate-700 hover:bg-slate-800'
                           : 'bg-slate-950/60 text-slate-300 hover:text-white border-slate-800 hover:bg-slate-800'
                       }`}
                     >
@@ -849,12 +919,16 @@ export const HostelSettingsPage: React.FC = () => {
                         className={`text-[9px] font-mono px-1 rounded ${
                           isSelected
                             ? 'bg-slate-950/20 text-slate-950 font-bold'
+                            : isTomorrow
+                            ? 'bg-amber-500/20 text-amber-300 font-bold'
+                            : isToday
+                            ? 'bg-slate-800 text-slate-300 font-medium'
                             : hasData
                             ? 'text-emerald-400'
                             : 'text-slate-500'
                         }`}
                       >
-                        {hasData ? '✓ মেনু' : 'ফাঁকা'}
+                        {isTomorrow ? 'আগামীকাল ★' : isToday ? 'আজ' : hasData ? '✓ মেনু' : 'ফাঁকা'}
                       </span>
                     </button>
                   )
@@ -864,14 +938,37 @@ export const HostelSettingsPage: React.FC = () => {
 
             {/* Day Inputs: Breakfast, Lunch, Dinner */}
             <div className="p-4 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-xs">
+              <div className="flex flex-wrap items-center justify-between pb-2 border-b border-slate-800 text-xs gap-2">
                 <div className="font-bold text-white flex items-center gap-2">
                   <CalendarDays className="w-4 h-4 text-amber-400" />
                   <span>{DAY_METADATA[selectedDayTab]?.nameBn}-এর খাবার মেনু নির্ধারণ</span>
+                  {selectedDayTab === tomorrowDayKey && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      ★ বর্ডার ড্যাশবোর্ডে আগামীকালের মেনু হিসেবে শো করবে
+                    </span>
+                  )}
                 </div>
-                <span className="text-[11px] text-slate-400">
-                  প্রতিটি বেলার পুষ্টিকর ও সুস্বাদু খাবারের বিবরণ লিখুন
-                </span>
+                <div className="flex items-center gap-2">
+                  {selectedDayTab !== tomorrowDayKey && (
+                    <button
+                      type="button"
+                      onClick={handleCopyCurrentToTomorrow}
+                      className="text-[11px] font-medium text-amber-300 hover:text-white bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 px-2.5 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                      title="এই মেনু আগামীকালের তালিকায় কপি করুন"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>আগামীকালে ({tomorrowDayMeta?.nameBn}) কপি করুন</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleApplyToAllDays}
+                    className="text-[11px] font-medium text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded-lg transition-colors cursor-pointer"
+                    title="এই মেনু সব দিনে সেট করুন"
+                  >
+                    সকল দিনে সেট করুন
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-3.5">
@@ -1170,16 +1267,60 @@ export const HostelSettingsPage: React.FC = () => {
           ) : (
             /* Boarder Dashboard Live Meal Card Preview */
             <div className="space-y-4 animate-in fade-in">
-              <p className="text-xs text-slate-400">
-                বোর্ডার আইডির হোমপেজে <strong className="text-amber-400">{DAY_METADATA[selectedDayTab]?.nameBn}</strong>-এর খাবার অন/অফের নিচে মেনু যেভাবে হুবহু প্রদর্শিত হবে:
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-slate-400">
+                  বোর্ডার আইডির হোমপেজে মেনু যেভাবে প্রদর্শিত হবে:
+                </p>
+                {selectedDayTab === tomorrowDayKey ? (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    বর্ডার ড্যাশবোর্ডে এখনই লাইভ
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                    {DAY_METADATA[selectedDayTab]?.nameBn}-এর প্রিভিউ
+                  </span>
+                )}
+              </div>
+
+              {selectedDayTab !== tomorrowDayKey && (
+                <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-300/90 leading-relaxed space-y-2">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-amber-200">
+                        বর্ডার ড্যাশবোর্ডে বর্তমানে আগামীকালের ({tomorrowDayMeta?.nameBn}) মেনু সক্রিয়
+                      </p>
+                      <p className="text-[11px] text-amber-300/80 mt-0.5">
+                        বর্ডাররা রাত ১০:০০ টা পর্যন্ত আগামীকালের খাবার নির্ধারণ করে। তাই ড্যাশবোর্ডে আগামীকালের (<strong className="text-white">{tomorrowDayMeta?.nameBn}</strong>) মেনু দৃশ্যমান। আপনি বর্তমানে <strong className="text-white">{DAY_METADATA[selectedDayTab]?.nameBn}</strong>-এর প্রিভিউ দেখছেন।
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1 border-t border-amber-500/20">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDayTab(tomorrowDayKey)}
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500 text-slate-950 hover:bg-amber-400 transition-colors cursor-pointer"
+                    >
+                      আগামীকালের ({tomorrowDayMeta?.nameBn}) মেনু দেখুন
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCopyCurrentToTomorrow}
+                      className="px-2 py-1 rounded-lg text-[10px] font-semibold bg-slate-800 text-slate-200 hover:text-white transition-colors cursor-pointer"
+                    >
+                      এই মেনু আগামীকালে কপি করুন
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="p-5 rounded-3xl bg-slate-900/90 border border-slate-800 shadow-xl space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-amber-400" />
                     <h4 className="text-sm font-bold text-white">
-                      খাবার দ্রুত নির্ধারণ ({DAY_METADATA[selectedDayTab]?.nameBn})
+                      খাবার দ্রুত নির্ধারণ প্রিভিউ ({DAY_METADATA[selectedDayTab]?.nameBn})
                     </h4>
                   </div>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
@@ -1271,10 +1412,10 @@ export const HostelSettingsPage: React.FC = () => {
               <span>কোথায় কোথায় এই তথ্যগুলো কাজ করবে?</span>
             </div>
             <ul className="list-disc list-inside space-y-1 text-[11px] text-slate-300">
-              <li>বোর্ডার আইডির হোম ড্যাশবোর্ডে আগামীকালের মিল অন/অফের নিচে মেনু কার্ড</li>
-              <li>বোর্ডার মিল পোর্টালের প্রতিটি বেলার সিলেক্টরের ভেতরে</li>
-              <li>অফিসিয়াল মানি রিসিপ্ট প্রিন্ট ও ডাউনলোড ভাউচার</li>
-              <li>সফটওয়্যারের হেডার ব্র্যান্ডিং ও মোবাইল ড্রয়ার টাইটেল</li>
+              <li>বর্ডার আইডির হোম ড্যাশবোর্ডে প্রতিদিন রাত ১০:০০ টা পর্যন্ত আগামীকালের খাবার মিল অন/অফের নিচে আগামীকালের মেনু কার্ড শো করবে</li>
+              <li>বর্ডার মিল পোর্টালের প্রতি বেলার সিলেকশনের ভেতরে রুটিন অনুযায়ী প্রতিটি দিনের মেনু শো করবে</li>
+              <li>বর্ডাররা "সাপ্তাহিক রুটিন" বাটনে ক্লিক করে পুরো সপ্তাহের (শনি থেকে শুক্র) ৭ দিনের তালিকা দেখতে পারবে</li>
+              <li>সফটওয়্যারের ভেতর ব্যানার ও মেস নোটিশে সাপ্তাহিক পুষ্টিকর খাবারের তালিকা কার্যকর থাকবে</li>
             </ul>
           </div>
         </div>

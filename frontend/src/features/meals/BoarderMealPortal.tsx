@@ -12,6 +12,7 @@ import {
   UserCheck,
   Users,
 } from 'lucide-react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import {
   useBrandingStore,
@@ -20,7 +21,7 @@ import {
   type WeeklyMealMenu,
   type DayMealMenu,
 } from '@/app/store/useBrandingStore'
-import { isSupabaseConfigured } from '@/lib/supabaseClient'
+import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
 import { isPhoneMatch } from '@/utils/phone'
 import { formatCurrencyBn } from '@/utils/date'
 import { useCurrentBoarder } from '@/features/boarders/api/useCurrentBoarder'
@@ -79,6 +80,39 @@ export const BoarderMealPortal: React.FC = () => {
     data: selections = [],
     isLoading,
   } = useBoarderMealSelections(selectedBoarderId)
+
+  // Fetch live organization settings for latest weekly meal menu
+  const { data: orgSettings } = useQuery({
+    queryKey: ['live-organization-settings'],
+    queryFn: async () => {
+      if (!isSupabaseConfigured) return null
+      const { data, error } = await supabase
+        .from('organization_settings')
+        .select('*')
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (error) return null
+      return data
+    },
+    staleTime: 1000,
+    refetchOnWindowFocus: true,
+  })
+
+  // Real-time synchronization across browser tabs and storage updates
+  const queryClient = useQueryClient()
+  React.useEffect(() => {
+    const handleSync = () => {
+      queryClient.invalidateQueries({ queryKey: ['live-organization-settings'] })
+      branding.initializeBranding()
+    }
+    window.addEventListener('storage', handleSync)
+    window.addEventListener('bachelor_erp_branding_updated', handleSync)
+    return () => {
+      window.removeEventListener('storage', handleSync)
+      window.removeEventListener('bachelor_erp_branding_updated', handleSync)
+    }
+  }, [queryClient, branding])
 
   const toggleMutation = useToggleMealMutation()
   const batchToggleMutation = useBatchToggleMealsMutation()
@@ -428,7 +462,8 @@ export const BoarderMealPortal: React.FC = () => {
       ) : (
         (() => {
           const selectedDayKey = getDayKeyFromDateStr(selectedDate)
-          const currentWeeklyMenu: WeeklyMealMenu = branding.weeklyMealMenu || DEFAULT_WEEKLY_MEAL_MENU
+          const currentWeeklyMenu: WeeklyMealMenu =
+            orgSettings?.weekly_meal_menu || branding.weeklyMealMenu || DEFAULT_WEEKLY_MEAL_MENU
           const selectedDayMenu: DayMealMenu =
             currentWeeklyMenu[selectedDayKey] || DEFAULT_WEEKLY_MEAL_MENU[selectedDayKey]
 

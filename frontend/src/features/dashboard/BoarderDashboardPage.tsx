@@ -1,6 +1,6 @@
 import React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   UtensilsCrossed,
   Clock,
@@ -54,6 +54,21 @@ export const BoarderDashboardPage: React.FC = () => {
   const { profile } = useAuthStore()
   const branding = useBrandingStore()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+
+  // Real-time synchronization across browser tabs and storage updates
+  React.useEffect(() => {
+    const handleSync = () => {
+      queryClient.invalidateQueries({ queryKey: ['live-organization-settings'] })
+      branding.initializeBranding()
+    }
+    window.addEventListener('storage', handleSync)
+    window.addEventListener('bachelor_erp_branding_updated', handleSync)
+    return () => {
+      window.removeEventListener('storage', handleSync)
+      window.removeEventListener('bachelor_erp_branding_updated', handleSync)
+    }
+  }, [queryClient, branding])
 
   // If a Super Admin or Manager enters the boarder portal, auto-redirect them to the master ERP dashboard
   React.useEffect(() => {
@@ -105,7 +120,8 @@ export const BoarderDashboardPage: React.FC = () => {
       }
       return data
     },
-    staleTime: 5000,
+    staleTime: 1000,
+    refetchOnWindowFocus: true,
   })
 
   const liveHostelRules: string =

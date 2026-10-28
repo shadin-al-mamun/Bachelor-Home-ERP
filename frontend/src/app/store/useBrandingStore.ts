@@ -274,6 +274,9 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
     set({ ...updated, isLoading: false, isSaved: true })
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...get(), ...updated }))
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('bachelor_erp_branding_updated', { detail: updated }))
+      }
     } catch (e) {
       console.warn('LocalStorage save failed:', e)
     }
@@ -312,6 +315,7 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
             .eq('id', currentId)
 
           if (error) {
+            console.warn('organization_settings update error with payload:', error.message)
             // Fallback: update only core columns if migration not run yet
             await supabase
               .from('organization_settings')
@@ -335,12 +339,28 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
 
           if (existing?.id) {
             set({ id: existing.id })
-            await supabase
+            const { error: updateErr } = await supabase
               .from('organization_settings')
               .update(payload)
               .eq('id', existing.id)
+
+            if (updateErr) {
+              console.warn('organization_settings update error with payload:', updateErr.message)
+              await supabase
+                .from('organization_settings')
+                .update({
+                  org_name: updated.orgName,
+                  short_name: updated.shortName,
+                  tagline: updated.tagline,
+                  logo_url: updated.logoUrl,
+                  app_icon_url: updated.appIconUrl,
+                  favicon_url: updated.faviconUrl,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', existing.id)
+            }
           } else {
-            const { data: inserted } = await supabase
+            const { data: inserted, error: insertErr } = await supabase
               .from('organization_settings')
               .insert(payload)
               .select('id')
@@ -348,6 +368,8 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
 
             if (inserted?.id) {
               set({ id: inserted.id })
+            } else if (insertErr) {
+              console.warn('organization_settings insert error:', insertErr.message)
             }
           }
         }
@@ -437,3 +459,11 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
     applyFaviconToDOM(DEFAULT_BRANDING.faviconUrl!)
   },
 }))
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === STORAGE_KEY) {
+      useBrandingStore.getState().initializeBranding()
+    }
+  })
+}
