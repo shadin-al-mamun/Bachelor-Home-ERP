@@ -470,7 +470,7 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
     set({ ...DEFAULT_BRANDING, isSaved: true })
     try {
       localStorage.removeItem(STORAGE_KEY)
-    } catch {}
+    } catch { }
     applyFaviconToDOM(DEFAULT_BRANDING.faviconUrl!)
   },
 }))

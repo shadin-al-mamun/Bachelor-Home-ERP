@@ -332,6 +332,18 @@ export const INITIAL_MOCK_BOARDERS: BoarderWithRelations[] = [
     remarks: 'অনলাইন রেজিস্ট্রেশন পোর্টাল থেকে নতুন আবেদন এসেছে। NID ও স্টুডেন্ট আইডি যাচাই সাপেক্ষে অনুমোদন প্রয়োজন।',
     created_at: '2026-10-14T14:30:00Z',
     updated_at: '2026-10-14T14:30:00Z',
+    father_name: 'মুস্তাফিজুর রহমান',
+    date_of_birth: '2001-08-15',
+    marital_status: 'অবিবাহিত',
+    religion: 'ইসলাম',
+    educational_qualification: 'বিএসসি (সফটওয়্যার ইঞ্জিনিয়ারিং)',
+    occupation: 'শিক্ষার্থী',
+    workplace_address: 'ড্যাফোডিল ইন্টারন্যাশনাল ইউনিভার্সিটি',
+    passport_number: '',
+    emergency_contact_name: 'মুস্তাফিজুর রহমান',
+    emergency_contact_relation: 'চাচা',
+    emergency_contact_phone: '01512345678',
+    emergency_contact_address: 'ধানমন্ডি ২৭, ঢাকা',
     active_allocation: null,
     total_due: 0,
     total_paid: 0,
@@ -363,6 +375,18 @@ export const INITIAL_MOCK_BOARDERS: BoarderWithRelations[] = [
     remarks: 'প্রফেশনাল ব্যাচেলর। চাকরি আইডি ও NID সংযুক্ত করা হয়েছে।',
     created_at: '2026-10-15T09:15:00Z',
     updated_at: '2026-10-15T09:15:00Z',
+    father_name: 'আব্দুর রাজ্জাক',
+    date_of_birth: '2000-03-22',
+    marital_status: 'অবিবাহিত',
+    religion: 'ইসলাম',
+    educational_qualification: 'ডিপ্লোমা (গ্রাফিক ডিজাইন)',
+    occupation: 'প্রোডাক্ট ডিজাইনার',
+    workplace_address: 'টেকভার্স সলিউশনস লি., ঢাকা',
+    passport_number: '',
+    emergency_contact_name: 'আব্দুর রাজ্জাক',
+    emergency_contact_relation: 'পিতা',
+    emergency_contact_phone: '01799887766',
+    emergency_contact_address: 'গ্রাম: রাধানগর, শ্রীমঙ্গল, মৌলভীবাজার',
     active_allocation: null,
     total_due: 0,
     total_paid: 0,
@@ -390,6 +414,18 @@ export const INITIAL_MOCK_BOARDERS: BoarderWithRelations[] = [
     remarks: 'চাকরি পরিবর্তনের কারণে হোস্টেল ত্যাগ করেছেন। সকল বকেয়া ও ডিপোজিট সমন্বয় সম্পন্ন।',
     created_at: '2025-06-01T10:00:00Z',
     updated_at: '2026-08-31T18:00:00Z',
+    father_name: 'শফিকুল ইসলাম',
+    date_of_birth: '1997-07-10',
+    marital_status: 'অবিবাহিত',
+    religion: 'ইসলাম',
+    educational_qualification: 'স্নাতক (পাস)',
+    occupation: 'কর্মজীবী',
+    workplace_address: 'উত্তরা, ঢাকা',
+    passport_number: '',
+    emergency_contact_name: 'শফিকুল ইসলাম',
+    emergency_contact_relation: 'পিতা',
+    emergency_contact_phone: '01822334455',
+    emergency_contact_address: 'চৌধুরী বাড়ি, সদর, কুমিলা',
     active_allocation: null,
     total_due: 0,
     total_paid: 45000,
@@ -627,15 +663,30 @@ export async function createBoarderApplication(input: CreateBoarderInput): Promi
       }
 
       if (!rpcError && rpcData) {
-        // Sync photo_url directly to boarders table if provided
-        if (input.photo_url && rpcData.id) {
+        // Sync photo_url and tenant form verification fields directly to boarders table
+        const extraUpdates: Record<string, any> = {}
+        if (input.photo_url) extraUpdates.photo_url = input.photo_url
+        if (input.date_of_birth) extraUpdates.date_of_birth = input.date_of_birth
+        if (input.father_name) extraUpdates.father_name = input.father_name
+        if (input.marital_status) extraUpdates.marital_status = input.marital_status
+        if (input.religion) extraUpdates.religion = input.religion
+        if (input.educational_qualification) extraUpdates.educational_qualification = input.educational_qualification
+        if (input.occupation) extraUpdates.occupation = input.occupation
+        if (input.workplace_address) extraUpdates.workplace_address = input.workplace_address
+        if (input.passport_number) extraUpdates.passport_number = input.passport_number
+        if (input.emergency_contact_name) extraUpdates.emergency_contact_name = input.emergency_contact_name
+        if (input.emergency_contact_relation) extraUpdates.emergency_contact_relation = input.emergency_contact_relation
+        if (input.emergency_contact_address) extraUpdates.emergency_contact_address = input.emergency_contact_address
+        if (input.emergency_contact_phone) extraUpdates.emergency_contact_phone = input.emergency_contact_phone
+
+        if (Object.keys(extraUpdates).length > 0 && rpcData.id) {
           try {
-            await supabase.from('boarders').update({ photo_url: input.photo_url }).eq('id', rpcData.id)
+            await supabase.from('boarders').update(extraUpdates).eq('id', rpcData.id)
           } catch (updateErr) {
-            console.warn('Could not update photo_url after RPC:', updateErr)
+            console.warn('Could not update extra tenant fields after RPC:', updateErr)
           }
         }
-        const merged = { ...newBoarder, ...rpcData, photo_url: input.photo_url || rpcData.photo_url }
+        const merged = { ...newBoarder, ...rpcData, ...extraUpdates }
         saveStoredBoarders([merged, ...getStoredBoarders().filter(b => b.id !== merged.id)])
         return merged
       }
@@ -1256,6 +1307,18 @@ export function useApproveApplicantMutation() {
               status: 'ACTIVE',
               admission_date: new Date().toISOString().slice(0, 10),
               remarks: remarks || 'অ্যাডমিন কর্তৃক আবেদন অনুমোদিত হয়েছে।',
+              date_of_birth: (pRow as any).date_of_birth || null,
+              father_name: (pRow as any).father_name || null,
+              marital_status: (pRow as any).marital_status || 'অবিবাহিত',
+              religion: (pRow as any).religion || 'ইসলাম',
+              educational_qualification: (pRow as any).educational_qualification || null,
+              occupation: (pRow as any).occupation || null,
+              workplace_address: (pRow as any).workplace_address || null,
+              passport_number: (pRow as any).passport_number || null,
+              emergency_contact_name: (pRow as any).emergency_contact_name || null,
+              emergency_contact_relation: (pRow as any).emergency_contact_relation || null,
+              emergency_contact_address: (pRow as any).emergency_contact_address || null,
+              emergency_contact_phone: (pRow as any).emergency_contact_phone || null,
             })
             .select()
             .single()

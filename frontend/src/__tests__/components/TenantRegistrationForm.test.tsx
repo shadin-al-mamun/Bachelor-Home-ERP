@@ -185,6 +185,7 @@ describe('Tenant Registration Form (DMP Replica)', () => {
     // Check boarder specific fields rendered
     expect(screen.getByText('কাজী আরিফুল ইসলাম')).toBeInTheDocument()
     expect(screen.getByText('কাজী নুরুল ইসলাম')).toBeInTheDocument()
+    expect(screen.getByText('১২/০৪/১৯৯৬')).toBeInTheDocument()
     expect(screen.getByText('অবিবাহিত')).toBeInTheDocument()
     expect(screen.getByText('গ্রাম: চরভদ্রাসন, থানা: সদর, জেলা: ফরিদপুর')).toBeInTheDocument()
     expect(screen.getByText('সফটওয়্যার ইঞ্জিনিয়ার, কারওয়ান বাজার, ঢাকা')).toBeInTheDocument()

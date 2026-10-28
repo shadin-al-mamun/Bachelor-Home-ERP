@@ -25,6 +25,9 @@ export interface FormMetaInfo {
   landlordName?: string
   landlordPhone?: string
   issueDate?: string
+  dob?: string
+  fatherName?: string
+  maritalStatus?: string
 }
 
 interface TenantPoliceFormProps {
@@ -44,10 +47,40 @@ export function toBengaliNumerals(input: string | number | null | undefined): st
 export function formatBengaliDate(dateStr?: string | null): string {
   if (!dateStr) return ''
   try {
-    const parts = dateStr.split('T')[0].split('-')
-    if (parts.length === 3) {
-      const [year, month, day] = parts
-      return `${toBengaliNumerals(day)}/${toBengaliNumerals(month)}/${toBengaliNumerals(year)}`
+    const cleanStr = String(dateStr).trim()
+    if (!cleanStr) return ''
+    const isoPart = cleanStr.split('T')[0]
+
+    // Handle dash-separated: YYYY-MM-DD or DD-MM-YYYY
+    if (isoPart.includes('-')) {
+      const parts = isoPart.split('-')
+      if (parts.length === 3) {
+        if (parts[0].length === 4) {
+          // YYYY-MM-DD
+          const [year, month, day] = parts
+          return `${toBengaliNumerals(day)}/${toBengaliNumerals(month)}/${toBengaliNumerals(year)}`
+        } else if (parts[2].length === 4) {
+          // DD-MM-YYYY
+          const [day, month, year] = parts
+          return `${toBengaliNumerals(day)}/${toBengaliNumerals(month)}/${toBengaliNumerals(year)}`
+        }
+      }
+    }
+
+    // Handle slash-separated: YYYY/MM/DD or DD/MM/YYYY
+    if (isoPart.includes('/')) {
+      const parts = isoPart.split('/')
+      if (parts.length === 3) {
+        if (parts[0].length === 4) {
+          // YYYY/MM/DD
+          const [year, month, day] = parts
+          return `${toBengaliNumerals(day)}/${toBengaliNumerals(month)}/${toBengaliNumerals(year)}`
+        } else if (parts[2].length === 4) {
+          // DD/MM/YYYY
+          const [day, month, year] = parts
+          return `${toBengaliNumerals(day)}/${toBengaliNumerals(month)}/${toBengaliNumerals(year)}`
+        }
+      }
     }
   } catch {
     // fallback
@@ -118,9 +151,10 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
 
   // Border data mapping
   const fullName = boarder?.full_name || ''
-  const fatherName = boarder?.father_name || boarder?.guardian_name || ''
-  const dob = boarder?.date_of_birth ? formatBengaliDate(boarder.date_of_birth) : ''
-  const maritalStatus = boarder?.marital_status || 'অবিবাহিত'
+  const fatherName = meta?.fatherName || boarder?.father_name || boarder?.guardian_name || ''
+  const rawDob = meta?.dob || boarder?.date_of_birth || ''
+  const dob = rawDob ? formatBengaliDate(rawDob) : ''
+  const maritalStatus = meta?.maritalStatus || boarder?.marital_status || 'অবিবাহিত'
   const permanentAddress = boarder?.permanent_address || ''
   const occupation = boarder?.occupation || (boarder?.student_id ? 'শিক্ষার্থী' : 'কর্মজীবী')
   const workplace = boarder?.workplace_address || boarder?.institution || ''

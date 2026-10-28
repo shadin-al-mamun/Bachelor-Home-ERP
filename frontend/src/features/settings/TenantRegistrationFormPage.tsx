@@ -18,10 +18,17 @@ import {
   ShieldCheck,
   Info,
   Image as ImageIcon,
+  Save,
+  Calendar,
+  AlertCircle,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import { useBrandingStore } from '@/app/store/useBrandingStore'
-import { useBoarders, type BoarderWithRelations } from '@/features/boarders/api/useBoarders'
+import {
+  useBoarders,
+  useUpdateBoarderMutation,
+  type BoarderWithRelations,
+} from '@/features/boarders/api/useBoarders'
 import Button from '@/components/common/Button'
 import TenantPoliceForm, {
   type FlatAddressInfo,
@@ -75,6 +82,15 @@ export const TenantRegistrationFormPage: React.FC = () => {
   const [customLandlordName, setCustomLandlordName] = useState('')
   const [customLandlordPhone, setCustomLandlordPhone] = useState('')
 
+  // Boarder personal overrides (for Serial 2, 3: Father name, DOB, Marital Status)
+  const [customDob, setCustomDob] = useState('')
+  const [customFatherName, setCustomFatherName] = useState('')
+  const [customMaritalStatus, setCustomMaritalStatus] = useState('অবিবাহিত')
+  const [isSavingBoarderInfo, setIsSavingBoarderInfo] = useState(false)
+  const [saveBoarderInfoSuccess, setSaveBoarderInfoSuccess] = useState(false)
+
+  const updateBoarderMutation = useUpdateBoarderMutation()
+
   // Sync defaults when selected boarder changes
   useEffect(() => {
     if (selectedBoarder) {
@@ -86,8 +102,36 @@ export const TenantRegistrationFormPage: React.FC = () => {
       setCustomPostCode(defaultFlat.postCode)
       setCustomLandlordName('মোঃ আব্দুস সাত্তার')
       setCustomLandlordPhone('01718246365')
+
+      // Sync personal info for the police form
+      setCustomDob(selectedBoarder.date_of_birth || '')
+      setCustomFatherName(selectedBoarder.father_name || selectedBoarder.guardian_name || '')
+      setCustomMaritalStatus(selectedBoarder.marital_status || 'অবিবাহিত')
+      setSaveBoarderInfoSuccess(false)
     }
   }, [selectedBoarder, brandingAddress])
+
+  // Save updated birth date and father name directly to the boarder record
+  const handleSaveBoarderPersonalDetails = async () => {
+    if (!selectedBoarder) return
+    setIsSavingBoarderInfo(true)
+    try {
+      await updateBoarderMutation.mutateAsync({
+        boarderId: selectedBoarder.id,
+        fullName: selectedBoarder.full_name,
+        phoneNumber: selectedBoarder.phone_number,
+        dateOfBirth: customDob,
+        fatherName: customFatherName,
+        maritalStatus: customMaritalStatus,
+      })
+      setSaveBoarderInfoSuccess(true)
+      setTimeout(() => setSaveBoarderInfoSuccess(false), 3500)
+    } catch (err) {
+      console.error('Failed to save boarder info from tenant form:', err)
+    } finally {
+      setIsSavingBoarderInfo(false)
+    }
+  }
 
   // Roommates for item 11 (roommates in the same room, or other rooms in the flat)
   const roommates = useMemo(() => {
@@ -115,8 +159,18 @@ export const TenantRegistrationFormPage: React.FC = () => {
       landlordName: customLandlordName || 'মোঃ আব্দুস সাত্তার',
       landlordPhone: customLandlordPhone || '01718246365',
       issueDate: new Date().toISOString().split('T')[0],
+      dob: customDob,
+      fatherName: customFatherName,
+      maritalStatus: customMaritalStatus,
     }
-  }, [selectedBoarder, customLandlordName, customLandlordPhone])
+  }, [
+    selectedBoarder,
+    customLandlordName,
+    customLandlordPhone,
+    customDob,
+    customFatherName,
+    customMaritalStatus,
+  ])
 
   // PDF Download Handler
   const handleDownloadPdf = async (boarderToDownload: BoarderWithRelations | null = selectedBoarder) => {
@@ -389,7 +443,29 @@ export const TenantRegistrationFormPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Address Customization Drawer / Box */}
+      {/* Helpful alert if selected boarder does not have Date of Birth */}
+      {selectedBoarder && !customDob && !selectedBoarder.date_of_birth && (
+        <div className="p-3.5 rounded-2xl bg-amber-950/30 border border-amber-500/30 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-300 animate-in fade-in">
+          <div className="flex items-center gap-2.5">
+            <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+            <span>
+              <strong>৩নং ক্রমিক (জন্ম তারিখ):</strong> নির্বাচিত বর্ডার <strong>{selectedBoarder.full_name}</strong>-এর জন্ম তারিখ প্রোফাইলে দেওয়া নেই। ফরমের ৩নং ক্রমিকে জন্ম তারিখ প্রদর্শনের জন্য নিচের <strong>&ldquo;তথ্য কাস্টমাইজ&rdquo;</strong> বাটনে ক্লিক করে জন্ম তারিখ নির্বাচন করুন।
+            </span>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => setIsCustomizing(true)}
+            className="border-amber-500/40 text-amber-300 hover:bg-amber-500/10 text-xs whitespace-nowrap self-end sm:self-auto"
+          >
+            <Calendar className="w-3.5 h-3.5 mr-1.5" />
+            জন্ম তারিখ যুক্ত করুন
+          </Button>
+        </div>
+      )}
+
+      {/* Address & Personal Customization Drawer / Box */}
       {isCustomizing && (
         <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-cyan-500/30 shadow-lg space-y-4 animate-in fade-in">
           <div className="flex items-center justify-between pb-2 border-b border-slate-800">
@@ -466,6 +542,88 @@ export const TenantRegistrationFormPage: React.FC = () => {
                 onChange={(e) => setCustomLandlordPhone(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-200"
               />
+            </div>
+          </div>
+
+          {/* Section: Boarder personal fields (Serial 2, 3: Father name, DOB, Marital Status) */}
+          <div className="pt-2 border-t border-cyan-500/30 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-cyan-300 uppercase tracking-wide flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-cyan-400" />
+                বোর্ডারের ব্যক্তিগত তথ্য (৩নং জন্ম তারিখ ও ২নং পিতার নাম)
+              </span>
+              <span className="text-[11px] text-slate-400">
+                পরিবর্তন সাথে সাথে ৩নং ক্রমিকে দেখাবে
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div>
+                <label className="text-[11px] text-cyan-300 font-semibold block mb-1 flex items-center gap-1">
+                  <span>৩. জন্ম তারিখ (Date of Birth) :</span>
+                  <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={customDob}
+                  onChange={(e) => setCustomDob(e.target.value)}
+                  className="w-full bg-slate-950 border border-cyan-500/50 rounded-lg px-2.5 py-1.5 text-slate-100 font-medium focus:ring-1 focus:ring-cyan-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] text-slate-300 block mb-1">২. পিতার নাম :</label>
+                <input
+                  type="text"
+                  value={customFatherName}
+                  onChange={(e) => setCustomFatherName(e.target.value)}
+                  placeholder="পিতার নাম"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-200"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] text-slate-300 block mb-1">বৈবাহিক অবস্থা :</label>
+                <select
+                  value={customMaritalStatus}
+                  onChange={(e) => setCustomMaritalStatus(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-200"
+                >
+                  <option value="অবিবাহিত">অবিবাহিত</option>
+                  <option value="বিবাহিত">বিবাহিত</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-1">
+              <p className="text-[11px] text-slate-400">
+                টিপস: জন্ম তারিখ প্রদান করলে তা স্বয়ংক্রিয়ভাবে বাংলা ক্যালেন্ডার ফরম্যাটে (দিন/মাস/বছর) ৩নং ক্রমিকে প্রিন্ট হবে।
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={handleSaveBoarderPersonalDetails}
+                disabled={isSavingBoarderInfo || !selectedBoarder}
+                className="border-cyan-500/50 text-cyan-300 hover:bg-cyan-500/10 text-xs whitespace-nowrap"
+              >
+                {isSavingBoarderInfo ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    সংরক্ষণ হচ্ছে...
+                  </>
+                ) : saveBoarderInfoSuccess ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5 mr-1.5 text-emerald-400" />
+                    প্রোফাইলে সংরক্ষিত হয়েছে!
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-3.5 h-3.5 mr-1.5 text-cyan-400" />
+                    বোর্ডারের তথ্যে সেভ করুন
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         </div>
