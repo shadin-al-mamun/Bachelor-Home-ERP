@@ -83,6 +83,7 @@ export const TenantRegistrationFormPage: React.FC = () => {
       setCustomHouseHolding(defaultFlat.houseHolding)
       setCustomRoad(defaultFlat.road)
       setCustomArea(defaultFlat.area)
+      setCustomPostCode(defaultFlat.postCode)
       setCustomLandlordName('মোঃ আব্দুস সাত্তার')
       setCustomLandlordPhone('01718246365')
     }

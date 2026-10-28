@@ -76,9 +76,9 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
     (flatObj?.name ? `${flatObj.name}${roomObj?.name ? ` (${roomObj.name})` : ''}` : 'ফ্ল্যাট ৪এ (৪র্থ তলা)')
   const displayHouseHolding =
     flatInfo?.houseHolding || (buildingObj?.name ? `${buildingObj.name}, হোল্ডিং #৪২` : 'বাড়ি #৪২')
-  const displayRoad = flatInfo?.road || 'রোড #১১, সেক্টর #৪'
-  const displayArea = flatInfo?.area || 'উত্তরা / শেরে বাংলা নগর'
-  const displayPostCode = toBengaliNumerals(flatInfo?.postCode || '১২৩০')
+  const displayRoad = flatInfo?.road || '৯ সাত্তার টাওয়ার'
+  const displayArea = flatInfo?.area || 'শেরে বাংলা নগর'
+  const displayPostCode = toBengaliNumerals(flatInfo?.postCode || '১২০৭')
 
   // Fixed top-center division and thana
   const displayDivision = meta?.division || 'ঢাকা'
@@ -204,12 +204,12 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
             </div>
           </div>
 
-          <div className="mt-2.5">
+          <div className="mt-2 mb-1">
             <h2
-              className="text-base sm:text-[18px] font-extrabold inline-block text-black px-3 tracking-wide"
+              className="text-base sm:text-[18px] font-extrabold inline-block text-black px-4 tracking-wide"
               style={{
                 borderBottom: '3px double #000000',
-                paddingBottom: '2px',
+                paddingBottom: '6px',
               }}
             >
               ভাড়াটিয়া নিবন্ধন ফরম
