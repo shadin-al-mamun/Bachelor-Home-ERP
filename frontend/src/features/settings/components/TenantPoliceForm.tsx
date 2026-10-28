@@ -192,14 +192,14 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
           <div className="text-xs sm:text-[13px] font-medium space-y-1 mt-0.5 text-black">
             <div className="flex items-center justify-center gap-1">
               <span className="font-semibold">বিভাগ :</span>
-              <div className="border-b border-dotted border-black/80 px-2 min-w-[150px] inline-flex justify-center items-end pb-0.5 min-h-[22px]">
-                <span className="font-bold text-black leading-normal">{displayDivision}</span>
+              <div className="tenant-dotted-field border-b border-dotted border-black/80 px-2 min-w-[150px] inline-flex justify-center items-end pb-[3px] min-h-[22px]">
+                <span className="tenant-dotted-value font-bold text-black leading-normal mb-[1px]">{displayDivision}</span>
               </div>
             </div>
             <div className="flex items-center justify-center gap-1">
               <span className="font-semibold">থানা :</span>
-              <div className="border-b border-dotted border-black/80 px-2 min-w-[150px] inline-flex justify-center items-end pb-0.5 min-h-[22px]">
-                <span className="font-bold text-black leading-normal">{displayThana}</span>
+              <div className="tenant-dotted-field border-b border-dotted border-black/80 px-2 min-w-[150px] inline-flex justify-center items-end pb-[3px] min-h-[22px]">
+                <span className="tenant-dotted-value font-bold text-black leading-normal mb-[1px]">{displayThana}</span>
               </div>
             </div>
           </div>
@@ -246,14 +246,14 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
 
       {/* ============================================================== */}
       {/* 2. BODY FORM FIELDS (১ to ১৭) */}
-      {/* Clean text baseline spacing above dotted lines with ample line-height */}
+      {/* Clean text baseline spacing elevated above dotted lines */}
       {/* ============================================================== */}
       <div className="text-[12.5px] sm:text-[13px] text-black space-y-2">
         {/* Item 1 */}
         <div className="flex items-end">
           <span className="font-semibold whitespace-nowrap text-black">১. ভাড়াটিয়া/বাড়ীওয়ালার নাম :</span>
-          <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[22px] flex items-end pb-0.5 overflow-hidden">
-            <span className="font-bold text-black leading-normal whitespace-nowrap">
+          <div className="tenant-dotted-field flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[22px] flex items-end pb-[3px] overflow-hidden">
+            <span className="tenant-dotted-value font-bold text-black leading-normal whitespace-nowrap mb-[1px]">
               {fullName}
             </span>
           </div>
@@ -262,8 +262,8 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
         {/* Item 2 */}
         <div className="flex items-end">
           <span className="font-semibold whitespace-nowrap text-black">২. পিতার নাম :</span>
-          <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[22px] flex items-end pb-0.5 overflow-hidden">
-            <span className="font-bold text-black leading-normal whitespace-nowrap">
+          <div className="tenant-dotted-field flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[22px] flex items-end pb-[3px] overflow-hidden">
+            <span className="tenant-dotted-value font-bold text-black leading-normal whitespace-nowrap mb-[1px]">
               {fatherName}
             </span>
           </div>
@@ -273,16 +273,16 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
         <div className="flex items-end gap-3">
           <div className="flex items-end flex-1 min-w-0">
             <span className="font-semibold whitespace-nowrap text-black">৩. জন্ম তারিখ :</span>
-            <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[22px] flex items-end pb-0.5 overflow-hidden">
-              <span className="font-bold text-black leading-normal whitespace-nowrap">
+            <div className="tenant-dotted-field flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[22px] flex items-end pb-[3px] overflow-hidden">
+              <span className="tenant-dotted-value font-bold text-black leading-normal whitespace-nowrap mb-[1px]">
                 {dob}
               </span>
             </div>
           </div>
           <div className="flex items-end w-[240px]">
             <span className="font-semibold whitespace-nowrap text-black">বৈবাহিক অবস্থা :</span>
-            <div className="flex-1 justify-center border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[22px] flex items-end pb-0.5 overflow-hidden">
-              <span className="font-bold text-black leading-normal whitespace-nowrap text-center">
+            <div className="tenant-dotted-field flex-1 justify-center border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[22px] flex items-end pb-[3px] overflow-hidden">
+              <span className="tenant-dotted-value font-bold text-black leading-normal whitespace-nowrap text-center mb-[1px]">
                 {maritalStatus}
               </span>
             </div>
@@ -292,8 +292,8 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
         {/* Item 4 */}
         <div className="flex items-end">
           <span className="font-semibold whitespace-nowrap text-black">৪. স্থায়ী ঠিকানা :</span>
-          <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[22px] flex items-end pb-0.5 overflow-hidden">
-            <span className="font-medium text-black leading-normal whitespace-nowrap">
+          <div className="tenant-dotted-field flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[22px] flex items-end pb-[3px] overflow-hidden">
+            <span className="tenant-dotted-value font-medium text-black leading-normal whitespace-nowrap mb-[1px]">
               {permanentAddress}
             </span>
           </div>
@@ -302,8 +302,8 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
         {/* Item 5 */}
         <div className="flex items-end">
           <span className="font-semibold whitespace-nowrap text-black">৫. পেশা ও প্রতিষ্ঠান/কর্মস্থলের ঠিকানা :</span>
-          <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[22px] flex items-end pb-0.5 overflow-hidden">
-            <span className="font-medium text-black leading-normal whitespace-nowrap">
+          <div className="tenant-dotted-field flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[22px] flex items-end pb-[3px] overflow-hidden">
+            <span className="tenant-dotted-value font-medium text-black leading-normal whitespace-nowrap mb-[1px]">
               {occupationAndWorkplace}
             </span>
           </div>
@@ -313,16 +313,16 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
         <div className="flex items-end gap-3">
           <div className="flex items-end flex-1 min-w-0">
             <span className="font-semibold whitespace-nowrap text-black">৬. ধর্ম :</span>
-            <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[22px] flex items-end pb-0.5 overflow-hidden">
-              <span className="font-bold text-black leading-normal whitespace-nowrap">
+            <div className="tenant-dotted-field flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[22px] flex items-end pb-[3px] overflow-hidden">
+              <span className="tenant-dotted-value font-bold text-black leading-normal whitespace-nowrap mb-[1px]">
                 {religion}
               </span>
             </div>
           </div>
           <div className="flex items-end flex-1 min-w-0">
             <span className="font-semibold whitespace-nowrap text-black">শিক্ষাগত যোগ্যতা :</span>
-            <div className="flex-1 justify-center border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[22px] flex items-end pb-0.5 overflow-hidden">
-              <span className="font-bold text-black leading-normal whitespace-nowrap text-center">
+            <div className="tenant-dotted-field flex-1 justify-center border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[22px] flex items-end pb-[3px] overflow-hidden">
+              <span className="tenant-dotted-value font-bold text-black leading-normal whitespace-nowrap text-center mb-[1px]">
                 {educationalQualification}
               </span>
             </div>
@@ -333,16 +333,16 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
         <div className="flex items-end gap-3">
           <div className="flex items-end flex-1 min-w-0">
             <span className="font-semibold whitespace-nowrap text-black">৭. মোবাইল নম্বর :</span>
-            <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[22px] flex items-end pb-0.5 overflow-hidden">
-              <span className="font-bold text-black leading-normal whitespace-nowrap tracking-wider">
+            <div className="tenant-dotted-field flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[22px] flex items-end pb-[3px] overflow-hidden">
+              <span className="tenant-dotted-value font-bold text-black leading-normal whitespace-nowrap tracking-wider mb-[1px]">
                 {phone}
               </span>
             </div>
           </div>
           <div className="flex items-end flex-1 min-w-0">
             <span className="font-semibold whitespace-nowrap text-black">ই-মেইল আইডি :</span>
-            <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[22px] flex items-end pb-0.5 overflow-hidden">
-              <span className="font-medium text-black leading-normal whitespace-nowrap">
+            <div className="tenant-dotted-field flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[22px] flex items-end pb-[3px] overflow-hidden">
+              <span className="tenant-dotted-value font-medium text-black leading-normal whitespace-nowrap mb-[1px]">
                 {email}
               </span>
             </div>
@@ -352,8 +352,8 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
         {/* Item 8 */}
         <div className="flex items-end">
           <span className="font-semibold whitespace-nowrap text-black">৮. জাতীয় পরিচয়পত্র নম্বর :</span>
-          <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[22px] flex items-end pb-0.5 overflow-hidden">
-            <span className="font-bold text-black leading-normal whitespace-nowrap tracking-wider">
+          <div className="tenant-dotted-field flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[22px] flex items-end pb-[3px] overflow-hidden">
+            <span className="tenant-dotted-value font-bold text-black leading-normal whitespace-nowrap tracking-wider mb-[1px]">
               {nidNumber}
             </span>
           </div>
@@ -362,8 +362,8 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
         {/* Item 9 */}
         <div className="flex items-end">
           <span className="font-semibold whitespace-nowrap text-black">৯. পাসপোর্ট নম্বর (যদি থাকে) :</span>
-          <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[22px] flex items-end pb-0.5 overflow-hidden">
-            <span className="font-medium text-black leading-normal whitespace-nowrap tracking-wider">
+          <div className="tenant-dotted-field flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[22px] flex items-end pb-[3px] overflow-hidden">
+            <span className="tenant-dotted-value font-medium text-black leading-normal whitespace-nowrap tracking-wider mb-[1px]">
               {passportNumber}
             </span>
           </div>
@@ -375,16 +375,16 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
           <div className="grid grid-cols-2 gap-3 pl-3">
             <div className="flex items-end min-w-0">
               <span className="font-medium whitespace-nowrap text-black">(ক) নাম :</span>
-              <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[21px] flex items-end pb-0.5 overflow-hidden">
-                <span className="font-bold text-black leading-normal whitespace-nowrap">
+              <div className="tenant-dotted-field flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[21px] flex items-end pb-[3px] overflow-hidden">
+                <span className="tenant-dotted-value font-bold text-black leading-normal whitespace-nowrap mb-[1px]">
                   {emergencyName}
                 </span>
               </div>
             </div>
             <div className="flex items-end min-w-0">
               <span className="font-medium whitespace-nowrap text-black">(খ) সম্পর্ক :</span>
-              <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[21px] flex items-end pb-0.5 overflow-hidden">
-                <span className="font-bold text-black leading-normal whitespace-nowrap">
+              <div className="tenant-dotted-field flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[21px] flex items-end pb-[3px] overflow-hidden">
+                <span className="tenant-dotted-value font-bold text-black leading-normal whitespace-nowrap mb-[1px]">
                   {emergencyRelation}
                 </span>
               </div>
@@ -393,16 +393,16 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
           <div className="grid grid-cols-2 gap-3 pl-3">
             <div className="flex items-end min-w-0">
               <span className="font-medium whitespace-nowrap text-black">(গ) ঠিকানা :</span>
-              <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[21px] flex items-end pb-0.5 overflow-hidden">
-                <span className="font-medium text-black leading-normal whitespace-nowrap">
+              <div className="tenant-dotted-field flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[21px] flex items-end pb-[3px] overflow-hidden">
+                <span className="tenant-dotted-value font-medium text-black leading-normal whitespace-nowrap mb-[1px]">
                   {emergencyAddress}
                 </span>
               </div>
             </div>
             <div className="flex items-end min-w-0">
               <span className="font-medium whitespace-nowrap text-black">(ঘ) মোবাইল নম্বর :</span>
-              <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[21px] flex items-end pb-0.5 overflow-hidden">
-                <span className="font-bold text-black leading-normal whitespace-nowrap tracking-wider">
+              <div className="tenant-dotted-field flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[21px] flex items-end pb-[3px] overflow-hidden">
+                <span className="tenant-dotted-value font-bold text-black leading-normal whitespace-nowrap tracking-wider mb-[1px]">
                   {emergencyPhone}
                 </span>
               </div>
@@ -522,16 +522,16 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
         <div className="grid grid-cols-2 gap-3 pt-0.5">
           <div className="flex items-end min-w-0">
             <span className="font-semibold whitespace-nowrap text-black">১৬. বর্তমান বাড়িওয়ালার নাম :</span>
-            <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[21px] flex items-end pb-0.5 overflow-hidden">
-              <span className="font-bold text-black leading-normal whitespace-nowrap">
+            <div className="tenant-dotted-field flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[21px] flex items-end pb-[3px] overflow-hidden">
+              <span className="tenant-dotted-value font-bold text-black leading-normal whitespace-nowrap mb-[1px]">
                 {FIXED_LANDLORD_NAME}
               </span>
             </div>
           </div>
           <div className="flex items-end min-w-0">
             <span className="font-semibold whitespace-nowrap text-black">মোবাইল নম্বর :</span>
-            <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[21px] flex items-end pb-0.5 overflow-hidden">
-              <span className="font-bold text-black leading-normal whitespace-nowrap tracking-wider">
+            <div className="tenant-dotted-field flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[21px] flex items-end pb-[3px] overflow-hidden">
+              <span className="tenant-dotted-value font-bold text-black leading-normal whitespace-nowrap tracking-wider mb-[1px]">
                 {FIXED_LANDLORD_PHONE}
               </span>
             </div>
@@ -541,8 +541,8 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
         {/* Item 17 */}
         <div className="flex items-end pt-0.5">
           <span className="font-semibold whitespace-nowrap text-black">১৭. বর্তমান বাড়ীতে কোন তারিখ থেকে বসবাস :</span>
-          <div className="flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[21px] flex items-end pb-0.5 overflow-hidden">
-            <span className="font-bold text-black leading-normal whitespace-nowrap">
+          <div className="tenant-dotted-field flex-1 border-b border-dotted border-black/80 ml-1.5 px-1 min-h-[21px] flex items-end pb-[3px] overflow-hidden">
+            <span className="tenant-dotted-value font-bold text-black leading-normal whitespace-nowrap mb-[1px]">
               {displayAllotmentDate}
             </span>
           </div>
@@ -554,8 +554,8 @@ export const TenantPoliceForm: React.FC<TenantPoliceFormProps> = ({
       {/* ============================================================== */}
       <div className="mt-7 pt-3 flex items-end justify-between text-xs sm:text-[13px] text-black">
         <div className="min-w-[160px] text-center">
-          <div className="border-b border-dotted border-black/80 mb-1 pb-0.5 flex justify-center items-end min-h-[22px]">
-            <span className="font-bold text-black leading-normal">
+          <div className="tenant-dotted-field border-b border-dotted border-black/80 mb-1 pb-[3px] flex justify-center items-end min-h-[22px]">
+            <span className="tenant-dotted-value font-bold text-black leading-normal mb-[1px]">
               {displayToday}
             </span>
           </div>

@@ -36,6 +36,21 @@ export async function captureTenantFormCanvas(elementId: string): Promise<HTMLCa
         clonedEl.style.transform = 'none'
         clonedEl.style.boxShadow = 'none'
         clonedEl.style.margin = '0 auto'
+
+        // Lift all text fields cleanly above the dotted baseline in canvas render
+        // so downloaded PDF/JPG matches the exact visual elevation shown in the browser preview
+        const fields = clonedEl.querySelectorAll('.tenant-dotted-field')
+        fields.forEach((f) => {
+          const el = f as HTMLElement
+          el.style.paddingBottom = '6px'
+        })
+
+        const values = clonedEl.querySelectorAll('.tenant-dotted-value')
+        values.forEach((v) => {
+          const el = v as HTMLElement
+          el.style.display = 'inline-block'
+          el.style.transform = 'translateY(-2px)'
+        })
       }
     },
   })
