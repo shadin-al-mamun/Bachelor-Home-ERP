@@ -13,6 +13,7 @@ import {
   Phone,
   ShieldCheck,
   Loader2,
+  Image as ImageIcon,
 } from 'lucide-react'
 
 interface SelectBoarderModalProps {
@@ -22,6 +23,7 @@ interface SelectBoarderModalProps {
   selectedBoarder: BoarderWithRelations | null
   onSelectBoarder: (boarder: BoarderWithRelations) => void
   onDownloadPdf: (boarder: BoarderWithRelations) => Promise<void>
+  onDownloadJpg?: (boarder: BoarderWithRelations) => Promise<void>
   onPrint: () => void
   isDownloading?: boolean
 }
@@ -33,6 +35,7 @@ export const SelectBoarderModal: React.FC<SelectBoarderModalProps> = ({
   selectedBoarder,
   onSelectBoarder,
   onDownloadPdf,
+  onDownloadJpg,
   onPrint,
   isDownloading = false,
 }) => {
@@ -81,6 +84,13 @@ export const SelectBoarderModal: React.FC<SelectBoarderModalProps> = ({
     if (tempSelected) {
       onSelectBoarder(tempSelected)
       await onDownloadPdf(tempSelected)
+    }
+  }
+
+  const handleDownloadJpg = async () => {
+    if (tempSelected && onDownloadJpg) {
+      onSelectBoarder(tempSelected)
+      await onDownloadJpg(tempSelected)
     }
   }
 
@@ -294,6 +304,20 @@ export const SelectBoarderModal: React.FC<SelectBoarderModalProps> = ({
               প্রিন্ট
             </Button>
 
+            {onDownloadJpg && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadJpg}
+                disabled={!currentBoarder || isDownloading}
+                className="flex-1 sm:flex-none border-emerald-500/50 text-emerald-300 hover:bg-emerald-500/10 font-medium"
+              >
+                <ImageIcon className="w-4 h-4 mr-1.5 text-emerald-400" />
+                জেপিজি
+              </Button>
+            )}
+
             <Button
               type="button"
               variant="primary"
@@ -305,7 +329,7 @@ export const SelectBoarderModal: React.FC<SelectBoarderModalProps> = ({
               {isDownloading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
-                  পিডিএফ তৈরি হচ্ছে...
+                  ডাউনলোড হচ্ছে...
                 </>
               ) : (
                 <>

@@ -17,6 +17,7 @@ import {
   UserCheck,
   ShieldCheck,
   Info,
+  Image as ImageIcon,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import { useBrandingStore } from '@/app/store/useBrandingStore'
@@ -31,7 +32,11 @@ import {
   resolveRoommatesForBoarder,
   resolveFlatInfoForBoarder,
 } from './utils/tenantFormHelpers'
-import { downloadTenantFormPDF, printTenantForm } from './utils/tenantFormPdfGenerator'
+import {
+  downloadTenantFormPDF,
+  downloadTenantFormJPG,
+  printTenantForm,
+} from './utils/tenantFormPdfGenerator'
 
 export const TenantRegistrationFormPage: React.FC = () => {
   const { profile } = useAuthStore()
@@ -45,6 +50,7 @@ export const TenantRegistrationFormPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
   const [downloadSuccess, setDownloadSuccess] = useState(false)
+  const [downloadFeedbackMsg, setDownloadFeedbackMsg] = useState('ভাড়াটিয়া নিবন্ধন ফরম সফলভাবে ডাউনলোড হয়েছে!')
   const [zoomScale, setZoomScale] = useState<number>(100)
   const [isCustomizing, setIsCustomizing] = useState(false)
 
@@ -124,6 +130,29 @@ export const TenantRegistrationFormPage: React.FC = () => {
 
       const success = await downloadTenantFormPDF('tenant-police-form-print', filename)
       if (success) {
+        setDownloadFeedbackMsg('ভাড়াটিয়া নিবন্ধন ফরম (PDF ফাইল) সফলভাবে ডাউনলোড হয়েছে!')
+        setDownloadSuccess(true)
+        setTimeout(() => setDownloadSuccess(false), 5000)
+      }
+    } finally {
+      setIsDownloading(false)
+    }
+  }
+
+  // JPG Image Download Handler
+  const handleDownloadJpg = async (boarderToDownload: BoarderWithRelations | null = selectedBoarder) => {
+    if (!boarderToDownload) return
+    setIsDownloading(true)
+    setDownloadSuccess(false)
+
+    try {
+      const safeCode = (boarderToDownload.boarder_code || 'BDR').replace(/[^a-zA-Z0-9_-]/g, '_')
+      const safeName = (boarderToDownload.full_name || 'Boarder').replace(/[^a-zA-Z0-9_\u0980-\u09FF-]/g, '_')
+      const filename = `Tenant_Registration_Form_${safeCode}_${safeName}.jpg`
+
+      const success = await downloadTenantFormJPG('tenant-police-form-print', filename)
+      if (success) {
+        setDownloadFeedbackMsg('ভাড়াটিয়া নিবন্ধন ফরম (JPG ছবি) সফলভাবে ডাউনলোড হয়েছে!')
         setDownloadSuccess(true)
         setTimeout(() => setDownloadSuccess(false), 5000)
       }
@@ -187,6 +216,17 @@ export const TenantRegistrationFormPage: React.FC = () => {
           </Button>
 
           <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleDownloadJpg()}
+            disabled={!selectedBoarder || isDownloading}
+            className="border-emerald-500/50 text-emerald-300 hover:bg-emerald-500/10 font-medium"
+          >
+            <ImageIcon className="w-4 h-4 mr-1.5 text-emerald-400" />
+            জেপিজি ডাউনলোড
+          </Button>
+
+          <Button
             variant="primary"
             size="sm"
             onClick={() => handleDownloadPdf()}
@@ -196,7 +236,7 @@ export const TenantRegistrationFormPage: React.FC = () => {
             {isDownloading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
-                পিডিএফ ডাউনলোড হচ্ছে...
+                ডাউনলোড হচ্ছে...
               </>
             ) : (
               <>
@@ -265,7 +305,7 @@ export const TenantRegistrationFormPage: React.FC = () => {
         <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-sm flex items-center gap-3 animate-in fade-in">
           <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
           <div>
-            <p className="font-semibold">ভাড়াটিয়া নিবন্ধন ফরম সফলভাবে ডাউনলোড হয়েছে!</p>
+            <p className="font-semibold">{downloadFeedbackMsg}</p>
             <p className="text-xs text-emerald-400/80 mt-0.5">
               নির্বাচিত বর্ডারের ছবি, ফ্ল্যাট ও রুমমেটদের বিবরণসহ অফিশিয়াল এ৪ ফরম্যাট সংরক্ষণ করা হয়েছে।
             </p>
@@ -443,12 +483,23 @@ export const TenantRegistrationFormPage: React.FC = () => {
             type="button"
             variant="outline"
             size="sm"
+            onClick={() => handleDownloadJpg()}
+            disabled={!selectedBoarder || isDownloading}
+            className="border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 text-xs py-1"
+          >
+            <ImageIcon className="w-3.5 h-3.5 mr-1 text-emerald-400" />
+            জেপিজি
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
             onClick={() => handleDownloadPdf()}
             disabled={!selectedBoarder || isDownloading}
             className="border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/10 text-xs py-1"
           >
             <Download className="w-3.5 h-3.5 mr-1" />
-            ডাউনলোড
+            পিডিএফ
           </Button>
         </div>
       </div>
@@ -496,6 +547,12 @@ export const TenantRegistrationFormPage: React.FC = () => {
           // Wait a tick for DOM to update with selected boarder then download
           setTimeout(async () => {
             await handleDownloadPdf(b)
+          }, 100)
+        }}
+        onDownloadJpg={async (b) => {
+          setSelectedBoarderId(b.id)
+          setTimeout(async () => {
+            await handleDownloadJpg(b)
           }, 100)
         }}
         onPrint={handlePrint}

@@ -11,6 +11,8 @@ import i18n from 'i18next'
 vi.mock('@/features/settings/utils/tenantFormPdfGenerator', () => ({
   downloadTenantFormPDF: vi.fn().mockResolvedValue(true),
   downloadTenantFormPdf: vi.fn().mockResolvedValue(true),
+  downloadTenantFormJPG: vi.fn().mockResolvedValue(true),
+  downloadTenantFormJpg: vi.fn().mockResolvedValue(true),
   printTenantForm: vi.fn().mockReturnValue(true),
 }))
 
@@ -100,10 +102,20 @@ describe('Tenant Registration Form (DMP Replica)', () => {
     const downloadBtns = screen.getAllByRole('button', { name: /ভাড়াটিয়া ফরম ডাউনলোড করুন/i })
     expect(downloadBtns.length).toBeGreaterThan(0)
 
+    // The JPG download button in the modal
+    const jpgBtns = screen.getAllByRole('button', { name: /জেপিজি/i })
+    expect(jpgBtns.length).toBeGreaterThan(0)
+
     // Clicking download in the modal calls downloadTenantFormPDF
     fireEvent.click(downloadBtns[downloadBtns.length - 1])
     await waitFor(() => {
       expect(pdfGen.downloadTenantFormPDF).toHaveBeenCalled()
+    })
+
+    // Clicking JPG in the modal calls downloadTenantFormJPG
+    fireEvent.click(jpgBtns[jpgBtns.length - 1])
+    await waitFor(() => {
+      expect(pdfGen.downloadTenantFormJPG).toHaveBeenCalled()
     })
   })
 

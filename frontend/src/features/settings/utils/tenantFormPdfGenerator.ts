@@ -2,28 +2,57 @@ import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
 
 /**
+ * Internal helper to render the form DOM element into a crisp, high-DPI canvas
+ */
+export async function captureTenantFormCanvas(elementId: string): Promise<HTMLCanvasElement | null> {
+  const element = document.getElementById(elementId)
+  if (!element) {
+    console.error(`[captureTenantFormCanvas] Element with id #${elementId} not found.`)
+    return null
+  }
+
+  // Ensure all web fonts (such as Hind Siliguri) are fully loaded
+  if (typeof document !== 'undefined' && 'fonts' in document) {
+    try {
+      await (document as any).fonts.ready
+    } catch {
+      // ignore
+    }
+  }
+
+  // Render the DOM element with 3x scale for crisp Bengali typography and vector-like lines
+  const canvas = await html2canvas(element, {
+    scale: 3,
+    useCORS: true,
+    allowTaint: true,
+    backgroundColor: '#ffffff',
+    logging: false,
+    onclone: (clonedDoc) => {
+      const clonedEl = clonedDoc.getElementById(elementId)
+      if (clonedEl) {
+        clonedEl.style.width = '794px'
+        clonedEl.style.maxWidth = '794px'
+        clonedEl.style.minHeight = '1123px'
+        clonedEl.style.transform = 'none'
+        clonedEl.style.boxShadow = 'none'
+        clonedEl.style.margin = '0 auto'
+      }
+    },
+  })
+
+  return canvas
+}
+
+/**
  * High-definition PDF generation for Dhaka Metropolitan Police Tenant Registration Form
  */
 export async function downloadTenantFormPDF(
   elementId: string,
   filename: string = 'Tenant_Registration_Form.pdf'
 ): Promise<boolean> {
-  const element = document.getElementById(elementId)
-  if (!element) {
-    console.error(`[downloadTenantFormPDF] Element with id #${elementId} not found.`)
-    return false
-  }
-
   try {
-    // Render the DOM element with high DPI scale for crisp Bengali typography
-    const canvas = await html2canvas(element, {
-      scale: 2.5,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      logging: false,
-      windowWidth: 794,
-    })
+    const canvas = await captureTenantFormCanvas(elementId)
+    if (!canvas) return false
 
     // Standard A4 dimensions in mm: 210 x 297
     const pdf = new jsPDF({
@@ -47,6 +76,33 @@ export async function downloadTenantFormPDF(
 }
 
 export const downloadTenantFormPdf = downloadTenantFormPDF
+
+/**
+ * High-definition JPG Image download for Dhaka Metropolitan Police Tenant Registration Form
+ */
+export async function downloadTenantFormJPG(
+  elementId: string,
+  filename: string = 'Tenant_Registration_Form.jpg'
+): Promise<boolean> {
+  try {
+    const canvas = await captureTenantFormCanvas(elementId)
+    if (!canvas) return false
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.98)
+    const link = document.createElement('a')
+    link.href = imgData
+    link.download = filename.endsWith('.jpg') || filename.endsWith('.jpeg') ? filename : `${filename}.jpg`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    return true
+  } catch (err) {
+    console.error('[downloadTenantFormJPG] Error during JPG export:', err)
+    return false
+  }
+}
+
+export const downloadTenantFormJpg = downloadTenantFormJPG
 
 /**
  * Print utility for physical paper printing of the Tenant Registration Form
