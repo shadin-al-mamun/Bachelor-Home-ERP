@@ -27,7 +27,7 @@ import { Link } from 'react-router-dom'
 import { Modal } from '@/components/common/Modal'
 import { Button } from '@/components/common/Button'
 
-interface LedgerEntry {
+export interface LedgerEntry {
   id: string
   date: string
   accountId: string
@@ -41,6 +41,70 @@ interface LedgerEntry {
   runningBalance: number
 }
 
+export interface ComputeLedgerParams {
+  rawEntries: LedgerEntry[]
+  selectedAccountId: string
+  dateFilter: 'ALL' | 'THIS_MONTH' | 'LAST_MONTH'
+  searchQuery?: string
+  currentMonthPrefix?: string
+}
+
+/**
+ * Pure helper function to compute account-scoped running balances.
+ * When a specific account is selected, running balances are strictly computed
+ * from that account's own opening balance and inflows/outflows, guaranteeing
+ * that the latest ledger running balance perfectly matches the account's live balance.
+ */
+export function computeAccountLedger({
+  rawEntries,
+  selectedAccountId,
+  dateFilter,
+  searchQuery = '',
+  currentMonthPrefix = new Date().toISOString().slice(0, 7),
+}: ComputeLedgerParams): LedgerEntry[] {
+  // 1. Isolate account entries if a specific account is chosen
+  let scopedList = rawEntries
+  if (selectedAccountId !== 'ALL') {
+    scopedList = scopedList.filter((item) => item.accountId === selectedAccountId)
+  }
+
+  // 2. Sort chronologically (oldest to newest) to accurately compute running balances
+  scopedList = [...scopedList].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  )
+
+  // 3. Compute running balance for this specific scope
+  let running = 0
+  const calculated = scopedList.map((entry) => {
+    running += entry.credit - entry.debit
+    return {
+      ...entry,
+      runningBalance: running,
+    }
+  })
+
+  // 4. Reverse to show newest transactions first
+  let result = [...calculated].reverse()
+
+  // 5. Apply Date Range Filter (display range)
+  if (dateFilter === 'THIS_MONTH') {
+    result = result.filter((item) => item.date.startsWith(currentMonthPrefix))
+  }
+
+  // 6. Apply Search Query Filter
+  if (searchQuery && searchQuery.trim()) {
+    const q = searchQuery.toLowerCase().trim()
+    result = result.filter(
+      (item) =>
+        item.referenceNo.toLowerCase().includes(q) ||
+        item.description.toLowerCase().includes(q) ||
+        item.accountName.toLowerCase().includes(q)
+    )
+  }
+
+  return result
+}
+
 export const FinancialAccountsPage: React.FC = () => {
   const { data: accounts = [], refetch: refetchAccounts } = useFinancialAccounts()
   const { data: receipts = [] } = useReceipts({ status: 'VALID' })
@@ -52,8 +116,12 @@ export const FinancialAccountsPage: React.FC = () => {
 
   // Selected Account for Ledger Filter
   const [selectedAccountId, setSelectedAccountId] = useState<string>('ALL')
-  const [dateFilter, setDateFilter] = useState<'ALL' | 'THIS_MONTH' | 'LAST_MONTH'>('THIS_MONTH')
+  const [dateFilter, setDateFilter] = useState<'ALL' | 'THIS_MONTH' | 'LAST_MONTH'>('ALL')
   const [searchQuery, setSearchQuery] = useState('')
+
+  const selectedAccount = useMemo(() => {
+    return accounts.find((a) => a.id === selectedAccountId) || null
+  }, [accounts, selectedAccountId])
 
   // Modals
   const [isCreateAccountOpen, setIsCreateAccountOpen] = useState(false)
@@ -223,46 +291,18 @@ export const FinancialAccountsPage: React.FC = () => {
       })
     })
 
-    // Sort Chronologically (oldest to newest) to compute running balances correctly
-    list.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-
-    // Compute running balances
-    let running = 0
-    const calculated = list.map((entry) => {
-      running += entry.credit - entry.debit
-      return {
-        ...entry,
-        runningBalance: running,
-      }
-    })
-
-    return calculated.reverse()
+    // Sort Chronologically (oldest to newest)
+    return list.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
   }, [accounts, receipts, incomes, expenses, transfers])
 
-  // Filtered Ledger
+  // Filtered Ledger with account-scoped running balance
   const filteredLedger = useMemo(() => {
-    let result = rawLedgerEntries
-
-    if (selectedAccountId !== 'ALL') {
-      result = result.filter((item) => item.accountId === selectedAccountId)
-    }
-
-    if (dateFilter === 'THIS_MONTH') {
-      const monthPrefix = new Date().toISOString().slice(0, 7)
-      result = result.filter((item) => item.date.startsWith(monthPrefix))
-    }
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
-      result = result.filter(
-        (item) =>
-          item.referenceNo.toLowerCase().includes(q) ||
-          item.description.toLowerCase().includes(q) ||
-          item.accountName.toLowerCase().includes(q)
-      )
-    }
-
-    return result
+    return computeAccountLedger({
+      rawEntries: rawLedgerEntries,
+      selectedAccountId,
+      dateFilter,
+      searchQuery,
+    })
   }, [rawLedgerEntries, selectedAccountId, dateFilter, searchQuery])
 
   return (
@@ -357,10 +397,11 @@ export const FinancialAccountsPage: React.FC = () => {
           return (
             <div
               key={acc.id}
-              className={`p-5 rounded-3xl border transition-all relative flex flex-col justify-between ${
+              onClick={() => setSelectedAccountId(isSelected ? 'ALL' : acc.id)}
+              className={`p-5 rounded-3xl border transition-all relative flex flex-col justify-between cursor-pointer select-none ${
                 isSelected
                   ? 'border-emerald-500 bg-slate-900 shadow-xl shadow-emerald-500/10 ring-2 ring-emerald-500/30'
-                  : 'border-slate-800 bg-slate-900/70 hover:border-slate-700'
+                  : 'border-slate-800 bg-slate-900/70 hover:border-slate-700 hover:bg-slate-900/90'
               }`}
             >
               <div>
@@ -370,7 +411,11 @@ export const FinancialAccountsPage: React.FC = () => {
                     {badgeLabel}
                   </span>
                   <button
-                    onClick={() => handleOpenOpeningBalance(acc)}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleOpenOpeningBalance(acc)
+                    }}
                     className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors"
                     title="প্রারম্ভিক ব্যালেন্স সেট বা আপডেট করুন"
                   >
@@ -414,10 +459,14 @@ export const FinancialAccountsPage: React.FC = () => {
               {/* Action Button to Filter Ledger */}
               <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
                 <button
-                  onClick={() => setSelectedAccountId(isSelected ? 'ALL' : acc.id)}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setSelectedAccountId(isSelected ? 'ALL' : acc.id)
+                  }}
                   className={`text-xs font-bold py-1.5 px-3 rounded-xl transition-all ${
                     isSelected
-                      ? 'bg-emerald-600 text-white'
+                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
                       : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
                   }`}
                 >
@@ -431,15 +480,44 @@ export const FinancialAccountsPage: React.FC = () => {
 
       {/* Running Ledger Section */}
       <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-4">
+        {/* Active Account Filter Notification Banner */}
+        {selectedAccount && (
+          <div className="p-3.5 px-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs animate-fade-in">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-slate-300">
+                একক খতিয়ান সক্রিয়:{' '}
+                <strong className="text-white font-bold">{selectedAccount.account_name}</strong>
+              </span>
+              <span className="text-slate-400 font-mono">
+                (প্রারম্ভিক: {formatCurrencyBn(selectedAccount.opening_balance || 0)} • লাইভ স্থিতি: {formatCurrencyBn(Number(selectedAccount.current_balance) > 0 ? selectedAccount.current_balance : (selectedAccount.opening_balance || 0))})
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedAccountId('ALL')}
+              className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold underline flex items-center gap-1 self-start sm:self-auto cursor-pointer"
+            >
+              সকল অ্যাকাউন্টের খতিয়ান দেখুন
+            </button>
+          </div>
+        )}
+
         {/* Ledger Header & Filters */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-800">
           <div>
             <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
               <CreditCard className="w-5 h-5 text-indigo-400" />
-              অ্যাকাউন্ট রানিং বিবরণী (Running Ledger)
+              <span>
+                {selectedAccount
+                  ? `${selectedAccount.account_name} — রানিং বিবরণী`
+                  : 'অ্যাকাউন্ট রানিং বিবরণী (Running Ledger)'}
+              </span>
             </h2>
             <p className="text-xs text-slate-400">
-              তারিখ অনুযায়ী প্রতিটি ক্রেডিট (আদায়/জমা) ও ডেবিট (ব্যয়) ট্রানজ্যাকশন এবং ক্রমপুঞ্জিত ব্যালেন্স
+              {selectedAccount
+                ? `নির্বাচিত অ্যাকাউন্টের তারিখ অনুযায়ী প্রতিটি ক্রেডিট ও ডেবিট লেনদেন এবং লাইভ ব্যালেন্স`
+                : `তারিখ অনুযায়ী প্রতিটি ক্রেডিট (আদায়/জমা) ও ডেবিট (ব্যয়) ট্রানজ্যাকশন এবং ক্রমপুঞ্জিত ব্যালেন্স`}
             </p>
           </div>
 
@@ -476,8 +554,8 @@ export const FinancialAccountsPage: React.FC = () => {
               onChange={(e) => setDateFilter(e.target.value as any)}
               className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-medium focus:outline-none focus:border-indigo-500"
             >
-              <option value="THIS_MONTH">চলতি মাস</option>
               <option value="ALL">সর্বকালের খতিয়ান</option>
+              <option value="THIS_MONTH">চলতি মাস</option>
             </select>
           </div>
         </div>
