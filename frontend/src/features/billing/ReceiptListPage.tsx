@@ -1,9 +1,9 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import {
   useReceipts,
+  filterReceiptsBySearch,
   type ExtendedReceipt,
-  type ReceiptFilters,
 } from './api/useReceipts'
 import { CollectReceiptModal } from './components/CollectReceiptModal'
 import { ReceiptPrintView } from './components/ReceiptPrintView'
@@ -25,6 +25,7 @@ import {
   Ban,
   Calendar,
   Zap,
+  X,
 } from 'lucide-react'
 
 
@@ -47,18 +48,14 @@ export const ReceiptListPage: React.FC = () => {
   const [printReceipt, setPrintReceipt] = useState<ExtendedReceipt | null>(null)
   const [voidReceipt, setVoidReceipt] = useState<ExtendedReceipt | null>(null)
 
-  const filters: ReceiptFilters = {
-    search: search.trim() || undefined,
-    status: statusFilter,
-    paymentMethod: paymentMethodFilter,
+  // Fetch all receipts for this view context (e.g. boarder or whole hostel)
+  const { data: allReceipts = [], isLoading, refetch, isFetching } = useReceipts({
     boarderId: initialBoarderId,
-  }
+  })
 
-  const { data: receipts = [], isLoading, refetch, isFetching } = useReceipts(filters)
-
-  // Calculations
-  const validReceipts = receipts.filter((r) => !r.is_void)
-  const voidReceipts = receipts.filter((r) => r.is_void)
+  // Calculations for overview metrics
+  const validReceipts = allReceipts.filter((r) => !r.is_void)
+  const voidReceipts = allReceipts.filter((r) => r.is_void)
   const totalCollected = validReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
   const totalVoided = voidReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
 
@@ -66,6 +63,27 @@ export const ReceiptListPage: React.FC = () => {
   const todayCollected = validReceipts
     .filter((r) => r.receipt_date.slice(0, 10) === todayStr)
     .reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
+
+  // Client-side filtering for zero-latency instant search and snappy filters
+  const displayedReceipts = useMemo(() => {
+    let result = allReceipts
+
+    if (statusFilter === 'VALID') {
+      result = result.filter((r) => !r.is_void)
+    } else if (statusFilter === 'VOID') {
+      result = result.filter((r) => r.is_void)
+    }
+
+    if (paymentMethodFilter !== 'ALL') {
+      result = result.filter((r) => r.payment_method === paymentMethodFilter)
+    }
+
+    if (search.trim()) {
+      result = filterReceiptsBySearch(result, search)
+    }
+
+    return result
+  }, [allReceipts, statusFilter, paymentMethodFilter, search])
 
   const paymentMethodLabel: Record<string, string> = {
     CASH: 'নগদ ক্যাশ',
@@ -176,7 +194,7 @@ export const ReceiptListPage: React.FC = () => {
         <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur flex items-center justify-between">
           <div>
             <span className="text-xs font-medium text-slate-400 block mb-1">সর্বমোট রিসিপ্ট</span>
-            <span className="text-xl font-black text-white">{receipts.length} টি</span>
+            <span className="text-xl font-black text-white">{allReceipts.length} টি</span>
             <span className="text-[11px] text-slate-500 block mt-0.5">অফিসিয়াল ট্রানজ্যাকশন</span>
           </div>
           <div className="w-11 h-11 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
@@ -203,14 +221,24 @@ export const ReceiptListPage: React.FC = () => {
       <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-3">
         {/* Search */}
         <div className="relative w-full md:w-80">
-          <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="রিসিপ্ট নং, বর্ডারের নাম বা মোবাইল..."
-            className="w-full pl-9 pr-4 py-2 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+            className="w-full pl-9 pr-9 py-2 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+              title="সার্চ মুছে ফেলুন"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Filter Controls */}
@@ -223,7 +251,7 @@ export const ReceiptListPage: React.FC = () => {
                 statusFilter === 'ALL' ? 'bg-slate-800 text-white shadow' : 'text-slate-400'
               }`}
             >
-              সকল
+              সকল ({allReceipts.length})
             </button>
             <button
               onClick={() => setStatusFilter('VALID')}
@@ -285,14 +313,30 @@ export const ReceiptListPage: React.FC = () => {
                     </div>
                   </td>
                 </tr>
-              ) : receipts.length === 0 ? (
+              ) : displayedReceipts.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-500">
-                    কোনো মানি রিসিপ্ট পাওয়া যায়নি।
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <Search className="w-6 h-6 text-slate-600" />
+                      <span className="text-slate-300">
+                        {search.trim()
+                          ? `"${search}" এর সাথে মিল রেখে কোনো মানি রিসিপ্ট পাওয়া যায়নি।`
+                          : 'কোনো মানি রিসিপ্ট পাওয়া যায়নি।'}
+                      </span>
+                      {search.trim() && (
+                        <button
+                          type="button"
+                          onClick={() => setSearch('')}
+                          className="text-xs text-emerald-400 hover:text-emerald-300 underline mt-1"
+                        >
+                          সার্চ ফিল্টার মুছে ফেলুন
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ) : (
-                receipts.map((rc) => (
+                displayedReceipts.map((rc) => (
                   <tr
                     key={rc.id}
                     className={`hover:bg-slate-800/30 transition-colors ${

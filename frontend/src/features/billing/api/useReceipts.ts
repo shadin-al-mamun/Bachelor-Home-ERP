@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
+import { convertBengaliDigits } from '@/utils/phone'
 import type {
   Receipt,
   PaymentMethod,
@@ -143,6 +144,44 @@ export interface ReceiptFilters {
   paymentMethod?: PaymentMethod | 'ALL'
 }
 
+/**
+ * Robust multi-term search filtering for receipts, supporting:
+ * - Receipt number (RCT-..., English/Bengali digits)
+ * - Boarder full name
+ * - Boarder code (BDR-..., English/Bengali digits)
+ * - Mobile / phone number (English and Bengali digits)
+ * - Transaction reference / notes
+ * - Account name
+ * - Collector name
+ * - Amount (English/Bengali digits)
+ */
+export function filterReceiptsBySearch(
+  receipts: ExtendedReceipt[],
+  search?: string
+): ExtendedReceipt[] {
+  if (!search || !search.trim()) return receipts
+
+  const qNorm = convertBengaliDigits(search.toLowerCase().trim())
+  const terms = qNorm.split(/\s+/).filter(Boolean)
+  if (terms.length === 0) return receipts
+
+  return receipts.filter((r) => {
+    const fields = [
+      convertBengaliDigits((r.receipt_number || '').toLowerCase()),
+      (r.boarder_name || '').toLowerCase(),
+      convertBengaliDigits((r.boarder_code || '').toLowerCase()),
+      convertBengaliDigits((r.boarder_phone || '').toLowerCase()),
+      convertBengaliDigits((r.transaction_reference || '').toLowerCase()),
+      (r.account_name || '').toLowerCase(),
+      (r.collector_name || '').toLowerCase(),
+      (r.remarks || '').toLowerCase(),
+      convertBengaliDigits(String(r.amount || '')),
+    ]
+
+    return terms.every((term) => fields.some((field) => field.includes(term)))
+  })
+}
+
 export function useReceipts(filters?: ReceiptFilters) {
   return useQuery({
     queryKey: ['receipts', filters],
@@ -161,14 +200,7 @@ export function useReceipts(filters?: ReceiptFilters) {
           result = result.filter((r) => r.payment_method === filters.paymentMethod)
         }
         if (filters?.search?.trim()) {
-          const q = filters.search.toLowerCase()
-          result = result.filter(
-            (r) =>
-              r.receipt_number.toLowerCase().includes(q) ||
-              r.boarder_name.toLowerCase().includes(q) ||
-              r.boarder_code.toLowerCase().includes(q) ||
-              (r.transaction_reference && r.transaction_reference.toLowerCase().includes(q))
-          )
+          result = filterReceiptsBySearch(result, filters.search)
         }
         return result
       }
@@ -204,7 +236,7 @@ export function useReceipts(filters?: ReceiptFilters) {
         return []
       }
 
-      return (data || []).map((r: any) => {
+      let list = (data || []).map((r: any) => {
         let b = r.boarder
         if (Array.isArray(b)) b = b.length > 0 ? b[0] : null
         let acc = r.destination_account
@@ -230,6 +262,12 @@ export function useReceipts(filters?: ReceiptFilters) {
           }),
         }
       }) as ExtendedReceipt[]
+
+      if (filters?.search?.trim()) {
+        list = filterReceiptsBySearch(list, filters.search)
+      }
+
+      return list
     },
   })
 }
