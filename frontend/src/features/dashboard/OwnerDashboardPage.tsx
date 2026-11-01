@@ -73,13 +73,6 @@ export const OwnerDashboardPage: React.FC = () => {
     return options
   }, [])
 
-  const selectedMonthOption = monthOptions.find((o) => o.value === selectedFinanceMonth)
-  const selectedMonthLabel = selectedMonthOption
-    ? selectedMonthOption.label.replace(' (চলতি মাস)', '')
-    : selectedFinanceMonth === 'ALL'
-    ? 'সর্বমোট'
-    : selectedFinanceMonth
-
   const kpis = dashboard?.kpis
   const cashFlowTrend = dashboard?.cash_flow_trend || []
   const flatOccupancy = dashboard?.flat_occupancy || []
@@ -269,7 +262,7 @@ export const OwnerDashboardPage: React.FC = () => {
                 id="finance-month-filter"
                 value={selectedFinanceMonth}
                 onChange={(e) => setSelectedFinanceMonth(e.target.value)}
-                className="bg-slate-950 border border-emerald-500/40 text-emerald-300 text-xs font-semibold rounded-xl px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer hover:border-emerald-400 transition-colors"
+                className="appearance-auto bg-slate-950 border border-emerald-500/40 text-emerald-300 text-xs font-semibold rounded-xl px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer hover:border-emerald-400 transition-colors"
               >
                 {monthOptions.map((opt) => (
                   <option key={opt.value} value={opt.value} className="bg-slate-900 text-white py-1">
@@ -331,12 +324,26 @@ export const OwnerDashboardPage: React.FC = () => {
                 </span>
               </div>
 
-              {/* Selected Month Indicator Pill */}
-              <div className="mt-1 flex items-center gap-1.5 text-[10px] text-emerald-400/90 font-medium">
-                <span className="text-slate-400">হিসাব মাস:</span>
-                <span className="px-1.5 py-0.5 rounded bg-emerald-950/80 border border-emerald-800/50 text-emerald-300 font-mono text-[9px] font-bold">
-                  {selectedMonthLabel}
+              {/* Interactive Financial Month Dropdown */}
+              <div className="mt-2 flex items-center gap-1.5">
+                <span className="text-[10px] font-medium text-slate-400 shrink-0 flex items-center gap-1">
+                  <Calendar className="w-3 h-3 text-emerald-400" />
+                  হিসাব মাস:
                 </span>
+                <div className="relative flex-1 min-w-0">
+                  <select
+                    value={selectedFinanceMonth}
+                    onChange={(e) => setSelectedFinanceMonth(e.target.value)}
+                    className="w-full appearance-auto bg-slate-950/90 hover:bg-slate-900 border border-emerald-500/50 hover:border-emerald-400 text-emerald-300 font-bold text-[10.5px] rounded-lg px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400 cursor-pointer transition-all shadow-sm"
+                    title="আর্থিক হিসাব মাস নির্বাচন করুন"
+                  >
+                    {monthOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value} className="bg-slate-900 text-white py-1">
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="text-2xl sm:text-3xl font-extrabold font-mono text-emerald-300 mt-1.5">
@@ -371,13 +378,11 @@ export const OwnerDashboardPage: React.FC = () => {
             </div>
 
             {/* Card 3: 📉 Expenses & Net Operating Income (NOI) */}
-            <div className={`p-4 sm:p-5 rounded-3xl bg-slate-900/70 border ${
-              kpis.net_operating_income >= 0 ? 'border-cyan-500/30' : 'border-rose-500/30'
-            } backdrop-blur-sm relative overflow-hidden group`}>
+            <div className={`p-4 sm:p-5 rounded-3xl bg-slate-900/70 border ${kpis.net_operating_income >= 0 ? 'border-cyan-500/30' : 'border-rose-500/30'
+              } backdrop-blur-sm relative overflow-hidden group`}>
               <div className="flex items-center justify-between">
-                <span className={`text-[11px] font-bold ${
-                  kpis.net_operating_income >= 0 ? 'text-cyan-400' : 'text-rose-400'
-                } uppercase tracking-wider flex items-center gap-1.5`}>
+                <span className={`text-[11px] font-bold ${kpis.net_operating_income >= 0 ? 'text-cyan-400' : 'text-rose-400'
+                  } uppercase tracking-wider flex items-center gap-1.5`}>
                   {kpis.net_operating_income >= 0 ? (
                     <TrendingUp className="w-4 h-4 text-cyan-400" />
                   ) : (
@@ -385,26 +390,38 @@ export const OwnerDashboardPage: React.FC = () => {
                   )}
                   নিট পরিচালন উদ্বৃত্ত (NOI)
                 </span>
-                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                  kpis.net_operating_income >= 0
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${kpis.net_operating_income >= 0
                     ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
                     : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                }`}>
+                  }`}>
                   {kpis.net_operating_income >= 0 ? 'মুনাফা' : 'ঘাটতি'}
                 </span>
               </div>
 
-              {/* Selected Month Indicator Pill */}
-              <div className="mt-1 flex items-center gap-1.5 text-[10px] text-cyan-400/90 font-medium">
-                <span className="text-slate-400">হিসাব মাস:</span>
-                <span className="px-1.5 py-0.5 rounded bg-cyan-950/80 border border-cyan-800/50 text-cyan-300 font-mono text-[9px] font-bold">
-                  {selectedMonthLabel}
+              {/* Interactive Financial Month Dropdown */}
+              <div className="mt-2 flex items-center gap-1.5">
+                <span className="text-[10px] font-medium text-slate-400 shrink-0 flex items-center gap-1">
+                  <Calendar className="w-3 h-3 text-cyan-400" />
+                  হিসাব মাস:
                 </span>
+                <div className="relative flex-1 min-w-0">
+                  <select
+                    value={selectedFinanceMonth}
+                    onChange={(e) => setSelectedFinanceMonth(e.target.value)}
+                    className="w-full appearance-auto bg-slate-950/90 hover:bg-slate-900 border border-cyan-500/50 hover:border-cyan-400 text-cyan-300 font-bold text-[10.5px] rounded-lg px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-cyan-400 cursor-pointer transition-all shadow-sm"
+                    title="আর্থিক হিসাব মাস নির্বাচন করুন"
+                  >
+                    {monthOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value} className="bg-slate-900 text-white py-1">
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              <div className={`text-2xl sm:text-3xl font-extrabold font-mono ${
-                kpis.net_operating_income >= 0 ? 'text-cyan-300' : 'text-rose-400'
-              } mt-1.5`}>
+              <div className={`text-2xl sm:text-3xl font-extrabold font-mono ${kpis.net_operating_income >= 0 ? 'text-cyan-300' : 'text-rose-400'
+                } mt-1.5`}>
                 ৳{(kpis.net_operating_income / 1000).toFixed(1)}k
               </div>
 
@@ -606,17 +623,15 @@ export const OwnerDashboardPage: React.FC = () => {
             <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-xl p-1 text-[11px] font-semibold">
               <button
                 onClick={() => setTrendMetric('ALL')}
-                className={`px-2.5 py-1 rounded-lg transition-all ${
-                  trendMetric === 'ALL' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
-                }`}
+                className={`px-2.5 py-1 rounded-lg transition-all ${trendMetric === 'ALL' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
+                  }`}
               >
                 উভয়
               </button>
               <button
                 onClick={() => setTrendMetric('SURPLUS')}
-                className={`px-2.5 py-1 rounded-lg transition-all ${
-                  trendMetric === 'SURPLUS' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
-                }`}
+                className={`px-2.5 py-1 rounded-lg transition-all ${trendMetric === 'SURPLUS' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
+                  }`}
               >
                 নিট উদ্বৃত্ত
               </button>
@@ -709,10 +724,10 @@ export const OwnerDashboardPage: React.FC = () => {
                 bucket.bucket === '< 30 days'
                   ? 'text-teal-400 bg-teal-500/10 border-teal-500/30'
                   : bucket.bucket === '30-60 days'
-                  ? 'text-amber-400 bg-amber-500/10 border-amber-500/30'
-                  : bucket.bucket === '60-90 days'
-                  ? 'text-orange-400 bg-orange-500/10 border-orange-500/30'
-                  : 'text-rose-400 bg-rose-500/10 border-rose-500/30 font-bold'
+                    ? 'text-amber-400 bg-amber-500/10 border-amber-500/30'
+                    : bucket.bucket === '60-90 days'
+                      ? 'text-orange-400 bg-orange-500/10 border-orange-500/30'
+                      : 'text-rose-400 bg-rose-500/10 border-rose-500/30 font-bold'
 
               return (
                 <div key={bucket.bucket} className="space-y-1.5">
@@ -725,9 +740,8 @@ export const OwnerDashboardPage: React.FC = () => {
 
                   <div className="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden">
                     <div
-                      className={`h-full rounded-full ${
-                        bucket.bucket === '> 90 days' ? 'bg-rose-500' : 'bg-indigo-500'
-                      }`}
+                      className={`h-full rounded-full ${bucket.bucket === '> 90 days' ? 'bg-rose-500' : 'bg-indigo-500'
+                        }`}
                       style={{ width: `${bucket.percentage}%` }}
                     />
                   </div>
@@ -793,13 +807,12 @@ export const OwnerDashboardPage: React.FC = () => {
 
                 <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all ${
-                      flat.rate === 100
+                    className={`h-full rounded-full transition-all ${flat.rate === 100
                         ? 'bg-emerald-500'
                         : flat.rate >= 80
-                        ? 'bg-indigo-500'
-                        : 'bg-amber-500'
-                    }`}
+                          ? 'bg-indigo-500'
+                          : 'bg-amber-500'
+                      }`}
                     style={{ width: `${flat.rate}%` }}
                   />
                 </div>
@@ -842,13 +855,12 @@ export const OwnerDashboardPage: React.FC = () => {
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                        isPayment
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isPayment
                           ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                           : isExpense
-                          ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                          : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
-                      }`}
+                            ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                            : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                        }`}
                     >
                       {isPayment ? (
                         <DollarSign className="w-4 h-4" />
@@ -873,9 +885,8 @@ export const OwnerDashboardPage: React.FC = () => {
                   {act.amount && (
                     <div className="text-right whitespace-nowrap shrink-0">
                       <div
-                        className={`font-mono font-bold text-xs ${
-                          isPayment ? 'text-emerald-400' : isExpense ? 'text-rose-400' : 'text-white'
-                        }`}
+                        className={`font-mono font-bold text-xs ${isPayment ? 'text-emerald-400' : isExpense ? 'text-rose-400' : 'text-white'
+                          }`}
                       >
                         {isPayment ? '+' : isExpense ? '−' : ''}৳{act.amount.toLocaleString('en-IN')}
                       </div>
