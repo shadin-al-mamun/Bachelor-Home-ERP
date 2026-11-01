@@ -816,6 +816,11 @@ export function useGenerateMonthlyMealChargesMutation() {
         input.boarderMinOverrides
       )
       const startDate = preview.start_date
+      const effectiveDueDate =
+        input.dueDate && input.dueDate.trim()
+          ? input.dueDate
+          : `${startDate.slice(0, 7)}-10`
+
       let generatedCount = 0
       let totalAmountBilled = 0
 
@@ -837,36 +842,42 @@ export function useGenerateMonthlyMealChargesMutation() {
 
         if (existing) {
           if (existing.status === 'UNPAID' && Number(existing.paid_amount || 0) === 0) {
-            await supabase
+            const { error: updErr } = await supabase
               .from('boarder_charges')
               .update({
                 amount: item.total_amount,
-                due_amount: item.total_amount,
                 description: desc,
-                due_date: input.dueDate || null,
+                due_date: effectiveDueDate,
                 updated_at: new Date().toISOString(),
               })
               .eq('id', existing.id)
 
-            generatedCount++
-            totalAmountBilled += item.total_amount
+            if (!updErr) {
+              generatedCount++
+              totalAmountBilled += item.total_amount
+            } else {
+              console.error('Failed to update meal charge for boarder:', item.boarder_id, updErr)
+            }
           }
         } else {
-          await supabase.from('boarder_charges').insert({
+          const { error: insErr } = await supabase.from('boarder_charges').insert({
             boarder_id: item.boarder_id,
             allocation_id: item.allocation_id || null,
             charge_type: 'MEAL',
             billing_month: startDate,
             amount: item.total_amount,
             paid_amount: 0.0,
-            due_amount: item.total_amount,
             status: 'UNPAID',
-            due_date: input.dueDate || null,
+            due_date: effectiveDueDate,
             description: desc,
           })
 
-          generatedCount++
-          totalAmountBilled += item.total_amount
+          if (!insErr) {
+            generatedCount++
+            totalAmountBilled += item.total_amount
+          } else {
+            console.error('Failed to insert meal charge for boarder:', item.boarder_id, insErr)
+          }
         }
       }
 
@@ -883,7 +894,10 @@ export function useGenerateMonthlyMealChargesMutation() {
       queryClient.invalidateQueries({ queryKey: ['monthly-meal-billing-preview'] })
       queryClient.invalidateQueries({ queryKey: ['boarder-detail-meal-selections'] })
       queryClient.invalidateQueries({ queryKey: ['boarder-dues'] })
+      queryClient.invalidateQueries({ queryKey: ['boarder-charges'] })
+      queryClient.invalidateQueries({ queryKey: ['unpaid-charges'] })
       queryClient.invalidateQueries({ queryKey: ['charges'] })
+      queryClient.invalidateQueries({ queryKey: ['boarder'] })
       queryClient.invalidateQueries({ queryKey: ['boarders'] })
       queryClient.invalidateQueries({ queryKey: ['owner-executive-dashboard'] })
     },

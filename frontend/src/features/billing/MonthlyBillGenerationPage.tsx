@@ -160,10 +160,22 @@ export const MonthlyBillGenerationPage: React.FC = () => {
         defaultMinMeals,
         boarderMinOverrides,
       })
-      setMealStatus({
-        type: 'success',
-        message: result.message || 'সফলভাবে মিল চার্জ জেনারেট সম্পন্ন হয়েছে।',
-      })
+      if (result.generated === 0 && (result.skipped || 0) > 0) {
+        setMealStatus({
+          type: 'success',
+          message: `এই মাসের মিল বিল ইতিমধ্যে তৈরি রয়েছে (${result.skipped} জন বর্ডারের বিল পূর্বে তৈরি থাকায় অপরিবর্তিত রাখা হয়েছে)।`,
+        })
+      } else if (result.generated === 0) {
+        setMealStatus({
+          type: 'error',
+          message: result.message || 'কোনো বর্ডারের জন্য মিল চার্জ তৈরি করা যায়নি।',
+        })
+      } else {
+        setMealStatus({
+          type: 'success',
+          message: result.message || `সফলভাবে ${result.generated} জন বর্ডারের মাসিক খাবার বিল তৈরি বা আপডেট সম্পন্ন হয়েছে।`,
+        })
+      }
       refetchMealBilling()
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'মিল চার্জ জেনারেট করতে সমস্যা হয়েছে।'
@@ -498,7 +510,7 @@ export const MonthlyBillGenerationPage: React.FC = () => {
                 <div
                   onClick={(e) => {
                     const input = e.currentTarget.querySelector('input')
-                    try { input?.showPicker?.() } catch {}
+                    try { input?.showPicker?.() } catch { }
                   }}
                   className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 cursor-pointer hover:bg-slate-900/90 transition-colors"
                   title="তারিখ পরিবর্তন করতে ক্লিক করুন"
@@ -513,7 +525,7 @@ export const MonthlyBillGenerationPage: React.FC = () => {
                     value={rentDueDate}
                     onChange={(e) => setRentDueDate(e.target.value)}
                     onClick={(e) => {
-                      try { e.currentTarget.showPicker?.() } catch {}
+                      try { e.currentTarget.showPicker?.() } catch { }
                     }}
                     className="bg-transparent text-white text-xs font-mono focus:outline-none cursor-pointer [color-scheme:dark]"
                   />
@@ -681,7 +693,7 @@ export const MonthlyBillGenerationPage: React.FC = () => {
                 <div
                   onClick={(e) => {
                     const input = e.currentTarget.querySelector('input')
-                    try { input?.showPicker?.() } catch {}
+                    try { input?.showPicker?.() } catch { }
                   }}
                   className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 cursor-pointer hover:bg-slate-900/90 transition-colors"
                   title="তারিখ পরিবর্তন করতে ক্লিক করুন"
@@ -695,7 +707,7 @@ export const MonthlyBillGenerationPage: React.FC = () => {
                     value={mealDueDate}
                     onChange={(e) => setMealDueDate(e.target.value)}
                     onClick={(e) => {
-                      try { e.currentTarget.showPicker?.() } catch {}
+                      try { e.currentTarget.showPicker?.() } catch { }
                     }}
                     className="bg-transparent text-white text-xs font-mono focus:outline-none cursor-pointer [color-scheme:dark]"
                   />
@@ -962,7 +974,7 @@ export const MonthlyBillGenerationPage: React.FC = () => {
                 <div
                   onClick={(e) => {
                     const input = e.currentTarget.querySelector('input')
-                    try { input?.showPicker?.() } catch {}
+                    try { input?.showPicker?.() } catch { }
                   }}
                   className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 cursor-pointer hover:bg-slate-900/90 transition-colors"
                   title="তারিখ পরিবর্তন করতে ক্লিক করুন"
@@ -976,7 +988,7 @@ export const MonthlyBillGenerationPage: React.FC = () => {
                     value={utilityDueDate}
                     onChange={(e) => setUtilityDueDate(e.target.value)}
                     onClick={(e) => {
-                      try { e.currentTarget.showPicker?.() } catch {}
+                      try { e.currentTarget.showPicker?.() } catch { }
                     }}
                     className="bg-transparent text-white text-xs font-mono focus:outline-none cursor-pointer [color-scheme:dark]"
                   />
@@ -1330,7 +1342,7 @@ export const MonthlyBillGenerationPage: React.FC = () => {
                       value={manualDueDate}
                       onChange={(e) => setManualDueDate(e.target.value)}
                       onClick={(e) => {
-                        try { e.currentTarget.showPicker?.() } catch {}
+                        try { e.currentTarget.showPicker?.() } catch { }
                       }}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-rose-500/50 cursor-pointer [color-scheme:dark]"
                     />
