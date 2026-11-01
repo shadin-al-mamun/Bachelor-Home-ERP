@@ -21,6 +21,7 @@ import {
 import { Button, Card, Badge } from '@/components/common'
 import { useSeats, useBuildings, useFlats, useRooms, useUpdateSeatStatus } from '../api/useAccommodation'
 import { formatBDT } from '@/utils/date'
+import { formatFloorBn } from '@/utils/floor'
 import SeatModal from './SeatModal'
 import RoomModal from './RoomModal'
 import AllocateSeatModal from './AllocateSeatModal'
@@ -226,7 +227,7 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
                   </span>
                 </div>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  {activeFlatInfo.flat.floor_number ? `${activeFlatInfo.flat.floor_number}ম তলা • ` : ''}
+                  {activeFlatInfo.flat.floor_number ? `${formatFloorBn(activeFlatInfo.flat.floor_number)} • ` : ''}
                   {activeFlatInfo.buildingName} • এই ফ্ল্যাটের সকল সিট অকুপেন্সি তালিকা
                 </p>
               </div>
@@ -785,7 +786,7 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
                               {flat.floor_number && (
                                 <>
                                   <span>•</span>
-                                  <span>{flat.floor_number}ম তলা</span>
+                                  <span>{formatFloorBn(flat.floor_number)}</span>
                                 </>
                               )}
                             </p>

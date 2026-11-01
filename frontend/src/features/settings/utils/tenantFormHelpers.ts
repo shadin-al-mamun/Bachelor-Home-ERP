@@ -1,6 +1,7 @@
 import type { BoarderWithRelations } from '@/features/boarders/api/useBoarders'
 import type { RoommateInfo, FlatAddressInfo } from '../components/TenantPoliceForm'
 import { toBengaliNumerals } from '../components/TenantPoliceForm'
+import { formatFloorBn } from '@/utils/floor'
 
 /**
  * Calculates approximate age in Bengali numerals from birth date string (YYYY-MM-DD)
@@ -94,7 +95,7 @@ export function resolveFlatInfoForBoarder(
   const room = seat?.room
   const building = flat?.building
 
-  const floorNumber = flat?.floor_number ? `${toBengaliNumerals(flat.floor_number)}ম তলা` : ''
+  const floorNumber = flat?.floor_number ? formatFloorBn(flat.floor_number) : ''
   const flatName = flat?.name || ''
   const flatFloor = [flatName, floorNumber, room?.name ? `(${room.name})` : '']
     .filter(Boolean)

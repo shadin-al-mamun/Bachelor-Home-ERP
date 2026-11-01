@@ -18,6 +18,7 @@ import { useRealtimeMeals } from './hooks/useRealtimeMeals'
 import { MealEngineTabs } from './components/MealEngineTabs'
 import { FlatBoarderBreakdownModal } from './components/FlatBoarderBreakdownModal'
 import { StaffMealControlModal } from './components/StaffMealControlModal'
+import { formatFloorBn } from '@/utils/floor'
 
 export const KitchenMealSummaryPage: React.FC = () => {
   const dhakaNow = getDhakaNow()
@@ -278,7 +279,7 @@ export const KitchenMealSummaryPage: React.FC = () => {
                         {flat.flat_name}
                       </div>
                       <div className="text-[10px] text-slate-400 print:text-gray-700">
-                        {flat.building_name} • {flat.floor_number}ম তলা
+                        {flat.building_name} • {formatFloorBn(flat.floor_number)}
                       </div>
                     </td>
 

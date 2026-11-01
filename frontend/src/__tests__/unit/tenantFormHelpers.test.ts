@@ -184,7 +184,7 @@ describe('tenantFormHelpers', () => {
 
       const info = resolveFlatInfoForBoarder(mockBoarder)
       expect(info.flatFloor).toContain('ফ্ল্যাট ৩বি')
-      expect(info.flatFloor).toContain('৩ম তলা')
+      expect(info.flatFloor).toContain('৩য় তলা')
       expect(info.flatFloor).toContain('(রুম ২০২)')
       expect(info.houseHolding).toContain('গ্রীন ভিউ হোস্টেল')
     })

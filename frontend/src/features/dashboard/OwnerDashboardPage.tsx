@@ -26,6 +26,7 @@ import { StaffMealControlModal } from '@/features/meals/components/StaffMealCont
 import { useBoarders, type BoarderWithRelations } from '@/features/boarders/api/useBoarders'
 import ApplicantReviewModal from '@/features/boarders/components/ApplicantReviewModal'
 import { formatDateBn } from '@/utils/date'
+import { formatFloorBn } from '@/utils/floor'
 
 export const OwnerDashboardPage: React.FC = () => {
   const { profile } = useAuthStore()
@@ -391,8 +392,8 @@ export const OwnerDashboardPage: React.FC = () => {
                   নিট পরিচালন উদ্বৃত্ত (NOI)
                 </span>
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${kpis.net_operating_income >= 0
-                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                    : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                  : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
                   }`}>
                   {kpis.net_operating_income >= 0 ? 'মুনাফা' : 'ঘাটতি'}
                 </span>
@@ -795,7 +796,7 @@ export const OwnerDashboardPage: React.FC = () => {
                 <div className="flex items-center justify-between text-xs">
                   <div>
                     <span className="font-bold text-white">{flat.flat_name}</span>
-                    <span className="text-slate-400 text-[11px] ml-2">({flat.floor_number}ম তলা)</span>
+                    <span className="text-slate-400 text-[11px] ml-2">({formatFloorBn(flat.floor_number)})</span>
                   </div>
                   <div className="font-mono font-bold text-slate-200">
                     {flat.occupied_seats}/{flat.total_seats} সিট
@@ -808,10 +809,10 @@ export const OwnerDashboardPage: React.FC = () => {
                 <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all ${flat.rate === 100
-                        ? 'bg-emerald-500'
-                        : flat.rate >= 80
-                          ? 'bg-indigo-500'
-                          : 'bg-amber-500'
+                      ? 'bg-emerald-500'
+                      : flat.rate >= 80
+                        ? 'bg-indigo-500'
+                        : 'bg-amber-500'
                       }`}
                     style={{ width: `${flat.rate}%` }}
                   />
@@ -856,10 +857,10 @@ export const OwnerDashboardPage: React.FC = () => {
                   <div className="flex items-center gap-3 min-w-0">
                     <div
                       className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isPayment
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                          : isExpense
-                            ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                            : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                        : isExpense
+                          ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                          : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
                         }`}
                     >
                       {isPayment ? (
