@@ -379,10 +379,10 @@ export const FinancialAccountsPage: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {accounts.map((acc, index) => {
           const isSelected = selectedAccountId === acc.id
-          
+
           let badgeLabel = `${index + 1}. অ্যাকাউন্ট`
           let IconComponent = Wallet
-          
+
           if (acc.id === '11111111-0000-0000-0000-000000000001' || acc.account_name.toLowerCase().includes('main')) {
             badgeLabel = '১. মেইন অ্যাকাউন্ট (Hostel Main)'
             IconComponent = Building2
@@ -398,11 +398,10 @@ export const FinancialAccountsPage: React.FC = () => {
             <div
               key={acc.id}
               onClick={() => setSelectedAccountId(isSelected ? 'ALL' : acc.id)}
-              className={`p-5 rounded-3xl border transition-all relative flex flex-col justify-between cursor-pointer select-none ${
-                isSelected
+              className={`p-5 rounded-3xl border transition-all relative flex flex-col justify-between cursor-pointer select-none ${isSelected
                   ? 'border-emerald-500 bg-slate-900 shadow-xl shadow-emerald-500/10 ring-2 ring-emerald-500/30'
                   : 'border-slate-800 bg-slate-900/70 hover:border-slate-700 hover:bg-slate-900/90'
-              }`}
+                }`}
             >
               <div>
                 {/* Account Category Badge */}
@@ -464,11 +463,10 @@ export const FinancialAccountsPage: React.FC = () => {
                     e.stopPropagation()
                     setSelectedAccountId(isSelected ? 'ALL' : acc.id)
                   }}
-                  className={`text-xs font-bold py-1.5 px-3 rounded-xl transition-all ${
-                    isSelected
+                  className={`text-xs font-bold py-1.5 px-3 rounded-xl transition-all ${isSelected
                       ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
                       : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
-                  }`}
+                    }`}
                 >
                   {isSelected ? '✓ খতিয়ান ফিল্টার সক্রিয়' : 'এই অ্যাকাউন্টের খতিয়ান দেখুন'}
                 </button>

@@ -31,6 +31,13 @@ import { formatFloorBn } from '@/utils/floor'
 export const OwnerDashboardPage: React.FC = () => {
   const { profile } = useAuthStore()
 
+  // Governance & Role Scope: NOI/Net Business Profit is an Executive/Owner metric,
+  // hidden from operational staff (such as Managers) for business confidentiality.
+  const canViewExecutiveNOI =
+    profile?.role === 'SUPER_ADMIN' ||
+    profile?.role === 'ADMIN' ||
+    profile?.role === 'AUDITOR'
+
   // Dedicated Financial Month Filter (Controls Rent Revenue & NOI cards)
   const currentDhakaMonthStr = () => {
     const dhakaNow = new Date()
@@ -274,7 +281,7 @@ export const OwnerDashboardPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4">
+          <div className={`grid grid-cols-1 sm:grid-cols-2 ${canViewExecutiveNOI ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3.5 sm:gap-4`}>
             {/* Card 1: 🏢 Occupancy Rate */}
             <div className="p-4 sm:p-5 rounded-3xl bg-slate-900/70 border border-indigo-500/30 backdrop-blur-sm relative overflow-hidden group">
               <div className="flex items-center justify-between">
@@ -378,65 +385,67 @@ export const OwnerDashboardPage: React.FC = () => {
               </Link>
             </div>
 
-            {/* Card 3: 📉 Expenses & Net Operating Income (NOI) */}
-            <div className={`p-4 sm:p-5 rounded-3xl bg-slate-900/70 border ${kpis.net_operating_income >= 0 ? 'border-cyan-500/30' : 'border-rose-500/30'
-              } backdrop-blur-sm relative overflow-hidden group`}>
-              <div className="flex items-center justify-between">
-                <span className={`text-[11px] font-bold ${kpis.net_operating_income >= 0 ? 'text-cyan-400' : 'text-rose-400'
-                  } uppercase tracking-wider flex items-center gap-1.5`}>
-                  {kpis.net_operating_income >= 0 ? (
-                    <TrendingUp className="w-4 h-4 text-cyan-400" />
-                  ) : (
-                    <TrendingDown className="w-4 h-4 text-rose-400" />
-                  )}
-                  নিট পরিচালন উদ্বৃত্ত (NOI)
-                </span>
-                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${kpis.net_operating_income >= 0
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                  : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                  }`}>
-                  {kpis.net_operating_income >= 0 ? 'মুনাফা' : 'ঘাটতি'}
-                </span>
-              </div>
+            {/* Card 3: 📉 Expenses & Net Operating Income (NOI) - Executive/Owner View Only */}
+            {canViewExecutiveNOI && (
+              <div className={`p-4 sm:p-5 rounded-3xl bg-slate-900/70 border ${kpis.net_operating_income >= 0 ? 'border-cyan-500/30' : 'border-rose-500/30'
+                } backdrop-blur-sm relative overflow-hidden group`}>
+                <div className="flex items-center justify-between">
+                  <span className={`text-[11px] font-bold ${kpis.net_operating_income >= 0 ? 'text-cyan-400' : 'text-rose-400'
+                    } uppercase tracking-wider flex items-center gap-1.5`}>
+                    {kpis.net_operating_income >= 0 ? (
+                      <TrendingUp className="w-4 h-4 text-cyan-400" />
+                    ) : (
+                      <TrendingDown className="w-4 h-4 text-rose-400" />
+                    )}
+                    নিট পরিচালন উদ্বৃত্ত (NOI)
+                  </span>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${kpis.net_operating_income >= 0
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                    : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                    }`}>
+                    {kpis.net_operating_income >= 0 ? 'মুনাফা' : 'ঘাটতি'}
+                  </span>
+                </div>
 
-              {/* Interactive Financial Month Dropdown */}
-              <div className="mt-2 flex items-center gap-1.5">
-                <span className="text-[10px] font-medium text-slate-400 shrink-0 flex items-center gap-1">
-                  <Calendar className="w-3 h-3 text-cyan-400" />
-                  হিসাব মাস:
-                </span>
-                <div className="relative flex-1 min-w-0">
-                  <select
-                    value={selectedFinanceMonth}
-                    onChange={(e) => setSelectedFinanceMonth(e.target.value)}
-                    className="w-full appearance-auto bg-slate-950/90 hover:bg-slate-900 border border-cyan-500/50 hover:border-cyan-400 text-cyan-300 font-bold text-[10.5px] rounded-lg px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-cyan-400 cursor-pointer transition-all shadow-sm"
-                    title="আর্থিক হিসাব মাস নির্বাচন করুন"
-                  >
-                    {monthOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value} className="bg-slate-900 text-white py-1">
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
+                {/* Interactive Financial Month Dropdown */}
+                <div className="mt-2 flex items-center gap-1.5">
+                  <span className="text-[10px] font-medium text-slate-400 shrink-0 flex items-center gap-1">
+                    <Calendar className="w-3 h-3 text-cyan-400" />
+                    হিসাব মাস:
+                  </span>
+                  <div className="relative flex-1 min-w-0">
+                    <select
+                      value={selectedFinanceMonth}
+                      onChange={(e) => setSelectedFinanceMonth(e.target.value)}
+                      className="w-full appearance-auto bg-slate-950/90 hover:bg-slate-900 border border-cyan-500/50 hover:border-cyan-400 text-cyan-300 font-bold text-[10.5px] rounded-lg px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-cyan-400 cursor-pointer transition-all shadow-sm"
+                      title="আর্থিক হিসাব মাস নির্বাচন করুন"
+                    >
+                      {monthOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value} className="bg-slate-900 text-white py-1">
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className={`text-2xl sm:text-3xl font-extrabold font-mono ${kpis.net_operating_income >= 0 ? 'text-cyan-300' : 'text-rose-400'
+                  } mt-1.5`}>
+                  ৳{(kpis.net_operating_income / 1000).toFixed(1)}k
+                </div>
+
+                <p className="text-[10px] text-slate-400 mt-1">
+                  খরচ: ৳{kpis.operating_expenses_month.toLocaleString('en-IN')}
+                </p>
+
+                <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-[10px]">
+                  <span className="text-slate-400">অন্যান্য আয়:</span>
+                  <span className="text-teal-400 font-bold font-mono">
+                    +৳{kpis.non_rent_incomes_month.toLocaleString('en-IN')}
+                  </span>
                 </div>
               </div>
-
-              <div className={`text-2xl sm:text-3xl font-extrabold font-mono ${kpis.net_operating_income >= 0 ? 'text-cyan-300' : 'text-rose-400'
-                } mt-1.5`}>
-                ৳{(kpis.net_operating_income / 1000).toFixed(1)}k
-              </div>
-
-              <p className="text-[10px] text-slate-400 mt-1">
-                খরচ: ৳{kpis.operating_expenses_month.toLocaleString('en-IN')}
-              </p>
-
-              <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-[10px]">
-                <span className="text-slate-400">অন্যান্য আয়:</span>
-                <span className="text-teal-400 font-bold font-mono">
-                  +৳{kpis.non_rent_incomes_month.toLocaleString('en-IN')}
-                </span>
-              </div>
-            </div>
+            )}
 
             {/* Card 4: 🍲 Meal Metrics */}
             <div className="p-4 sm:p-5 rounded-3xl bg-slate-900/70 border border-amber-500/30 backdrop-blur-sm relative overflow-hidden group">
