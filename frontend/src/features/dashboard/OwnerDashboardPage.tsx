@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import {
   TrendingUp,
   TrendingDown,
@@ -16,6 +16,7 @@ import {
   PlusCircle,
   FileSpreadsheet,
   SlidersHorizontal,
+  Calendar,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '@/app/store/useAuthStore'
@@ -28,12 +29,56 @@ import { formatDateBn } from '@/utils/date'
 
 export const OwnerDashboardPage: React.FC = () => {
   const { profile } = useAuthStore()
-  const { data: dashboard, isLoading, refetch, isRefetching } = useOwnerDashboard()
+
+  // Dedicated Financial Month Filter (Controls Rent Revenue & NOI cards)
+  const currentDhakaMonthStr = () => {
+    const dhakaNow = new Date()
+    const utc = dhakaNow.getTime() + dhakaNow.getTimezoneOffset() * 60000
+    const dhaka = new Date(utc + 3600000 * 6)
+    return `${dhaka.getFullYear()}-${String(dhaka.getMonth() + 1).padStart(2, '0')}`
+  }
+
+  const [selectedFinanceMonth, setSelectedFinanceMonth] = useState<string>(currentDhakaMonthStr)
+  const { data: dashboard, isLoading, refetch, isRefetching } = useOwnerDashboard(selectedFinanceMonth)
   const { data: pendingBoarders = [], refetch: refetchPendingBoarders } = useBoarders({ status: 'PENDING' })
 
   const [reviewApplicant, setReviewApplicant] = useState<BoarderWithRelations | null>(null)
   const [trendMetric, setTrendMetric] = useState<'SURPLUS' | 'ALL'>('ALL')
   const [isStaffMealControlOpen, setIsStaffMealControlOpen] = useState(false)
+
+  // Dynamically generate financial month options (current month + past 11 months + ALL)
+  const monthOptions = useMemo(() => {
+    const options: { value: string; label: string }[] = []
+    const dhakaNow = new Date()
+    const utc = dhakaNow.getTime() + dhakaNow.getTimezoneOffset() * 60000
+    const dhaka = new Date(utc + 3600000 * 6)
+    const currentYear = dhaka.getFullYear()
+    const currentMonth = dhaka.getMonth()
+
+    const monthNamesBn = [
+      'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+      'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
+    ]
+
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(currentYear, currentMonth - i, 1)
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, '0')
+      const val = `${y}-${m}`
+      const label = `${monthNamesBn[d.getMonth()]} ${y}${i === 0 ? ' (চলতি মাস)' : ''}`
+      options.push({ value: val, label })
+    }
+
+    options.push({ value: 'ALL', label: 'সর্বমোট (শুরু থেকে আজ পর্যন্ত)' })
+    return options
+  }, [])
+
+  const selectedMonthOption = monthOptions.find((o) => o.value === selectedFinanceMonth)
+  const selectedMonthLabel = selectedMonthOption
+    ? selectedMonthOption.label.replace(' (চলতি মাস)', '')
+    : selectedFinanceMonth === 'ALL'
+    ? 'সর্বমোট'
+    : selectedFinanceMonth
 
   const kpis = dashboard?.kpis
   const cashFlowTrend = dashboard?.cash_flow_trend || []
@@ -204,194 +249,260 @@ export const OwnerDashboardPage: React.FC = () => {
           <p className="text-xs text-slate-400 font-medium">এক্সিকিউটিভ ডেটা লোড হচ্ছে...</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4">
-          {/* Card 1: 🏢 Occupancy Rate */}
-          <div className="p-4 sm:p-5 rounded-3xl bg-slate-900/70 border border-indigo-500/30 backdrop-blur-sm relative overflow-hidden group">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Building2 className="w-4 h-4 text-indigo-400" />
-                অকুপেন্সি রেট
-              </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
-                {kpis.occupancy_rate}%
-              </span>
+        <div className="space-y-3.5">
+          {/* KPI Section Control Header with Financial Month Selector */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1 pt-1">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+              <h2 className="text-sm font-bold text-white tracking-wide flex items-center gap-2">
+                <span>এক্সিকিউটিভ পারফরম্যান্স ও লাইভ স্ট্যাটাস</span>
+              </h2>
             </div>
 
-            <div className="text-2xl sm:text-3xl font-extrabold font-mono text-white mt-2">
-              {kpis.occupied_seats} <span className="text-xs font-normal text-slate-400">/ {kpis.total_seats} সিট</span>
-            </div>
-
-            {/* Progress bar */}
-            <div className="w-full mt-3 bg-slate-800 rounded-full h-1.5 overflow-hidden">
-              <div
-                className="bg-gradient-to-r from-indigo-500 to-teal-400 h-full rounded-full transition-all duration-1000"
-                style={{ width: `${kpis.occupancy_rate}%` }}
-              />
-            </div>
-
-            <div className="flex items-center justify-between text-[10px] text-slate-400 mt-2">
-              <span className="text-emerald-400 font-semibold">{kpis.vacant_seats}টি সিট খালি</span>
-              <span>{kpis.maintenance_seats}টি মেরামত</span>
-            </div>
-          </div>
-
-          {/* Card 2: 💰 Financial Health (Revenue & Dues) */}
-          <div className="p-4 sm:p-5 rounded-3xl bg-slate-900/70 border border-emerald-500/30 backdrop-blur-sm relative overflow-hidden group">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                <DollarSign className="w-4 h-4 text-emerald-400" />
-                ভাড়া ও রাজস্ব আদায়
-              </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                {Math.min(100, Math.max(0, kpis.collection_rate || 0))}% আদায়
-              </span>
-            </div>
-
-            <div className="text-2xl sm:text-3xl font-extrabold font-mono text-emerald-300 mt-2">
-              ৳{kpis.total_collected_month >= 1000
-                ? (kpis.total_collected_month / 1000).toFixed(1) + 'k'
-                : kpis.total_collected_month.toLocaleString('en-IN')}
-            </div>
-
-            <p className="text-[10px] text-slate-400 mt-1">
-              মোট বিল: ৳{Math.max(
-                kpis.total_billed_month,
-                kpis.total_collected_month + kpis.total_outstanding_dues
-              ).toLocaleString('en-IN')}
-            </p>
-
-            <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-[10px]">
-              <span className="text-slate-400">বকেয়া বিল:</span>
-              <span className="text-rose-400 font-bold font-mono">
-                ৳{kpis.total_outstanding_dues.toLocaleString('en-IN')}
-              </span>
-            </div>
-
-            <Link
-              to="/billing"
-              className="mt-2 pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-[11px] font-bold text-emerald-400 hover:text-emerald-300 transition-colors"
-            >
-              <span>ভাড়া আদায় করুন</span>
-              <span className="text-xs">➔</span>
-            </Link>
-          </div>
-
-          {/* Card 3: 📉 Expenses & Net Operating Income (NOI) */}
-          <div className={`p-4 sm:p-5 rounded-3xl bg-slate-900/70 border ${
-            kpis.net_operating_income >= 0 ? 'border-cyan-500/30' : 'border-rose-500/30'
-          } backdrop-blur-sm relative overflow-hidden group`}>
-            <div className="flex items-center justify-between">
-              <span className={`text-[11px] font-bold ${
-                kpis.net_operating_income >= 0 ? 'text-cyan-400' : 'text-rose-400'
-              } uppercase tracking-wider flex items-center gap-1.5`}>
-                {kpis.net_operating_income >= 0 ? (
-                  <TrendingUp className="w-4 h-4 text-cyan-400" />
-                ) : (
-                  <TrendingDown className="w-4 h-4 text-rose-400" />
-                )}
-                নিট পরিচালন উদ্বৃত্ত (NOI)
-              </span>
-              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                kpis.net_operating_income >= 0
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                  : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-              }`}>
-                {kpis.net_operating_income >= 0 ? 'মুনাফা' : 'ঘাটতি'}
-              </span>
-            </div>
-
-            <div className={`text-2xl sm:text-3xl font-extrabold font-mono ${
-              kpis.net_operating_income >= 0 ? 'text-cyan-300' : 'text-rose-400'
-            } mt-2`}>
-              ৳{(kpis.net_operating_income / 1000).toFixed(1)}k
-            </div>
-
-            <p className="text-[10px] text-slate-400 mt-1">
-              খরচ: ৳{kpis.operating_expenses_month.toLocaleString('en-IN')}
-            </p>
-
-            <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-[10px]">
-              <span className="text-slate-400">অন্যান্য আয়:</span>
-              <span className="text-teal-400 font-bold font-mono">
-                +৳{kpis.non_rent_incomes_month.toLocaleString('en-IN')}
-              </span>
+            {/* Dedicated Financial Month Selector (Controls Card 2 & 3) */}
+            <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 rounded-2xl px-3 py-1.5 shadow-md self-start sm:self-auto">
+              <Calendar className="w-4 h-4 text-emerald-400 shrink-0" />
+              <label htmlFor="finance-month-filter" className="text-[11px] font-medium text-slate-300 shrink-0">
+                আর্থিক হিসাব মাস:
+              </label>
+              <select
+                id="finance-month-filter"
+                value={selectedFinanceMonth}
+                onChange={(e) => setSelectedFinanceMonth(e.target.value)}
+                className="bg-slate-950 border border-emerald-500/40 text-emerald-300 text-xs font-semibold rounded-xl px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer hover:border-emerald-400 transition-colors"
+              >
+                {monthOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value} className="bg-slate-900 text-white py-1">
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
-          {/* Card 4: 🍲 Meal Metrics */}
-          <div className="p-4 sm:p-5 rounded-3xl bg-slate-900/70 border border-amber-500/30 backdrop-blur-sm relative overflow-hidden group">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                <PieChart className="w-4 h-4 text-amber-400" />
-                মিল প্রস্তুতি ও উপস্থিতি
-              </span>
-              <div className="flex items-center gap-1.5">
-                <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800/40">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  লাইভ সিঙ্ক
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4">
+            {/* Card 1: 🏢 Occupancy Rate */}
+            <div className="p-4 sm:p-5 rounded-3xl bg-slate-900/70 border border-indigo-500/30 backdrop-blur-sm relative overflow-hidden group">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Building2 className="w-4 h-4 text-indigo-400" />
+                  অকুপেন্সি রেট
                 </span>
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                  {kpis.meal_attendance_rate}%
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
+                  {kpis.occupancy_rate}%
                 </span>
               </div>
+
+              {/* Live Indicator Pill */}
+              <div className="mt-1 flex items-center gap-1.5 text-[10px] text-indigo-400/90 font-medium">
+                <span className="text-slate-400">স্ট্যাটাস:</span>
+                <span className="px-1.5 py-0.5 rounded bg-indigo-950/80 border border-indigo-800/50 text-indigo-300 text-[9px] font-bold">
+                  লাইভ আসন
+                </span>
+              </div>
+
+              <div className="text-2xl sm:text-3xl font-extrabold font-mono text-white mt-1.5">
+                {kpis.occupied_seats} <span className="text-xs font-normal text-slate-400">/ {kpis.total_seats} সিট</span>
+              </div>
+
+              {/* Progress bar */}
+              <div className="w-full mt-3 bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                <div
+                  className="bg-gradient-to-r from-indigo-500 to-teal-400 h-full rounded-full transition-all duration-1000"
+                  style={{ width: `${kpis.occupancy_rate}%` }}
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-[10px] text-slate-400 mt-2">
+                <span className="text-emerald-400 font-semibold">{kpis.vacant_seats}টি সিট খালি</span>
+                <span>{kpis.maintenance_seats}টি মেরামত</span>
+              </div>
             </div>
 
-            <div className="mt-2.5 grid grid-cols-2 gap-1.5">
-              <div className="p-2 rounded-xl bg-slate-950/70 border border-slate-800">
-                <span className="text-[10px] text-slate-400 block">আজকের মিল:</span>
-                <div className="text-xl sm:text-2xl font-extrabold font-mono text-amber-300 mt-0.5">
-                  {kpis.active_meals_today} <span className="text-[10px] font-normal text-slate-400">টি</span>
+            {/* Card 2: 💰 Financial Health (Revenue & Dues) */}
+            <div className="p-4 sm:p-5 rounded-3xl bg-slate-900/70 border border-emerald-500/30 backdrop-blur-sm relative overflow-hidden group">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <DollarSign className="w-4 h-4 text-emerald-400" />
+                  ভাড়া ও রাজস্ব আদায়
+                </span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                  {Math.min(100, Math.max(0, kpis.collection_rate || 0))}% আদায়
+                </span>
+              </div>
+
+              {/* Selected Month Indicator Pill */}
+              <div className="mt-1 flex items-center gap-1.5 text-[10px] text-emerald-400/90 font-medium">
+                <span className="text-slate-400">হিসাব মাস:</span>
+                <span className="px-1.5 py-0.5 rounded bg-emerald-950/80 border border-emerald-800/50 text-emerald-300 font-mono text-[9px] font-bold">
+                  {selectedMonthLabel}
+                </span>
+              </div>
+
+              <div className="text-2xl sm:text-3xl font-extrabold font-mono text-emerald-300 mt-1.5">
+                ৳{kpis.total_collected_month >= 1000
+                  ? (kpis.total_collected_month / 1000).toFixed(1) + 'k'
+                  : kpis.total_collected_month.toLocaleString('en-IN')}
+              </div>
+
+              <p className="text-[10px] text-slate-400 mt-1">
+                মোট বিল: ৳{Math.max(
+                  kpis.total_billed_month,
+                  kpis.total_collected_month + (kpis.month_dues ?? kpis.total_outstanding_dues)
+                ).toLocaleString('en-IN')}
+              </p>
+
+              <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-[10px]">
+                <span className="text-slate-400">
+                  {selectedFinanceMonth === 'ALL' ? 'মোট বকেয়া বিল:' : 'এ মাসের বকেয়া:'}
+                </span>
+                <span className="text-rose-400 font-bold font-mono">
+                  ৳{(kpis.month_dues ?? kpis.total_outstanding_dues).toLocaleString('en-IN')}
+                </span>
+              </div>
+
+              <Link
+                to="/billing"
+                className="mt-2 pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-[11px] font-bold text-emerald-400 hover:text-emerald-300 transition-colors"
+              >
+                <span>ভাড়া আদায় করুন</span>
+                <span className="text-xs">➔</span>
+              </Link>
+            </div>
+
+            {/* Card 3: 📉 Expenses & Net Operating Income (NOI) */}
+            <div className={`p-4 sm:p-5 rounded-3xl bg-slate-900/70 border ${
+              kpis.net_operating_income >= 0 ? 'border-cyan-500/30' : 'border-rose-500/30'
+            } backdrop-blur-sm relative overflow-hidden group`}>
+              <div className="flex items-center justify-between">
+                <span className={`text-[11px] font-bold ${
+                  kpis.net_operating_income >= 0 ? 'text-cyan-400' : 'text-rose-400'
+                } uppercase tracking-wider flex items-center gap-1.5`}>
+                  {kpis.net_operating_income >= 0 ? (
+                    <TrendingUp className="w-4 h-4 text-cyan-400" />
+                  ) : (
+                    <TrendingDown className="w-4 h-4 text-rose-400" />
+                  )}
+                  নিট পরিচালন উদ্বৃত্ত (NOI)
+                </span>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                  kpis.net_operating_income >= 0
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                    : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                }`}>
+                  {kpis.net_operating_income >= 0 ? 'মুনাফা' : 'ঘাটতি'}
+                </span>
+              </div>
+
+              {/* Selected Month Indicator Pill */}
+              <div className="mt-1 flex items-center gap-1.5 text-[10px] text-cyan-400/90 font-medium">
+                <span className="text-slate-400">হিসাব মাস:</span>
+                <span className="px-1.5 py-0.5 rounded bg-cyan-950/80 border border-cyan-800/50 text-cyan-300 font-mono text-[9px] font-bold">
+                  {selectedMonthLabel}
+                </span>
+              </div>
+
+              <div className={`text-2xl sm:text-3xl font-extrabold font-mono ${
+                kpis.net_operating_income >= 0 ? 'text-cyan-300' : 'text-rose-400'
+              } mt-1.5`}>
+                ৳{(kpis.net_operating_income / 1000).toFixed(1)}k
+              </div>
+
+              <p className="text-[10px] text-slate-400 mt-1">
+                খরচ: ৳{kpis.operating_expenses_month.toLocaleString('en-IN')}
+              </p>
+
+              <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-[10px]">
+                <span className="text-slate-400">অন্যান্য আয়:</span>
+                <span className="text-teal-400 font-bold font-mono">
+                  +৳{kpis.non_rent_incomes_month.toLocaleString('en-IN')}
+                </span>
+              </div>
+            </div>
+
+            {/* Card 4: 🍲 Meal Metrics */}
+            <div className="p-4 sm:p-5 rounded-3xl bg-slate-900/70 border border-amber-500/30 backdrop-blur-sm relative overflow-hidden group">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <PieChart className="w-4 h-4 text-amber-400" />
+                  মিল প্রস্তুতি ও উপস্থিতি
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800/40">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    লাইভ সিঙ্ক
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                    {kpis.meal_attendance_rate}%
+                  </span>
                 </div>
               </div>
-              <div className="p-2 rounded-xl bg-slate-950/70 border border-slate-800">
-                <span className="text-[10px] text-slate-400 block">আগামীকাল প্রস্তুত:</span>
-                <div key={kpis.active_meals_tomorrow} className="text-xl sm:text-2xl font-extrabold font-mono text-indigo-300 mt-0.5 animate-fade-in">
-                  {kpis.active_meals_tomorrow} <span className="text-[10px] font-normal text-slate-400">টি</span>
+
+              <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+                <div className="p-2 rounded-xl bg-slate-950/70 border border-slate-800">
+                  <span className="text-[10px] text-slate-400 block">আজকের মিল:</span>
+                  <div className="text-xl sm:text-2xl font-extrabold font-mono text-amber-300 mt-0.5">
+                    {kpis.active_meals_today} <span className="text-[10px] font-normal text-slate-400">টি</span>
+                  </div>
+                </div>
+                <div className="p-2 rounded-xl bg-slate-950/70 border border-slate-800">
+                  <span className="text-[10px] text-slate-400 block">আগামীকাল প্রস্তুত:</span>
+                  <div key={kpis.active_meals_tomorrow} className="text-xl sm:text-2xl font-extrabold font-mono text-indigo-300 mt-0.5 animate-fade-in">
+                    {kpis.active_meals_tomorrow} <span className="text-[10px] font-normal text-slate-400">টি</span>
+                  </div>
                 </div>
               </div>
+
+              <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-[10px]">
+                <span className="text-slate-400">মাসিক প্রাক্কলন:</span>
+                <span className="text-amber-400 font-bold font-mono">
+                  ৳{kpis.estimated_monthly_meal_bill.toLocaleString('en-IN')}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsStaffMealControlOpen(true)}
+                className="mt-2 pt-1.5 border-t border-slate-800/80 w-full flex items-center justify-between text-[11px] font-bold text-amber-400 hover:text-amber-300 transition-colors"
+              >
+                <span className="flex items-center gap-1">
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  মিল অন/অফ পরিচালনা
+                </span>
+                <span className="text-xs">➔</span>
+              </button>
             </div>
 
-            <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-[10px]">
-              <span className="text-slate-400">মাসিক প্রাক্কলন:</span>
-              <span className="text-amber-400 font-bold font-mono">
-                ৳{kpis.estimated_monthly_meal_bill.toLocaleString('en-IN')}
-              </span>
-            </div>
+            {/* Card 5: 💼 Cash in Custody */}
+            <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-br from-amber-950/40 via-slate-900 to-indigo-950/40 border-2 border-amber-500/40 shadow-xl relative overflow-hidden group">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Receipt className="w-4 h-4 text-amber-400" />
+                  ম্যানেজার ক্যাশ হেফাজত
+                </span>
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              </div>
 
-            <button
-              type="button"
-              onClick={() => setIsStaffMealControlOpen(true)}
-              className="mt-2 pt-1.5 border-t border-slate-800/80 w-full flex items-center justify-between text-[11px] font-bold text-amber-400 hover:text-amber-300 transition-colors"
-            >
-              <span className="flex items-center gap-1">
-                <SlidersHorizontal className="w-3.5 h-3.5" />
-                মিল অন/অফ পরিচালনা
-              </span>
-              <span className="text-xs">➔</span>
-            </button>
-          </div>
+              {/* Live Indicator Pill */}
+              <div className="mt-1 flex items-center gap-1.5 text-[10px] text-amber-400/90 font-medium">
+                <span className="text-slate-400">স্ট্যাটাস:</span>
+                <span className="px-1.5 py-0.5 rounded bg-amber-950/80 border border-amber-800/50 text-amber-300 text-[9px] font-bold">
+                  লাইভ ড্রয়ার ক্যাশ
+                </span>
+              </div>
 
-          {/* Card 5: 💼 Cash in Custody */}
-          <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-br from-amber-950/40 via-slate-900 to-indigo-950/40 border-2 border-amber-500/40 shadow-xl relative overflow-hidden group">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
-                <Receipt className="w-4 h-4 text-amber-400" />
-                ম্যানেজার ক্যাশ হেফাজত
-              </span>
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            </div>
+              <div className="text-2xl sm:text-3xl font-extrabold font-mono text-amber-400 mt-1.5">
+                ৳{kpis.cash_in_custody.toLocaleString('en-IN')}
+              </div>
 
-            <div className="text-2xl sm:text-3xl font-extrabold font-mono text-amber-400 mt-2">
-              ৳{kpis.cash_in_custody.toLocaleString('en-IN')}
-            </div>
+              <p className="text-[10px] text-amber-200/80 mt-1">
+                ড্রয়ারে থাকা মোট নগদ টাকা
+              </p>
 
-            <p className="text-[10px] text-amber-200/80 mt-1">
-              ড্রয়ারে থাকা মোট নগদ টাকা
-            </p>
-
-            <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-[10px]">
-              <span className="text-slate-400">হেফাজতকারী:</span>
-              <span className="text-slate-300 font-semibold">{kpis.cash_in_custody_source || 'ম্যানেজার ক্যাশ ড্রয়ার'}</span>
+              <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-[10px]">
+                <span className="text-slate-400">হেফাজতকারী:</span>
+                <span className="text-slate-300 font-semibold">{kpis.cash_in_custody_source || 'ম্যানেজার ক্যাশ ড্রয়ার'}</span>
+              </div>
             </div>
           </div>
         </div>

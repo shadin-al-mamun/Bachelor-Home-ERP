@@ -13,11 +13,13 @@ export interface ExecutiveKPIs {
   maintenance_seats: number
   occupancy_rate: number // %
 
-  // 2. Financial Health (Current Month)
+  // 2. Financial Health (Current Month or Selected Month)
   total_billed_month: number
   total_collected_month: number
   collection_rate: number // %
   total_outstanding_dues: number
+  month_dues?: number
+  selected_month?: string
 
   // 3. Expenses & Operating Surplus (NOI)
   operating_expenses_month: number
@@ -335,10 +337,17 @@ export function updateOwnerDashboardMealBatch(dateStr: string, deltaMeals: numbe
 // React Query Hooks
 // ==============================================================================
 
-export function useOwnerDashboard() {
+export function useOwnerDashboard(selectedFinanceMonth?: string) {
   return useQuery({
-    queryKey: ['owner-executive-dashboard'],
+    queryKey: ['owner-executive-dashboard', selectedFinanceMonth || 'DEFAULT'],
     queryFn: async (): Promise<OwnerDashboardData> => {
+      const dhakaNow = new Date()
+      const utc = dhakaNow.getTime() + dhakaNow.getTimezoneOffset() * 60000
+      const dhaka = new Date(utc + 3600000 * 6)
+      const currentMonthStr = `${dhaka.getFullYear()}-${String(dhaka.getMonth() + 1).padStart(2, '0')}`
+      const isAll = selectedFinanceMonth === 'ALL'
+      const targetMonth = isAll ? null : (selectedFinanceMonth || currentMonthStr)
+
       if (!isSupabaseConfigured) {
         // Fetch from shared dev server API so mobile updates sync to PC instantly
         let serverMetrics: Partial<LiveMealMetrics> = {}
@@ -372,14 +381,13 @@ export function useOwnerDashboard() {
             active_meals_tomorrow: activeTomorrow,
             meal_attendance_rate: attendanceRate,
             estimated_monthly_meal_bill: bill,
+            month_dues: MOCK_DASHBOARD_DATA.kpis.total_outstanding_dues,
+            selected_month: isAll ? 'ALL' : (targetMonth || currentMonthStr),
           },
         }
       }
 
       try {
-        const dhakaNow = new Date()
-        const utc = dhakaNow.getTime() + dhakaNow.getTimezoneOffset() * 60000
-        const dhaka = new Date(utc + 3600000 * 6)
         const todayStr = `${dhaka.getFullYear()}-${String(dhaka.getMonth() + 1).padStart(2, '0')}-${String(dhaka.getDate()).padStart(2, '0')}`
         const tomorrow = new Date(dhaka)
         tomorrow.setDate(tomorrow.getDate() + 1)
@@ -388,7 +396,9 @@ export function useOwnerDashboard() {
         // 0. Try high-precision authoritative RPC first (bypasses RLS or permission discrepancies)
         let rpcKpis: any = null
         try {
-          const { data: rpcData, error: rpcErr } = await supabase.rpc('get_executive_kpis')
+          const { data: rpcData, error: rpcErr } = await supabase.rpc('get_executive_kpis', {
+            p_month: isAll ? 'ALL' : targetMonth,
+          })
           if (!rpcErr && rpcData && typeof rpcData === 'object') {
             rpcKpis = rpcData
           }
@@ -409,10 +419,10 @@ export function useOwnerDashboard() {
           mealsTomorrowRes,
         ] = await Promise.all([
           supabase.from('seats').select('id, status'),
-          supabase.from('boarder_charges').select('amount, paid_amount, status, due_date'),
-          supabase.from('receipts').select('amount, is_void').eq('is_void', false),
-          supabase.from('expenses').select('amount, approval_status').eq('approval_status', 'APPROVED'),
-          supabase.from('incomes').select('amount'),
+          supabase.from('boarder_charges').select('amount, paid_amount, status, due_date, billing_month'),
+          supabase.from('receipts').select('amount, is_void, receipt_date').eq('is_void', false),
+          supabase.from('expenses').select('amount, approval_status, expense_date').eq('approval_status', 'APPROVED'),
+          supabase.from('incomes').select('amount, income_date'),
           supabase
             .from('financial_accounts')
             .select('id, account_name, account_number, account_type, opening_balance, current_balance, is_active')
@@ -429,13 +439,53 @@ export function useOwnerDashboard() {
         const maintenanceSeats = Number(rpcKpis?.maintenance_seats) || seats.filter((s) => s.status === 'MAINTENANCE').length
         const occupancyRate = Number(rpcKpis?.occupancy_rate) || (totalSeats > 0 ? (occupiedSeats / totalSeats) * 100 : 0)
 
-        const charges = chargesRes.data || []
-        const totalBilledDirect = charges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
-        const totalCollectedCharges = charges.reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
-        const totalReceipts = (receiptsRes.data || []).reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
+        const allCharges = chargesRes.data || []
+        const allReceipts = receiptsRes.data || []
+        const allExpenses = expensesRes.data || []
+        const allIncomes = incomesRes.data || []
+
+        // Filter financial records according to the selected month (or ALL)
+        const filteredCharges = targetMonth
+          ? allCharges.filter((c: any) => {
+              if (c.billing_month && String(c.billing_month).startsWith(targetMonth)) return true
+              if (!c.billing_month && c.due_date && String(c.due_date).startsWith(targetMonth)) return true
+              return false
+            })
+          : allCharges
+
+        const filteredReceipts = targetMonth
+          ? allReceipts.filter((r: any) => {
+              if (!r.receipt_date) return false
+              const rd = new Date(r.receipt_date)
+              const rUtc = rd.getTime() + rd.getTimezoneOffset() * 60000
+              const rDhaka = new Date(rUtc + 3600000 * 6)
+              const ym = `${rDhaka.getFullYear()}-${String(rDhaka.getMonth() + 1).padStart(2, '0')}`
+              return ym === targetMonth
+            })
+          : allReceipts
+
+        const filteredExpenses = targetMonth
+          ? allExpenses.filter((e: any) => e.expense_date && String(e.expense_date).startsWith(targetMonth))
+          : allExpenses
+
+        const filteredIncomes = targetMonth
+          ? allIncomes.filter((i: any) => i.income_date && String(i.income_date).startsWith(targetMonth))
+          : allIncomes
+
+        const totalBilledDirect = filteredCharges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+        const totalCollectedCharges = filteredCharges.reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
+        const totalReceipts = filteredReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
         const totalCollectedDirect = Math.max(totalReceipts, totalCollectedCharges)
 
-        const openChargesDues = charges
+        const openChargesMonthDues = filteredCharges
+          .filter((c: any) => c.status !== 'PAID')
+          .reduce(
+            (sum: number, c: any) =>
+              sum + Math.max(0, (Number(c.amount) || 0) - (Number(c.paid_amount) || 0)),
+            0
+          )
+
+        const openChargesAllDues = allCharges
           .filter((c: any) => c.status !== 'PAID')
           .reduce(
             (sum: number, c: any) =>
@@ -454,11 +504,14 @@ export function useOwnerDashboard() {
         const totalDues =
           rpcKpis?.total_outstanding_dues !== undefined
             ? Number(rpcKpis.total_outstanding_dues)
-            : openChargesDues
+            : openChargesAllDues
+        const activeMonthDues =
+          rpcKpis?.month_dues !== undefined
+            ? Number(rpcKpis.month_dues)
+            : openChargesMonthDues
 
-        // Total billed demand must be at least equal to collected receipts plus outstanding dues.
-        // This eliminates the anomaly where receipts were collected before monthly batch charges were generated.
-        const totalBilled = Math.max(rawBilled, totalCollected + totalDues)
+        // Total billed demand must be at least equal to collected receipts plus outstanding dues
+        const totalBilled = Math.max(rawBilled, totalCollected + activeMonthDues)
 
         // Collection rate is always logically capped between 0% and 100%
         const collectionRate =
@@ -468,8 +521,14 @@ export function useOwnerDashboard() {
             ? 100
             : 0
 
-        const totalExpenses = rpcKpis?.operating_expenses_month !== undefined ? Number(rpcKpis.operating_expenses_month) : (expensesRes.data || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
-        const totalIncomes = rpcKpis?.non_rent_incomes_month !== undefined ? Number(rpcKpis.non_rent_incomes_month) : (incomesRes.data || []).reduce((sum, i) => sum + (Number(i.amount) || 0), 0)
+        const totalExpenses =
+          rpcKpis?.operating_expenses_month !== undefined
+            ? Number(rpcKpis.operating_expenses_month)
+            : filteredExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
+        const totalIncomes =
+          rpcKpis?.non_rent_incomes_month !== undefined
+            ? Number(rpcKpis.non_rent_incomes_month)
+            : filteredIncomes.reduce((sum, i) => sum + (Number(i.amount) || 0), 0)
 
         // 5. Manager Cash in Custody (Single Source of Truth: Live Manager Cash Account Balance)
         // Strictly identify active manager cash drawer account(s), excluding owner vault and bank
@@ -573,23 +632,48 @@ export function useOwnerDashboard() {
           }
         })
 
-        // 2. Live 6-Month Cash Flow Trend
+        // 2. Live 6-Month Cash Flow Trend (computed dynamically for each past month)
         const monthsBn = ['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর']
         const cashFlowTrend: CashFlowTrendPoint[] = []
         for (let i = 5; i >= 0; i--) {
           const d = new Date(dhaka)
           d.setMonth(d.getMonth() - i)
-          const mLabel = `${monthsBn[d.getMonth()]} ${d.getFullYear()}`
+          const y = d.getFullYear()
+          const m = String(d.getMonth() + 1).padStart(2, '0')
+          const mKey = `${y}-${m}`
+          const mLabel = `${monthsBn[d.getMonth()]} ${y}`
+
+          const mReceipts = allReceipts
+            .filter((r: any) => {
+              if (!r.receipt_date) return false
+              const rd = new Date(r.receipt_date)
+              const rUtc = rd.getTime() + rd.getTimezoneOffset() * 60000
+              const rDhaka = new Date(rUtc + 3600000 * 6)
+              const ym = `${rDhaka.getFullYear()}-${String(rDhaka.getMonth() + 1).padStart(2, '0')}`
+              return ym === mKey
+            })
+            .reduce((sum: number, r: any) => sum + (Number(r.amount) || 0), 0)
+
+          const mChargesPaid = allCharges
+            .filter((c: any) => c.billing_month && String(c.billing_month).startsWith(mKey))
+            .reduce((sum: number, c: any) => sum + (Number(c.paid_amount) || 0), 0)
+
+          const mRev = Math.max(mReceipts, mChargesPaid)
+
+          const mExp = allExpenses
+            .filter((e: any) => e.expense_date && String(e.expense_date).startsWith(mKey))
+            .reduce((sum: number, e: any) => sum + (Number(e.amount) || 0), 0)
+
           cashFlowTrend.push({
             month_label: mLabel,
-            revenue: i === 0 ? totalCollected : 0,
-            expenses: i === 0 ? totalExpenses : 0,
-            surplus: i === 0 ? Math.max(0, totalCollected - totalExpenses) : 0,
+            revenue: mRev,
+            expenses: mExp,
+            surplus: Math.max(0, mRev - mExp),
           })
         }
 
         // 3. Live Dues Aging
-        const overdueCharges = charges.filter((c) => c.status !== 'PAID')
+        const overdueCharges = allCharges.filter((c: any) => c.status !== 'PAID')
         const duesAging: DuesAgingPoint[] = [
           {
             bucket: '< 30 days',
@@ -643,6 +727,8 @@ export function useOwnerDashboard() {
             total_collected_month: totalCollected,
             collection_rate: collectionRate,
             total_outstanding_dues: totalDues,
+            month_dues: activeMonthDues,
+            selected_month: isAll ? 'ALL' : (targetMonth || currentMonthStr),
             operating_expenses_month: totalExpenses,
             non_rent_incomes_month: totalIncomes,
             cash_in_custody: cashCustody,
