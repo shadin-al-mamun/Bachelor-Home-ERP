@@ -29,6 +29,7 @@ import {
 } from './api/useMealSettingsAndRates'
 import { MealEngineTabs } from './components/MealEngineTabs'
 import { CreateMealRateModal } from './components/CreateMealRateModal'
+import { MonthPickerControl } from '@/features/billing/components/MonthPickerControl'
 
 export const MealSettingsPage: React.FC = () => {
   const location = useLocation()
@@ -652,23 +653,29 @@ export const MealSettingsPage: React.FC = () => {
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5">
-                  <span className="text-xs text-slate-400">বিলিং মাস:</span>
-                  <input
-                    type="month"
-                    value={billingMonth.slice(0, 7)}
-                    onChange={(e) => setBillingMonth(`${e.target.value}-01`)}
-                    className="bg-transparent text-white text-xs font-mono focus:outline-none cursor-pointer"
-                  />
-                </div>
+                <MonthPickerControl
+                  value={billingMonth}
+                  onChange={(val) => setBillingMonth(`${val}-01`)}
+                  accentColor="text-indigo-400"
+                />
 
-                <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5">
-                  <span className="text-xs text-slate-400">পরিশোধের শেষ তারিখ:</span>
+                <div
+                  onClick={(e) => {
+                    const input = e.currentTarget.querySelector('input')
+                    try { input?.showPicker?.() } catch {}
+                  }}
+                  className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 cursor-pointer hover:bg-slate-900/90 transition-colors"
+                  title="তারিখ পরিবর্তন করতে ক্লিক করুন"
+                >
+                  <span className="text-xs text-slate-400 select-none">পরিশোধের শেষ তারিখ:</span>
                   <input
                     type="date"
                     value={dueDate}
                     onChange={(e) => setDueDate(e.target.value)}
-                    className="bg-transparent text-white text-xs font-mono focus:outline-none cursor-pointer"
+                    onClick={(e) => {
+                      try { e.currentTarget.showPicker?.() } catch {}
+                    }}
+                    className="bg-transparent text-white text-xs font-mono focus:outline-none cursor-pointer [color-scheme:dark]"
                   />
                 </div>
 

@@ -59,6 +59,22 @@ vi.mock('@/features/boarders/api/useBoarders', () => ({
   }),
 }))
 
+vi.mock('@/features/billing/api/useBilling', () => ({
+  useBoarderDuesSummary: () => ({
+    data: [
+      {
+        boarder_id: 'bdr-101',
+        boarder_code: 'BDR-001',
+        full_name: 'তানভীর আহমেদ',
+        outstanding_due: 8500,
+        advance_balance: 0,
+        seat_name: '১০১এ',
+        flat_name: '৪এ',
+      },
+    ],
+  }),
+}))
+
 describe('CollectReceiptModal.test.tsx - Payment Auto-Distribution to Oldest Dues', () => {
   describe('autoDistributePayment algorithm (FIFO rule)', () => {
     const mockCharges = [

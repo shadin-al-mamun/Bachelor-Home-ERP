@@ -5,9 +5,11 @@ import { Input } from '@/components/common/Input'
 import {
   useFinancialAccounts,
   useRecordReceiptMutation,
+  useUnpaidCharges,
   type ExtendedReceipt,
   type UnifiedCollectionItem,
 } from '../api/useReceipts'
+import { useBoarderDuesSummary } from '../api/useBilling'
 import { useBoarders } from '@/features/boarders/api/useBoarders'
 import { ReceiptPrintView } from './ReceiptPrintView'
 import { formatCurrencyBn } from '@/utils/date'
@@ -21,7 +23,8 @@ import {
   Plus,
   Trash2,
   Calendar,
-  Building,
+  Zap,
+  CheckCircle2,
 } from 'lucide-react'
 import { CreateFinancialAccountModal } from '@/features/finance/components/CreateFinancialAccountModal'
 
@@ -54,8 +57,21 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
 }) => {
   const { data: boarders = [] } = useBoarders({ status: 'ACTIVE' })
   const { data: accounts = [] } = useFinancialAccounts()
+  const { data: duesList = [] } = useBoarderDuesSummary()
 
   const [boarderId, setBoarderId] = useState(preSelectedBoarderId || '')
+  const { data: unpaidCharges = [] } = useUnpaidCharges(boarderId)
+
+  const duesMap = useMemo(() => {
+    const map = new Map<string, (typeof duesList)[0]>()
+    duesList.forEach((d) => map.set(d.boarder_id, d))
+    return map
+  }, [duesList])
+
+  const boarderDueSummary = useMemo(() => {
+    return boarderId ? duesMap.get(boarderId) : undefined
+  }, [boarderId, duesMap])
+
   const currentMonthStr = useMemo(() => new Date().toISOString().slice(0, 7), [])
   const [billingMonth, setBillingMonth] = useState(currentMonthStr)
   const [collectionDate, setCollectionDate] = useState(new Date().toISOString().slice(0, 10))
@@ -127,6 +143,123 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
   const selectedBoarder = useMemo(() => {
     return boarders.find((b) => b.id === boarderId)
   }, [boarders, boarderId])
+
+  const duesBreakdown = useMemo(() => {
+    let rentDue = 0
+    let mealDue = 0
+    let utilityDue = 0
+    let otherDue = 0
+
+    unpaidCharges.forEach((c) => {
+      const due =
+        c.due_amount !== undefined
+          ? Number(c.due_amount)
+          : Math.max(0, Number(c.amount) - (Number(c.paid_amount) || 0))
+      if (due <= 0) return
+
+      if (c.charge_type === 'RENT') {
+        rentDue += due
+      } else if (c.charge_type === 'MEAL') {
+        mealDue += due
+      } else if (c.charge_type === 'UTILITY') {
+        utilityDue += due
+      } else {
+        otherDue += due
+      }
+    })
+
+    const chargesTotal = rentDue + mealDue + utilityDue + otherDue
+    const summaryDue = Number(boarderDueSummary?.outstanding_due || 0)
+    const effectiveTotalDue = chargesTotal > 0 ? chargesTotal : summaryDue
+
+    return {
+      rentDue,
+      mealDue,
+      utilityDue,
+      otherDue,
+      totalDue: effectiveTotalDue,
+      advanceBalance: Number(boarderDueSummary?.advance_balance || 0),
+      hasDues: effectiveTotalDue > 0,
+    }
+  }, [unpaidCharges, boarderDueSummary])
+
+  const handleAutoFillFromDues = () => {
+    if (!duesBreakdown.hasDues) return
+
+    const newItems: ItemRow[] = []
+
+    if (duesBreakdown.rentDue > 0) {
+      newItems.push({
+        head_code: 'SEAT_RENT',
+        head_name: 'সিট ভাড়া',
+        amount: duesBreakdown.rentDue,
+        description: 'বকেয়া সিট ভাড়া পরিশোধ',
+      })
+    } else {
+      newItems.push({
+        head_code: 'SEAT_RENT',
+        head_name: 'সিট ভাড়া',
+        amount: 0,
+        description: '',
+      })
+    }
+
+    if (duesBreakdown.mealDue > 0) {
+      newItems.push({
+        head_code: 'MEAL_BILL',
+        head_name: 'মিল বিল',
+        amount: duesBreakdown.mealDue,
+        description: 'বকেয়া খাবার বিল পরিশোধ',
+      })
+    } else {
+      newItems.push({
+        head_code: 'MEAL_BILL',
+        head_name: 'মিল বিল',
+        amount: 0,
+        description: '',
+      })
+    }
+
+    if (duesBreakdown.utilityDue > 0) {
+      newItems.push({
+        head_code: 'MISC_BILL',
+        head_name: 'বিবিধ বিল',
+        amount: duesBreakdown.utilityDue,
+        description: 'বকেয়া ইউটিলিটি বিল পরিশোধ',
+      })
+    } else {
+      newItems.push({
+        head_code: 'MISC_BILL',
+        head_name: 'বিবিধ বিল',
+        amount: 0,
+        description: '',
+      })
+    }
+
+    if (duesBreakdown.otherDue > 0) {
+      newItems.push({
+        head_code: 'OTHER',
+        head_name: 'অন্যান্য',
+        amount: duesBreakdown.otherDue,
+        description: 'অন্যান্য বকেয়া চার্জ পরিশোধ',
+      })
+    }
+
+    if (newItems.every((i) => i.amount === 0) && duesBreakdown.totalDue > 0) {
+      newItems[0].amount = duesBreakdown.totalDue
+      newItems[0].description = 'বকেয়া পরিশোধ'
+    }
+
+    setItems(newItems)
+  }
+
+  const getHeadDue = (headCode: string) => {
+    if (headCode === 'SEAT_RENT') return duesBreakdown.rentDue
+    if (headCode === 'MEAL_BILL') return duesBreakdown.mealDue
+    if (headCode === 'MISC_BILL') return duesBreakdown.utilityDue
+    if (headCode === 'OTHER' || headCode === 'FINE') return duesBreakdown.otherDue
+    return 0
+  }
 
   const handleItemChange = (index: number, field: keyof ItemRow, value: any) => {
     setItems((prev) => {
@@ -268,15 +401,18 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
                 value={boarderId}
                 onChange={(e) => setBoarderId(e.target.value)}
                 disabled={Boolean(preSelectedBoarderId)}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-primary-500"
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-primary-500 cursor-pointer"
                 required
               >
                 <option value="">বর্ডার নির্বাচন করুন...</option>
-                {boarders.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.full_name} ({b.boarder_code})
-                  </option>
-                ))}
+                {boarders.map((b) => {
+                  const due = duesMap.get(b.id)?.outstanding_due || 0
+                  return (
+                    <option key={b.id} value={b.id}>
+                      {b.full_name} ({b.boarder_code}) {due > 0 ? `— বকেয়া: ৳${due.toLocaleString('en-IN')}` : '— পরিশোধিত'}
+                    </option>
+                  )
+                })}
               </select>
             </div>
 
@@ -289,7 +425,10 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
                 type="month"
                 value={billingMonth}
                 onChange={(e) => setBillingMonth(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs font-mono focus:outline-none focus:border-indigo-500"
+                onClick={(e) => {
+                  try { e.currentTarget.showPicker?.() } catch {}
+                }}
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs font-mono focus:outline-none focus:border-indigo-500 cursor-pointer [color-scheme:dark]"
                 required
               />
             </div>
@@ -303,24 +442,126 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
                 type="date"
                 value={collectionDate}
                 onChange={(e) => setCollectionDate(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs font-mono focus:outline-none focus:border-emerald-500"
+                onClick={(e) => {
+                  try { e.currentTarget.showPicker?.() } catch {}
+                }}
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs font-mono focus:outline-none focus:border-emerald-500 cursor-pointer [color-scheme:dark]"
                 required
               />
             </div>
           </div>
 
-          {/* Boarder Info Snippet if selected */}
+          {/* Boarder Info & Live Dues Status Card */}
           {selectedBoarder && (
-            <div className="px-3.5 py-2.5 bg-primary-500/5 border border-primary-500/20 rounded-xl flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2 text-slate-300">
-                <Building className="w-4 h-4 text-primary-400" />
-                <span>
-                  বর্ডার: <strong className="text-white">{selectedBoarder.full_name}</strong> | ফোন: {selectedBoarder.phone_number || 'নেই'}
-                </span>
+            <div
+              className={`p-3.5 rounded-2xl border transition-all ${
+                duesBreakdown.hasDues
+                  ? 'bg-rose-950/20 border-rose-500/30 shadow-lg shadow-rose-950/20'
+                  : 'bg-emerald-950/20 border-emerald-500/30'
+              }`}
+            >
+              {/* Main row: Boarder Info & Total Due + Action */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 text-xs text-slate-300">
+                  <div
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                      duesBreakdown.hasDues
+                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                        : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    }`}
+                  >
+                    <User className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-white text-sm">{selectedBoarder.full_name}</span>
+                      <span className="px-2 py-0.5 bg-slate-800 text-slate-300 border border-slate-700 rounded-md font-mono text-[11px] font-semibold">
+                        আইডি: {selectedBoarder.boarder_code}
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-slate-400">
+                      মোবাইল: {selectedBoarder.phone_number || 'নেই'}
+                      {boarderDueSummary?.seat_name && ` | সিট: ${boarderDueSummary.seat_name}`}
+                      {boarderDueSummary?.flat_name && ` (${boarderDueSummary.flat_name})`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Right side: Due Badge & Auto-fill Action */}
+                <div className="flex items-center gap-2.5 self-end sm:self-center">
+                  {duesBreakdown.hasDues ? (
+                    <div className="flex items-center gap-2.5">
+                      <div className="text-right">
+                        <span className="text-[10px] text-rose-300 font-bold block uppercase tracking-wider">
+                          মোট বকেয়া পাওনা
+                        </span>
+                        <span className="text-base font-black font-mono text-rose-400">
+                          {formatCurrencyBn(duesBreakdown.totalDue)}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAutoFillFromDues}
+                        title="বকেয়ার অংক অনুযায়ী নিচের খাতসমূহ স্বয়ংক্রিয়ভাবে পূরণ করুন"
+                        className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950 text-xs font-bold shadow-md shadow-rose-500/20 transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                      >
+                        <Zap className="w-3.5 h-3.5 fill-current" />
+                        <span>বকেয়া অটো-ফিল</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-right">
+                      {duesBreakdown.advanceBalance > 0 && (
+                        <div className="text-right mr-2">
+                          <span className="text-[10px] text-cyan-300 font-bold block">অগ্রিম ব্যালেন্স</span>
+                          <span className="text-xs font-mono font-bold text-cyan-400">
+                            {formatCurrencyBn(duesBreakdown.advanceBalance)}
+                          </span>
+                        </div>
+                      )}
+                      <div className="px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>কোনো বকেয়া নেই (পরিশোধিত)</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-              <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-md font-mono text-[11px] font-semibold">
-                আইডি: {selectedBoarder.boarder_code}
-              </span>
+
+              {/* Breakdown Tags Row if dues exist */}
+              {duesBreakdown.hasDues && (
+                <div className="mt-2.5 pt-2 border-t border-rose-500/20 flex flex-wrap items-center gap-2 text-xs">
+                  <span className="text-[11px] text-rose-300/80 font-medium flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 text-rose-400 shrink-0" />
+                    বকেয়ার বিবরণ:
+                  </span>
+                  {duesBreakdown.rentDue > 0 && (
+                    <span className="px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-300 font-mono text-[11px]">
+                      সিট ভাড়া: <strong>{formatCurrencyBn(duesBreakdown.rentDue)}</strong>
+                    </span>
+                  )}
+                  {duesBreakdown.mealDue > 0 && (
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 font-mono text-[11px]">
+                      মিল বিল: <strong>{formatCurrencyBn(duesBreakdown.mealDue)}</strong>
+                    </span>
+                  )}
+                  {duesBreakdown.utilityDue > 0 && (
+                    <span className="px-2 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 font-mono text-[11px]">
+                      ইউটিলিটি: <strong>{formatCurrencyBn(duesBreakdown.utilityDue)}</strong>
+                    </span>
+                  )}
+                  {duesBreakdown.otherDue > 0 && (
+                    <span className="px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20 text-purple-300 font-mono text-[11px]">
+                      অন্যান্য: <strong>{formatCurrencyBn(duesBreakdown.otherDue)}</strong>
+                    </span>
+                  )}
+                  {duesBreakdown.advanceBalance > 0 && (
+                    <span className="px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 font-mono text-[11px] ml-auto">
+                      অগ্রিম জমা: <strong>{formatCurrencyBn(duesBreakdown.advanceBalance)}</strong>
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -387,13 +628,25 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
                         />
                       </td>
                       <td className="py-2 px-3 text-right">
-                        <input
-                          type="number"
-                          value={item.amount || ''}
-                          onChange={(e) => handleItemChange(idx, 'amount', Math.max(0, Number(e.target.value)))}
-                          placeholder="0"
-                          className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-right text-xs text-emerald-400 font-mono font-bold focus:outline-none focus:border-emerald-500"
-                        />
+                        <div className="space-y-1">
+                          <input
+                            type="number"
+                            value={item.amount || ''}
+                            onChange={(e) => handleItemChange(idx, 'amount', Math.max(0, Number(e.target.value)))}
+                            placeholder="0"
+                            className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-right text-xs text-emerald-400 font-mono font-bold focus:outline-none focus:border-emerald-500"
+                          />
+                          {getHeadDue(item.head_code) > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleItemChange(idx, 'amount', getHeadDue(item.head_code))}
+                              title="বকেয়া অংকটি এই ঘরে বসান"
+                              className="text-[10px] text-amber-400 hover:text-amber-300 font-mono block ml-auto hover:underline cursor-pointer"
+                            >
+                              বকেয়া: {formatCurrencyBn(getHeadDue(item.head_code))} [পূরণ]
+                            </button>
+                          )}
+                        </div>
                       </td>
                       <td className="py-2 px-2 text-center">
                         {items.length > 1 && (

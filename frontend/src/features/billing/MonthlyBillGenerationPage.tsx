@@ -38,6 +38,7 @@ import {
   useMonthlyMealBillingPreview,
   useGenerateMonthlyMealChargesMutation,
 } from '@/features/meals/api/useMealSettingsAndRates'
+import { MonthPickerControl } from './components/MonthPickerControl'
 
 type BillingTab = 'rent' | 'meals' | 'flat-utility' | 'other'
 
@@ -484,25 +485,25 @@ export const MonthlyBillGenerationPage: React.FC = () => {
 
               {/* Form Controls */}
               <form onSubmit={handleGenerateRent} className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5">
-                  <span className="text-xs text-slate-400 flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-amber-400" />
-                    বিলিং মাস:
-                  </span>
-                  <input
-                    type="month"
-                    required
-                    value={rentMonth}
-                    onChange={(e) => {
-                      setRentMonth(e.target.value)
-                      setRentDueDate(`${e.target.value}-10`)
-                    }}
-                    className="bg-transparent text-white text-xs font-mono focus:outline-none cursor-pointer"
-                  />
-                </div>
+                <MonthPickerControl
+                  value={rentMonth}
+                  onChange={(val) => {
+                    setRentMonth(val)
+                    setRentDueDate(`${val}-10`)
+                  }}
+                  accentColor="text-amber-400"
+                  required
+                />
 
-                <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5">
-                  <span className="text-xs text-slate-400 flex items-center gap-1.5">
+                <div
+                  onClick={(e) => {
+                    const input = e.currentTarget.querySelector('input')
+                    try { input?.showPicker?.() } catch {}
+                  }}
+                  className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 cursor-pointer hover:bg-slate-900/90 transition-colors"
+                  title="তারিখ পরিবর্তন করতে ক্লিক করুন"
+                >
+                  <span className="text-xs text-slate-400 flex items-center gap-1.5 select-none">
                     <Clock className="w-3.5 h-3.5 text-indigo-400" />
                     পরিশোধের শেষ তারিখ:
                   </span>
@@ -511,7 +512,10 @@ export const MonthlyBillGenerationPage: React.FC = () => {
                     required
                     value={rentDueDate}
                     onChange={(e) => setRentDueDate(e.target.value)}
-                    className="bg-transparent text-white text-xs font-mono focus:outline-none cursor-pointer"
+                    onClick={(e) => {
+                      try { e.currentTarget.showPicker?.() } catch {}
+                    }}
+                    className="bg-transparent text-white text-xs font-mono focus:outline-none cursor-pointer [color-scheme:dark]"
                   />
                 </div>
 
@@ -668,21 +672,21 @@ export const MonthlyBillGenerationPage: React.FC = () => {
 
               {/* Form Controls */}
               <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5">
-                  <span className="text-xs text-slate-400 flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-emerald-400" />
-                    বিলিং মাস:
-                  </span>
-                  <input
-                    type="month"
-                    value={mealBillingMonth.slice(0, 7)}
-                    onChange={(e) => setMealBillingMonth(`${e.target.value}-01`)}
-                    className="bg-transparent text-white text-xs font-mono focus:outline-none cursor-pointer"
-                  />
-                </div>
+                <MonthPickerControl
+                  value={mealBillingMonth}
+                  onChange={(val) => setMealBillingMonth(`${val}-01`)}
+                  accentColor="text-emerald-400"
+                />
 
-                <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5">
-                  <span className="text-xs text-slate-400 flex items-center gap-1.5">
+                <div
+                  onClick={(e) => {
+                    const input = e.currentTarget.querySelector('input')
+                    try { input?.showPicker?.() } catch {}
+                  }}
+                  className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 cursor-pointer hover:bg-slate-900/90 transition-colors"
+                  title="তারিখ পরিবর্তন করতে ক্লিক করুন"
+                >
+                  <span className="text-xs text-slate-400 flex items-center gap-1.5 select-none">
                     <Clock className="w-3.5 h-3.5 text-indigo-400" />
                     পরিশোধের শেষ তারিখ:
                   </span>
@@ -690,7 +694,10 @@ export const MonthlyBillGenerationPage: React.FC = () => {
                     type="date"
                     value={mealDueDate}
                     onChange={(e) => setMealDueDate(e.target.value)}
-                    className="bg-transparent text-white text-xs font-mono focus:outline-none cursor-pointer"
+                    onClick={(e) => {
+                      try { e.currentTarget.showPicker?.() } catch {}
+                    }}
+                    className="bg-transparent text-white text-xs font-mono focus:outline-none cursor-pointer [color-scheme:dark]"
                   />
                 </div>
 
@@ -943,21 +950,24 @@ export const MonthlyBillGenerationPage: React.FC = () => {
 
               {/* Controls */}
               <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5">
-                  <span className="text-xs text-slate-400 flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-indigo-400" />
-                    বিলিং মাস:
-                  </span>
-                  <input
-                    type="month"
-                    value={utilityBillingMonth}
-                    onChange={(e) => setUtilityBillingMonth(e.target.value)}
-                    className="bg-transparent text-white text-xs font-mono focus:outline-none cursor-pointer"
-                  />
-                </div>
+                <MonthPickerControl
+                  value={utilityBillingMonth}
+                  onChange={(val) => {
+                    setUtilityBillingMonth(val)
+                    setUtilityDueDate(`${val}-10`)
+                  }}
+                  accentColor="text-indigo-400"
+                />
 
-                <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5">
-                  <span className="text-xs text-slate-400 flex items-center gap-1.5">
+                <div
+                  onClick={(e) => {
+                    const input = e.currentTarget.querySelector('input')
+                    try { input?.showPicker?.() } catch {}
+                  }}
+                  className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 cursor-pointer hover:bg-slate-900/90 transition-colors"
+                  title="তারিখ পরিবর্তন করতে ক্লিক করুন"
+                >
+                  <span className="text-xs text-slate-400 flex items-center gap-1.5 select-none">
                     <Clock className="w-3.5 h-3.5 text-amber-400" />
                     পরিশোধের শেষ তারিখ:
                   </span>
@@ -965,7 +975,10 @@ export const MonthlyBillGenerationPage: React.FC = () => {
                     type="date"
                     value={utilityDueDate}
                     onChange={(e) => setUtilityDueDate(e.target.value)}
-                    className="bg-transparent text-white text-xs font-mono focus:outline-none cursor-pointer"
+                    onClick={(e) => {
+                      try { e.currentTarget.showPicker?.() } catch {}
+                    }}
+                    className="bg-transparent text-white text-xs font-mono focus:outline-none cursor-pointer [color-scheme:dark]"
                   />
                 </div>
 
@@ -1292,12 +1305,16 @@ export const MonthlyBillGenerationPage: React.FC = () => {
                       <Calendar className="w-3.5 h-3.5 text-amber-400" />
                       বিলিং মাস <span className="text-rose-400">*</span>
                     </label>
-                    <input
-                      type="month"
-                      required
+                    <MonthPickerControl
                       value={manualBillingMonth}
-                      onChange={(e) => setManualBillingMonth(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-rose-500/50 cursor-pointer"
+                      onChange={(val) => {
+                        setManualBillingMonth(val)
+                        setManualDueDate(`${val}-15`)
+                      }}
+                      label=""
+                      accentColor="text-amber-400"
+                      required
+                      className="w-full justify-between"
                     />
                   </div>
 
@@ -1312,7 +1329,10 @@ export const MonthlyBillGenerationPage: React.FC = () => {
                       required
                       value={manualDueDate}
                       onChange={(e) => setManualDueDate(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-rose-500/50 cursor-pointer"
+                      onClick={(e) => {
+                        try { e.currentTarget.showPicker?.() } catch {}
+                      }}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-rose-500/50 cursor-pointer [color-scheme:dark]"
                     />
                   </div>
                 </div>
