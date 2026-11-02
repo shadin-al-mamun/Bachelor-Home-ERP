@@ -64,6 +64,7 @@ export const DepositOwnerModal: React.FC<DepositOwnerModalProps> = ({
       setPreviewUrl(URL.createObjectURL(file))
       setErrorMsg(null)
     }
+    e.target.value = ''
   }
 
   const handleRemoveFile = () => {
@@ -264,11 +265,12 @@ export const DepositOwnerModal: React.FC<DepositOwnerModalProps> = ({
             </label>
 
             <input
+              id="deposit-proof-file"
               type="file"
               ref={fileInputRef}
               accept="image/*,application/pdf"
               onChange={handleFileChange}
-              className="hidden"
+              className="sr-only"
             />
 
             {previewUrl ? (
@@ -295,9 +297,9 @@ export const DepositOwnerModal: React.FC<DepositOwnerModalProps> = ({
                 </button>
               </div>
             ) : (
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-slate-700/80 hover:border-cyan-500/60 rounded-2xl p-4 text-center cursor-pointer transition-all hover:bg-slate-950/40 group"
+              <label
+                htmlFor="deposit-proof-file"
+                className="border-2 border-dashed border-slate-700/80 hover:border-cyan-500/60 rounded-2xl p-4 text-center cursor-pointer transition-all hover:bg-slate-950/40 group block"
               >
                 <div className="flex justify-center gap-2 mb-1.5 text-slate-400 group-hover:text-cyan-400 transition-colors">
                   <Upload className="w-5 h-5" />
@@ -309,7 +311,7 @@ export const DepositOwnerModal: React.FC<DepositOwnerModalProps> = ({
                 <p className="text-[10px] text-slate-500 mt-0.5">
                   ক্যামেরা দিয়ে তুলুন অথবা গ্যালারি থেকে ফাইল নির্বাচন করুন
                 </p>
-              </div>
+              </label>
             )}
           </div>
 

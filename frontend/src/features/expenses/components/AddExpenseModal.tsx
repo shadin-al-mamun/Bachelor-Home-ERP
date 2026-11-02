@@ -89,6 +89,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   // Voucher File & Preview State
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [isDragging, setIsDragging] = useState<boolean>(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [successInfo, setSuccessInfo] = useState<{ voucherNo: string } | null>(null)
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState<boolean>(false)
@@ -157,11 +158,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
   if (!isOpen) return null
 
-  // Handle file selection
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
+  // Handle file processing
+  const processSelectedFile = (file: File) => {
     if (file.size > 10 * 1024 * 1024) {
       setErrorMsg('ফাইল সাইজ সর্বোচ্চ ১০ মেগাবাইট (10MB) পর্যন্ত হতে পারবে।')
       return
@@ -178,12 +176,34 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     }
   }
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      processSelectedFile(file)
+    }
+    // Reset input value so selecting the same file again fires onChange
+    e.target.value = ''
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+    const file = e.dataTransfer.files?.[0]
+    if (file) {
+      processSelectedFile(file)
+    }
+  }
+
   const handleRemoveFile = () => {
     setSelectedFile(null)
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl)
       setPreviewUrl(null)
     }
+    const fileEl = document.getElementById('expense-voucher-file') as HTMLInputElement | null
+    if (fileEl) fileEl.value = ''
+    const camEl = document.getElementById('expense-voucher-camera') as HTMLInputElement | null
+    if (camEl) camEl.value = ''
     if (fileInputRef.current) fileInputRef.current.value = ''
     if (cameraInputRef.current) cameraInputRef.current.value = ''
   }
@@ -558,24 +578,27 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               <span className="text-[10px] text-slate-500">ঐচ্ছিক</span>
             </label>
 
+            {/* Native Hidden File Inputs */}
             <input
+              id="expense-voucher-file"
               type="file"
               ref={fileInputRef}
               onChange={handleFileChange}
               accept="image/*,application/pdf"
-              className="hidden"
+              className="sr-only"
             />
             <input
+              id="expense-voucher-camera"
               type="file"
               ref={cameraInputRef}
               onChange={handleFileChange}
               accept="image/*"
               capture="environment"
-              className="hidden"
+              className="sr-only"
             />
 
             {selectedFile ? (
-              <div className="p-3.5 rounded-2xl bg-slate-950/90 border border-slate-700/80 flex items-center justify-between gap-3">
+              <div className="p-3.5 rounded-2xl bg-slate-950/90 border border-emerald-500/40 flex items-center justify-between gap-3 animate-fade-in shadow-inner">
                 <div className="flex items-center gap-3 min-w-0">
                   {previewUrl ? (
                     <img
@@ -593,7 +616,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                       {selectedFile.name}
                     </p>
                     <p className="text-[11px] text-slate-400">
-                      {(selectedFile.size / 1024).toFixed(1)} KB
+                      {(selectedFile.size / 1024).toFixed(1)} KB • {selectedFile.type.includes('pdf') ? 'PDF ভাউচার' : 'ছবি সংযুক্তি'}
                     </p>
                   </div>
                 </div>
@@ -608,24 +631,47 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => cameraInputRef.current?.click()}
-                  className="p-3.5 rounded-2xl border border-dashed border-indigo-500/40 hover:border-indigo-400 bg-indigo-950/20 hover:bg-indigo-950/30 flex items-center justify-center gap-2 text-indigo-300 transition-all text-xs font-semibold"
-                >
-                  <Camera className="w-4 h-4" />
-                  <span>ক্যামেরা দিয়ে ছবি তুলুন</span>
-                </button>
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  setIsDragging(true)
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleDrop}
+                className={`p-4 rounded-2xl border-2 border-dashed transition-all text-center ${
+                  isDragging
+                    ? 'border-indigo-400 bg-indigo-950/40 ring-2 ring-indigo-500/30'
+                    : 'border-slate-700/80 bg-slate-950/60 hover:border-slate-600 hover:bg-slate-950/80'
+                }`}
+              >
+                <div className="flex justify-center gap-3 mb-1.5 text-slate-400">
+                  <Upload className="w-5 h-5 text-indigo-400" />
+                  <Camera className="w-5 h-5 text-emerald-400" />
+                </div>
+                <p className="text-xs font-semibold text-slate-200 mb-0.5">
+                  এখানে ফাইল ড্রপ করুন অথবা নিচের যেকোনো অপশন ব্যবহার করুন
+                </p>
+                <p className="text-[10px] text-slate-400 mb-3">
+                  (সর্বোচ্চ সাইজ ১০ MB — JPG, PNG ছবি বা PDF ফরম্যাট)
+                </p>
 
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="p-3.5 rounded-2xl border border-dashed border-slate-700 hover:border-slate-500 bg-slate-950/60 hover:bg-slate-900 flex items-center justify-center gap-2 text-slate-300 transition-all text-xs font-semibold"
-                >
-                  <Upload className="w-4 h-4" />
-                  <span>ছবি বা পিডিএফ ফাইল সিলেক্ট করুন</span>
-                </button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <label
+                    htmlFor="expense-voucher-file"
+                    className="cursor-pointer p-3 rounded-xl border border-dashed border-slate-700 bg-slate-900/90 hover:bg-slate-800 hover:border-indigo-400 flex items-center justify-center gap-2 text-slate-200 hover:text-indigo-300 transition-all text-xs font-semibold select-none shadow-sm active:scale-[0.98]"
+                  >
+                    <Upload className="w-4 h-4 text-indigo-400" />
+                    <span>ছবি বা PDF ফাইল সিলেক্ট করুন</span>
+                  </label>
+
+                  <label
+                    htmlFor="expense-voucher-camera"
+                    className="cursor-pointer p-3 rounded-xl border border-dashed border-emerald-600/40 bg-emerald-950/20 hover:bg-emerald-950/30 hover:border-emerald-400 flex items-center justify-center gap-2 text-emerald-300 transition-all text-xs font-semibold select-none shadow-sm active:scale-[0.98]"
+                  >
+                    <Camera className="w-4 h-4 text-emerald-400" />
+                    <span>ক্যামেরা দিয়ে ছবি তুলুন</span>
+                  </label>
+                </div>
               </div>
             )}
           </div>

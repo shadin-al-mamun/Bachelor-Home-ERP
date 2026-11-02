@@ -6,32 +6,24 @@ import './styles/print.css'
 import './i18n'
 import App from './App.tsx'
 
-// Immediate auto-update handler for PWA / Service Worker caches
-const updateSW = registerSW({
+// Safe Service Worker registration for PWA
+registerSW({
   immediate: true,
   onNeedRefresh() {
-    updateSW(true)
+    // New version ready; activates seamlessly without forced page disruption
   },
   onOfflineReady() {
     // App cached and ready for offline use
   },
 })
 
-// Check for updates when user returns to app and reload when new worker takes control
+// Check for service worker updates in background without forcefully interrupting active forms
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
       navigator.serviceWorker.ready
         .then((reg) => reg.update())
         .catch(() => {})
-    }
-  })
-
-  let refreshing = false
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!refreshing) {
-      refreshing = true
-      window.location.reload()
     }
   })
 }
