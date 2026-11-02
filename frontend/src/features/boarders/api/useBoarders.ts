@@ -1094,7 +1094,12 @@ export function useBoarder(id?: string) {
       }
 
       const totalReceipts = boarderReceipts.reduce((acc: number, r: any) => acc + Number(r.amount || 0), 0)
-      const charges = data.charges || []
+      const rawCharges = data.charges || []
+      // Sanity guard: An unseated boarder cannot have legitimate resident mess meal charges
+      const charges = rawCharges.filter((c: any) => {
+        if (!activeAlloc && c.charge_type === 'MEAL') return false
+        return true
+      })
       const totalBilled = charges.reduce((acc: number, c: any) => acc + Number(c.amount || 0), 0)
       const totalPaidCharges = charges.reduce((acc: number, c: any) => acc + Number(c.paid_amount || 0), 0)
       const totalPaid = Math.max(totalReceipts, totalPaidCharges)
@@ -1117,7 +1122,8 @@ export function useBoarder(id?: string) {
         },
       }
 
-      if (data.status === 'ACTIVE' && todayStr >= effectiveStart) {
+      // Only compute Opt-Out meal summary if the boarder is ACTIVE and has an ACTIVE seat allocation
+      if (data.status === 'ACTIVE' && activeAlloc && todayStr >= effectiveStart) {
         try {
           const { data: selections } = await supabase
             .from('meal_selections')
@@ -1244,8 +1250,8 @@ export function useApproveApplicantMutation() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             boarderId,
-            status: 'ACTIVE',
-            remarks: remarks || 'অ্যাডমিন কর্তৃক আবেদন অনুমোদিত হয়েছে।',
+            status: 'PENDING',
+            remarks: remarks || 'অ্যাডমিন কর্তৃক আবেদন যাচাইপূর্বক অনুমোদিত (সিট বরাদ্দের অপেক্ষায়)।',
           }),
         })
       } catch {
@@ -1256,8 +1262,8 @@ export function useApproveApplicantMutation() {
         const list = getStoredBoarders()
         const item = list.find((b) => b.id === boarderId)
         if (item) {
-          item.status = 'ACTIVE'
-          item.remarks = remarks || 'অ্যাডমিন কর্তৃক আবেদন অনুমোদিত হয়েছে।'
+          item.status = 'PENDING'
+          item.remarks = remarks || 'অ্যাডমিন কর্তৃক আবেদন যাচাইপূর্বক অনুমোদিত (সিট বরাদ্দের অপেক্ষায়)।'
           item.updated_at = new Date().toISOString()
           saveStoredBoarders(list)
         }
@@ -1276,8 +1282,8 @@ export function useApproveApplicantMutation() {
         const { data: updatedBdr, error: bError } = await supabase
           .from('boarders')
           .update({
-            status: 'ACTIVE',
-            remarks: remarks || 'অ্যাডমিন কর্তৃক আবেদন অনুমোদিত হয়েছে।',
+            status: 'PENDING',
+            remarks: remarks || 'অ্যাডমিন কর্তৃক আবেদন যাচাইপূর্বক অনুমোদিত (সিট বরাদ্দের অপেক্ষায়)।',
             updated_at: new Date().toISOString(),
           })
           .eq('id', boarderId)
@@ -1287,7 +1293,7 @@ export function useApproveApplicantMutation() {
         if (bError) throw bError
         boarder = updatedBdr
       } else {
-        // boarderId is an applicant profile ID: create real boarders row
+        // boarderId is an applicant profile ID: create real boarders row with PENDING status
         const { data: pRow } = await supabase
           .from('profiles')
           .select('*')
@@ -1301,12 +1307,12 @@ export function useApproveApplicantMutation() {
             .insert({
               user_id: pRow.id,
               boarder_code: randomCode,
-              full_name: pRow.full_name || 'নতুন বোর্ডার',
+              full_name: pRow.full_name || 'নতুন আবেদনকারী',
               phone_number: pRow.phone_number || '',
               email: pRow.email || null,
-              status: 'ACTIVE',
+              status: 'PENDING',
               admission_date: new Date().toISOString().slice(0, 10),
-              remarks: remarks || 'অ্যাডমিন কর্তৃক আবেদন অনুমোদিত হয়েছে।',
+              remarks: remarks || 'অ্যাডমিন কর্তৃক আবেদন যাচাইপূর্বক অনুমোদিত (সিট বরাদ্দের অপেক্ষায়)।',
               date_of_birth: (pRow as any).date_of_birth || null,
               father_name: (pRow as any).father_name || null,
               marital_status: (pRow as any).marital_status || 'অবিবাহিত',

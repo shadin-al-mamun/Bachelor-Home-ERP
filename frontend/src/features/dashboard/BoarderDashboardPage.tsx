@@ -358,7 +358,7 @@ export const BoarderDashboardPage: React.FC = () => {
   }
 
   // If authenticated as a resident boarder but no active allocation found
-  if (!isStaffRole && !hasActiveSeat && !currentBoarder && isSupabaseConfigured && !isLoadingBoarder) {
+  if (!isStaffRole && !hasActiveSeat && isSupabaseConfigured && !isLoadingBoarder) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center space-y-4">
         <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center animate-pulse">

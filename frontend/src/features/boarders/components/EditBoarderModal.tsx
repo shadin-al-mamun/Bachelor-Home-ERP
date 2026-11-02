@@ -203,10 +203,20 @@ export const EditBoarderModal: React.FC<EditBoarderModalProps> = ({
             <label className="text-[11px] text-slate-400 block mb-1">সদস্য স্ট্যাটাস</label>
             <select
               value={status}
-              onChange={(e) => setStatus(e.target.value as BoarderStatus)}
+              onChange={(e) => {
+                const newStatus = e.target.value as BoarderStatus
+                if (newStatus === 'ACTIVE' && !boarder.active_allocation) {
+                  setErrorMsg('সিট বরাদ্দ ব্যতীত কোনো বর্ডারকে সক্রিয় (Active) করা সম্ভব নয়। অনুগ্রহ করে আবাসন সেকশন থেকে সিট বরাদ্দ দিন।')
+                  return
+                }
+                setErrorMsg(null)
+                setStatus(newStatus)
+              }}
               className="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs font-semibold focus:outline-none focus:border-primary-500"
             >
-              <option value="ACTIVE">সক্রিয় (Active)</option>
+              <option value="ACTIVE" disabled={!boarder.active_allocation}>
+                সক্রিয় (Active) {!boarder.active_allocation ? '(সিট বরাদ্দ নেই)' : ''}
+              </option>
               <option value="PENDING">অপেক্ষমান (Pending)</option>
               <option value="LEFT">প্রস্থানকৃত (Left)</option>
               <option value="REJECTED">বাতিল (Rejected)</option>

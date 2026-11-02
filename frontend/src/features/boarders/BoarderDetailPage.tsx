@@ -141,8 +141,9 @@ export const BoarderDetailPage: React.FC = () => {
               <span className="font-mono text-xs bg-primary-500/10 text-primary-400 border border-primary-500/20 px-2.5 py-1 rounded-lg">
                 {boarder.boarder_code}
               </span>
-              {boarder.status === 'ACTIVE' && <Badge status="ACTIVE">সক্রিয় বর্ডার</Badge>}
-              {boarder.status === 'PENDING' && <Badge status="PENDING">অনুমোদন অপেক্ষমান</Badge>}
+              {boarder.status === 'ACTIVE' && alloc && <Badge status="ACTIVE">সক্রিয় বর্ডার</Badge>}
+              {boarder.status === 'ACTIVE' && !alloc && <Badge status="WARNING">সিট বরাদ্দ অপেক্ষমান</Badge>}
+              {boarder.status === 'PENDING' && <Badge status="PENDING">সিট বরাদ্দ অপেক্ষমান</Badge>}
               {boarder.status === 'LEFT' && <Badge status="INACTIVE">হোস্টেল ত্যাগ করেছেন</Badge>}
               {boarder.status === 'REJECTED' && <Badge status="REJECTED">আবেদন বাতিল</Badge>}
             </div>
@@ -166,10 +167,15 @@ export const BoarderDetailPage: React.FC = () => {
                 <Calendar className="w-3.5 h-3.5 text-slate-500" />
                 ভর্তি: {formatDateBn(boarder.admission_date)}
               </span>
-              {alloc && (
+              {alloc ? (
                 <span className="flex items-center gap-1.5 text-indigo-400 font-medium">
                   <BedDouble className="w-3.5 h-3.5" />
                   সিট: {alloc.seat?.seat_code} ({alloc.seat?.room?.name})
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 text-amber-400 font-medium">
+                  <BedDouble className="w-3.5 h-3.5" />
+                  সিট বরাদ্দ নেই
                 </span>
               )}
             </div>
@@ -177,6 +183,18 @@ export const BoarderDetailPage: React.FC = () => {
 
           {/* Quick Actions */}
           <div className="flex flex-wrap items-center gap-2">
+            {!alloc && boarder.status !== 'LEFT' && boarder.status !== 'REJECTED' && (
+              <Link to="/accommodation/seats">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-500 text-xs shadow-md shadow-emerald-600/20"
+                >
+                  <BedDouble className="w-3.5 h-3.5 mr-1.5" />
+                  সিট বরাদ্দ দিন
+                </Button>
+              </Link>
+            )}
             {(profile?.role === 'SUPER_ADMIN' || profile?.role === 'ADMIN' || profile?.role === 'MANAGER' || !profile?.role) && (
               <Button
                 variant="primary"

@@ -61,7 +61,7 @@ export function useCurrentBoarder() {
       monthly_rent: Number(seatData.monthly_rent || matchedFromList?.monthly_rent || 0),
       status: (seatData.boarder_status as any) || 'ACTIVE',
     }
-  } else if (matchedFromList) {
+  } else if (!isSupabaseConfigured && matchedFromList) {
     currentBoarder = matchedFromList
   } else if (!isStaffRole && !isSupabaseConfigured && boardersList.length > 0) {
     currentBoarder = boardersList[0]
@@ -73,7 +73,7 @@ export function useCurrentBoarder() {
   return {
     currentBoarder,
     activeBoarderId: currentBoarder?.id,
-    hasActiveSeat: Boolean(seatData ? seatData.has_active_seat : currentBoarder),
+    hasActiveSeat: Boolean(seatData ? seatData.has_active_seat : (!isSupabaseConfigured && currentBoarder)),
     isLoading,
     refetch: refetchSeat,
   }

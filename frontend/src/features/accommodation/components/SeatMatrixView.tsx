@@ -686,12 +686,14 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
                                 seat.allocations?.[0]
 
                               const allocId = activeAlloc?.id || seat.allocation_id || ''
+                              const boarderId = activeAlloc?.boarder_id || activeAlloc?.boarder?.id || seat.occupant_id || ''
                               const boarderName = activeAlloc?.boarder?.full_name || seat.occupant_name || 'বর্তমান বর্ডার'
                               const boarderCode = activeAlloc?.boarder?.boarder_code || seat.occupant_code || 'BDR-ACTIVE'
 
                               setCancellingAllocation({
                                 allocationId: allocId,
                                 seatId: seat.id,
+                                boarderId: boarderId,
                                 boarderName: boarderName,
                                 boarderCode: boarderCode,
                                 seatCode: seat.seat_code,

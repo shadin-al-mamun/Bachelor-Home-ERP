@@ -378,8 +378,10 @@ export function useCancelAllocationMutation() {
 
       // 3. Fallback: Direct table update if RPC failed or no allocation ID was found
       if (params.seatId) {
+        let boarderIdToUpdate: string | null = null
+
         if (isValidUuid(allocId)) {
-          await supabase
+          const { data: aRow } = await supabase
             .from('allocations')
             .update({
               status: params.status || 'ENDED',
@@ -388,9 +390,12 @@ export function useCancelAllocationMutation() {
               updated_at: new Date().toISOString(),
             })
             .eq('id', allocId)
+            .select('boarder_id')
+            .maybeSingle()
+          boarderIdToUpdate = aRow?.boarder_id || null
         } else {
           // End any active allocations for this seat
-          await supabase
+          const { data: aRows } = await supabase
             .from('allocations')
             .update({
               status: params.status || 'ENDED',
@@ -400,6 +405,25 @@ export function useCancelAllocationMutation() {
             })
             .eq('seat_id', params.seatId)
             .eq('status', 'ACTIVE')
+            .select('boarder_id')
+          boarderIdToUpdate = aRows?.[0]?.boarder_id || null
+        }
+
+        // Update boarder status to LEFT
+        if (boarderIdToUpdate) {
+          try {
+            await supabase
+              .from('boarders')
+              .update({
+                status: 'LEFT',
+                leaving_date: params.endDate,
+                remarks: params.reason,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', boarderIdToUpdate)
+          } catch (bUpdateErr) {
+            console.warn('Fallback boarder status update warning:', bUpdateErr)
+          }
         }
 
         // Set seat status to AVAILABLE
@@ -423,6 +447,8 @@ export function useCancelAllocationMutation() {
       queryClient.invalidateQueries({ queryKey: ['boarders'] })
       queryClient.invalidateQueries({ queryKey: ['boarder'] })
       queryClient.invalidateQueries({ queryKey: ['owner-executive-dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['meal-boarders-list'] })
+      queryClient.invalidateQueries({ queryKey: ['boarder-seat-status'] })
     },
   })
 }

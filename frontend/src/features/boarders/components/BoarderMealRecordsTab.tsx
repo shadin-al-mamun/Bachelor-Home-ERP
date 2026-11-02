@@ -1,4 +1,6 @@
 import React, { useState, useMemo } from 'react'
+import { Link } from 'react-router-dom'
+import Button from '@/components/common/Button'
 import {
   UtensilsCrossed,
   Calendar,
@@ -153,6 +155,9 @@ export const BoarderMealRecordsTab: React.FC<BoarderMealRecordsTabProps> = ({
 
   // Generate All Days of the Month with Opt-Out Mess Evaluation
   const dailyRecords: DayMealRecord[] = useMemo(() => {
+    if (!boarder.active_allocation) {
+      return []
+    }
     const [year, month] = selectedMonth.split('-').map(Number)
     const records: DayMealRecord[] = []
     const selectionsMap = new Map<string, any>(selections.map((s) => [s.meal_date, s]))
@@ -384,6 +389,29 @@ export const BoarderMealRecordsTab: React.FC<BoarderMealRecordsTabProps> = ({
     const nextDate = new Date(y, m, 1)
     const nextStr = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`
     setSelectedMonth(nextStr)
+  }
+
+  if (!boarder.active_allocation) {
+    return (
+      <div className="p-8 sm:p-12 text-center bg-slate-900/40 rounded-3xl border border-slate-800 space-y-4 animate-fade-in">
+        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto">
+          <UtensilsCrossed className="w-8 h-8" />
+        </div>
+        <div className="space-y-1.5 max-w-md mx-auto">
+          <h3 className="text-base font-bold text-white">কোনো সক্রিয় সিট বরাদ্দ নেই</h3>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            এই বর্ডারের জন্য বর্তমানে কোনো সক্রিয় সিট বরাদ্দ করা হয়নি। শুধুমাত্র সিট বরাদ্দপ্রাপ্ত আবাসিক বর্ডারদের জন্য হোস্টেলের খাবার সেবা ও মিল রেকর্ডস কার্যকর হয়।
+          </p>
+        </div>
+        <div className="pt-2">
+          <Link to="/accommodation/seats">
+            <Button variant="primary" size="sm" className="bg-primary-600 hover:bg-primary-500 text-xs">
+              সিট বরাদ্দ দিন
+            </Button>
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (

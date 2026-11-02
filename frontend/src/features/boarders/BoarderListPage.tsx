@@ -347,15 +347,27 @@ export const BoarderListPage: React.FC = () => {
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           {boarder.status === 'PENDING' ? (
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              onClick={() => setReviewApplicant(boarder)}
-                              className="bg-amber-600 hover:bg-amber-500 text-xs py-1"
-                            >
-                              <ShieldAlert className="w-3.5 h-3.5 mr-1" />
-                              আবেদন যাচাই
-                            </Button>
+                            <>
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={() => setReviewApplicant(boarder)}
+                                className="bg-amber-600 hover:bg-amber-500 text-xs py-1"
+                              >
+                                <ShieldAlert className="w-3.5 h-3.5 mr-1" />
+                                আবেদন যাচাই
+                              </Button>
+                              <Link to={`/boarders/${boarder.id}`}>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-slate-300 hover:text-white text-xs py-1"
+                                >
+                                  <Eye className="w-3.5 h-3.5 mr-1" />
+                                  প্রোফাইল
+                                </Button>
+                              </Link>
+                            </>
                           ) : (
                             <>
                               <Button
@@ -392,7 +404,7 @@ export const BoarderListPage: React.FC = () => {
                             </>
                           )}
 
-                          {boarder.status === 'ACTIVE' && !boarder.active_allocation && (
+                          {!boarder.active_allocation && boarder.status !== 'LEFT' && boarder.status !== 'REJECTED' && (
                             <Button
                               variant="outline"
                               size="sm"

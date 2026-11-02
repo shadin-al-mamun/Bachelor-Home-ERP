@@ -461,10 +461,19 @@ export function useMealBoardersList() {
         return []
       }
 
-      return data.map((b: any) => {
-        const activeAlloc = Array.isArray(b.allocations)
-          ? b.allocations.find((a: any) => a.status === 'ACTIVE') || b.allocations[0]
-          : b.allocations
+      return data
+        .filter((b: any) => {
+          // Strictly require an ACTIVE seat allocation to participate in meal management
+          if (!b.allocations) return false
+          if (Array.isArray(b.allocations)) {
+            return b.allocations.some((a: any) => a.status === 'ACTIVE')
+          }
+          return b.allocations.status === 'ACTIVE'
+        })
+        .map((b: any) => {
+          const activeAlloc = Array.isArray(b.allocations)
+            ? b.allocations.find((a: any) => a.status === 'ACTIVE')
+            : b.allocations
         const seat = activeAlloc?.seat
         const room = seat?.room
         const flat = room?.flat
