@@ -97,3 +97,4 @@ describe('Seat Allocation Lifecycle & Access Control Rules', () => {
     expect(billableBoarders.some((b) => b.name === 'Hashem')).toBe(false)
   })
 })
+

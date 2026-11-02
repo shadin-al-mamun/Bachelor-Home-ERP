@@ -658,3 +658,4 @@ $$;
 
 REVOKE ALL ON FUNCTION public.verify_boarder_seat_status(UUID, TEXT, TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.verify_boarder_seat_status(UUID, TEXT, TEXT) TO anon, authenticated, service_role;
+
