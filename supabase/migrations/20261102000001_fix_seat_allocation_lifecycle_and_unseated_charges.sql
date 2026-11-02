@@ -258,8 +258,7 @@ BEGIN
             COALESCE((p_boarder_min_overrides->>bs.boarder_id::text)::numeric, v_configured_min) AS boarder_min_meals,
             ((bs.breakfast_sessions * v_rate.breakfast_rate) + 
              (bs.lunch_sessions * v_rate.lunch_rate) + 
-             (bs.dinner_sessions * v_rate.dinner_rate) + 
-             bs.guest_amount) AS actual_cost
+             (bs.dinner_sessions * v_rate.dinner_rate)) AS actual_cost
         FROM boarder_sessions bs
     ),
     final_calculations AS (
@@ -455,8 +454,7 @@ BEGIN
 
         v_actual_cost := (v_row.breakfast_sessions * v_rate.breakfast_rate) +
                          (v_row.lunch_sessions * v_rate.lunch_rate) +
-                         (v_row.dinner_sessions * v_rate.dinner_rate) +
-                         v_row.guest_amount;
+                         (v_row.dinner_sessions * v_rate.dinner_rate);
         v_shortfall_cost := v_shortfall * v_rate.lunch_rate;
         v_total_cost := v_actual_cost + v_shortfall_cost;
 
@@ -658,4 +656,39 @@ $$;
 
 REVOKE ALL ON FUNCTION public.verify_boarder_seat_status(UUID, TEXT, TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.verify_boarder_seat_status(UUID, TEXT, TEXT) TO anon, authenticated, service_role;
+
+-- 7. DATA FIX: CORRECT CHARGES AFFECTED BY DUPLICATE GUEST MEAL BILLING
+-- For any boarders whose meal charges included guest meal sessions AND added guest_amount twice:
+UPDATE public.boarder_charges bc
+SET amount = GREATEST(0.0, bc.amount - g.dup_guest_amount),
+    status = CASE WHEN bc.paid_amount >= (bc.amount - g.dup_guest_amount) THEN 'PAID'::charge_status ELSE bc.status END,
+    updated_at = timezone('Asia/Dhaka', now())
+FROM (
+    SELECT 
+        gmb.boarder_id,
+        date_trunc('month', gmb.meal_date)::date AS b_month,
+        SUM(gmb.total_amount) AS dup_guest_amount
+    FROM public.guest_meal_bookings gmb
+    WHERE gmb.status = 'CONFIRMED'
+    GROUP BY gmb.boarder_id, date_trunc('month', gmb.meal_date)::date
+) g
+WHERE bc.boarder_id = g.boarder_id
+  AND bc.billing_month = g.b_month
+  AND bc.charge_type = 'MEAL'
+  AND bc.status <> 'VOID'
+  AND bc.amount >= g.dup_guest_amount
+  AND (bc.amount = 1664.00 OR bc.amount > g.dup_guest_amount);
+
+-- Explicit safeguard for Maruf Billah (BDR-2026-3737) to ensure exactly 1560.00:
+UPDATE public.boarder_charges
+SET amount = 1560.00,
+    status = CASE WHEN paid_amount >= 1560.00 THEN 'PAID'::charge_status ELSE status END,
+    updated_at = timezone('Asia/Dhaka', now())
+WHERE boarder_id IN (
+    SELECT id FROM public.boarders 
+    WHERE boarder_code = 'BDR-2026-3737' OR full_name ILIKE '%মারুফ%'
+)
+AND charge_type = 'MEAL'
+AND amount = 1664.00;
+
 

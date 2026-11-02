@@ -479,7 +479,9 @@ export async function calculateClientOptOutBillingPreview(
 
     // Shortfall cost at standard meal rate (lunch rate)
     const shortfallCost = Math.round(shortfallMeals * lRate * 100) / 100
-    const totalAmount = Math.round((bCost + lCost + dCost + guestAmount + shortfallCost) * 100) / 100
+    // Guest meals are already included in bCount, lCount, dCount (and thus bCost, lCost, dCost).
+    // Do not add guestAmount again to prevent double counting.
+    const totalAmount = Math.round((bCost + lCost + dCost + shortfallCost) * 100) / 100
 
     const existingCharge = chargeMap.get(b.id)
 
