@@ -19,7 +19,54 @@ import { useReceipts, type ExtendedReceipt } from '@/features/billing/api/useRec
 import { ReceiptPrintView } from '@/features/billing/components/ReceiptPrintView'
 import { formatCurrencyBn, formatDateBn } from '@/utils/date'
 import { useCurrentBoarder } from '@/features/boarders/api/useCurrentBoarder'
+import { ChargeBreakdownModal } from './components/ChargeBreakdownModal'
 import type { BoarderCharge, ChargeType, ChargeStatus } from '@/types/database'
+
+// Mock sample charges for demo/testing resilience mirroring user's exact ledger view
+const MOCK_PORTAL_CHARGES: BoarderCharge[] = [
+  {
+    id: 'ch-mock-1',
+    boarder_id: 'bdr-101',
+    charge_type: 'UTILITY',
+    amount: 844,
+    paid_amount: 844,
+    due_amount: 0,
+    status: 'PAID',
+    billing_month: '2026-10-01',
+    due_date: '2026-10-10',
+    description: 'October 2026 — Flat-206 বিবিধ বিল (ইউটিলিটি: ৳২৪৪.০০, বাবুর্চি: ৳৬০০.০০)',
+    created_at: '2026-10-01T00:00:00Z',
+    updated_at: '2026-10-01T00:00:00Z',
+  },
+  {
+    id: 'ch-mock-2',
+    boarder_id: 'bdr-101',
+    charge_type: 'RENT',
+    amount: 3200,
+    paid_amount: 3200,
+    due_amount: 0,
+    status: 'PAID',
+    billing_month: '2026-10-01',
+    due_date: '2026-10-30',
+    description: 'মাসিক সিট ভাড়া (October 2026)',
+    created_at: '2026-10-01T00:00:00Z',
+    updated_at: '2026-10-01T00:00:00Z',
+  },
+  {
+    id: 'ch-mock-3',
+    boarder_id: 'bdr-101',
+    charge_type: 'MEAL',
+    amount: 1560,
+    paid_amount: 1560,
+    due_amount: 0,
+    status: 'PAID',
+    billing_month: '2026-10-01',
+    due_date: '2026-11-11',
+    description: 'মাসিক খাবার বিল (2026-10) — বিলযোগ্য: ৩০টি মিল (গৃহীত: ২৩টি, শর্টফল: ৭টি; নাস্তা: ০, দুপুর: ১৩, রাত: ১০)',
+    created_at: '2026-10-01T00:00:00Z',
+    updated_at: '2026-10-01T00:00:00Z',
+  },
+]
 
 export const BoarderDuesPage: React.FC = () => {
   const { profile } = useAuthStore()
@@ -29,6 +76,15 @@ export const BoarderDuesPage: React.FC = () => {
   const [chargeFilter, setChargeFilter] = useState<'ALL' | 'UNPAID' | 'PAID'>('ALL')
   const [selectedReceipt, setSelectedReceipt] = useState<ExtendedReceipt | null>(null)
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false)
+
+  // Detailed breakdown modal state
+  const [selectedChargeForDetail, setSelectedChargeForDetail] = useState<BoarderCharge | null>(null)
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
+
+  const handleOpenChargeDetails = (c: BoarderCharge) => {
+    setSelectedChargeForDetail(c)
+    setIsDetailModalOpen(true)
+  }
 
   // 1. Resolve boarder identity authoritatively
   const { currentBoarder, activeBoarderId, isLoading: isLoadingBoarder } = useCurrentBoarder()
@@ -74,8 +130,8 @@ export const BoarderDuesPage: React.FC = () => {
           setCharges((data as BoarderCharge[]) || [])
         }
       } else {
-        // Fallback demo/mock
-        setCharges([])
+        // Fallback demo/mock with standard resident billing ledger
+        setCharges(MOCK_PORTAL_CHARGES)
       }
     } catch (err) {
       console.warn('Error fetching boarder charges:', err)
@@ -400,13 +456,14 @@ export const BoarderDuesPage: React.FC = () => {
                     <th className="py-3 px-3 text-right">পরিশোধিত</th>
                     <th className="py-3 px-3 text-right">বকেয়া</th>
                     <th className="py-3 px-3 text-center">পরিশোধের তারিখ</th>
-                    <th className="py-3 px-3 text-right">স্ট্যাটাস</th>
+                    <th className="py-3 px-3 text-center">স্ট্যাটাস</th>
+                    <th className="py-3 px-3 text-center">বিস্তারিত দেখুন</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
                   {isLoadingCharges ? (
                     <tr>
-                      <td colSpan={8} className="py-12 text-center text-slate-500">
+                      <td colSpan={9} className="py-12 text-center text-slate-500">
                         <div className="inline-flex items-center gap-2">
                           <RefreshCw className="w-4 h-4 animate-spin text-indigo-400" />
                           <span>বিল ও বকেয়ার তথ্য লোড হচ্ছে...</span>
@@ -415,7 +472,7 @@ export const BoarderDuesPage: React.FC = () => {
                     </tr>
                   ) : filteredCharges.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-12 text-center text-slate-500">
+                      <td colSpan={9} className="py-12 text-center text-slate-500">
                         <div className="max-w-xs mx-auto space-y-2">
                           <Info className="w-8 h-8 text-slate-600 mx-auto" />
                           <p className="font-medium text-slate-400">কোনো ধার্যকৃত বিল পাওয়া যায়নি।</p>
@@ -455,8 +512,19 @@ export const BoarderDuesPage: React.FC = () => {
                           <td className="py-3.5 px-3 text-center text-slate-400 whitespace-nowrap">
                             {c.due_date ? formatDateBn(c.due_date) : '-'}
                           </td>
-                          <td className="py-3.5 px-3 text-right whitespace-nowrap">
+                          <td className="py-3.5 px-3 text-center whitespace-nowrap">
                             {getStatusBadge(isPaid ? 'PAID' : c.status)}
+                          </td>
+                          <td className="py-3.5 px-3 text-center whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenChargeDetails(c)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600 hover:text-white border border-indigo-500/30 font-semibold transition-all text-xs cursor-pointer active:scale-95 shadow-sm"
+                              title="বিলের বিস্তারিত তথ্য ও হিসাব দেখুন"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>বিস্তারিত দেখুন</span>
+                            </button>
                           </td>
                         </tr>
                       )
@@ -559,6 +627,14 @@ export const BoarderDuesPage: React.FC = () => {
         isOpen={isPrintModalOpen}
         onClose={() => setIsPrintModalOpen(false)}
         receipt={selectedReceipt}
+      />
+
+      {/* 5. Detailed Charge Breakdown Modal */}
+      <ChargeBreakdownModal
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        charge={selectedChargeForDetail}
+        boarder={currentBoarder}
       />
     </div>
   )

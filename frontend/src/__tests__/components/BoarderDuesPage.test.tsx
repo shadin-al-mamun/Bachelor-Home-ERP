@@ -56,13 +56,17 @@ vi.mock('@/app/store/useBrandingStore', () => ({
 }))
 
 // Mock meals/boarders query
-vi.mock('@/features/meals/api/useMeals', () => ({
-  useMealBoardersList: () => ({
-    data: [MOCK_BOARDER],
-    isLoading: false,
-    refetch: vi.fn(),
-  }),
-}))
+vi.mock('@/features/meals/api/useMeals', async (importOriginal) => {
+  const actual: any = await importOriginal()
+  return {
+    ...actual,
+    useMealBoardersList: () => ({
+      data: [MOCK_BOARDER],
+      isLoading: false,
+      refetch: vi.fn(),
+    }),
+  }
+})
 
 // Mock useCurrentBoarder hook
 vi.mock('@/features/boarders/api/useCurrentBoarder', () => ({
@@ -144,5 +148,44 @@ describe('BoarderDuesPage.test.tsx - Boarder Portal Dues & Receipts', () => {
     // Clicking voucher button opens printable modal
     fireEvent.click(viewButton)
     expect(screen.getByText('অফিসিয়াল মানি রিসিপ্ট ভাউচার')).toBeInTheDocument()
+  })
+
+  it('renders "বিস্তারিত দেখুন" column and opens detailed breakdown modal on click', () => {
+    renderComponent()
+
+    // Column header and buttons should be present
+    const detailElements = screen.getAllByText('বিস্তারিত দেখুন')
+    expect(detailElements.length).toBeGreaterThanOrEqual(2)
+
+    // Multiple "বিস্তারিত দেখুন" buttons in the charges table
+    const detailButtons = screen.getAllByRole('button', { name: /বিস্তারিত দেখুন/ })
+    expect(detailButtons.length).toBeGreaterThanOrEqual(1)
+
+    // Click the first one (Utility charge: ৳৮৪৪)
+    fireEvent.click(detailButtons[0])
+
+    // Should open ChargeBreakdownModal
+    expect(screen.getByText('ইউটিলিটি ও বিবিধ বিলের পূর্ণাঙ্গ হিসাব')).toBeInTheDocument()
+    expect(screen.getByText('ফ্ল্যাটের ভাউচারভিত্তিক খরচের বিবরণ (Expense Vouchers)')).toBeInTheDocument()
+    expect(screen.getByText(/জনপ্রতি খরচের হিসেব যেভাবে নির্ধারিত হয়েছে/)).toBeInTheDocument()
+
+    // Close button should close modal
+    const closeBtn = screen.getByRole('button', { name: 'বন্ধ করুন' })
+    fireEvent.click(closeBtn)
+    expect(screen.queryByText('ইউটিলিটি ও বিবিধ বিলের পূর্ণাঙ্গ হিসাব')).not.toBeInTheDocument()
+  })
+
+  it('opens meal breakdown modal with session details and shortfall when meal charge is clicked', () => {
+    renderComponent()
+
+    const detailButtons = screen.getAllByRole('button', { name: /বিস্তারিত দেখুন/ })
+    // Third row is MEAL charge (ch-mock-3)
+    fireEvent.click(detailButtons[2])
+
+    // Should open Meal Breakdown
+    expect(screen.getByText('মাসিক খাবার বিলের হিসাব ও মিলের বিবরণী')).toBeInTheDocument()
+    expect(screen.getByText('সেশনভিত্তিক মিলের বিস্তারিত হিসাব (Meal Sessions Breakdown)')).toBeInTheDocument()
+    expect(screen.getByText(/খাবার বিল গণনার নীতি ও সূত্র/)).toBeInTheDocument()
+    expect(screen.getByText('গৃহীত নিজস্ব মিল')).toBeInTheDocument()
   })
 })
