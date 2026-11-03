@@ -52,16 +52,14 @@ export const ChargeBreakdownModal: React.FC<ChargeBreakdownModalProps> = ({
   charge,
   boarder,
 }) => {
-  if (!isOpen || !charge) return null
-
-  const isPaid = charge.status === 'PAID' || Number(charge.due_amount || 0) <= 0
-  const chargeAmount = Number(charge.amount) || 0
+  const isPaid = charge ? (charge.status === 'PAID' || Number(charge.due_amount || 0) <= 0) : false
+  const chargeAmount = Number(charge?.amount) || 0
   const paidAmount = isPaid
-    ? (Number(charge.paid_amount) > 0 ? Number(charge.paid_amount) : chargeAmount)
-    : Number(charge.paid_amount || 0)
+    ? (Number(charge?.paid_amount) > 0 ? Number(charge?.paid_amount) : chargeAmount)
+    : Number(charge?.paid_amount || 0)
   const dueAmount = isPaid ? 0 : Math.max(0, chargeAmount - paidAmount)
 
-  const monthStr = charge.billing_month ? String(charge.billing_month).slice(0, 7) : '2026-10'
+  const monthStr = charge?.billing_month ? String(charge.billing_month).slice(0, 7) : '2026-10'
 
   // 1. Fetch flat utility preview if charge is UTILITY
   const { data: flatsData = [] } = useFlatUtilityBillingPreview(monthStr)
@@ -85,7 +83,7 @@ export const ChargeBreakdownModal: React.FC<ChargeBreakdownModalProps> = ({
       if (byName) return byName
     }
     // Check if flat name is in charge description (e.g. "Flat-206")
-    if (charge.description) {
+    if (charge?.description) {
       const byDesc = flatsData.find(
         (f) =>
           charge.description?.includes(f.flat_code) ||
@@ -94,11 +92,11 @@ export const ChargeBreakdownModal: React.FC<ChargeBreakdownModalProps> = ({
       if (byDesc) return byDesc
     }
     return flatsData[0] || null
-  }, [flatsData, boarder, charge.description])
+  }, [flatsData, boarder, charge?.description])
 
   // Parse Utility Description Fallback
   const parsedUtility = useMemo(() => {
-    const desc = charge.description || ''
+    const desc = charge?.description || ''
     // e.g. "October 2026 — Flat-206 বিবিধ বিল (ইউটিলিটি: ৳২৪৪.০০, বাবুর্চি: ৳৬০০.০০, অন্যান্য: ৳...)"
     const utilMatch = desc.match(/ইউটিলিটি:\s*৳?([\d০-৯,.]+)/)
     const cookMatch = desc.match(/বাবুর্চি:\s*৳?([\d০-৯,.]+)/)
@@ -114,7 +112,7 @@ export const ChargeBreakdownModal: React.FC<ChargeBreakdownModalProps> = ({
       otherBillPerHead: otherPerHead,
       hasParsed: Boolean(utilMatch || cookMatch),
     }
-  }, [charge.description])
+  }, [charge?.description])
 
   // Match Meal Preview for this boarder
   const matchedMealItem = useMemo(() => {
@@ -122,16 +120,16 @@ export const ChargeBreakdownModal: React.FC<ChargeBreakdownModalProps> = ({
     return (
       mealPreview.preview_items.find(
         (item) =>
-          (charge.boarder_id && item.boarder_id === charge.boarder_id) ||
+          (charge?.boarder_id && item.boarder_id === charge.boarder_id) ||
           (boarder?.id && item.boarder_id === boarder.id) ||
           (boarder?.boarder_code && item.boarder_code === boarder.boarder_code)
       ) || null
     )
-  }, [mealPreview, charge.boarder_id, boarder])
+  }, [mealPreview, charge?.boarder_id, boarder])
 
   // Parse Meal Description Fallback
   const parsedMeal = useMemo(() => {
-    const desc = charge.description || ''
+    const desc = charge?.description || ''
     // e.g. "মাসিক খাবার বিল (2026-10) — বিলযোগ্য: ৩০টি মিল (গৃহীত: ২৩টি, শর্টফল: ৭টি; নাস্তা: ০, দুপুর: ১৩, রাত: ১০)"
     const billableMatch = desc.match(/বিলযোগ্য:\s*([\d০-৯,.]+)\s*টি/)
     const consumedMatch = desc.match(/গৃহীত:\s*([\d০-৯,.]+)\s*টি/)
@@ -156,7 +154,9 @@ export const ChargeBreakdownModal: React.FC<ChargeBreakdownModalProps> = ({
       dinner,
       hasParsed: Boolean(billableMatch || consumedMatch),
     }
-  }, [charge.description])
+  }, [charge?.description])
+
+  if (!isOpen || !charge) return null
 
   const handlePrint = () => {
     window.print()
