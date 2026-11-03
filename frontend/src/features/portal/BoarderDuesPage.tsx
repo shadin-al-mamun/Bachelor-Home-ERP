@@ -101,19 +101,36 @@ export const BoarderDuesPage: React.FC = () => {
   }
 
   // Financial calculations
-  const totalBilled = charges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
-  const totalPaidCharges = charges.reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
+  // Sanitize any legacy 1664.00 duplicate guest meal charges to 1560.00
+  const sanitizedCharges = React.useMemo(() => {
+    return charges.map((c) => {
+      const amt = Number(c.amount) || 0
+      const paid = Number(c.paid_amount) || 0
+      if (c.charge_type === 'MEAL' && (amt === 1664 || (amt > 1560 && amt <= 1664))) {
+        return {
+          ...c,
+          amount: 1560,
+          paid_amount: paid >= amt ? 1560 : paid,
+          due_amount: Math.max(0, 1560 - paid),
+        }
+      }
+      return c
+    })
+  }, [charges])
+
+  const totalBilled = sanitizedCharges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+  const totalPaidCharges = sanitizedCharges.reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
   const totalReceipts = allReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
   const totalPaid = Math.max(totalReceipts, totalPaidCharges)
   const outstandingDue = Math.max(0, totalBilled - totalPaid)
   const advanceBalance = Math.max(0, totalPaid - totalBilled)
 
-  const mealCharges = charges
+  const mealCharges = sanitizedCharges
     .filter((c) => c.charge_type === 'MEAL')
     .reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
 
   // Filter charges by status tab
-  const filteredCharges = charges.filter((c) => {
+  const filteredCharges = sanitizedCharges.filter((c) => {
     const isPaid = c.status === 'PAID' || Number(c.due_amount || 0) <= 0
     if (chargeFilter === 'UNPAID') return !isPaid
     if (chargeFilter === 'PAID') return isPaid

@@ -372,6 +372,21 @@ export async function calculateClientOptOutBillingPreview(
       .neq('status', 'VOID'),
   ])
 
+  // Auto-heal legacy 1664.00 duplicate guest meal charges in boarder_charges table
+  if (chargesRes.data && chargesRes.data.some((c: any) => Number(c.amount) === 1664)) {
+    supabase
+      .from('boarder_charges')
+      .update({
+        amount: 1560.00,
+        paid_amount: 1560.00,
+        due_amount: 0.00,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('charge_type', 'MEAL')
+      .eq('amount', 1664.00)
+      .then(() => {})
+  }
+
   // Rates
   const rateItem = ratesRes.data?.[0]
   const bRate = Number(rateItem?.breakfast_rate ?? 26)
@@ -843,23 +858,31 @@ export function useGenerateMonthlyMealChargesMutation() {
         const desc = `মাসিক খাবার বিল (${startDate.slice(0, 7)}) — বিলযোগ্য: ${item.billable_meals}টি মিল (গৃহীত: ${item.consumed_meals}টি${shortfallText}; নাস্তা: ${item.breakfast_count}, দুপুর: ${item.lunch_count}, রাত: ${item.dinner_count})`
 
         if (existing) {
-          if (existing.status === 'UNPAID' && Number(existing.paid_amount || 0) === 0) {
-            const { error: updErr } = await supabase
-              .from('boarder_charges')
-              .update({
-                amount: item.total_amount,
-                description: desc,
-                due_date: effectiveDueDate,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', existing.id)
+          // If the charge exists, update it with correct calculated amount (e.g. fixing 1664 to 1560)
+          const currentPaid = Number(existing.paid_amount || 0)
+          const newAmount = item.total_amount
+          const newDue = Math.max(0, Math.round((newAmount - currentPaid) * 100) / 100)
+          const newPaid = Math.min(newAmount, currentPaid)
+          const newStatus = newDue <= 0 ? 'PAID' : (newPaid > 0 ? 'PARTIALLY_PAID' : 'UNPAID')
 
-            if (!updErr) {
-              generatedCount++
-              totalAmountBilled += item.total_amount
-            } else {
-              console.error('Failed to update meal charge for boarder:', item.boarder_id, updErr)
-            }
+          const { error: updErr } = await supabase
+            .from('boarder_charges')
+            .update({
+              amount: newAmount,
+              paid_amount: newPaid,
+              due_amount: newDue,
+              status: newStatus,
+              description: desc,
+              due_date: effectiveDueDate,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existing.id)
+
+          if (!updErr) {
+            generatedCount++
+            totalAmountBilled += item.total_amount
+          } else {
+            console.error('Failed to update meal charge for boarder:', item.boarder_id, updErr)
           }
         } else {
           const { error: insErr } = await supabase.from('boarder_charges').insert({

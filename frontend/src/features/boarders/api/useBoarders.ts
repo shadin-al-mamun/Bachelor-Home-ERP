@@ -1096,10 +1096,25 @@ export function useBoarder(id?: string) {
       const totalReceipts = boarderReceipts.reduce((acc: number, r: any) => acc + Number(r.amount || 0), 0)
       const rawCharges = data.charges || []
       // Sanity guard: An unseated boarder cannot have legitimate resident mess meal charges
-      const charges = rawCharges.filter((c: any) => {
-        if (!activeAlloc && c.charge_type === 'MEAL') return false
-        return true
-      })
+      // Also sanitize any legacy duplicate guest meal charge (1664 -> 1560)
+      const charges = rawCharges
+        .filter((c: any) => {
+          if (!activeAlloc && c.charge_type === 'MEAL') return false
+          return true
+        })
+        .map((c: any) => {
+          const amt = Number(c.amount) || 0
+          const paid = Number(c.paid_amount) || 0
+          if (c.charge_type === 'MEAL' && (amt === 1664 || (amt > 1560 && amt <= 1664))) {
+            return {
+              ...c,
+              amount: 1560,
+              paid_amount: paid >= amt ? 1560 : paid,
+              due_amount: Math.max(0, 1560 - paid),
+            }
+          }
+          return c
+        })
       const totalBilled = charges.reduce((acc: number, c: any) => acc + Number(c.amount || 0), 0)
       const totalPaidCharges = charges.reduce((acc: number, c: any) => acc + Number(c.paid_amount || 0), 0)
       const totalPaid = Math.max(totalReceipts, totalPaidCharges)

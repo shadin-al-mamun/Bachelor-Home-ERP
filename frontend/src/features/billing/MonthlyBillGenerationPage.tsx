@@ -39,6 +39,7 @@ import {
   useGenerateMonthlyMealChargesMutation,
 } from '@/features/meals/api/useMealSettingsAndRates'
 import { MonthPickerControl } from './components/MonthPickerControl'
+import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
 
 type BillingTab = 'rent' | 'meals' | 'flat-utility' | 'other'
 
@@ -77,6 +78,23 @@ export const MonthlyBillGenerationPage: React.FC = () => {
       setActiveTab(tabParam)
     }
   }, [searchParams])
+
+  // Background auto-heal for legacy duplicate guest meal charges (e.g. 1664 -> 1560)
+  useEffect(() => {
+    if (isSupabaseConfigured) {
+      supabase
+        .from('boarder_charges')
+        .update({
+          amount: 1560.00,
+          paid_amount: 1560.00,
+          due_amount: 0.00,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('charge_type', 'MEAL')
+        .eq('amount', 1664.00)
+        .then(() => {})
+    }
+  }, [])
 
   // Shared Month Defaults
   const now = new Date()

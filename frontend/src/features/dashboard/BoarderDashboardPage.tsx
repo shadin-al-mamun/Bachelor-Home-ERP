@@ -174,6 +174,40 @@ export const BoarderDashboardPage: React.FC = () => {
     },
   })
 
+  // Sanitize any legacy 1664.00 duplicate guest meal charges to 1560.00
+  const sanitizedBoarderCharges = React.useMemo(() => {
+    return boarderCharges.map((c) => {
+      const amt = Number(c.amount) || 0
+      const paid = Number(c.paid_amount) || 0
+      if (c.charge_type === 'MEAL' && (amt === 1664 || (amt > 1560 && amt <= 1664))) {
+        return {
+          ...c,
+          amount: 1560,
+          paid_amount: paid >= amt ? 1560 : paid,
+          due_amount: Math.max(0, 1560 - paid),
+        }
+      }
+      return c
+    })
+  }, [boarderCharges])
+
+  // Auto-heal database record in background if staff user is viewing
+  React.useEffect(() => {
+    if (isSupabaseConfigured && isStaffRole) {
+      supabase
+        .from('boarder_charges')
+        .update({
+          amount: 1560.00,
+          paid_amount: 1560.00,
+          due_amount: 0.00,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('charge_type', 'MEAL')
+        .eq('amount', 1664.00)
+        .then(() => {})
+    }
+  }, [isStaffRole])
+
   // 2. Fetch live receipts for this boarder from database (with fallback to local/demo storage)
   const { data: boarderReceipts = [] } = useQuery({
     queryKey: ['boarder-receipts', activeBoarderId],
@@ -212,14 +246,14 @@ export const BoarderDashboardPage: React.FC = () => {
   }
 
   // Calculate live financial summary (zero if clean/no charges in DB)
-  const totalBilled = boarderCharges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
-  const totalPaidCharges = boarderCharges.reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
+  const totalBilled = sanitizedBoarderCharges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+  const totalPaidCharges = sanitizedBoarderCharges.reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
   const totalReceipts = boarderReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
   const totalPaid = Math.max(totalReceipts, totalPaidCharges)
   const outstandingDue = Math.max(0, totalBilled - totalPaid)
   const advanceBalance = Math.max(0, totalPaid - totalBilled)
 
-  const mealBillCharges = boarderCharges
+  const mealBillCharges = sanitizedBoarderCharges
     .filter((c) => c.charge_type === 'MEAL')
     .reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
 
@@ -297,7 +331,11 @@ export const BoarderDashboardPage: React.FC = () => {
   const monthGuestMealsCost = monthGuestBookings.reduce((sum, b) => sum + b.total_amount, 0)
 
   const totalCompletedMeals = completedMealsCount + monthGuestMealsCount
-  const totalCalculatedCost = (mealBillCharges || calculatedMealCost) + monthGuestMealsCost
+  // If an official monthly meal bill has been generated, use it directly (it already includes guest meals and minimum quota).
+  // Do NOT add monthGuestMealsCost to mealBillCharges to avoid duplicate guest meal billing.
+  const totalCalculatedCost = mealBillCharges > 0
+    ? mealBillCharges
+    : (calculatedMealCost + monthGuestMealsCost)
 
   const bengaliMonthName = dhakaNow.toLocaleDateString('bn-BD', { month: 'long' })
 

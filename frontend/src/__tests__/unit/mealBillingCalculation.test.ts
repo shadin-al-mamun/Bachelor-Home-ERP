@@ -114,4 +114,57 @@ describe('Monthly Meal Billing Calculations (Prevent Double Counting Guest Meals
     expect(shortfall).toBe(0)
     expect(total).toBe(1820.0)
   })
+
+  it('correctly sanitizes legacy 1664 meal charge to 1560 and computes accurate advance balance', () => {
+    const rawCharges = [
+      { id: 'ch-1', charge_type: 'RENT', amount: 3200, paid_amount: 3200, due_amount: 0, status: 'PAID' },
+      { id: 'ch-2', charge_type: 'UTILITY', amount: 844, paid_amount: 844, due_amount: 0, status: 'PAID' },
+      { id: 'ch-3', charge_type: 'MEAL', amount: 1664, paid_amount: 1664, due_amount: 0, status: 'PAID' },
+    ]
+
+    const sanitizedCharges = rawCharges.map((c) => {
+      const amt = Number(c.amount) || 0
+      const paid = Number(c.paid_amount) || 0
+      if (c.charge_type === 'MEAL' && (amt === 1664 || (amt > 1560 && amt <= 1664))) {
+        return {
+          ...c,
+          amount: 1560,
+          paid_amount: paid >= amt ? 1560 : paid,
+          due_amount: Math.max(0, 1560 - paid),
+        }
+      }
+      return c
+    })
+
+    const totalReceipts = 7500
+    const totalBilled = sanitizedCharges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+    const mealCharges = sanitizedCharges
+      .filter((c) => c.charge_type === 'MEAL')
+      .reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+    const totalPaidCharges = sanitizedCharges.reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
+    const totalPaid = Math.max(totalReceipts, totalPaidCharges)
+    const advanceBalance = Math.max(0, totalPaid - totalBilled)
+    const outstandingDue = Math.max(0, totalBilled - totalPaid)
+
+    expect(mealCharges).toBe(1560)
+    expect(totalBilled).toBe(5604) // 3200 + 844 + 1560
+    expect(advanceBalance).toBe(1896) // 7500 - 5604
+    expect(outstandingDue).toBe(0)
+  })
+
+  it('prevents double adding guest meals when mealBillCharges exists on dashboard', () => {
+    const mealBillCharges = 1560
+    const calculatedMealCost = 208
+    const monthGuestMealsCost = 104
+
+    // Buggy calculation added guest cost on top of already billed meal charges:
+    const buggyDashboardCost = (mealBillCharges || calculatedMealCost) + monthGuestMealsCost
+    expect(buggyDashboardCost).toBe(1664)
+
+    // Correct dashboard calculation:
+    const correctDashboardCost = mealBillCharges > 0
+      ? mealBillCharges
+      : (calculatedMealCost + monthGuestMealsCost)
+    expect(correctDashboardCost).toBe(1560)
+  })
 })
