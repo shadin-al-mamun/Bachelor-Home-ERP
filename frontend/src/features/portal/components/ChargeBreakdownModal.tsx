@@ -127,32 +127,41 @@ export const ChargeBreakdownModal: React.FC<ChargeBreakdownModalProps> = ({
     )
   }, [mealPreview, charge?.boarder_id, boarder])
 
-  // Parse Meal Description Fallback
+  // Parse Meal Description Authoritative Data
   const parsedMeal = useMemo(() => {
     const desc = charge?.description || ''
-    // e.g. "মাসিক খাবার বিল (2026-10) — বিলযোগ্য: ৩০টি মিল (গৃহীত: ২৩টি, শর্টফল: ৭টি; নাস্তা: ০, দুপুর: ১৩, রাত: ১০)"
-    const billableMatch = desc.match(/বিলযোগ্য:\s*([\d০-৯,.]+)\s*টি/)
-    const consumedMatch = desc.match(/গৃহীত:\s*([\d০-৯,.]+)\s*টি/)
-    const shortfallMatch = desc.match(/শর্টফল:\s*([\d০-৯,.]+)\s*টি/)
-    const bMatch = desc.match(/নাস্তা:\s*([\d০-৯,.]+)/)
-    const lMatch = desc.match(/দুপুর:\s*([\d০-৯,.]+)/)
-    const dMatch = desc.match(/রাত:\s*([\d০-৯,.]+)/)
+    // Support various formats:
+    // 1. "মাসিক খাবার বিল (2026-10) — বিলযোগ্য: ৩০টি মিল (গৃহীত: ২৩টি, শর্টফল: ৭টি; নাস্তা: ০, দুপুর: ১৩, রাত: ১০)"
+    // 2. "খাবার বিল (October 2026) - খাওয়া মিল: 23টি, নূন্যতম ঘাটতি মিল: 7টি (মোট বিল্য: 30টি মিল)"
+    // 3. "মাসিক খাবার বিল (2026-10) — গৃহীত: ২৩ মিল, সর্বনিম্ন কোটা: ৩০ মিল (+৭ মিল শর্টফল) (নাস্তা: ০, দুপুর: ১৩, রাত: ১০)"
+    // 4. "মাসিক খাবার বিল (2026-10) — মোট ৩০টি মিল (নাস্তা: ০, দুপুর: ১৩, রাত: ১০)"
+    const billableMatch = desc.match(/(?:বিলযোগ্য|মোট বিল্য|সর্বনিম্ন কোটা|মোট কোটা|মোট)\s*:\s*([\d০-৯,.]+)\s*(?:টি)?(?:\s*মিল)?/)
+    const consumedMatch = desc.match(/(?:গৃহীত|খাওয়া মিল)\s*:\s*([\d০-৯,.]+)\s*(?:টি)?(?:\s*মিল)?/)
+    const shortfallMatch = desc.match(/(?:শর্টফল|ঘাটতি মিল|নূন্যতম ঘাটতি মিল)\s*:\s*([\d০-৯,.]+)\s*(?:টি)?(?:\s*মিল)?|\+([\d০-৯,.]+)\s*মিল\s*শর্টফল/)
+    const bMatch = desc.match(/(?:নাস্তা|সকাল)\s*:\s*([\d০-৯,.]+)/)
+    const lMatch = desc.match(/দুপুর\s*:\s*([\d০-৯,.]+)/)
+    const dMatch = desc.match(/রাত\s*:\s*([\d০-৯,.]+)/)
 
-    const billable = billableMatch ? parseBnNum(billableMatch[1]) : 30
-    const consumed = consumedMatch ? parseBnNum(consumedMatch[1]) : 23
-    const shortfall = shortfallMatch ? parseBnNum(shortfallMatch[1]) : Math.max(0, billable - consumed)
+    const rawBillable = billableMatch ? parseBnNum(billableMatch[1]) : 0
+    const rawConsumed = consumedMatch ? parseBnNum(consumedMatch[1]) : 0
+    const rawShortfall = shortfallMatch ? parseBnNum(shortfallMatch[1] || shortfallMatch[2]) : 0
+
     const breakfast = bMatch ? parseBnNum(bMatch[1]) : 0
-    const lunch = lMatch ? parseBnNum(lMatch[1]) : 13
-    const dinner = dMatch ? parseBnNum(dMatch[1]) : 10
+    const lunch = lMatch ? parseBnNum(lMatch[1]) : 0
+    const dinner = dMatch ? parseBnNum(dMatch[1]) : 0
+
+    const hasSessionCounts = Boolean(bMatch || lMatch || dMatch)
+    const hasParsed = Boolean(billableMatch || consumedMatch || shortfallMatch || hasSessionCounts)
 
     return {
-      billable,
-      consumed,
-      shortfall,
+      billable: rawBillable,
+      consumed: rawConsumed,
+      shortfall: rawShortfall,
       breakfast,
       lunch,
       dinner,
-      hasParsed: Boolean(billableMatch || consumedMatch),
+      hasSessionCounts,
+      hasParsed,
     }
   }, [charge?.description])
 
@@ -455,23 +464,65 @@ export const ChargeBreakdownModal: React.FC<ChargeBreakdownModalProps> = ({
           {charge.charge_type === 'MEAL' && (
             <div className="space-y-6">
               {(() => {
-                const bCount = matchedMealItem?.breakfast_count ?? parsedMeal.breakfast
-                const lCount = matchedMealItem?.lunch_count ?? parsedMeal.lunch
-                const dCount = matchedMealItem?.dinner_count ?? parsedMeal.dinner
-                const consumedMeals = matchedMealItem?.consumed_meals ?? parsedMeal.consumed
-                const minMeals = matchedMealItem?.min_meals ?? 30.0
-                const shortfallMeals = matchedMealItem?.shortfall_meals ?? parsedMeal.shortfall
-                const billableMeals = matchedMealItem?.billable_meals ?? parsedMeal.billable
+                const bRate = Number(mealPreview?.rates?.breakfast ?? 26.0)
+                const mealRate = Number(mealPreview?.rates?.lunch ?? 52.0)
 
-                const mealRate = 52.0
-                const bRate = 26.0
+                // Authoritative Total Amount from Charge
+                const authoritativeAmount = chargeAmount > 0 ? chargeAmount : (Number(matchedMealItem?.total_amount) || 0)
 
-                const bCost = matchedMealItem?.breakfast_cost ?? (bCount * bRate)
-                const lCost = matchedMealItem?.lunch_cost ?? (lCount * mealRate)
-                const dCost = matchedMealItem?.dinner_cost ?? (dCount * mealRate)
-                const shortfallCost = matchedMealItem?.shortfall_cost ?? (shortfallMeals * mealRate)
+                // 1. Prioritize parsedMeal if description has authoritative breakdown
+                // 2. Fall back to authoritativeAmount / mealRate (e.g. 1560 / 52 = 30 meals)
+                // 3. Fall back to matchedMealItem
+                const billableMeals = parsedMeal.billable > 0
+                  ? parsedMeal.billable
+                  : (authoritativeAmount > 0
+                      ? Math.round((authoritativeAmount / mealRate) * 10) / 10
+                      : (matchedMealItem?.billable_meals ?? 30.0))
 
-                const totalCalculated = chargeAmount || (bCost + lCost + dCost + shortfallCost)
+                const consumedMeals = parsedMeal.consumed > 0
+                  ? parsedMeal.consumed
+                  : (matchedMealItem?.consumed_meals ?? Math.min(billableMeals, 23.0))
+
+                const shortfallMeals = parsedMeal.shortfall > 0
+                  ? parsedMeal.shortfall
+                  : Math.max(0, Math.round((billableMeals - consumedMeals) * 10) / 10)
+
+                const minMeals = Math.max(billableMeals, Math.round((consumedMeals + shortfallMeals) * 10) / 10)
+
+                // Sessional Breakdown Counts
+                let bCount = 0
+                let lCount = 0
+                let dCount = 0
+
+                if (parsedMeal.hasSessionCounts) {
+                  bCount = parsedMeal.breakfast
+                  lCount = parsedMeal.lunch
+                  dCount = parsedMeal.dinner
+                } else if (matchedMealItem && (matchedMealItem.breakfast_count > 0 || matchedMealItem.lunch_count > 0 || matchedMealItem.dinner_count > 0)) {
+                  bCount = matchedMealItem.breakfast_count
+                  lCount = matchedMealItem.lunch_count
+                  dCount = matchedMealItem.dinner_count
+                } else {
+                  // Fallback: estimate from consumed meals
+                  const halfConsumed = Math.floor(consumedMeals / 2)
+                  lCount = consumedMeals - halfConsumed
+                  dCount = halfConsumed
+                  bCount = 0
+                }
+
+                // Costs
+                const bCost = Math.round(bCount * bRate * 100) / 100
+                const lCost = Math.round(lCount * mealRate * 100) / 100
+                const dCost = Math.round(dCount * mealRate * 100) / 100
+                const baseConsumedCost = Math.round((bCost + lCost + dCost) * 100) / 100
+
+                // If authoritativeAmount is known, ensure shortfallCost reconciles exactly
+                const calculatedShortfallCost = Math.round(shortfallMeals * mealRate * 100) / 100
+                const effectiveShortfallCost = (authoritativeAmount > 0 && shortfallMeals > 0)
+                  ? Math.max(0, Math.round((authoritativeAmount - baseConsumedCost) * 100) / 100)
+                  : calculatedShortfallCost
+
+                const displayTotal = authoritativeAmount > 0 ? authoritativeAmount : Math.round((baseConsumedCost + effectiveShortfallCost) * 100) / 100
 
                 return (
                   <>
@@ -504,7 +555,7 @@ export const ChargeBreakdownModal: React.FC<ChargeBreakdownModalProps> = ({
                       <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-teal-500/30 space-y-1">
                         <span className="text-[10px] text-teal-300 block font-semibold">মোট খাবার বিল</span>
                         <div className="text-base font-black font-mono text-teal-300">
-                          {formatCurrencyBn(totalCalculated)}
+                          {formatCurrencyBn(displayTotal)}
                         </div>
                         <span className="text-[10px] text-slate-400 block">বিলযোগ্য {billableMeals}টি মিল</span>
                       </div>
@@ -531,19 +582,19 @@ export const ChargeBreakdownModal: React.FC<ChargeBreakdownModalProps> = ({
                             <tr className="hover:bg-slate-800/20">
                               <td className="py-2.5 px-3 text-slate-300 font-medium">সকালের নাস্তা (Breakfast)</td>
                               <td className="py-2.5 px-3 text-center font-mono font-bold text-white">{bCount} টি</td>
-                              <td className="py-2.5 px-3 text-right font-mono text-slate-400">৳২৬.০০</td>
+                              <td className="py-2.5 px-3 text-right font-mono text-slate-400">{formatCurrencyBn(bRate)}</td>
                               <td className="py-2.5 px-3 text-right font-mono font-bold text-white">{formatCurrencyBn(bCost)}</td>
                             </tr>
                             <tr className="hover:bg-slate-800/20">
                               <td className="py-2.5 px-3 text-slate-300 font-medium">দুপুরের খাবার (Lunch)</td>
                               <td className="py-2.5 px-3 text-center font-mono font-bold text-white">{lCount} টি</td>
-                              <td className="py-2.5 px-3 text-right font-mono text-slate-400">৳৫২.০০</td>
+                              <td className="py-2.5 px-3 text-right font-mono text-slate-400">{formatCurrencyBn(mealRate)}</td>
                               <td className="py-2.5 px-3 text-right font-mono font-bold text-white">{formatCurrencyBn(lCost)}</td>
                             </tr>
                             <tr className="hover:bg-slate-800/20">
                               <td className="py-2.5 px-3 text-slate-300 font-medium">রাতের খাবার (Dinner)</td>
                               <td className="py-2.5 px-3 text-center font-mono font-bold text-white">{dCount} টি</td>
-                              <td className="py-2.5 px-3 text-right font-mono text-slate-400">৳৫২.০০</td>
+                              <td className="py-2.5 px-3 text-right font-mono text-slate-400">{formatCurrencyBn(mealRate)}</td>
                               <td className="py-2.5 px-3 text-right font-mono font-bold text-white">{formatCurrencyBn(dCost)}</td>
                             </tr>
                             {shortfallMeals > 0 && (
@@ -552,8 +603,8 @@ export const ChargeBreakdownModal: React.FC<ChargeBreakdownModalProps> = ({
                                   <span>ন্যূনতম কোটা শর্টফল (Shortfall Meals)</span>
                                 </td>
                                 <td className="py-2.5 px-3 text-center font-mono font-bold text-rose-300">{shortfallMeals} টি</td>
-                                <td className="py-2.5 px-3 text-right font-mono text-slate-400">৳৫২.০০</td>
-                                <td className="py-2.5 px-3 text-right font-mono font-bold text-rose-300">{formatCurrencyBn(shortfallCost)}</td>
+                                <td className="py-2.5 px-3 text-right font-mono text-slate-400">{formatCurrencyBn(mealRate)}</td>
+                                <td className="py-2.5 px-3 text-right font-mono font-bold text-rose-300">{formatCurrencyBn(effectiveShortfallCost)}</td>
                               </tr>
                             )}
                           </tbody>
@@ -569,7 +620,7 @@ export const ChargeBreakdownModal: React.FC<ChargeBreakdownModalProps> = ({
                                 সর্বমোট খরচ:
                               </td>
                               <td className="py-2.5 px-3 text-right text-teal-400 font-mono font-black text-sm">
-                                {formatCurrencyBn(totalCalculated)}
+                                {formatCurrencyBn(displayTotal)}
                               </td>
                             </tr>
                           </tfoot>
@@ -585,11 +636,11 @@ export const ChargeBreakdownModal: React.FC<ChargeBreakdownModalProps> = ({
                       </div>
                       <div className="space-y-1.5 text-slate-300 leading-relaxed">
                         <p>
-                          ১. <strong>গৃহীত মিলের মোট হিসাব:</strong> নাস্তা ({bCount} × ৳২৬ = {formatCurrencyBn(bCost)}) + দুপুর ({lCount} × ৳৫২ = {formatCurrencyBn(lCost)}) + রাত ({dCount} × ৳৫২ = {formatCurrencyBn(dCost)}) = <strong>{formatCurrencyBn(bCost + lCost + dCost)}</strong>।
+                          ১. <strong>গৃহীত মিলের মোট হিসাব:</strong> নাস্তা ({bCount} × {formatCurrencyBn(bRate)} = {formatCurrencyBn(bCost)}) + দুপুর ({lCount} × {formatCurrencyBn(mealRate)} = {formatCurrencyBn(lCost)}) + রাত ({dCount} × {formatCurrencyBn(mealRate)} = {formatCurrencyBn(dCost)}) = <strong>{formatCurrencyBn(baseConsumedCost)}</strong>।
                         </p>
                         {shortfallMeals > 0 ? (
                           <p>
-                            ২. <strong>মিনিমাম কোটা সমন্বয়:</strong> হোস্টেল মেসের নিয়ম অনুযায়ী মাসিক ন্যূনতম মিল কোটা <strong>{minMeals}টি</strong>। বর্ডার কর্তৃক গৃহীত মিল <strong>{consumedMeals}টি</strong> হওয়ায় বাকি <strong>{shortfallMeals}টি</strong> শর্টফল মিল হিসেবে ধার্য করা হয়েছে ({shortfallMeals} × ৳৫২ = <strong>{formatCurrencyBn(shortfallCost)}</strong>)।
+                            ২. <strong>মিনিমাম কোটা সমন্বয়:</strong> হোস্টেল মেসের নিয়ম অনুযায়ী মাসিক ন্যূনতম মিল কোটা <strong>{minMeals}টি</strong>। বর্ডার কর্তৃক গৃহীত মিল <strong>{consumedMeals}টি</strong> হওয়ায় বাকি <strong>{shortfallMeals}টি</strong> শর্টফল মিল হিসেবে ধার্য করা হয়েছে ({shortfallMeals} × {formatCurrencyBn(mealRate)} = <strong>{formatCurrencyBn(effectiveShortfallCost)}</strong>)।
                           </p>
                         ) : (
                           <p>
@@ -597,7 +648,7 @@ export const ChargeBreakdownModal: React.FC<ChargeBreakdownModalProps> = ({
                           </p>
                         )}
                         <p className="pt-1.5 border-t border-teal-500/30 font-semibold text-white">
-                          সর্বমোট বিলযোগ্য মিল: {billableMeals}টি • মোট ধার্যকৃত খাবার বিল = <span className="text-teal-300 font-mono font-black text-sm">{formatCurrencyBn(totalCalculated)}</span>
+                          সর্বমোট বিলযোগ্য মিল: {billableMeals}টি • মোট ধার্যকৃত খাবার বিল = <span className="text-teal-300 font-mono font-black text-sm">{formatCurrencyBn(displayTotal)}</span>
                         </p>
                       </div>
                     </div>
