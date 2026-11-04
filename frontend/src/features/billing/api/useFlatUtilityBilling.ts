@@ -35,6 +35,7 @@ export interface FlatUtilityPreviewItem {
     per_seat_amount: number
     cook_bill: number
     other_bill: number
+    other_bill_per_head?: number
   } | null
 }
 
@@ -230,12 +231,19 @@ export function useFlatUtilityBillingPreview(billingMonth: string) {
       // Distributions map
       const distMap = new Map<string, any>()
       distributions.forEach((d: any) => {
+        const flatSeatCount = flatSeatsCountMap.get(d.flat_id) || 1
+        const otherBillTotal = Number(d.breakdown?.other_bill) || 0
+        const otherBillPerHead =
+          Number(d.breakdown?.other_bill_per_head) ||
+          (otherBillTotal > 0 ? Math.round(otherBillTotal / Math.max(1, flatSeatCount)) : 0)
+
         distMap.set(d.flat_id, {
           id: d.id,
           is_billed: d.is_billed,
           per_seat_amount: Number(d.per_seat_amount) || 0,
           cook_bill: Number(d.breakdown?.cook_bill) || 0,
-          other_bill: Number(d.breakdown?.other_bill) || 0,
+          other_bill: otherBillTotal,
+          other_bill_per_head: otherBillPerHead,
         })
       })
 

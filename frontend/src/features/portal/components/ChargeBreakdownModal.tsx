@@ -452,14 +452,17 @@ export const ChargeBreakdownModal: React.FC<ChargeBreakdownModalProps> = ({
                   (parsedUtility.cookBillPerHead > 0 ? parsedUtility.cookBillPerHead : 600)
 
                 const otherBillPerHead =
-                  matchedFlat?.existing_distribution?.other_bill ||
+                  matchedFlat?.existing_distribution?.other_bill_per_head ||
+                  (matchedFlat?.existing_distribution?.other_bill && totalSeats > 0
+                    ? Math.round(matchedFlat.existing_distribution.other_bill / totalSeats)
+                    : 0) ||
                   (parsedUtility.otherBillPerHead > 0 ? parsedUtility.otherBillPerHead : 0)
 
                 const grandTotalPerHead = utilityPerHead + cookBillPerHead + otherBillPerHead
 
                 return (
                   <>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className={`grid grid-cols-2 ${otherBillPerHead > 0 ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3`}>
                       <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-1">
                         <span className="text-[10px] text-slate-400 block">ফ্ল্যাটের মোট ভাউচার খরচ</span>
                         <div className="text-base font-black font-mono text-amber-400">
@@ -486,12 +489,24 @@ export const ChargeBreakdownModal: React.FC<ChargeBreakdownModalProps> = ({
                         <span className="text-[10px] text-slate-500 block">নির্ধারিত মাথাপিছু</span>
                       </div>
 
+                      {otherBillPerHead > 0 && (
+                        <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-purple-500/30 space-y-1">
+                          <span className="text-[10px] text-purple-300 block font-semibold">অন্যান্য বিবিধ বিল</span>
+                          <div className="text-base font-black font-mono text-purple-400">
+                            {formatCurrencyBn(otherBillPerHead)}
+                          </div>
+                          <span className="text-[10px] text-slate-500 block">মাথাপিছু অতিরিক্ত</span>
+                        </div>
+                      )}
+
                       <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-amber-500/30 space-y-1">
                         <span className="text-[10px] text-amber-300 block font-semibold">জনপ্রতি মোট ধার্যকৃত</span>
                         <div className="text-base font-black font-mono text-amber-300">
                           {formatCurrencyBn(grandTotalPerHead)}
                         </div>
-                        <span className="text-[10px] text-emerald-400 block font-medium">ইউটিলিটি + খালা বিল</span>
+                        <span className="text-[10px] text-emerald-400 block font-medium">
+                          {otherBillPerHead > 0 ? 'ইউটিলিটি + খালা + অন্যান্য' : 'ইউটিলিটি + খালা বিল'}
+                        </span>
                       </div>
                     </div>
 
@@ -574,9 +589,13 @@ export const ChargeBreakdownModal: React.FC<ChargeBreakdownModalProps> = ({
                         <p>
                           ২. <strong>খালা / বাবুর্চি বিল:</strong> জনপ্রতি মাসিক নির্ধারিত = <strong>{formatCurrencyBn(cookBillPerHead)}</strong>
                         </p>
-                        {otherBillPerHead > 0 && (
+                        {otherBillPerHead > 0 ? (
                           <p>
-                            ৩. <strong>অন্যান্য বিবিধ বিল:</strong> জনপ্রতি = <strong>{formatCurrencyBn(otherBillPerHead)}</strong>
+                            ৩. <strong>অন্যান্য বিবিধ বিল:</strong> জনপ্রতি অতিরিক্ত = <strong>{formatCurrencyBn(otherBillPerHead)}</strong>
+                          </p>
+                        ) : (
+                          <p className="text-slate-400">
+                            ৩. <strong>অন্যান্য বিবিধ বিল:</strong> ফ্ল্যাটওয়ারী অতিরিক্ত কোনো চার্জ নেই (২৫ অক্টোবরের লাইট ক্রয়ের ৳৮০০.০০ টাকার ভাউচারটি উপরের মোট ভাউচার খরচের ভেতরেই সমন্বিত রয়েছে)
                           </p>
                         )}
                         <p className="pt-1.5 border-t border-indigo-500/30 font-semibold text-white">
