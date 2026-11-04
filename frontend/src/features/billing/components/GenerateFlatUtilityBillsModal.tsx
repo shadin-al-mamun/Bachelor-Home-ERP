@@ -4,6 +4,9 @@ import { Button } from '@/components/common/Button'
 import {
   useFlatUtilityBillingPreview,
   useGenerateBatchFlatUtilityBills,
+  loadFlatUtilityInputsFromStorage,
+  saveFlatUtilityInputsToStorage,
+  loadFlatUtilityDistributionFromStorage,
   type FlatConfigPayload,
 } from '../api/useFlatUtilityBilling'
 import {
@@ -47,45 +50,65 @@ export const GenerateFlatUtilityBillsModal: React.FC<GenerateFlatUtilityBillsMod
   // Fetch preview data for the selected month
   const { data: flatsData = [], isLoading, isFetching, refetch } = useFlatUtilityBillingPreview(billingMonth)
 
-  // Initialize flatInputs whenever flatsData loads
+  // Initialize flatInputs whenever flatsData or billingMonth loads
   useEffect(() => {
     if (flatsData.length > 0) {
-      setFlatInputs((prev) => {
-        const nextState: Record<string, FlatRowState> = { ...prev }
-        flatsData.forEach((flat) => {
-          if (!nextState[flat.flat_id]) {
-            const existingCook = flat.existing_distribution?.cook_bill ?? 600
-            const existingOther = flat.existing_distribution?.other_bill ?? 0
-            const effectiveSeats = flat.total_seats > 0 ? flat.total_seats : (flat.active_boarders_count || 1)
+      const monthPrefix = billingMonth.slice(0, 7)
+      const storedInputs = loadFlatUtilityInputsFromStorage(monthPrefix)
+      const storedDist = loadFlatUtilityDistributionFromStorage(monthPrefix)
 
-            nextState[flat.flat_id] = {
-              seatCount: effectiveSeats,
-              cookBill: existingCook,
-              otherBill: existingOther,
-            }
-          }
-        })
-        return nextState
+      const nextState: Record<string, FlatRowState> = {}
+      flatsData.forEach((flat) => {
+        const savedInput = storedInputs?.[flat.flat_id]
+        const savedDist = storedDist?.[flat.flat_id]
+
+        const existingCook =
+          savedInput?.cookBill ??
+          savedDist?.cook_bill ??
+          flat.existing_distribution?.cook_bill ??
+          600
+
+        const existingOther =
+          savedInput?.otherBill ??
+          savedDist?.other_bill ??
+          flat.existing_distribution?.other_bill ??
+          0
+
+        const effectiveSeats =
+          savedInput?.seatCount ??
+          savedDist?.total_seats ??
+          (flat.total_seats > 0 ? flat.total_seats : (flat.active_boarders_count || 1))
+
+        nextState[flat.flat_id] = {
+          seatCount: effectiveSeats,
+          cookBill: existingCook,
+          otherBill: existingOther,
+        }
       })
+      setFlatInputs(nextState)
     }
-  }, [flatsData])
+  }, [flatsData, billingMonth])
 
   // Mutation to generate bills
   const generateMutation = useGenerateBatchFlatUtilityBills()
 
-  // Handle single flat input change
+  // Handle single flat input change with automatic persistence
   const handleInputChange = (
     flatId: string,
     field: keyof FlatRowState,
     value: number
   ) => {
-    setFlatInputs((prev) => ({
-      ...prev,
-      [flatId]: {
-        ...(prev[flatId] || { seatCount: 1, cookBill: 0, otherBill: 0 }),
-        [field]: isNaN(value) ? 0 : Math.max(0, value),
-      },
-    }))
+    setFlatInputs((prev) => {
+      const updated = {
+        ...prev,
+        [flatId]: {
+          ...(prev[flatId] || { seatCount: 1, cookBill: 0, otherBill: 0 }),
+          [field]: isNaN(value) ? 0 : Math.max(0, value),
+        },
+      }
+      saveFlatUtilityInputsToStorage(billingMonth, updated)
+      return updated
+    })
   }
 
   // Quick action: Apply cook bill to all flats
@@ -101,6 +124,7 @@ export const GenerateFlatUtilityBillsModal: React.FC<GenerateFlatUtilityBillsMod
           otherBill: prev[f.flat_id]?.otherBill ?? 0,
         }
       })
+      saveFlatUtilityInputsToStorage(billingMonth, next)
       return next
     })
   }

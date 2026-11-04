@@ -32,6 +32,9 @@ import {
 import {
   useFlatUtilityBillingPreview,
   useGenerateBatchFlatUtilityBills,
+  loadFlatUtilityInputsFromStorage,
+  saveFlatUtilityInputsToStorage,
+  loadFlatUtilityDistributionFromStorage,
   type FlatConfigPayload,
 } from './api/useFlatUtilityBilling'
 import {
@@ -220,26 +223,60 @@ export const MonthlyBillGenerationPage: React.FC = () => {
 
   useEffect(() => {
     if (flatsData.length > 0) {
-      setFlatInputs((prev) => {
-        const nextState: Record<string, FlatRowState> = { ...prev }
-        flatsData.forEach((flat) => {
-          if (!nextState[flat.flat_id]) {
-            const existingCook = flat.existing_distribution?.cook_bill ?? (globalCookBill === '' ? 600 : globalCookBill)
-            const existingOther = flat.existing_distribution?.other_bill ?? 0
-            const effectiveSeats =
-              flat.total_seats > 0 ? flat.total_seats : flat.active_boarders_count || 1
+      const monthPrefix = utilityBillingMonth.slice(0, 7)
+      const storedInputs = loadFlatUtilityInputsFromStorage(monthPrefix)
+      const storedDist = loadFlatUtilityDistributionFromStorage(monthPrefix)
 
-            nextState[flat.flat_id] = {
-              seatCount: effectiveSeats,
-              cookBill: existingCook,
-              otherBill: existingOther,
-            }
-          }
-        })
-        return nextState
+      const nextState: Record<string, FlatRowState> = {}
+      flatsData.forEach((flat) => {
+        const savedInput = storedInputs?.[flat.flat_id]
+        const savedDist = storedDist?.[flat.flat_id]
+
+        const existingCook =
+          savedInput?.cookBill ??
+          savedDist?.cook_bill ??
+          flat.existing_distribution?.cook_bill ??
+          (globalCookBill === '' ? 600 : globalCookBill)
+
+        const existingOther =
+          savedInput?.otherBill ??
+          savedDist?.other_bill ??
+          flat.existing_distribution?.other_bill ??
+          0
+
+        const effectiveSeats =
+          savedInput?.seatCount ??
+          savedDist?.total_seats ??
+          (flat.total_seats > 0 ? flat.total_seats : (flat.active_boarders_count || 1))
+
+        nextState[flat.flat_id] = {
+          seatCount: effectiveSeats,
+          cookBill: existingCook,
+          otherBill: existingOther,
+        }
       })
+      setFlatInputs(nextState)
     }
-  }, [flatsData])
+  }, [flatsData, utilityBillingMonth, globalCookBill])
+
+  const handleFlatInputChange = (
+    flatId: string,
+    field: keyof FlatRowState,
+    value: number
+  ) => {
+    setFlatInputs((prev) => {
+      const current = prev[flatId] || { seatCount: 1, cookBill: 600, otherBill: 0 }
+      const updated = {
+        ...prev,
+        [flatId]: {
+          ...current,
+          [field]: isNaN(value) ? 0 : Math.max(0, value),
+        },
+      }
+      saveFlatUtilityInputsToStorage(utilityBillingMonth, updated)
+      return updated
+    })
+  }
 
   const handleApplyGlobalCookBill = () => {
     if (globalCookBill === '') return
@@ -253,6 +290,7 @@ export const MonthlyBillGenerationPage: React.FC = () => {
         }
         updated[f.flat_id] = { ...current, cookBill: globalCookBill }
       })
+      saveFlatUtilityInputsToStorage(utilityBillingMonth, updated)
       return updated
     })
   }
@@ -1167,11 +1205,7 @@ export const MonthlyBillGenerationPage: React.FC = () => {
                               min="1"
                               value={row.seatCount}
                               onChange={(e) => {
-                                const val = Number(e.target.value)
-                                setFlatInputs((prev) => ({
-                                  ...prev,
-                                  [flat.flat_id]: { ...row, seatCount: val },
-                                }))
+                                handleFlatInputChange(flat.flat_id, 'seatCount', Number(e.target.value))
                               }}
                               className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-indigo-500"
                             />
@@ -1184,11 +1218,7 @@ export const MonthlyBillGenerationPage: React.FC = () => {
                               min="0"
                               value={row.cookBill}
                               onChange={(e) => {
-                                const val = Number(e.target.value)
-                                setFlatInputs((prev) => ({
-                                  ...prev,
-                                  [flat.flat_id]: { ...row, cookBill: val },
-                                }))
+                                handleFlatInputChange(flat.flat_id, 'cookBill', Number(e.target.value))
                               }}
                               className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-indigo-500"
                             />
@@ -1208,11 +1238,7 @@ export const MonthlyBillGenerationPage: React.FC = () => {
                               min="0"
                               value={row.otherBill}
                               onChange={(e) => {
-                                const val = Number(e.target.value)
-                                setFlatInputs((prev) => ({
-                                  ...prev,
-                                  [flat.flat_id]: { ...row, otherBill: val },
-                                }))
+                                handleFlatInputChange(flat.flat_id, 'otherBill', Number(e.target.value))
                               }}
                               className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-indigo-500"
                             />

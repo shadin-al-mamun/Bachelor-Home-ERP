@@ -20,7 +20,10 @@ import { formatCurrencyBn, formatDateBn } from '@/utils/date'
 import type { BoarderCharge, ChargeType } from '@/types/database'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
 import { useBrandingStore } from '@/app/store/useBrandingStore'
-import { useFlatUtilityBillingPreview } from '@/features/billing/api/useFlatUtilityBilling'
+import {
+  useFlatUtilityBillingPreview,
+  loadFlatUtilityDistributionFromStorage,
+} from '@/features/billing/api/useFlatUtilityBilling'
 import { useMonthlyMealBillingPreview } from '@/features/meals/api/useMealSettingsAndRates'
 
 interface ChargeBreakdownModalProps {
@@ -447,16 +450,24 @@ export const ChargeBreakdownModal: React.FC<ChargeBreakdownModalProps> = ({
                     ? calculatedUtilityPerHead
                     : (parsedUtility.utilityPerHead > 0 ? parsedUtility.utilityPerHead : 389)
 
+                const storedDist = loadFlatUtilityDistributionFromStorage(monthStr)
+                const savedFlatDist = matchedFlat ? storedDist?.[matchedFlat.flat_id] : null
+
                 const cookBillPerHead =
-                  matchedFlat?.existing_distribution?.cook_bill ||
+                  savedFlatDist?.cook_bill ??
+                  matchedFlat?.existing_distribution?.cook_bill ??
                   (parsedUtility.cookBillPerHead > 0 ? parsedUtility.cookBillPerHead : 600)
 
+                const otherBillTotal =
+                  savedFlatDist?.other_bill ??
+                  matchedFlat?.existing_distribution?.other_bill ??
+                  0
+
                 const otherBillPerHead =
-                  matchedFlat?.existing_distribution?.other_bill_per_head ||
-                  (matchedFlat?.existing_distribution?.other_bill && totalSeats > 0
-                    ? Math.round(matchedFlat.existing_distribution.other_bill / totalSeats)
-                    : 0) ||
-                  (parsedUtility.otherBillPerHead > 0 ? parsedUtility.otherBillPerHead : 0)
+                  savedFlatDist?.other_bill_per_head ??
+                  matchedFlat?.existing_distribution?.other_bill_per_head ??
+                  ((otherBillTotal > 0 && totalSeats > 0 ? Math.round(otherBillTotal / totalSeats) : 0) ||
+                  (parsedUtility.otherBillPerHead > 0 ? parsedUtility.otherBillPerHead : 0))
 
                 const grandTotalPerHead = utilityPerHead + cookBillPerHead + otherBillPerHead
 
@@ -591,7 +602,7 @@ export const ChargeBreakdownModal: React.FC<ChargeBreakdownModalProps> = ({
                         </p>
                         {otherBillPerHead > 0 ? (
                           <p>
-                            ৩. <strong>অন্যান্য বিবিধ বিল:</strong> জনপ্রতি অতিরিক্ত = <strong>{formatCurrencyBn(otherBillPerHead)}</strong>
+                            ৩. <strong>অন্যান্য বিবিধ বিল:</strong> ফ্ল্যাটওয়ারী অতিরিক্ত বিল {otherBillTotal > 0 ? `${formatCurrencyBn(otherBillTotal)} ÷ ${totalSeats}টি সিট = ` : ''}মাথাপিছু <strong>{formatCurrencyBn(otherBillPerHead)}</strong>
                           </p>
                         ) : (
                           <p className="text-slate-400">

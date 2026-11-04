@@ -1,0 +1,5 @@
+node_modules/
+.vite/
+.vitest-cache/
+dist/
+*.log

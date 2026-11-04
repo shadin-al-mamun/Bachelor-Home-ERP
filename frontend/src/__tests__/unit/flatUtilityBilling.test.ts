@@ -1,4 +1,10 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
+import {
+  saveFlatUtilityInputsToStorage,
+  loadFlatUtilityInputsFromStorage,
+  saveFlatUtilityDistributionToStorage,
+  loadFlatUtilityDistributionFromStorage,
+} from '@/features/billing/api/useFlatUtilityBilling'
 
 describe('Flat Utility & Miscellaneous Billing Calculation', () => {
   // Pure calculation logic mirroring MonthlyBillGenerationPage and GenerateFlatUtilityBillsModal
@@ -134,5 +140,78 @@ describe('Flat Utility & Miscellaneous Billing Calculation', () => {
     })`
 
     expect(desc).toBe('2026-10 — ফ্ল্যাট বিবিধ বিল (ইউটিলিটি: ৳333, বাবুর্চি: ৳600, অন্যান্য: ৳100)')
+  })
+
+  describe('Storage Persistence for Previous Month Inputs & Distribution', () => {
+    beforeEach(() => {
+      localStorage.clear()
+    })
+
+    it('saves custom other bill inputs for previous month and restores them accurately', () => {
+      const month = '2026-10'
+      const inputs = {
+        'flat-206': {
+          seatCount: 9,
+          cookBill: 600,
+          otherBill: 900,
+        },
+        'flat-207': {
+          seatCount: 6,
+          cookBill: 600,
+          otherBill: 300,
+        },
+      }
+
+      saveFlatUtilityInputsToStorage(month, inputs)
+      const restored = loadFlatUtilityInputsFromStorage(month)
+
+      expect(restored).not.toBeNull()
+      expect(restored?.['flat-206']?.otherBill).toBe(900)
+      expect(restored?.['flat-206']?.seatCount).toBe(9)
+      expect(restored?.['flat-207']?.otherBill).toBe(300)
+    })
+
+    it('persists generated distributions across months without interference', () => {
+      const octDist = {
+        'flat-206': {
+          flat_id: 'flat-206',
+          total_seats: 9,
+          total_voucher_amount: 3500,
+          utility_per_head: 389,
+          cook_bill: 600,
+          other_bill: 900,
+          other_bill_per_head: 100,
+          grand_total_per_head: 1089,
+          is_billed: true,
+        },
+      }
+
+      const novDist = {
+        'flat-206': {
+          flat_id: 'flat-206',
+          total_seats: 9,
+          total_voucher_amount: 4000,
+          utility_per_head: 444,
+          cook_bill: 600,
+          other_bill: 0,
+          other_bill_per_head: 0,
+          grand_total_per_head: 1044,
+          is_billed: true,
+        },
+      }
+
+      saveFlatUtilityDistributionToStorage('2026-10', octDist)
+      saveFlatUtilityDistributionToStorage('2026-11', novDist)
+
+      const octLoaded = loadFlatUtilityDistributionFromStorage('2026-10')
+      const novLoaded = loadFlatUtilityDistributionFromStorage('2026-11')
+
+      expect(octLoaded?.['flat-206']?.other_bill).toBe(900)
+      expect(octLoaded?.['flat-206']?.other_bill_per_head).toBe(100)
+      expect(octLoaded?.['flat-206']?.grand_total_per_head).toBe(1089)
+
+      expect(novLoaded?.['flat-206']?.other_bill).toBe(0)
+      expect(novLoaded?.['flat-206']?.grand_total_per_head).toBe(1044)
+    })
   })
 })

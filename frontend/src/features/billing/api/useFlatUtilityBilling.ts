@@ -56,6 +56,61 @@ export interface GenerateBatchFlatBillsParams {
   flatConfigs: FlatConfigPayload[]
 }
 
+export interface FlatRowInputState {
+  seatCount: number
+  cookBill: number
+  otherBill: number
+}
+
+export function getFlatUtilityStorageKey(prefix: 'distribution' | 'inputs', billingMonth: string): string {
+  const monthKey = billingMonth.slice(0, 7)
+  return `bachelor_flat_utility_${prefix}_${monthKey}`
+}
+
+export function saveFlatUtilityInputsToStorage(billingMonth: string, inputs: Record<string, FlatRowInputState>): void {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(getFlatUtilityStorageKey('inputs', billingMonth), JSON.stringify(inputs))
+    }
+  } catch (e) {
+    console.warn('Failed to save flat utility inputs to localStorage', e)
+  }
+}
+
+export function loadFlatUtilityInputsFromStorage(billingMonth: string): Record<string, FlatRowInputState> | null {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const raw = window.localStorage.getItem(getFlatUtilityStorageKey('inputs', billingMonth))
+      if (raw) return JSON.parse(raw)
+    }
+  } catch (e) {
+    console.warn('Failed to load flat utility inputs from localStorage', e)
+  }
+  return null
+}
+
+export function saveFlatUtilityDistributionToStorage(billingMonth: string, distMap: Record<string, any>): void {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(getFlatUtilityStorageKey('distribution', billingMonth), JSON.stringify(distMap))
+    }
+  } catch (e) {
+    console.warn('Failed to save flat utility distribution to localStorage', e)
+  }
+}
+
+export function loadFlatUtilityDistributionFromStorage(billingMonth: string): Record<string, any> | null {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const raw = window.localStorage.getItem(getFlatUtilityStorageKey('distribution', billingMonth))
+      if (raw) return JSON.parse(raw)
+    }
+  } catch (e) {
+    console.warn('Failed to load flat utility distribution from localStorage', e)
+  }
+  return null
+}
+
 // Default sample mock data mirroring user's exact flat vouchers for offline/demo resilience
 const MOCK_PREVIEW_DATA: FlatUtilityPreviewItem[] = [
   {
@@ -117,12 +172,38 @@ const MOCK_PREVIEW_DATA: FlatUtilityPreviewItem[] = [
 
 export function useFlatUtilityBillingPreview(billingMonth: string) {
   const normMonth = billingMonth.length === 7 ? `${billingMonth}-01` : billingMonth
+  const monthPrefix = normMonth.slice(0, 7)
 
   return useQuery({
     queryKey: ['flat-utility-preview', normMonth],
     queryFn: async (): Promise<FlatUtilityPreviewItem[]> => {
+      const localDist = loadFlatUtilityDistributionFromStorage(monthPrefix)
+      const localInputs = loadFlatUtilityInputsFromStorage(monthPrefix)
+
       if (!isSupabaseConfigured) {
-        return MOCK_PREVIEW_DATA
+        return MOCK_PREVIEW_DATA.map((mockItem) => {
+          const savedDist = localDist?.[mockItem.flat_id]
+          const savedInput = localInputs?.[mockItem.flat_id]
+          if (savedDist || savedInput) {
+            const cook = savedInput?.cookBill ?? savedDist?.cook_bill ?? mockItem.existing_distribution?.cook_bill ?? 600
+            const other = savedInput?.otherBill ?? savedDist?.other_bill ?? mockItem.existing_distribution?.other_bill ?? 0
+            const seats = savedInput?.seatCount ?? savedDist?.total_seats ?? mockItem.total_seats
+            const otherPerHead = savedDist?.other_bill_per_head ?? (seats > 0 ? Math.round(other / seats) : 0)
+            return {
+              ...mockItem,
+              total_seats: seats,
+              existing_distribution: {
+                id: savedDist?.id || mockItem.existing_distribution?.id || `dist-${mockItem.flat_id}`,
+                is_billed: true,
+                per_seat_amount: savedDist?.grand_total_per_head || (mockItem.existing_distribution?.per_seat_amount ?? 389),
+                cook_bill: cook,
+                other_bill: other,
+                other_bill_per_head: otherPerHead,
+              },
+            }
+          }
+          return mockItem
+        })
       }
 
       // 1. Try authoritative RPC first
@@ -132,7 +213,25 @@ export function useFlatUtilityBillingPreview(billingMonth: string) {
           { p_billing_month: normMonth }
         )
         if (!rpcErr && Array.isArray(rpcData)) {
-          return rpcData as FlatUtilityPreviewItem[]
+          return (rpcData as FlatUtilityPreviewItem[]).map((item) => {
+            const savedDist = localDist?.[item.flat_id]
+            const savedInput = localInputs?.[item.flat_id]
+            if (savedDist || savedInput) {
+              const cook = savedInput?.cookBill ?? savedDist?.cook_bill ?? item.existing_distribution?.cook_bill ?? 600
+              const other = savedInput?.otherBill ?? savedDist?.other_bill ?? item.existing_distribution?.other_bill ?? 0
+              const otherPerHead = savedDist?.other_bill_per_head ?? (item.total_seats > 0 ? Math.round(other / item.total_seats) : 0)
+              return {
+                ...item,
+                existing_distribution: {
+                  ...(item.existing_distribution || { id: `dist-${item.flat_id}`, is_billed: true, per_seat_amount: 0 }),
+                  cook_bill: cook,
+                  other_bill: other,
+                  other_bill_per_head: otherPerHead,
+                },
+              }
+            }
+            return item
+          })
         }
       } catch (e) {
         console.warn('RPC fn_get_flat_utility_billing_preview failed, falling back to direct queries:', e)
@@ -247,6 +346,30 @@ export function useFlatUtilityBillingPreview(billingMonth: string) {
         })
       })
 
+      // Merge with localStorage distribution for guaranteed consistency
+      if (localDist) {
+        Object.entries(localDist).forEach(([flatId, item]: [string, any]) => {
+          const existing = distMap.get(flatId)
+          if (!existing) {
+            distMap.set(flatId, {
+              id: item.id || `local-dist-${flatId}`,
+              is_billed: Boolean(item.is_billed),
+              per_seat_amount: Number(item.grand_total_per_head) || 0,
+              cook_bill: Number(item.cook_bill) || 0,
+              other_bill: Number(item.other_bill) || 0,
+              other_bill_per_head: Number(item.other_bill_per_head) || 0,
+            })
+          } else {
+            if (!existing.other_bill && item.other_bill) {
+              existing.other_bill = Number(item.other_bill)
+              existing.other_bill_per_head =
+                Number(item.other_bill_per_head) ||
+                Math.round(Number(item.other_bill) / Math.max(1, flatSeatsCountMap.get(flatId) || 1))
+            }
+          }
+        })
+      }
+
       return flats.map((f: any) => {
         const vouchers = flatExpensesMap.get(f.id) || []
         const totalVoucherAmount = vouchers.reduce((sum, v) => sum + v.amount, 0)
@@ -279,6 +402,39 @@ export function useGenerateBatchFlatUtilityBills() {
   return useMutation({
     mutationFn: async (params: GenerateBatchFlatBillsParams) => {
       const normMonth = params.billingMonth.length === 7 ? `${params.billingMonth}-01` : params.billingMonth
+      const monthPrefix = normMonth.slice(0, 7)
+
+      // 1. Immediately persist distributions and draft inputs to localStorage
+      const distMapToSave: Record<string, any> = {}
+      const inputsToSave: Record<string, FlatRowInputState> = {}
+
+      params.flatConfigs.forEach((c) => {
+        const seatCount = c.total_seats > 0 ? c.total_seats : 1
+        const otherPerHead =
+          c.other_bill_per_head !== undefined
+            ? c.other_bill_per_head
+            : Math.round(Number(c.other_bill || 0) / seatCount)
+
+        distMapToSave[c.flat_id] = {
+          flat_id: c.flat_id,
+          total_seats: seatCount,
+          total_voucher_amount: c.total_voucher_amount,
+          utility_per_head: c.utility_per_head,
+          cook_bill: c.cook_bill,
+          other_bill: c.other_bill,
+          other_bill_per_head: otherPerHead,
+          grand_total_per_head: c.grand_total_per_head,
+          is_billed: true,
+          billed_at: new Date().toISOString(),
+        }
+        inputsToSave[c.flat_id] = {
+          seatCount: seatCount,
+          cookBill: c.cook_bill,
+          otherBill: c.other_bill,
+        }
+      })
+      saveFlatUtilityDistributionToStorage(monthPrefix, distMapToSave)
+      saveFlatUtilityInputsToStorage(monthPrefix, inputsToSave)
 
       if (!isSupabaseConfigured) {
         return {
@@ -291,11 +447,44 @@ export function useGenerateBatchFlatUtilityBills() {
           updated_count: 0,
           skipped_count: 0,
           total_amount_billed: 12500,
-          message: 'ডেমো মোডে সকল ফ্ল্যাটের বর্ডারদের জন্য বিবিধ বিল সফলভাবে জেনারেট হয়েছে।',
+          message: 'সকল ফ্ল্যাটের বর্ডারদের জন্য বিবিধ বিল সফলভাবে জেনারেট ও সংরক্ষিত হয়েছে।',
         }
       }
 
-      // 1. Try authoritative RPC
+      // 2. Always persist to Supabase flat_monthly_distributions table
+      try {
+        const distRecords = params.flatConfigs.map((config) => {
+          const seatCount = config.total_seats > 0 ? config.total_seats : 1
+          const otherPerHead =
+            config.other_bill_per_head !== undefined
+              ? config.other_bill_per_head
+              : Math.round(Number(config.other_bill || 0) / seatCount)
+
+          return {
+            flat_id: config.flat_id,
+            billing_month: normMonth,
+            total_expense: config.total_voucher_amount,
+            total_seats: seatCount,
+            per_seat_amount: config.grand_total_per_head,
+            is_billed: true,
+            billed_at: new Date().toISOString(),
+            breakdown: {
+              vouchers_total: config.total_voucher_amount,
+              utility_per_head: config.utility_per_head,
+              cook_bill: config.cook_bill,
+              other_bill: config.other_bill,
+              other_bill_per_head: otherPerHead,
+              grand_total_per_head: config.grand_total_per_head,
+            },
+            updated_at: new Date().toISOString(),
+          }
+        })
+        await supabase.from('flat_monthly_distributions').upsert(distRecords, { onConflict: 'flat_id,billing_month' })
+      } catch (distErr) {
+        console.warn('Upsert into flat_monthly_distributions skipped or failed:', distErr)
+      }
+
+      // 3. Try authoritative RPC
       try {
         const { data, error } = await supabase.rpc('fn_generate_batch_flat_utility_bills', {
           p_billing_month: normMonth,
@@ -313,7 +502,7 @@ export function useGenerateBatchFlatUtilityBills() {
         console.warn('RPC execution exception, attempting client-side batch:', err)
       }
 
-      // 2. Direct client-side batch generation fallback
+      // 4. Direct client-side batch generation fallback
       let generated = 0
       let updated = 0
       let totalAmount = 0
