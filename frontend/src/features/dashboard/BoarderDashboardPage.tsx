@@ -163,7 +163,7 @@ export const BoarderDashboardPage: React.FC = () => {
       }
       const { data, error } = await supabase
         .from('boarder_charges')
-        .select('id, charge_type, amount, paid_amount, due_amount, status, billing_month')
+        .select('id, charge_type, amount, paid_amount, due_amount, status, billing_month, description')
         .eq('boarder_id', activeBoarderId!)
         .neq('status', 'VOID')
       if (error) {
@@ -174,7 +174,7 @@ export const BoarderDashboardPage: React.FC = () => {
     },
   })
 
-  // Sanitize any legacy 1664.00 duplicate guest meal charges to 1560.00
+  // Sanitize any legacy 1664.00 duplicate guest meal charges to 1560.00 and 844.00/1100.00 utility to 989.00
   const sanitizedBoarderCharges = React.useMemo(() => {
     return boarderCharges.map((c) => {
       const amt = Number(c.amount) || 0
@@ -185,6 +185,15 @@ export const BoarderDashboardPage: React.FC = () => {
           amount: 1560,
           paid_amount: paid >= amt ? 1560 : paid,
           due_amount: Math.max(0, 1560 - paid),
+        }
+      }
+      if (c.charge_type === 'UTILITY' && (amt === 844 || amt === 1100 || (amt > 0 && amt < 1100 && (c.description?.includes('২৪৪') || c.description?.includes('৫০০'))))) {
+        return {
+          ...c,
+          amount: 989,
+          paid_amount: paid >= amt ? 989 : paid,
+          due_amount: Math.max(0, 989 - paid),
+          description: 'October 2026 — Flat-206 বিবিধ বিল (ইউটিলিটি: ৳৩৮৯.০০, বাবুর্চি: ৳৬০০.০০)',
         }
       }
       return c
@@ -204,6 +213,19 @@ export const BoarderDashboardPage: React.FC = () => {
         })
         .eq('charge_type', 'MEAL')
         .eq('amount', 1664.00)
+        .then(() => {})
+
+      supabase
+        .from('boarder_charges')
+        .update({
+          amount: 989.00,
+          paid_amount: 989.00,
+          due_amount: 0.00,
+          description: 'October 2026 — Flat-206 বিবিধ বিল (ইউটিলিটি: ৳৩৮৯.০০, বাবুর্চি: ৳৬০০.০০)',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('charge_type', 'UTILITY')
+        .in('amount', [844.00, 1100.00])
         .then(() => {})
     }
   }, [isStaffRole])

@@ -115,7 +115,7 @@ describe('Monthly Meal Billing Calculations (Prevent Double Counting Guest Meals
     expect(total).toBe(1820.0)
   })
 
-  it('correctly sanitizes legacy 1664 meal charge to 1560 and legacy 844 utility to 1100, computing accurate advance balance', () => {
+  it('correctly sanitizes legacy 1664 meal charge to 1560 and legacy 844/1100 utility to 989 (9-seat capacity), computing accurate advance balance', () => {
     const rawCharges = [
       { id: 'ch-1', charge_type: 'RENT', amount: 3200, paid_amount: 3200, due_amount: 0, status: 'PAID' },
       { id: 'ch-2', charge_type: 'UTILITY', amount: 844, paid_amount: 844, due_amount: 0, status: 'PAID', description: 'October 2026 — Flat-206 বিবিধ বিল (ইউটিলিটি: ৳২৪৪.০০, বাবুর্চি: ৳৬০০.০০)' },
@@ -133,13 +133,13 @@ describe('Monthly Meal Billing Calculations (Prevent Double Counting Guest Meals
           due_amount: Math.max(0, 1560 - paid),
         }
       }
-      if (c.charge_type === 'UTILITY' && (amt === 844 || (amt > 0 && amt < 1100 && c.description?.includes('২৪৪')))) {
+      if (c.charge_type === 'UTILITY' && (amt === 844 || amt === 1100 || (amt > 0 && amt < 1100 && (c.description?.includes('২৪৪') || c.description?.includes('৫০০'))))) {
         return {
           ...c,
-          amount: 1100,
-          paid_amount: paid >= amt ? 1100 : paid,
-          due_amount: Math.max(0, 1100 - paid),
-          description: 'October 2026 — Flat-206 বিবিধ বিল (ইউটিলিটি: ৳৫০০.০০, বাবুর্চি: ৳৬০০.০০)',
+          amount: 989,
+          paid_amount: paid >= amt ? 989 : paid,
+          due_amount: Math.max(0, 989 - paid),
+          description: 'October 2026 — Flat-206 বিবিধ বিল (ইউটিলিটি: ৳৩৮৯.০০, বাবুর্চি: ৳৬০০.০০)',
         }
       }
       return c
@@ -156,8 +156,8 @@ describe('Monthly Meal Billing Calculations (Prevent Double Counting Guest Meals
     const outstandingDue = Math.max(0, totalBilled - totalPaid)
 
     expect(mealCharges).toBe(1560)
-    expect(totalBilled).toBe(5860) // 3200 + 1100 + 1560
-    expect(advanceBalance).toBe(1640) // 7500 - 5860
+    expect(totalBilled).toBe(5749) // 3200 + 989 + 1560
+    expect(advanceBalance).toBe(1751) // 7500 - 5749
     expect(outstandingDue).toBe(0)
   })
 

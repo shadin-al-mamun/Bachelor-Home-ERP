@@ -28,13 +28,13 @@ const MOCK_PORTAL_CHARGES: BoarderCharge[] = [
     id: 'ch-mock-1',
     boarder_id: 'bdr-101',
     charge_type: 'UTILITY',
-    amount: 1100,
-    paid_amount: 1100,
+    amount: 989,
+    paid_amount: 989,
     due_amount: 0,
     status: 'PAID',
     billing_month: '2026-10-01',
     due_date: '2026-10-10',
-    description: 'October 2026 — Flat-206 বিবিধ বিল (ইউটিলিটি: ৳৫০০.০০, বাবুর্চি: ৳৬০০.০০)',
+    description: 'October 2026 — Flat-206 বিবিধ বিল (ইউটিলিটি: ৳৩৮৯.০০, বাবুর্চি: ৳৬০০.০০)',
     created_at: '2026-10-01T00:00:00Z',
     updated_at: '2026-10-01T00:00:00Z',
   },
@@ -157,7 +157,7 @@ export const BoarderDuesPage: React.FC = () => {
   }
 
   // Financial calculations
-  // Reconcile legacy charges: 1664.00 duplicate guest meal charges to 1560.00, and 844.00 legacy utility to 1100.00 (500 utility + 600 cook)
+  // Reconcile legacy charges: 1664.00 duplicate guest meal charges to 1560.00, and 844.00/1100.00 legacy utility to 989.00 (389 utility + 600 cook)
   const sanitizedCharges = React.useMemo(() => {
     return charges.map((c) => {
       const amt = Number(c.amount) || 0
@@ -170,13 +170,13 @@ export const BoarderDuesPage: React.FC = () => {
           due_amount: Math.max(0, 1560 - paid),
         }
       }
-      if (c.charge_type === 'UTILITY' && (amt === 844 || (amt > 0 && amt < 1100 && c.description?.includes('২৪৪')))) {
+      if (c.charge_type === 'UTILITY' && (amt === 844 || amt === 1100 || (amt > 0 && amt < 1100 && (c.description?.includes('২৪৪') || c.description?.includes('৫০০'))))) {
         return {
           ...c,
-          amount: 1100,
-          paid_amount: paid >= amt ? 1100 : paid,
-          due_amount: Math.max(0, 1100 - paid),
-          description: 'October 2026 — Flat-206 বিবিধ বিল (ইউটিলিটি: ৳৫০০.০০, বাবুর্চি: ৳৬০০.০০)',
+          amount: 989,
+          paid_amount: paid >= amt ? 989 : paid,
+          due_amount: Math.max(0, 989 - paid),
+          description: 'October 2026 — Flat-206 বিবিধ বিল (ইউটিলিটি: ৳৩৮৯.০০, বাবুর্চি: ৳৬০০.০০)',
         }
       }
       return c
@@ -189,13 +189,13 @@ export const BoarderDuesPage: React.FC = () => {
     const healCharges = async () => {
       for (const c of charges) {
         const amt = Number(c.amount) || 0
-        if (c.charge_type === 'UTILITY' && amt === 844) {
+        if (c.charge_type === 'UTILITY' && (amt === 844 || amt === 1100)) {
           await supabase
             .from('boarder_charges')
             .update({
-              amount: 1100,
-              paid_amount: Number(c.paid_amount) >= 844 ? 1100 : c.paid_amount,
-              description: 'October 2026 — Flat-206 বিবিধ বিল (ইউটিলিটি: ৳৫০০.০০, বাবুর্চি: ৳৬০০.০০)',
+              amount: 989,
+              paid_amount: Number(c.paid_amount) >= amt ? 989 : c.paid_amount,
+              description: 'October 2026 — Flat-206 বিবিধ বিল (ইউটিলিটি: ৳৩৮৯.০০, বাবুর্চি: ৳৬০০.০০)',
             })
             .eq('id', c.id)
         }

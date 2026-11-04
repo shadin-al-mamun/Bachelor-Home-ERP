@@ -106,6 +106,23 @@ describe('Flat Utility & Miscellaneous Billing Calculation', () => {
     expect(res.grandTotalPerHead).toBe(1100)
   })
 
+  it('matches exact October 2026 calculation for Flat-206 (9 seats, 3500 Tk vouchers, 600 Tk cook bill)', () => {
+    // 5 real expense vouchers totaling 3500 Tk (200 + 1200 + 800 + 800 + 500)
+    // Flat-206 has 9 seats total (6 occupied, 2 available, 1 maintenance)
+    // Ceiling of 3500 / 9 = 389 Tk utility
+    const res = computeFlatBilling({
+      totalVoucherAmount: 3500,
+      totalSeats: 9,
+      cookBill: 600,
+      otherBill: 0,
+    })
+
+    expect(res.seatCount).toBe(9)
+    expect(res.utilityPerHead).toBe(389) // Math.round(3500 / 9) = 389
+    expect(res.otherBillPerHead).toBe(0)
+    expect(res.grandTotalPerHead).toBe(989) // 389 + 600 = 989
+  })
+
   it('formats bill description showing per-head other bill', () => {
     const billingMonth = '2026-10-01'
     const effectiveUtility = 333

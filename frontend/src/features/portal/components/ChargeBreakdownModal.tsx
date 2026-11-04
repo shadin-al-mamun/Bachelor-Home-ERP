@@ -434,18 +434,18 @@ export const ChargeBreakdownModal: React.FC<ChargeBreakdownModalProps> = ({
             <div className="space-y-6">
               {/* Summary Metric KPI Cards */}
               {(() => {
-                const totalSeats = matchedFlat?.total_seats && matchedFlat.total_seats > 0 ? matchedFlat.total_seats : 7
+                const totalSeats = matchedFlat?.total_seats && matchedFlat.total_seats > 0 ? matchedFlat.total_seats : 9
                 const totalVoucherAmount =
                   matchedFlat?.total_voucher_amount !== undefined && matchedFlat.total_voucher_amount > 0
                     ? matchedFlat.total_voucher_amount
                     : 3500
 
-                // Mathematically consistent division: total voucher expense ÷ total flat seats (3500 / 7 = 500)
-                const calculatedUtilityPerHead = Math.round(totalVoucherAmount / Math.max(1, totalSeats))
+                // Mathematically consistent division: total voucher expense ÷ total flat seats (3500 / 9 = 388.88 -> 389)
+                const calculatedUtilityPerHead = Math.ceil(totalVoucherAmount / Math.max(1, totalSeats))
                 const utilityPerHead =
                   calculatedUtilityPerHead > 0
                     ? calculatedUtilityPerHead
-                    : (parsedUtility.utilityPerHead > 0 ? parsedUtility.utilityPerHead : 500)
+                    : (parsedUtility.utilityPerHead > 0 ? parsedUtility.utilityPerHead : 389)
 
                 const cookBillPerHead =
                   matchedFlat?.existing_distribution?.cook_bill ||
@@ -569,7 +569,7 @@ export const ChargeBreakdownModal: React.FC<ChargeBreakdownModalProps> = ({
                       </div>
                       <div className="space-y-1.5 text-slate-300 leading-relaxed">
                         <p>
-                          ১. <strong>ইউটিলিটি মাথাপিছু:</strong> মোট ভাউচার খরচ ({formatCurrencyBn(totalVoucherAmount)}) ÷ মোট সিট সংখ্যা ({totalSeats}টি) = <strong>{formatCurrencyBn(utilityPerHead)}</strong>
+                          ১. <strong>ইউটিলিটি মাথাপিছু:</strong> মোট ভাউচার খরচ ({formatCurrencyBn(totalVoucherAmount)}) ÷ মোট সিট সংখ্যা ({totalSeats}টি) = <strong>{formatCurrencyBn(utilityPerHead)}</strong> (ভগ্নাংশে পরবর্তী টাকায় সমন্বিত)
                         </p>
                         <p>
                           ২. <strong>খালা / বাবুর্চি বিল:</strong> জনপ্রতি মাসিক নির্ধারিত = <strong>{formatCurrencyBn(cookBillPerHead)}</strong>
