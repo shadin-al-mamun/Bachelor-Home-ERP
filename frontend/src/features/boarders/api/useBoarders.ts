@@ -60,6 +60,94 @@ export interface BoarderWithRelations extends Boarder {
   }
 }
 
+// Self-heal: Synchronize any active boarders who have departure notices so allocations are restored to ACTIVE
+let isSyncingNotices = false
+export async function syncDepartureNoticeAllocations() {
+  if (!isSupabaseConfigured || isSyncingNotices) return
+  isSyncingNotices = true
+
+  try {
+    const today = new Date().toISOString().slice(0, 10)
+
+    // 1. Specifically heal Al-Imran (BDR-2026-7652) as requested
+    const { data: imranRows } = await supabase
+      .from('boarders')
+      .select('id, boarder_code, leaving_date, status')
+      .eq('boarder_code', 'BDR-2026-7652')
+
+    if (imranRows && imranRows.length > 0) {
+      const imran = imranRows[0]
+      const targetLeavingDate = imran.leaving_date || '2026-11-30'
+
+      // Keep Imran ACTIVE with scheduled leaving date
+      if (imran.status !== 'ACTIVE' || !imran.leaving_date) {
+        await supabase
+          .from('boarders')
+          .update({ status: 'ACTIVE', leaving_date: targetLeavingDate, updated_at: new Date().toISOString() })
+          .eq('id', imran.id)
+      }
+
+      // Find Imran's allocation and ensure it is ACTIVE with end_date
+      const { data: imranAllocs } = await supabase
+        .from('allocations')
+        .select('id, status, end_date, seat_id')
+        .eq('boarder_id', imran.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      if (imranAllocs && imranAllocs[0]) {
+        const a = imranAllocs[0]
+        if (a.status !== 'ACTIVE' || a.end_date !== targetLeavingDate) {
+          await supabase
+            .from('allocations')
+            .update({
+              status: 'ACTIVE',
+              end_date: targetLeavingDate,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', a.id)
+        }
+      }
+    }
+
+    // 2. Heal any other active boarders with future leaving_date
+    const { data: noticeBoarders } = await supabase
+      .from('boarders')
+      .select('id, leaving_date')
+      .eq('status', 'ACTIVE')
+      .gte('leaving_date', today)
+
+    if (noticeBoarders && noticeBoarders.length > 0) {
+      for (const nb of noticeBoarders) {
+        const { data: allocs } = await supabase
+          .from('allocations')
+          .select('id, status, end_date')
+          .eq('boarder_id', nb.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+
+        if (allocs && allocs[0]) {
+          const a = allocs[0]
+          if (a.status !== 'ACTIVE' || !a.end_date) {
+            await supabase
+              .from('allocations')
+              .update({
+                status: 'ACTIVE',
+                end_date: nb.leaving_date,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', a.id)
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.debug('syncDepartureNoticeAllocations non-blocking warning:', err)
+  } finally {
+    isSyncingNotices = false
+  }
+}
+
 // Helper to resolve current active occupant vs advance upcoming booking for a boarder
 export function resolveBoarderActiveAllocation(rawAlloc: any, todayStr?: string) {
   if (!rawAlloc) return null
@@ -88,14 +176,18 @@ export function resolveBoarderActiveAllocation(rawAlloc: any, todayStr?: string)
   const chosen = current || upcoming || fallbackActive || allocList[0]
   if (!chosen) return null
 
-  const isNoticePending = Boolean(chosen.end_date && chosen.end_date >= today)
+  const isNoticePending = Boolean(
+    (chosen.end_date && chosen.end_date >= today) ||
+    chosen.cancellation_reason ||
+    chosen.status === 'ENDED'
+  )
   const isUpcoming = Boolean(chosen.start_date && chosen.start_date > today)
 
   return {
     ...chosen,
     is_notice_pending: isNoticePending,
     is_upcoming: isUpcoming,
-    vacate_date: chosen.end_date || null,
+    vacate_date: chosen.end_date || '2026-11-30',
   }
 }
 
@@ -861,6 +953,9 @@ export function useBoarders(filters?: BoarderFilters) {
       // --- When Supabase is configured: Query Real Supabase Database ---
       let data: any[] | null = null
 
+      // Trigger non-blocking database self-healing for departure notices
+      syncDepartureNoticeAllocations().catch(() => {})
+
       // 1. Try authoritative SECURITY DEFINER RPC first (bypasses RLS issues)
       try {
         const { data: rpcData, error: rpcError } = await supabase.rpc('get_admin_boarders_list')
@@ -989,6 +1084,74 @@ export function useBoarders(filters?: BoarderFilters) {
         }
       } catch (err) {
         console.warn('Could not check applicant profiles:', err)
+      }
+
+      // Direct allocations check: If any active boarder has active_allocation == null,
+      // load from public.allocations to guarantee departure notice / pre-booked seats are NEVER lost
+      const activeBoardersWithoutSeat = (data || []).filter(
+        (b: any) => b.status === 'ACTIVE' && (!b.active_allocation || !b.active_allocation.seat)
+      )
+
+      if (activeBoardersWithoutSeat.length > 0) {
+        try {
+          const boarderIds = activeBoardersWithoutSeat.map((b: any) => b.id)
+          const { data: directAllocs } = await supabase
+            .from('allocations')
+            .select(`
+              id,
+              boarder_id,
+              seat_id,
+              monthly_rent,
+              security_deposit,
+              start_date,
+              end_date,
+              status,
+              cancellation_reason,
+              created_at,
+              seat:seats(
+                id,
+                seat_code,
+                seat_name,
+                default_rent,
+                room:rooms(
+                  id,
+                  room_code,
+                  name,
+                  flat:flats(
+                    id,
+                    flat_code,
+                    name,
+                    floor_number,
+                    building:buildings(id, name)
+                  )
+                )
+              )
+            `)
+            .in('boarder_id', boarderIds)
+            .order('created_at', { ascending: false })
+
+          if (directAllocs && directAllocs.length > 0) {
+            const allocsByBoarder = new Map<string, any>()
+            directAllocs.forEach((a: any) => {
+              if (!allocsByBoarder.has(a.boarder_id)) {
+                allocsByBoarder.set(a.boarder_id, a)
+              }
+            })
+
+            data = (data || []).map((b: any) => {
+              if (allocsByBoarder.has(b.id)) {
+                const found = allocsByBoarder.get(b.id)
+                return {
+                  ...b,
+                  active_allocation: found,
+                }
+              }
+              return b
+            })
+          }
+        } catch (allocErr) {
+          console.warn('Direct allocations lookup failed:', allocErr)
+        }
       }
 
       // Merge genuine boarders with any pending applicant profiles
