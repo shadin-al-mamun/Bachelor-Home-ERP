@@ -316,13 +316,36 @@ export const BoarderListPage: React.FC = () => {
                       <td className="py-3 px-4">
                         {alloc && alloc.seat ? (
                           <div className="flex items-center gap-2">
-                            <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                            <div
+                              className={`p-1.5 rounded-lg border ${
+                                alloc.is_notice_pending ||
+                                (boarder.leaving_date && boarder.leaving_date >= new Date().toISOString().slice(0, 10))
+                                  ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                                  : alloc.is_upcoming
+                                  ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                                  : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+                              }`}
+                            >
                               <BedDouble className="w-4 h-4" />
                             </div>
                             <div>
-                              <span className="font-semibold text-indigo-300 block">
-                                {alloc.seat.seat_code}
-                              </span>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-semibold text-indigo-300 block">
+                                  {alloc.seat.seat_code}
+                                </span>
+                                {(alloc.is_notice_pending ||
+                                  (boarder.leaving_date &&
+                                    boarder.leaving_date >= new Date().toISOString().slice(0, 10))) && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30 whitespace-nowrap">
+                                    {formatDateBn(alloc.end_date || boarder.leaving_date || '')} প্রস্থান
+                                  </span>
+                                )}
+                                {alloc.is_upcoming && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 whitespace-nowrap">
+                                    {formatDateBn(alloc.start_date)} থেকে
+                                  </span>
+                                )}
+                              </div>
                               <span className="text-[11px] text-slate-400">
                                 {alloc.seat.room?.name || 'রুম'}, {alloc.seat.room?.flat?.flat_code}
                               </span>

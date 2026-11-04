@@ -5,7 +5,7 @@ import { Input } from '@/components/common/Input'
 import { useAccommodation, type RoomWithSeats, type FlatWithRooms, type BuildingWithFlats } from '../api/useAccommodation'
 import { useBoarders } from '@/features/boarders/api/useBoarders'
 import { useAllocateSeatMutation } from '../api/useSeatAllocations'
-import { formatCurrencyBn } from '@/utils/date'
+import { formatCurrencyBn, formatDateBn } from '@/utils/date'
 import type { Seat } from '@/types/database'
 import { CheckCircle2, User, AlertCircle, BedDouble } from 'lucide-react'
 
@@ -21,6 +21,10 @@ interface AvailableSeat extends Seat {
   buildingName: string
   flatCode: string
   roomName: string
+  has_notice_to_vacate?: boolean
+  vacate_date?: string | null
+  vacant_from_date?: string | null
+  has_upcoming_allocation?: boolean
 }
 
 export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
@@ -50,8 +54,13 @@ export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
         (b.flats || []).flatMap((f: FlatWithRooms) =>
           (f.rooms || []).flatMap((r: RoomWithSeats) =>
             (r.seats || [])
-              .filter((s) => s.status === 'AVAILABLE' || s.id === preSelectedSeatId)
-              .map((s) => ({
+              .filter(
+                (s: any) =>
+                  s.status === 'AVAILABLE' ||
+                  s.id === preSelectedSeatId ||
+                  (s.has_notice_to_vacate && !s.has_upcoming_allocation)
+              )
+              .map((s: any) => ({
                 ...s,
                 buildingName: b.name,
                 flatCode: f.flat_code,
@@ -61,6 +70,11 @@ export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
         )
     )
   }, [seatMatrix, preSelectedSeatId])
+
+  // Selected seat object
+  const selectedSeat = useMemo(() => {
+    return availableSeats.find((s) => s.id === selectedSeatId) || null
+  }, [selectedSeatId, availableSeats])
 
   // Eligible boarders: Either active boarder without a seat, or pending applicant awaiting allocation
   const eligibleBoarders = useMemo(() => {
@@ -82,20 +96,27 @@ export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
     }
   }, [isOpen, preSelectedSeatId, preSelectedBoarderId])
 
-  // Automatically update default rent when selected seat changes
+  // Automatically update default rent and suggested start date when selected seat changes
   useEffect(() => {
-    if (selectedSeatId && availableSeats.length > 0) {
-      const seat = availableSeats.find((s) => s.id === selectedSeatId)
-      if (seat && seat.default_rent) {
-        setMonthlyRent(seat.default_rent)
+    if (selectedSeat) {
+      if (selectedSeat.default_rent) {
+        setMonthlyRent(selectedSeat.default_rent)
+      }
+      if (selectedSeat.has_notice_to_vacate && selectedSeat.vacant_from_date) {
+        setStartDate(selectedSeat.vacant_from_date)
       }
     }
-  }, [selectedSeatId, availableSeats])
+  }, [selectedSeat])
 
   const handleSeatChange = (seatId: string) => {
     setSelectedSeatId(seatId)
     const seat = availableSeats.find((s) => s.id === seatId)
-    if (seat) setMonthlyRent(seat.default_rent)
+    if (seat) {
+      setMonthlyRent(seat.default_rent)
+      if (seat.has_notice_to_vacate && seat.vacant_from_date) {
+        setStartDate(seat.vacant_from_date)
+      }
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -200,11 +221,23 @@ export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
             {availableSeats.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.seat_code} — {s.seat_name} ({s.flatCode}, {s.roomName}) — {formatCurrencyBn(s.default_rent)}
+                {s.has_notice_to_vacate ? ` [${formatDateBn(s.vacant_from_date || '')} থেকে খালি]` : ''}
               </option>
             ))}
           </select>
+          {selectedSeat?.has_notice_to_vacate && (
+            <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs flex items-start gap-2 mt-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-400" />
+              <div className="space-y-0.5">
+                <span className="font-semibold block">অগ্রিম বরাদ্দ (Advance Booking):</span>
+                <span className="text-[11px] text-slate-300 block leading-relaxed">
+                  এই সিটে বর্তমানে <strong>{selectedSeat.occupant_name || 'বর্তমান বর্ডার'}</strong> অবস্থান করছেন এবং <strong>{formatDateBn(selectedSeat.vacate_date || '')}</strong> তারিখে প্রস্থান করবেন। তাই নতুন বর্ডারের জন্য <strong>{formatDateBn(selectedSeat.vacant_from_date || '')}</strong> তারিখ থেকে অগ্রিম বরাদ্দ প্রদান করা হচ্ছে।
+                </span>
+              </div>
+            </div>
+          )}
           {availableSeats.length === 0 && (
-            <p className="text-[11px] text-rose-400 mt-1">হোস্টেলে বর্তমানে কোনো খালি সিট নেই।</p>
+            <p className="text-[11px] text-rose-400 mt-1">হোস্টেলে বর্তমানে কোনো খালি বা বরাদ্দযোগ্য সিট নেই।</p>
           )}
         </div>
 
@@ -233,9 +266,10 @@ export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
             type="date"
-            label="বরাদ্দ শুরুর তারিখ"
+            label={selectedSeat?.has_notice_to_vacate ? 'অগ্রিম বরাদ্দ শুরুর তারিখ' : 'বরাদ্দ শুরুর তারিখ'}
             value={startDate}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStartDate(e.target.value)}
+            min={selectedSeat?.has_notice_to_vacate && selectedSeat.vacant_from_date ? selectedSeat.vacant_from_date : undefined}
             required
             className="text-xs"
           />

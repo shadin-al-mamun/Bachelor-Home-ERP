@@ -17,10 +17,11 @@ import {
   Layers,
   Building,
   Edit3,
+  Clock,
 } from 'lucide-react'
 import { Button, Card, Badge } from '@/components/common'
 import { useSeats, useBuildings, useFlats, useRooms, useUpdateSeatStatus } from '../api/useAccommodation'
-import { formatBDT } from '@/utils/date'
+import { formatBDT, formatDateBn } from '@/utils/date'
 import { formatFloorBn } from '@/utils/floor'
 import SeatModal from './SeatModal'
 import RoomModal from './RoomModal'
@@ -157,11 +158,12 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
-      list = list.filter((s) => {
+      list = list.filter((s: any) => {
         const code = s.seat_code.toLowerCase()
         const name = s.seat_name.toLowerCase()
         const occupant = s.occupant_name?.toLowerCase() || ''
-        return code.includes(q) || name.includes(q) || occupant.includes(q)
+        const upcoming = s.upcoming_occupant_name?.toLowerCase() || ''
+        return code.includes(q) || name.includes(q) || occupant.includes(q) || upcoming.includes(q)
       })
     }
 
@@ -522,10 +524,12 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {seatsInActiveFlat.map((seat) => {
+            {seatsInActiveFlat.map((seat: any) => {
               const isAvailable = seat.status === 'AVAILABLE'
               const isOccupied = seat.status === 'OCCUPIED'
               const isMaintenance = seat.status === 'MAINTENANCE'
+              const hasNotice = Boolean(seat.has_notice_to_vacate)
+              const hasUpcoming = Boolean(seat.has_upcoming_allocation)
 
               return (
                 <Card
@@ -535,7 +539,9 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
                     isAvailable
                       ? 'hover:border-emerald-500/50 hover:shadow-glow-emerald border-emerald-500/20 bg-slate-900/70'
                       : isOccupied
-                      ? 'hover:border-indigo-500/50 hover:shadow-glow-primary border-indigo-500/20 bg-slate-900/70'
+                      ? hasNotice && !hasUpcoming
+                        ? 'hover:border-amber-500/50 hover:shadow-glow-amber border-amber-500/30 bg-slate-900/70'
+                        : 'hover:border-indigo-500/50 hover:shadow-glow-primary border-indigo-500/20 bg-slate-900/70'
                       : isMaintenance
                       ? 'border-amber-500/20 bg-slate-900/70'
                       : 'border-slate-800 opacity-60'
@@ -550,7 +556,9 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
                             isAvailable
                               ? 'bg-emerald-500/15 text-emerald-400'
                               : isOccupied
-                              ? 'bg-indigo-500/15 text-indigo-400'
+                              ? hasNotice && !hasUpcoming
+                                ? 'bg-amber-500/15 text-amber-400'
+                                : 'bg-indigo-500/15 text-indigo-400'
                               : 'bg-amber-500/15 text-amber-400'
                           }`}
                         >
@@ -578,15 +586,27 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
-                        <Badge status={seat.status} showDot={true}>
-                          {seat.status === 'AVAILABLE'
-                            ? 'খালি'
-                            : seat.status === 'OCCUPIED'
-                            ? 'বরাদ্দকৃত'
-                            : seat.status === 'MAINTENANCE'
-                            ? 'মেরামত'
-                            : 'নিষ্ক্রিয়'}
-                        </Badge>
+                        {hasNotice && hasUpcoming ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                            হস্তান্তর প্রক্রিয়াধীন
+                          </span>
+                        ) : hasNotice && !hasUpcoming ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                            আসন্ন খালি ({formatDateBn(seat.vacant_from_date)})
+                          </span>
+                        ) : (
+                          <Badge status={seat.status} showDot={true}>
+                            {seat.status === 'AVAILABLE'
+                              ? 'খালি'
+                              : seat.status === 'OCCUPIED'
+                              ? 'বরাদ্দকৃত'
+                              : seat.status === 'MAINTENANCE'
+                              ? 'মেরামত'
+                              : 'নিষ্ক্রিয়'}
+                          </Badge>
+                        )}
                       </div>
                     </div>
 
@@ -608,16 +628,84 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
                       </div>
                     </div>
 
-                    {/* Occupant or Maintenance Status Info */}
+                    {/* Occupants or Maintenance Status Info */}
                     {isOccupied && (
-                      <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-indigo-200">
-                          <User className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                          <span className="font-semibold truncate">{seat.occupant_name || 'বর্ডার বরাদ্দ'}</span>
+                      <div className="space-y-2">
+                        {/* Current Occupant */}
+                        <div
+                          className={`p-2.5 rounded-xl border text-xs space-y-1.5 ${
+                            hasNotice
+                              ? 'bg-amber-500/10 border-amber-500/25 text-amber-200'
+                              : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-200'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <User className={`w-3.5 h-3.5 shrink-0 ${hasNotice ? 'text-amber-400' : 'text-indigo-400'}`} />
+                              <span className="font-semibold truncate">
+                                {hasNotice ? `${seat.occupant_name || 'বর্তমান বর্ডার'}` : (seat.occupant_name || 'বর্ডার বরাদ্দ')}
+                              </span>
+                            </div>
+                            <span
+                              className={`text-[10px] font-mono shrink-0 ${
+                                hasNotice ? 'text-amber-300' : 'text-indigo-300'
+                              }`}
+                            >
+                              {seat.occupant_code || 'সক্রিয়'}
+                            </span>
+                          </div>
+
+                          {hasNotice && (
+                            <div className="flex items-center justify-between text-[10.5px] text-amber-300/90 pt-1 border-t border-amber-500/20">
+                              <span className="flex items-center gap-1">
+                                <LogOut className="w-3 h-3 text-amber-400" />
+                                প্রস্থান নোটিশ:
+                              </span>
+                              <span className="font-semibold font-mono">
+                                {formatDateBn(seat.vacate_date)} পর্যন্ত
+                              </span>
+                            </div>
+                          )}
                         </div>
-                        <span className="text-[10px] text-indigo-300 font-mono">
-                          {seat.occupant_code || 'সক্রিয়'}
-                        </span>
+
+                        {/* Upcoming Occupant if advance booking made */}
+                        {hasUpcoming && (
+                          <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-xs space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 text-emerald-200 min-w-0">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                <span className="font-semibold truncate">
+                                  পরবর্তী: {seat.upcoming_occupant_name}
+                                </span>
+                              </div>
+                              <span className="text-[10px] text-emerald-300 font-mono shrink-0">
+                                {seat.upcoming_occupant_code || 'অগ্রিম বরাদ্দ'}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-[10.5px] text-emerald-300/90 pt-1 border-t border-emerald-500/20">
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-emerald-400" />
+                                কার্যকর হবে:
+                              </span>
+                              <span className="font-semibold font-mono">
+                                {formatDateBn(seat.upcoming_start_date)} থেকে
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Vacancy Callout if notice given and not yet booked */}
+                        {hasNotice && !hasUpcoming && (
+                          <div className="p-2 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-xs flex items-center justify-between text-emerald-300">
+                            <span className="flex items-center gap-1.5">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                              সিট ফাঁকা হবে:
+                            </span>
+                            <span className="font-bold font-mono">
+                              {formatDateBn(seat.vacant_from_date)} থেকে
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -644,66 +732,162 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
                           সিট বরাদ্দ করুন (Allocate)
                         </Button>
                       ) : isOccupied ? (
-                        <div className="flex items-center gap-1.5 w-full">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="flex-1 text-[11px] py-1 text-primary-400 border-primary-500/30 hover:bg-primary-500/10"
-                            onClick={() => {
-                              const activeAlloc =
-                                seat.active_allocation ||
-                                seat.allocations?.find((a: any) => a.status === 'ACTIVE') ||
-                                seat.allocations?.[0]
+                        hasNotice && !hasUpcoming ? (
+                          <div className="space-y-1.5 w-full">
+                            <Button
+                              size="sm"
+                              variant="primary"
+                              className="w-full text-xs py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-sm"
+                              onClick={() => {
+                                setAllocatingSeatId(seat.id)
+                                onAllocateSeat?.(seat.id)
+                              }}
+                              leftIcon={<CheckCircle2 className="w-3.5 h-3.5" />}
+                            >
+                              অগ্রিম বরাদ্দ করুন ({formatDateBn(seat.vacant_from_date)} থেকে)
+                            </Button>
+                            <div className="flex items-center gap-1.5 w-full">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1 text-[11px] py-1 text-primary-400 border-primary-500/30 hover:bg-primary-500/10"
+                                onClick={() => {
+                                  const activeAlloc =
+                                    seat.active_allocation ||
+                                    seat.allocations?.find((a: any) => a.status === 'ACTIVE') ||
+                                    seat.allocations?.[0]
 
-                              const allocId = activeAlloc?.id || seat.allocation_id || ''
-                              const boarderName = activeAlloc?.boarder?.full_name || seat.occupant_name || 'বর্তমান বর্ডার'
-                              const boarderCode = activeAlloc?.boarder?.boarder_code || seat.occupant_code || 'BDR-ACTIVE'
-                              const boarderId = activeAlloc?.boarder?.id || (activeAlloc as any)?.boarder_id || seat.occupant_id || ''
-                              const rent = activeAlloc?.monthly_rent ?? seat.occupant_rent ?? seat.default_rent
+                                  setTransferringAllocation({
+                                    allocationId: activeAlloc?.id || seat.allocation_id || '',
+                                    boarderId: activeAlloc?.boarder?.id || activeAlloc?.boarder_id || seat.occupant_id || '',
+                                    boarderName: activeAlloc?.boarder?.full_name || seat.occupant_name || 'বর্তমান বর্ডার',
+                                    boarderCode: activeAlloc?.boarder?.boarder_code || seat.occupant_code || 'BDR-ACTIVE',
+                                    currentSeatId: seat.id,
+                                    currentSeatCode: seat.seat_code,
+                                    currentRent: activeAlloc?.monthly_rent ?? seat.occupant_rent ?? seat.default_rent,
+                                  })
+                                }}
+                                leftIcon={<ArrowRightLeft className="w-3 h-3" />}
+                              >
+                                স্থানান্তর
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1 text-[11px] py-1 text-amber-400 border-amber-500/30 hover:bg-amber-500/10"
+                                onClick={() => {
+                                  const activeAlloc =
+                                    seat.active_allocation ||
+                                    seat.allocations?.find((a: any) => a.status === 'ACTIVE') ||
+                                    seat.allocations?.[0]
 
-                              setTransferringAllocation({
-                                allocationId: allocId,
-                                boarderId: boarderId,
-                                boarderName: boarderName,
-                                boarderCode: boarderCode,
-                                currentSeatId: seat.id,
-                                currentSeatCode: seat.seat_code,
-                                currentRent: rent,
-                              })
-                            }}
-                            leftIcon={<ArrowRightLeft className="w-3 h-3" />}
-                          >
-                            স্থানান্তর
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="flex-1 text-[11px] py-1 text-rose-400 border-rose-500/30 hover:bg-rose-500/10"
-                            onClick={() => {
-                              const activeAlloc =
-                                seat.active_allocation ||
-                                seat.allocations?.find((a: any) => a.status === 'ACTIVE') ||
-                                seat.allocations?.[0]
+                                  setCancellingAllocation({
+                                    allocationId: activeAlloc?.id || seat.allocation_id || '',
+                                    seatId: seat.id,
+                                    boarderId: activeAlloc?.boarder_id || activeAlloc?.boarder?.id || seat.occupant_id || '',
+                                    boarderName: activeAlloc?.boarder?.full_name || seat.occupant_name || 'বর্তমান বর্ডার',
+                                    boarderCode: activeAlloc?.boarder?.boarder_code || seat.occupant_code || 'BDR-ACTIVE',
+                                    seatCode: seat.seat_code,
+                                  })
+                                }}
+                                leftIcon={<Edit3 className="w-3 h-3" />}
+                              >
+                                নোটিশ পরিবর্তন
+                              </Button>
+                            </div>
+                          </div>
+                        ) : hasNotice && hasUpcoming ? (
+                          <div className="flex items-center gap-1.5 w-full">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 text-[11px] py-1 text-primary-400 border-primary-500/30 hover:bg-primary-500/10"
+                              onClick={() => {
+                                const activeAlloc =
+                                  seat.active_allocation ||
+                                  seat.allocations?.find((a: any) => a.status === 'ACTIVE') ||
+                                  seat.allocations?.[0]
 
-                              const allocId = activeAlloc?.id || seat.allocation_id || ''
-                              const boarderId = activeAlloc?.boarder_id || activeAlloc?.boarder?.id || seat.occupant_id || ''
-                              const boarderName = activeAlloc?.boarder?.full_name || seat.occupant_name || 'বর্তমান বর্ডার'
-                              const boarderCode = activeAlloc?.boarder?.boarder_code || seat.occupant_code || 'BDR-ACTIVE'
+                                setTransferringAllocation({
+                                  allocationId: activeAlloc?.id || seat.allocation_id || '',
+                                  boarderId: activeAlloc?.boarder?.id || activeAlloc?.boarder_id || seat.occupant_id || '',
+                                  boarderName: activeAlloc?.boarder?.full_name || seat.occupant_name || 'বর্তমান বর্ডার',
+                                  boarderCode: activeAlloc?.boarder?.boarder_code || seat.occupant_code || 'BDR-ACTIVE',
+                                  currentSeatId: seat.id,
+                                  currentSeatCode: seat.seat_code,
+                                  currentRent: activeAlloc?.monthly_rent ?? seat.occupant_rent ?? seat.default_rent,
+                                })
+                              }}
+                              leftIcon={<ArrowRightLeft className="w-3 h-3" />}
+                            >
+                              স্থানান্তর
+                            </Button>
+                            <span className="text-[10px] font-medium text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-2.5 py-1 rounded-lg">
+                              অগ্রিম বরাদ্দ নিশ্চিত
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 w-full">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 text-[11px] py-1 text-primary-400 border-primary-500/30 hover:bg-primary-500/10"
+                              onClick={() => {
+                                const activeAlloc =
+                                  seat.active_allocation ||
+                                  seat.allocations?.find((a: any) => a.status === 'ACTIVE') ||
+                                  seat.allocations?.[0]
 
-                              setCancellingAllocation({
-                                allocationId: allocId,
-                                seatId: seat.id,
-                                boarderId: boarderId,
-                                boarderName: boarderName,
-                                boarderCode: boarderCode,
-                                seatCode: seat.seat_code,
-                              })
-                            }}
-                            leftIcon={<LogOut className="w-3 h-3" />}
-                          >
-                            প্রস্থান
-                          </Button>
-                        </div>
+                                const allocId = activeAlloc?.id || seat.allocation_id || ''
+                                const boarderName = activeAlloc?.boarder?.full_name || seat.occupant_name || 'বর্তমান বর্ডার'
+                                const boarderCode = activeAlloc?.boarder?.boarder_code || seat.occupant_code || 'BDR-ACTIVE'
+                                const boarderId = activeAlloc?.boarder?.id || (activeAlloc as any)?.boarder_id || seat.occupant_id || ''
+                                const rent = activeAlloc?.monthly_rent ?? seat.occupant_rent ?? seat.default_rent
+
+                                setTransferringAllocation({
+                                  allocationId: allocId,
+                                  boarderId: boarderId,
+                                  boarderName: boarderName,
+                                  boarderCode: boarderCode,
+                                  currentSeatId: seat.id,
+                                  currentSeatCode: seat.seat_code,
+                                  currentRent: rent,
+                                })
+                              }}
+                              leftIcon={<ArrowRightLeft className="w-3 h-3" />}
+                            >
+                              স্থানান্তর
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 text-[11px] py-1 text-rose-400 border-rose-500/30 hover:bg-rose-500/10"
+                              onClick={() => {
+                                const activeAlloc =
+                                  seat.active_allocation ||
+                                  seat.allocations?.find((a: any) => a.status === 'ACTIVE') ||
+                                  seat.allocations?.[0]
+
+                                const allocId = activeAlloc?.id || seat.allocation_id || ''
+                                const boarderId = activeAlloc?.boarder_id || activeAlloc?.boarder?.id || seat.occupant_id || ''
+                                const boarderName = activeAlloc?.boarder?.full_name || seat.occupant_name || 'বর্তমান বর্ডার'
+                                const boarderCode = activeAlloc?.boarder?.boarder_code || seat.occupant_code || 'BDR-ACTIVE'
+
+                                setCancellingAllocation({
+                                  allocationId: allocId,
+                                  seatId: seat.id,
+                                  boarderId: boarderId,
+                                  boarderName: boarderName,
+                                  boarderCode: boarderCode,
+                                  seatCode: seat.seat_code,
+                                })
+                              }}
+                              leftIcon={<LogOut className="w-3 h-3" />}
+                            >
+                              প্রস্থান
+                            </Button>
+                          </div>
+                        )
                       ) : (
                         <Button
                           size="sm"

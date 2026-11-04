@@ -414,17 +414,89 @@ export interface SeatFilterParams {
   status?: string
 }
 
+// Helper to resolve current active occupant, departure notice, and upcoming future allocation
+export function enrichSeatAllocations(s: any) {
+  const today = new Date().toISOString().slice(0, 10)
+  const allAllocs: any[] = Array.isArray(s.allocations) ? s.allocations : []
+
+  // 1. Current resident today:
+  // Started on or before today, and hasn't left yet (no end_date, or end_date >= today)
+  const currentAlloc = allAllocs.find((a: any) => {
+    if (a.status === 'CANCELLED') return false
+    const started = !a.start_date || a.start_date <= today
+    const notEnded = !a.end_date || a.end_date >= today
+    return started && notEnded
+  }) || allAllocs.find((a: any) => a.status === 'ACTIVE' && (!a.start_date || a.start_date <= today))
+
+  // 2. Upcoming / advance booking:
+  // Starts in the future after today
+  const upcomingAlloc = allAllocs
+    .filter((a: any) => a.status !== 'CANCELLED' && a.start_date && a.start_date > today)
+    .sort((a: any, b: any) => (a.start_date > b.start_date ? 1 : -1))[0]
+
+  // 3. Fallback active allocation
+  const fallbackAlloc = allAllocs.find((a: any) => a.status === 'ACTIVE') || null
+
+  const primaryAlloc = currentAlloc || (!upcomingAlloc ? fallbackAlloc : null)
+  const hasNotice = Boolean(primaryAlloc?.end_date && primaryAlloc.end_date >= today)
+  const vacateDate = hasNotice ? primaryAlloc.end_date : (s.vacate_date || null)
+
+  let vacantFromDate: string | null = s.vacant_from_date || null
+  if (vacateDate) {
+    const d = new Date(vacateDate)
+    d.setDate(d.getDate() + 1)
+    vacantFromDate = d.toISOString().slice(0, 10)
+  }
+
+  // Determine effective seat status
+  let effectiveStatus = s.status
+  if (s.status !== 'MAINTENANCE' && s.status !== 'INACTIVE') {
+    if (primaryAlloc || upcomingAlloc) {
+      effectiveStatus = 'OCCUPIED'
+    } else {
+      effectiveStatus = 'AVAILABLE'
+    }
+  }
+
+  return {
+    ...s,
+    status: effectiveStatus,
+    active_allocation: primaryAlloc || upcomingAlloc || null,
+    allocation_id: primaryAlloc?.id || upcomingAlloc?.id || null,
+    occupant_name: primaryAlloc?.boarder?.full_name || s.occupant_name || null,
+    occupant_code: primaryAlloc?.boarder?.boarder_code || s.occupant_code || null,
+    occupant_id: primaryAlloc?.boarder?.id || primaryAlloc?.boarder_id || s.occupant_id || null,
+    occupant_rent: primaryAlloc?.monthly_rent ?? s.default_rent,
+    occupant_start_date: primaryAlloc?.start_date || null,
+
+    // Notice to vacate details
+    has_notice_to_vacate: hasNotice || Boolean(s.has_notice_to_vacate),
+    vacate_date: vacateDate,
+    vacant_from_date: vacantFromDate,
+    cancellation_reason: primaryAlloc?.cancellation_reason || s.cancellation_reason || null,
+
+    // Upcoming allocation details
+    has_upcoming_allocation: Boolean(upcomingAlloc) || Boolean(s.has_upcoming_allocation),
+    upcoming_allocation: upcomingAlloc || s.upcoming_allocation || null,
+    upcoming_occupant_name: upcomingAlloc?.boarder?.full_name || s.upcoming_occupant_name || null,
+    upcoming_occupant_code: upcomingAlloc?.boarder?.boarder_code || s.upcoming_occupant_code || null,
+    upcoming_occupant_id: upcomingAlloc?.boarder?.id || upcomingAlloc?.boarder_id || s.upcoming_occupant_id || null,
+    upcoming_start_date: upcomingAlloc?.start_date || s.upcoming_start_date || null,
+  }
+}
+
 export function useSeats(params?: SeatFilterParams) {
   return useQuery({
     queryKey: ['seats', params],
     queryFn: async () => {
       if (!isSupabaseConfigured) {
         let results = mockSeats.map((s) => {
+          const enriched = enrichSeatAllocations(s)
           const r = mockRooms.find((rm) => rm.id === s.room_id)
           const f = mockFlats.find((fl) => fl.id === r?.flat_id)
           const b = mockBuildings.find((bl) => bl.id === f?.building_id)
           return {
-            ...s,
+            ...enriched,
             room: r ? { ...r, flat: f ? { ...f, building: b } : undefined } : undefined,
           }
         })
@@ -449,8 +521,8 @@ export function useSeats(params?: SeatFilterParams) {
             )
           ),
           allocations (
-            id, status, monthly_rent, security_deposit, start_date, boarder_id,
-            boarder:boarders (id, full_name, boarder_code, phone_number)
+            id, status, monthly_rent, security_deposit, start_date, end_date, cancellation_reason, boarder_id,
+            boarder:boarders (id, full_name, boarder_code, phone_number, status, leaving_date)
           )
         `)
 
@@ -466,18 +538,7 @@ export function useSeats(params?: SeatFilterParams) {
         console.warn('seats fetch failed:', error.message)
         return []
       }
-      return (data || []).map((s: any) => {
-        const activeAlloc = s.allocations?.find((a: any) => a.status === 'ACTIVE') || s.allocations?.[0]
-        return {
-          ...s,
-          active_allocation: activeAlloc || null,
-          allocation_id: activeAlloc?.id || null,
-          occupant_name: activeAlloc?.boarder?.full_name || s.occupant_name || null,
-          occupant_code: activeAlloc?.boarder?.boarder_code || null,
-          occupant_id: activeAlloc?.boarder?.id || activeAlloc?.boarder_id || null,
-          occupant_rent: activeAlloc?.monthly_rent ?? s.default_rent,
-        }
-      })
+      return (data || []).map((s: any) => enrichSeatAllocations(s))
     },
   })
 }
@@ -641,7 +702,9 @@ export function useAccommodation() {
                 .filter((r) => r.flat_id === f.id)
                 .map((r) => ({
                   ...r,
-                  seats: mockSeats.filter((s) => s.room_id === r.id),
+                  seats: mockSeats
+                    .filter((s) => s.room_id === r.id)
+                    .map((s) => enrichSeatAllocations(s)),
                 })),
             })),
         }))
@@ -649,7 +712,22 @@ export function useAccommodation() {
 
       const { data, error } = await supabase
         .from('buildings')
-        .select(`*, flats (*, rooms (*, seats (*)))`)
+        .select(`
+          *,
+          flats (
+            *,
+            rooms (
+              *,
+              seats (
+                *,
+                allocations (
+                  id, status, monthly_rent, security_deposit, start_date, end_date, cancellation_reason, boarder_id,
+                  boarder:boarders (id, full_name, boarder_code, phone_number, status, leaving_date)
+                )
+              )
+            )
+          )
+        `)
         .order('name', { ascending: true })
 
       if (error) {
@@ -664,13 +742,24 @@ export function useAccommodation() {
                 .filter((r) => r.flat_id === f.id)
                 .map((r) => ({
                   ...r,
-                  seats: mockSeats.filter((s) => s.room_id === r.id),
+                  seats: mockSeats
+                    .filter((s) => s.room_id === r.id)
+                    .map((s) => enrichSeatAllocations(s)),
                 })),
             })),
         }))
       }
 
-      return (data || []) as BuildingWithFlats[]
+      return (data || []).map((b: any) => ({
+        ...b,
+        flats: (b.flats || []).map((f: any) => ({
+          ...f,
+          rooms: (f.rooms || []).map((r: any) => ({
+            ...r,
+            seats: (r.seats || []).map((s: any) => enrichSeatAllocations(s)),
+          })),
+        })),
+      })) as BuildingWithFlats[]
     },
   })
 }

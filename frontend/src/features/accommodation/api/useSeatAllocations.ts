@@ -379,12 +379,14 @@ export function useCancelAllocationMutation() {
       // 3. Fallback: Direct table update if RPC failed or no allocation ID was found
       if (params.seatId) {
         let boarderIdToUpdate: string | null = null
+        const today = new Date().toISOString().slice(0, 10)
+        const isFuture = Boolean(params.endDate && params.endDate > today)
 
         if (isValidUuid(allocId)) {
           const { data: aRow } = await supabase
             .from('allocations')
             .update({
-              status: params.status || 'ENDED',
+              status: isFuture ? 'ACTIVE' : (params.status || 'ENDED'),
               end_date: params.endDate,
               cancellation_reason: params.reason,
               updated_at: new Date().toISOString(),
@@ -398,7 +400,7 @@ export function useCancelAllocationMutation() {
           const { data: aRows } = await supabase
             .from('allocations')
             .update({
-              status: params.status || 'ENDED',
+              status: isFuture ? 'ACTIVE' : (params.status || 'ENDED'),
               end_date: params.endDate,
               cancellation_reason: params.reason,
               updated_at: new Date().toISOString(),
@@ -409,13 +411,13 @@ export function useCancelAllocationMutation() {
           boarderIdToUpdate = aRows?.[0]?.boarder_id || null
         }
 
-        // Update boarder status to LEFT
+        // Update boarder: if future, keep status 'ACTIVE' with leaving_date
         if (boarderIdToUpdate) {
           try {
             await supabase
               .from('boarders')
               .update({
-                status: 'LEFT',
+                status: isFuture ? 'ACTIVE' : 'LEFT',
                 leaving_date: params.endDate,
                 remarks: params.reason,
                 updated_at: new Date().toISOString(),
@@ -426,14 +428,16 @@ export function useCancelAllocationMutation() {
           }
         }
 
-        // Set seat status to AVAILABLE
-        const { error: seatUpdateErr } = await supabase
-          .from('seats')
-          .update({ status: 'AVAILABLE', updated_at: new Date().toISOString() })
-          .eq('id', params.seatId)
+        // Set seat status to AVAILABLE only if departure is today or in the past
+        if (!isFuture) {
+          const { error: seatUpdateErr } = await supabase
+            .from('seats')
+            .update({ status: 'AVAILABLE', updated_at: new Date().toISOString() })
+            .eq('id', params.seatId)
 
-        if (seatUpdateErr) {
-          throw new Error(seatUpdateErr.message || 'সিটের স্ট্যাটাস পরিবর্তন করতে সমস্যা হয়েছে।')
+          if (seatUpdateErr) {
+            throw new Error(seatUpdateErr.message || 'সিটের স্ট্যাটাস পরিবর্তন করতে সমস্যা হয়েছে।')
+          }
         }
 
         return { success: true, fallback: true }

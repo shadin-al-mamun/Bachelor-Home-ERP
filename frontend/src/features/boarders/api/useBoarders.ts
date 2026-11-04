@@ -10,7 +10,12 @@ export interface BoarderWithRelations extends Boarder {
     monthly_rent: number
     security_deposit: number
     start_date: string
+    end_date?: string | null
     status: AllocationStatus
+    cancellation_reason?: string | null
+    is_notice_pending?: boolean
+    is_upcoming?: boolean
+    vacate_date?: string | null
     created_at?: string
     updated_at?: string
     seat?: {
@@ -52,6 +57,45 @@ export interface BoarderWithRelations extends Boarder {
       lunch: boolean
       dinner: boolean
     }
+  }
+}
+
+// Helper to resolve current active occupant vs advance upcoming booking for a boarder
+export function resolveBoarderActiveAllocation(rawAlloc: any, todayStr?: string) {
+  if (!rawAlloc) return null
+  const today = todayStr || new Date().toISOString().slice(0, 10)
+  const allocList: any[] = Array.isArray(rawAlloc) ? rawAlloc : [rawAlloc]
+  if (allocList.length === 0) return null
+
+  // 1. Current resident today:
+  // Not cancelled, started on or before today, and hasn't ended yet (end_date IS NULL or end_date >= today)
+  const current = allocList.find((a: any) => {
+    if (a.status === 'CANCELLED') return false
+    const started = !a.start_date || a.start_date <= today
+    const notEnded = !a.end_date || a.end_date >= today
+    return started && notEnded
+  })
+
+  // 2. Upcoming advance booking:
+  // Starts after today
+  const upcoming = allocList
+    .filter((a: any) => a.status !== 'CANCELLED' && a.start_date && a.start_date > today)
+    .sort((a: any, b: any) => (a.start_date > b.start_date ? 1 : -1))[0]
+
+  // 3. Fallback active allocation
+  const fallbackActive = allocList.find((a: any) => a.status === 'ACTIVE')
+
+  const chosen = current || upcoming || fallbackActive || allocList[0]
+  if (!chosen) return null
+
+  const isNoticePending = Boolean(chosen.end_date && chosen.end_date >= today)
+  const isUpcoming = Boolean(chosen.start_date && chosen.start_date > today)
+
+  return {
+    ...chosen,
+    is_notice_pending: isNoticePending,
+    is_upcoming: isUpcoming,
+    vacate_date: chosen.end_date || null,
   }
 }
 
@@ -840,7 +884,9 @@ export function useBoarders(filters?: BoarderFilters) {
               monthly_rent,
               security_deposit,
               start_date,
+              end_date,
               status,
+              cancellation_reason,
               seat:seats(
                 id,
                 seat_code,
@@ -948,9 +994,7 @@ export function useBoarders(filters?: BoarderFilters) {
       // Merge genuine boarders with any pending applicant profiles
       const rawList = [...(data || []), ...pendingFromProfiles].map((b: any) => ({
         ...b,
-        active_allocation: Array.isArray(b.active_allocation)
-          ? b.active_allocation.find((a: any) => a.status === 'ACTIVE') || null
-          : b.active_allocation,
+        active_allocation: resolveBoarderActiveAllocation(b.active_allocation),
       }))
 
       // Strictly filter out super admin test records (shadin0158@gmail.com should never be listed as a boarder)
@@ -1001,7 +1045,9 @@ export function useBoarder(id?: string) {
             monthly_rent,
             security_deposit,
             start_date,
+            end_date,
             status,
+            cancellation_reason,
             seat:seats(
               id,
               seat_code,
@@ -1076,9 +1122,7 @@ export function useBoarder(id?: string) {
         throw new Error('প্রশাসনিক কর্মকর্তা প্রোফাইল বোর্ডার তালিকায় অন্তর্ভুক্ত নয়।')
       }
 
-      const activeAlloc = Array.isArray(data.active_allocation)
-        ? data.active_allocation.find((a: any) => a.status === 'ACTIVE') || null
-        : data.active_allocation
+      const activeAlloc = resolveBoarderActiveAllocation(data.active_allocation)
 
       // Fetch non-void receipts to calculate accurate totalPaid and advance credit
       let boarderReceipts: any[] = []

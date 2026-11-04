@@ -6,7 +6,7 @@ import { useCancelAllocationMutation } from '../api/useSeatAllocations'
 import { AlertTriangle, LogOut, CheckCircle2, Loader2, AlertCircle } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
-import { formatCurrencyBn } from '@/utils/date'
+import { formatCurrencyBn, formatDateBn } from '@/utils/date'
 
 export interface AllocationCancelInfo {
   allocationId: string
@@ -175,7 +175,11 @@ export const CancelAllocationModal: React.FC<CancelAllocationModalProps> = ({
         {isSuccess && (
           <div className="p-3.5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-xs flex items-center gap-2.5">
             <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-            <span>বরাদ্দ সমাপ্তি সফল হয়েছে! সিটটি পুনরায় খালি (AVAILABLE) হিসেবে চিহ্নিত হয়েছে এবং সফটওয়্যার অ্যাক্সেস প্রত্যাহার করা হয়েছে।</span>
+            <span>
+              {endDate > new Date().toISOString().slice(0, 10)
+                ? `অগ্রিম প্রস্থান নোটিশ সংরক্ষিত হয়েছে! বর্ডার ${formatDateBn(endDate)} তারিখ পর্যন্ত এই সিটে বহাল থাকবেন এবং সফটওয়্যার স্বয়ংক্রিয়ভাবে পরবর্তী দিন থেকে সিটটিকে অগ্রিম বরাদ্দের সুযোগ দেবে।`
+                : 'বরাদ্দ সমাপ্তি সফল হয়েছে! সিটটি পুনরায় খালি (AVAILABLE) হিসেবে চিহ্নিত হয়েছে এবং সফটওয়্যার অ্যাক্সেস প্রত্যাহার করা হয়েছে।'}
+            </span>
           </div>
         )}
 
@@ -258,14 +262,27 @@ export const CancelAllocationModal: React.FC<CancelAllocationModalProps> = ({
         </div>
 
         {/* End Date */}
-        <Input
-          type="date"
-          label="প্রস্থান বা বাতিলের কার্যকর তারিখ"
-          value={endDate}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEndDate(e.target.value)}
-          required
-          className="text-xs"
-        />
+        <div className="space-y-1.5">
+          <Input
+            type="date"
+            label="প্রস্থান বা বাতিলের কার্যকর তারিখ"
+            value={endDate}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEndDate(e.target.value)}
+            required
+            className="text-xs"
+          />
+          {endDate > new Date().toISOString().slice(0, 10) && (
+            <div className="p-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-400" />
+              <div className="space-y-0.5">
+                <span className="font-semibold block">অগ্রিম প্রস্থান নোটিশ (Advance Notice):</span>
+                <span className="text-[11px] text-slate-300 block leading-relaxed">
+                  যেহেতু আপনি ভবিষ্যতের তারিখ নির্বাচন করেছেন, তাই বর্ডার <strong>{formatDateBn(endDate)}</strong> পর্যন্ত এই সিটে নিয়মিত সক্রিয় হিসেবে বহাল থাকবেন। সিট কার্ডে এই নোটিশ সংরক্ষিত থাকবে এবং সফটওয়্যার স্বয়ংক্রিয়ভাবে পরবর্তী দিন থেকে সিটটিকে নতুন বর্ডারের অগ্রিম বরাদ্দের সুযোগ দেবে।
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Leaving Reason */}
         <Input

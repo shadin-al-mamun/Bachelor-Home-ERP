@@ -135,9 +135,8 @@ describe('Flat Utility & Miscellaneous Billing Calculation', () => {
     const cookBill = 600
     const otherBillPerHead = 100
 
-    const desc = `${billingMonth.slice(0, 7)} — ফ্ল্যাট বিবিধ বিল (ইউটিলিটি: ৳${effectiveUtility}, বাবুর্চি: ৳${cookBill}${
-      otherBillPerHead > 0 ? `, অন্যান্য: ৳${otherBillPerHead}` : ''
-    })`
+    const desc = `${billingMonth.slice(0, 7)} — ফ্ল্যাট বিবিধ বিল (ইউটিলিটি: ৳${effectiveUtility}, বাবুর্চি: ৳${cookBill}${otherBillPerHead > 0 ? `, অন্যান্য: ৳${otherBillPerHead}` : ''
+      })`
 
     expect(desc).toBe('2026-10 — ফ্ল্যাট বিবিধ বিল (ইউটিলিটি: ৳333, বাবুর্চি: ৳600, অন্যান্য: ৳100)')
   })
