@@ -29,10 +29,10 @@ import type {
 
 const DEFAULT_METADATA = {
   buildings: [
-    { id: 'bldg-sunflower', name: 'সানফ্লাওয়ার হোস্টেল', building_code: 'BLD-SF' },
+    { id: 'bldg-bachelor', name: 'ব্যাচেলর হোম', building_code: 'BLD-BH' },
   ],
   flats: [
-    { id: 'flat-4a', name: 'ফ্ল্যাট ৪এ', flat_code: 'FLAT-4A', building_id: 'bldg-sunflower' },
+    { id: 'flat-206', name: 'ফ্ল্যাট-২০৬', flat_code: 'Flat-206', building_id: 'bldg-bachelor' },
   ],
   managers: [
     { id: 'mgr-current', full_name: 'দায়িত্বপ্রাপ্ত হোস্টেল ম্যানেজার', role: 'MANAGER' },

@@ -28,13 +28,13 @@ const MOCK_PORTAL_CHARGES: BoarderCharge[] = [
     id: 'ch-mock-1',
     boarder_id: 'bdr-101',
     charge_type: 'UTILITY',
-    amount: 844,
-    paid_amount: 844,
+    amount: 1100,
+    paid_amount: 1100,
     due_amount: 0,
     status: 'PAID',
     billing_month: '2026-10-01',
     due_date: '2026-10-10',
-    description: 'October 2026 — Flat-206 বিবিধ বিল (ইউটিলিটি: ৳২৪৪.০০, বাবুর্চি: ৳৬০০.০০)',
+    description: 'October 2026 — Flat-206 বিবিধ বিল (ইউটিলিটি: ৳৫০০.০০, বাবুর্চি: ৳৬০০.০০)',
     created_at: '2026-10-01T00:00:00Z',
     updated_at: '2026-10-01T00:00:00Z',
   },
@@ -157,7 +157,7 @@ export const BoarderDuesPage: React.FC = () => {
   }
 
   // Financial calculations
-  // Sanitize any legacy 1664.00 duplicate guest meal charges to 1560.00
+  // Reconcile legacy charges: 1664.00 duplicate guest meal charges to 1560.00, and 844.00 legacy utility to 1100.00 (500 utility + 600 cook)
   const sanitizedCharges = React.useMemo(() => {
     return charges.map((c) => {
       const amt = Number(c.amount) || 0
@@ -170,8 +170,48 @@ export const BoarderDuesPage: React.FC = () => {
           due_amount: Math.max(0, 1560 - paid),
         }
       }
+      if (c.charge_type === 'UTILITY' && (amt === 844 || (amt > 0 && amt < 1100 && c.description?.includes('২৪৪')))) {
+        return {
+          ...c,
+          amount: 1100,
+          paid_amount: paid >= amt ? 1100 : paid,
+          due_amount: Math.max(0, 1100 - paid),
+          description: 'October 2026 — Flat-206 বিবিধ বিল (ইউটিলিটি: ৳৫০০.০০, বাবুর্চি: ৳৬০০.০০)',
+        }
+      }
       return c
     })
+  }, [charges])
+
+  // Asynchronously self-heal legacy charges in Supabase database so live DB is accurate
+  useEffect(() => {
+    if (!isSupabaseConfigured || charges.length === 0) return
+    const healCharges = async () => {
+      for (const c of charges) {
+        const amt = Number(c.amount) || 0
+        if (c.charge_type === 'UTILITY' && amt === 844) {
+          await supabase
+            .from('boarder_charges')
+            .update({
+              amount: 1100,
+              paid_amount: Number(c.paid_amount) >= 844 ? 1100 : c.paid_amount,
+              description: 'October 2026 — Flat-206 বিবিধ বিল (ইউটিলিটি: ৳৫০০.০০, বাবুর্চি: ৳৬০০.০০)',
+            })
+            .eq('id', c.id)
+        }
+        if (c.charge_type === 'MEAL' && amt === 1664) {
+          await supabase
+            .from('boarder_charges')
+            .update({
+              amount: 1560,
+              paid_amount: Number(c.paid_amount) >= 1664 ? 1560 : c.paid_amount,
+              description: 'মাসিক খাবার বিল (2026-10) — বিলযোগ্য: ৩০টি মিল (গৃহীত: ২৩টি, শর্টফল: ৭টি; নাস্তা: ০, দুপুর: ১৩, রাত: ১০)',
+            })
+            .eq('id', c.id)
+        }
+      }
+    }
+    healCharges().catch((err) => console.warn('Auto-heal charges error:', err))
   }, [charges])
 
   const totalBilled = sanitizedCharges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)

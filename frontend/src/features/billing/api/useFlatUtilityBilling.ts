@@ -55,48 +55,62 @@ export interface GenerateBatchFlatBillsParams {
   flatConfigs: FlatConfigPayload[]
 }
 
-// Default sample mock data mirroring user's exact screenshot for offline/demo resilience
+// Default sample mock data mirroring user's exact flat vouchers for offline/demo resilience
 const MOCK_PREVIEW_DATA: FlatUtilityPreviewItem[] = [
   {
     flat_id: 'flat-206',
     flat_code: 'Flat-206',
     flat_name: 'ফ্ল্যাট-২০৬',
     floor_number: 2,
-    building_name: 'প্রধান ভবন',
-    total_seats: 9,
-    active_boarders_count: 9,
+    building_name: 'ব্যাচেলর হোম',
+    total_seats: 7,
+    active_boarders_count: 7,
     boarders: [
-      { boarder_id: 'b-1', boarder_code: 'B-001', full_name: 'তানভীর আহমেদ', seat_code: 'S-206-A' },
-      { boarder_id: 'b-2', boarder_code: 'B-002', full_name: 'রাকিবুল হাসান', seat_code: 'S-206-B' },
-      { boarder_id: 'b-3', boarder_code: 'B-003', full_name: 'মাহমুদুল হাসান', seat_code: 'S-206-C' },
+      { boarder_id: 'b-1', boarder_code: 'BDR-2026-3737', full_name: 'মারুফ বিল্লাহ', seat_code: 'Seat B-2' },
+      { boarder_id: 'b-2', boarder_code: 'BDR-2026-4549', full_name: 'মোশারফ হোসেন', seat_code: 'Seat A-3' },
+      { boarder_id: 'b-3', boarder_code: 'BDR-2026-2995', full_name: 'আব্দুল মালেক ইবনে রহমান', seat_code: 'Seat A-4' },
     ],
-    total_voucher_amount: 2205,
+    total_voucher_amount: 3500,
     vouchers: [
-      { id: 'v-1', voucher_no: 'EXP-005014', expense_date: '10/10/2026', category_name: 'বিদ্যুৎ বিল', description: 'অক্টোবর ডেসকো প্রিপেইড বিল', amount: 1200 },
-      { id: 'v-2', voucher_no: 'EXP-005015', expense_date: '12/10/2026', category_name: 'গ্যাস বিল', description: 'এলপিজি সিলিন্ডার রিফিল', amount: 800 },
-      { id: 'v-3', voucher_no: 'EXP-005005', expense_date: '15/10/2026', category_name: 'ময়লা বিল', description: 'সিটি কর্পোরেশন বর্জ্য বিল', amount: 205 },
+      { id: 'v-1', voucher_no: 'EXP-005005', expense_date: '22/10/2026', category_name: 'ময়লা বিল (Garbage Bill)', description: 'ময়লা', amount: 200 },
+      { id: 'v-2', voucher_no: 'EXP-005014', expense_date: '24/10/2026', category_name: 'বিদ্যুৎ বিল (Electricity Bill)', description: 'বিদ্যুৎ বিল', amount: 1200 },
+      { id: 'v-3', voucher_no: 'EXP-005015', expense_date: '24/10/2026', category_name: 'গ্যাস বিল (Gas Bill)', description: 'গ্যাস বিল', amount: 800 },
+      { id: 'v-4', voucher_no: 'EXP-005018', expense_date: '25/10/2026', category_name: 'অন্যান্য ফ্ল্যাটওয়ারী বিবিধ খরচ (Other Flat Misc)', description: 'লাইট ক্রয়', amount: 800 },
+      { id: 'v-5', voucher_no: 'EXP-005022', expense_date: '30/10/2026', category_name: 'ওয়াইফাই বিল (Wi-Fi Bill)', description: 'নেট বিল', amount: 500 },
     ],
-    existing_distribution: null,
+    existing_distribution: {
+      id: 'dist-206',
+      is_billed: true,
+      per_seat_amount: 500,
+      cook_bill: 600,
+      other_bill: 0,
+    },
   },
   {
     flat_id: 'flat-207',
     flat_code: 'Flat-207',
     flat_name: 'ফ্ল্যাট-২০৭',
     floor_number: 2,
-    building_name: 'প্রধান ভবন',
+    building_name: 'ব্যাচেলর হোম',
     total_seats: 6,
     active_boarders_count: 6,
     boarders: [
-      { boarder_id: 'b-4', boarder_code: 'B-004', full_name: 'নাজমুল আলম', seat_code: 'S-207-A' },
-      { boarder_id: 'b-5', boarder_code: 'B-005', full_name: 'সাইফুল ইসলাম', seat_code: 'S-207-B' },
+      { boarder_id: 'b-4', boarder_code: 'BDR-2026-6951', full_name: 'আলামিন', seat_code: 'Seat A-1' },
+      { boarder_id: 'b-5', boarder_code: 'BDR-2026-8040', full_name: 'রায়হানুল হাসান', seat_code: 'Seat C-1' },
     ],
     total_voucher_amount: 2400,
     vouchers: [
-      { id: 'v-4', voucher_no: 'EXP-005014', expense_date: '10/10/2026', category_name: 'বিদ্যুৎ বিল', description: 'অক্টোবর ডেসকো প্রিপেইড বিল', amount: 1400 },
-      { id: 'v-5', voucher_no: 'EXP-005015', expense_date: '12/10/2026', category_name: 'গ্যাস বিল', description: 'এলপিজি গ্যাস বিল', amount: 800 },
-      { id: 'v-6', voucher_no: 'EXP-005005', expense_date: '15/10/2026', category_name: 'ময়লা বিল', description: 'সোসাইটি ময়লা অপসারণ ফি', amount: 200 },
+      { id: 'v-6', voucher_no: 'EXP-005014', expense_date: '10/10/2026', category_name: 'বিদ্যুৎ বিল', description: 'অক্টোবর ডেসকো প্রিপেইড বিল', amount: 1400 },
+      { id: 'v-7', voucher_no: 'EXP-005015', expense_date: '12/10/2026', category_name: 'গ্যাস বিল', description: 'এলপিজি গ্যাস বিল', amount: 800 },
+      { id: 'v-8', voucher_no: 'EXP-005005', expense_date: '15/10/2026', category_name: 'ময়লা বিল', description: 'সোসাইটি ময়লা অপসারণ ফি', amount: 200 },
     ],
-    existing_distribution: null,
+    existing_distribution: {
+      id: 'dist-207',
+      is_billed: true,
+      per_seat_amount: 400,
+      cook_bill: 600,
+      other_bill: 0,
+    },
   },
 ]
 

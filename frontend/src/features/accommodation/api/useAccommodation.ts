@@ -7,7 +7,7 @@ let mockBuildings: Building[] = [
   {
     id: '11111111-1111-1111-1111-111111111111',
     building_code: 'BLD-01',
-    name: 'Sunflower Hostel (সানফ্লাওয়ার হোস্টেল)',
+    name: 'Bachelor Home (ব্যাচেলর হোম)',
     address: 'House 42, Road 11, Sector 4, Uttara, Dhaka-1230',
     status: 'ACTIVE',
     description: 'Primary modern hostel campus equipped with CCTV, WiFi, and dining hall.',
