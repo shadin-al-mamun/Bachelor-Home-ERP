@@ -104,6 +104,62 @@ export function formatSheetMonthBn(yearMonthStr: string): string {
   return `${monthName}/${yearBn}`
 }
 
+export interface MonthOption {
+  value: string // 'YYYY-MM'
+  label: string
+}
+
+export function getAvailableMonthOptions(currentSelected?: string): MonthOption[] {
+  const now = new Date()
+  const nowY = now.getFullYear()
+  const nowM = now.getMonth() // 0-based
+  const currentYM = `${nowY}-${String(nowM + 1).padStart(2, '0')}`
+
+  const options: MonthOption[] = []
+  const seen = new Set<string>()
+
+  // Always include currentSelected if provided
+  if (currentSelected && !seen.has(currentSelected)) {
+    const parts = currentSelected.split('-')
+    const y = parseInt(parts[0], 10)
+    const m = parseInt(parts[1], 10) - 1
+    if (!isNaN(y) && !isNaN(m) && m >= 0 && m < 12) {
+      const bnMonth = BENGALI_MONTHS[m]
+      const bnYear = toBengaliDigits(y)
+      const enMonth = new Date(y, m, 1).toLocaleString('en-US', { month: 'long' })
+      const isCur = currentSelected === currentYM
+      options.push({
+        value: currentSelected,
+        label: `${bnMonth} ${bnYear} (${enMonth} ${y})${isCur ? ' — চলতি মাস' : ''}`,
+      })
+      seen.add(currentSelected)
+    }
+  }
+
+  // Generate options from 3 months ahead down to past 24 months
+  for (let offset = -3; offset <= 24; offset++) {
+    const d = new Date(nowY, nowM - offset, 1)
+    const y = d.getFullYear()
+    const m = d.getMonth()
+    const ym = `${y}-${String(m + 1).padStart(2, '0')}`
+    if (seen.has(ym)) continue
+    seen.add(ym)
+
+    const bnMonth = BENGALI_MONTHS[m]
+    const bnYear = toBengaliDigits(y)
+    const enMonth = d.toLocaleString('en-US', { month: 'long' })
+    const isCur = ym === currentYM
+    options.push({
+      value: ym,
+      label: `${bnMonth} ${bnYear} (${enMonth} ${y})${isCur ? ' — চলতি মাস' : ''}`,
+    })
+  }
+
+  // Sort descending by YYYY-MM
+  options.sort((a, b) => b.value.localeCompare(a.value))
+  return options
+}
+
 export function formatSheetAmount(val: number | null | undefined, showDashWhenZero = true): string {
   if (val === null || val === undefined || isNaN(val) || val === 0) {
     return showDashWhenZero ? '—' : ''

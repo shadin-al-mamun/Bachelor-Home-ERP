@@ -25,12 +25,16 @@ interface ReportTableRendererProps {
   reportId: ReportId
   data: any
   isLoading: boolean
+  filters?: import('../types').ReportFilterState
+  onFiltersChange?: (updated: import('../types').ReportFilterState) => void
 }
 
 export const ReportTableRenderer: React.FC<ReportTableRendererProps> = ({
   reportId,
   data,
   isLoading,
+  filters,
+  onFiltersChange,
 }) => {
   // Render loading skeleton
   if (isLoading) {
@@ -955,7 +959,12 @@ export const ReportTableRenderer: React.FC<ReportTableRendererProps> = ({
 
   // 17. MONTHLY_COLLECTION_SHEET
   if (reportId === 'MONTHLY_COLLECTION_SHEET') {
-    return <MonthlyCollectionSheetReportPanel />
+    return (
+      <MonthlyCollectionSheetReportPanel
+        filters={filters}
+        onFiltersChange={onFiltersChange}
+      />
+    )
   }
 
   return null

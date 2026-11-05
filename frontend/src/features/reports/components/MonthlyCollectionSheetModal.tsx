@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import {
   FileSpreadsheet,
   Download,
@@ -9,8 +9,13 @@ import {
   Calendar,
   Eye,
   CheckCircle,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
-import { useMonthlyCollectionSheetData } from '../api/useMonthlyCollectionSheetData'
+import {
+  useMonthlyCollectionSheetData,
+  getAvailableMonthOptions,
+} from '../api/useMonthlyCollectionSheetData'
 import { MonthlyCollectionSheetView } from './MonthlyCollectionSheetView'
 import { exportMonthlySheetToExcel } from '../utils/monthlySheetExcelExport'
 
@@ -46,6 +51,24 @@ export const MonthlyCollectionSheetModal: React.FC<MonthlyCollectionSheetModalPr
     selectedMonthBn,
     isLoading,
   } = useMonthlyCollectionSheetData(selectedMonth, selectedFlatId)
+
+  const monthOptions = useMemo(() => {
+    return getAvailableMonthOptions(selectedMonth)
+  }, [selectedMonth])
+
+  const handlePrevMonth = () => {
+    const [y, m] = selectedMonth.split('-').map(Number)
+    const prevDate = new Date(y, m - 2, 1)
+    const prevYM = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`
+    setSelectedMonth(prevYM)
+  }
+
+  const handleNextMonth = () => {
+    const [y, m] = selectedMonth.split('-').map(Number)
+    const nextDate = new Date(y, m, 1)
+    const nextYM = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`
+    setSelectedMonth(nextYM)
+  }
 
   if (!isOpen) return null
 
@@ -120,32 +143,60 @@ export const MonthlyCollectionSheetModal: React.FC<MonthlyCollectionSheetModalPr
             <select
               value={selectedFlatId}
               onChange={(e) => setSelectedFlatId(e.target.value)}
-              className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+              className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer"
             >
-              {availableFlats.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name} ({f.code})
-                </option>
-              ))}
+              {availableFlats.map((f) => {
+                const label = f.name.includes(f.code) ? f.name : `${f.name} (${f.code})`
+                return (
+                  <option key={f.id} value={f.id}>
+                    {label}
+                  </option>
+                )
+              })}
             </select>
           </div>
 
-          {/* Month Selector */}
-          <div className="lg:col-span-3">
+          {/* Month Selector Dropdown with Prev/Next stepper */}
+          <div className="lg:col-span-4">
             <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5 text-indigo-400" />
               <span>মাসের নাম ও বছর *</span>
             </label>
-            <input
-              type="month"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-950 border border-slate-700 rounded-xl text-slate-100 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-            />
+            <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-700">
+              <button
+                type="button"
+                onClick={handlePrevMonth}
+                title="পূর্ববর্তী মাস"
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="w-full bg-transparent text-xs sm:text-sm text-slate-100 font-bold focus:outline-none cursor-pointer py-1"
+              >
+                {monthOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value} className="bg-slate-900 text-slate-100 py-1 font-sans">
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                onClick={handleNextMonth}
+                title="পরবর্তী মাস"
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           {/* Action Buttons: Download PDF / Print & Download Excel */}
-          <div className="lg:col-span-5 flex flex-wrap items-center gap-2">
+          <div className="lg:col-span-4 flex flex-wrap items-center gap-2">
             {/* Primary Download / Print Button (Exact Requirement) */}
             <button
               type="button"

@@ -23,7 +23,6 @@ import {
   Megaphone,
   Zap,
   FileText,
-  FileSpreadsheet,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import { useBrandingStore } from '@/app/store/useBrandingStore'
@@ -225,15 +224,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           defaultTitle: '৫. রিপোর্ট (Reports)',
           href: '/reports',
           icon: <FileBarChart2 className="w-4 h-4 shrink-0 text-amber-400" />,
-          roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'AUDITOR'],
-          permissionKey: 'reports',
-        },
-        {
-          id: 'monthly_collection_sheet',
-          titleKey: 'nav.monthly_collection_sheet',
-          defaultTitle: 'মাসিক বিল আদায়ের শীট',
-          href: '/reports?openMonthlySheet=true',
-          icon: <FileSpreadsheet className="w-4 h-4 shrink-0 text-emerald-400" />,
           roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'AUDITOR'],
           permissionKey: 'reports',
         },
