@@ -426,5 +426,27 @@ export function getReportExportData(reportId: ReportId, data: any): ReportExport
     return { columns, rows: exportRows as unknown as Record<string, unknown>[] }
   }
 
+  // 17. MONTHLY_COLLECTION_SHEET
+  if (reportId === 'MONTHLY_COLLECTION_SHEET') {
+    const columns: ExportColumn[] = [
+      { header: 'ক্রঃনং', key: 'sl', width: 8, align: 'center' },
+      { header: 'সদস্যের নাম ও মোবাইল নম্বর', key: 'boarderName', width: 25 },
+      { header: 'এডভান্স ভাড়া', key: 'advanceAmount', width: 14, isCurrency: true },
+      { header: 'পূর্ববর্তী মাসের পাওনা', key: 'previousDue', width: 15, isCurrency: true },
+      { header: 'পূর্ববর্তী মাসের পাওনা আদায়', key: 'previousDueCollected', width: 16, isCurrency: true },
+      { header: 'চলতি মাসে আদায় (১ম)', key: 'payment1', width: 14, isCurrency: true },
+      { header: 'চলতি মাসে আদায় (২য়)', key: 'payment2', width: 14, isCurrency: true },
+      { header: 'চলতি মাসে আদায় (৩য়)', key: 'payment3', width: 14, isCurrency: true },
+      { header: 'চলতি মাসে আদায় (৪র্থ)', key: 'payment4', width: 14, isCurrency: true },
+      { header: 'চলতি মাসের মোট আদায়', key: 'totalCurrentCollected', width: 16, isCurrency: true },
+      { header: 'সিট ভাড়া', key: 'seatRent', width: 14, isCurrency: true },
+      { header: 'সার্ভিস চার্জ', key: 'serviceCharge', width: 14, isCurrency: true },
+      { header: 'মিল খরচ', key: 'mealCharge', width: 14, isCurrency: true },
+      { header: 'চলতি মাসের মোট খরচ', key: 'totalCurrentExpense', width: 16, isCurrency: true },
+      { header: 'দেনা/পাওনা', key: 'netBalance', width: 16, isCurrency: true },
+    ]
+    return { columns, rows: [] }
+  }
+
   return { columns: [], rows: [] }
 }

@@ -24,6 +24,7 @@ export type ReportId =
   | 'OWNER_DEPOSITS'
   | 'CASH_HANDOVERS'
   // Category 3: Boarder & Deposits
+  | 'MONTHLY_COLLECTION_SHEET'
   | 'BOARDER_DUES_AGING'
   | 'SECURITY_DEPOSITS'
   // Category 4: Compliance & Audits

@@ -1,4 +1,5 @@
 import React from 'react'
+import { MonthlyCollectionSheetReportPanel } from './MonthlyCollectionSheetReportPanel'
 import type {
   ReportId,
   DailyIncomeExpenseRow,
@@ -950,6 +951,11 @@ export const ReportTableRenderer: React.FC<ReportTableRendererProps> = ({
         </table>
       </div>
     )
+  }
+
+  // 17. MONTHLY_COLLECTION_SHEET
+  if (reportId === 'MONTHLY_COLLECTION_SHEET') {
+    return <MonthlyCollectionSheetReportPanel />
   }
 
   return null

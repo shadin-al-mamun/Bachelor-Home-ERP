@@ -146,7 +146,17 @@ export const ALL_REPORTS: ReportDefinition[] = [
     icon: 'ArrowRightLeft',
   },
 
-  // 13. Boarder Ledger & Dues Aging Report
+  // 13. Monthly Bill Collection Sheet
+  {
+    id: 'MONTHLY_COLLECTION_SHEET',
+    category: 'BOARDER_OPERATIONS',
+    titleEn: 'Monthly Bill Collection Sheet',
+    titleBn: 'মাসিক বিল আদায়ের শীট',
+    descriptionEn: 'Flat-wise 15-column collection sheet: advance, prior dues, installment collections with vouchers, seat rent, service charges, meal costs, and balance.',
+    descriptionBn: 'ফ্ল্যাটভিত্তিক ১৫টি কলামে বর্ডারদের এডভান্স, পূর্ববর্তী বকেয়া, কিস্তিতে চলতি আদায়, সিট ভাড়া, সার্ভিস চার্জ, মিল খরচ ও দেনা-পাওনা রেজিস্টার।',
+    icon: 'FileSpreadsheet',
+  },
+  // 14. Boarder Ledger & Dues Aging Report
   {
     id: 'BOARDER_DUES_AGING',
     category: 'BOARDER_OPERATIONS',

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import {
   FileText,
   Calendar,
@@ -17,13 +17,16 @@ import {
   Trash2,
   Award,
   Search,
+  FileSpreadsheet,
 } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import type { ReportId, ReportFilterState } from './types'
 import { ALL_REPORTS, REPORT_CATEGORIES } from './reportDefinitions'
 import { useReportsData } from './api/useReportsData'
 import { ReportFilterBar } from './components/ReportFilterBar'
 import { ReportTableRenderer } from './components/ReportTableRenderer'
 import { ExportActions } from './components/ExportActions'
+import { MonthlyCollectionSheetModal } from './components/MonthlyCollectionSheetModal'
 import { getReportExportData } from './reportExportData'
 import {
   type ExportMetadata,
@@ -50,6 +53,7 @@ const REPORT_ICONS: Record<string, React.ElementType> = {
   Shield,
   Trash2,
   Award,
+  FileSpreadsheet,
 }
 
 export const ReportsHubPage: React.FC = () => {
@@ -59,10 +63,37 @@ export const ReportsHubPage: React.FC = () => {
   const lastDayDate = new Date(today.getFullYear(), today.getMonth() + 1, 0)
   const lastDay = `${lastDayDate.getFullYear()}-${String(lastDayDate.getMonth() + 1).padStart(2, '0')}-${String(lastDayDate.getDate()).padStart(2, '0')}`
 
+  const [searchParams, setSearchParams] = useSearchParams()
   const [activeReportId, setActiveReportId] = useState<ReportId>('DAILY_INCOME_EXPENSE')
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL')
   const [searchQuery, setSearchQuery] = useState('')
   const [isExporting, setIsExporting] = useState(false)
+  const [isMonthlySheetModalOpen, setIsMonthlySheetModalOpen] = useState<boolean>(() => {
+    return (
+      searchParams.get('openMonthlySheet') === 'true' ||
+      searchParams.get('openSheetModal') === 'true'
+    )
+  })
+
+  // Synchronize modal state if url param changes
+  useEffect(() => {
+    if (
+      searchParams.get('openMonthlySheet') === 'true' ||
+      searchParams.get('openSheetModal') === 'true'
+    ) {
+      setIsMonthlySheetModalOpen(true)
+    }
+  }, [searchParams])
+
+  const handleCloseMonthlySheetModal = () => {
+    setIsMonthlySheetModalOpen(false)
+    if (searchParams.has('openMonthlySheet') || searchParams.has('openSheetModal')) {
+      const next = new URLSearchParams(searchParams)
+      next.delete('openMonthlySheet')
+      next.delete('openSheetModal')
+      setSearchParams(next, { replace: true })
+    }
+  }
 
   const [filters, setFilters] = useState<ReportFilterState>({
     startDate: firstDay,
@@ -182,6 +213,43 @@ export const ReportsHubPage: React.FC = () => {
           onExportExcel={handleExportExcel}
           isExporting={isExporting}
         />
+      </div>
+
+      {/* Featured Banner: মাসিক বিল আদায়ের শীট (Monthly Bill Collection Sheet) */}
+      <div className="no-print mb-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-900 border border-emerald-500/30 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+        <div className="flex items-start sm:items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 shadow-inner">
+            <FileSpreadsheet className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                বিশেষ ফ্ল্যাটভিত্তিক রেজিস্টার
+              </span>
+              <span className="text-[11px] text-slate-400 font-medium">
+                ১৫টি নির্ধারিত কলামে কিস্তিতে আদায় ও মিল-ভাড়া হিসাব
+              </span>
+            </div>
+            <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+              <span>মাসিক বিল আদায়ের শীট</span>
+              <span className="text-slate-400 font-light text-xs sm:text-sm">
+                | Monthly Bill Collection Sheet
+              </span>
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              ফ্ল্যাট নির্বাচন করে এডভান্স, পূর্ববর্তী বকেয়া, চলতি মাসের আদায় ভাউচার, সিট ভাড়া, সার্ভিস চার্জ ও মিল খরচের শীট ডাউনলোড করুন
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setIsMonthlySheetModalOpen(true)}
+          className="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 shrink-0 self-start md:self-auto cursor-pointer"
+        >
+          <FileSpreadsheet className="w-4 h-4" />
+          <span>শীট তৈরি ও ডাউনলোড করুন</span>
+        </button>
       </div>
 
       {/* 2. Category Tabs & Search Bar */}
@@ -312,6 +380,12 @@ export const ReportsHubPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Monthly Bill Collection Sheet Modal Popup */}
+      <MonthlyCollectionSheetModal
+        isOpen={isMonthlySheetModalOpen}
+        onClose={handleCloseMonthlySheetModal}
+      />
     </div>
   )
 }
