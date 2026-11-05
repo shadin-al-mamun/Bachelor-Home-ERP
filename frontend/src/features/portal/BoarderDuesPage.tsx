@@ -749,8 +749,8 @@ export const BoarderDuesPage: React.FC = () => {
             <button
               onClick={() => setActiveTab('charges')}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${activeTab === 'charges'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'text-slate-400 hover:text-white'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                : 'text-slate-400 hover:text-white'
                 }`}
             >
               <FileText className="w-4 h-4" />
@@ -759,8 +759,8 @@ export const BoarderDuesPage: React.FC = () => {
             <button
               onClick={() => setActiveTab('receipts')}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${activeTab === 'receipts'
-                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
-                  : 'text-slate-400 hover:text-white'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+                : 'text-slate-400 hover:text-white'
                 }`}
             >
               <ReceiptIcon className="w-4 h-4" />
@@ -989,8 +989,8 @@ export const BoarderDuesPage: React.FC = () => {
                         <td className="py-3.5 px-3 text-center whitespace-nowrap">
                           <span
                             className={`px-2 py-0.5 rounded text-[10px] font-bold ${rec.is_void
-                                ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
-                                : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                              ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
+                              : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                               }`}
                           >
                             {rec.is_void ? 'বাতিল' : 'বৈধ রিসিপ্ট'}

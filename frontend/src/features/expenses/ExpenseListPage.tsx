@@ -51,7 +51,7 @@ export const ExpenseListPage: React.FC = () => {
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(() => {
     try {
-      return sessionStorage.getItem('bachelor_expense_modal_open') === 'true'
+      return localStorage.getItem('bachelor_expense_modal_open_v2') === 'true'
     } catch {
       return false
     }
@@ -63,15 +63,15 @@ export const ExpenseListPage: React.FC = () => {
 
   const handleOpenAddModal = () => {
     try {
-      sessionStorage.setItem('bachelor_expense_modal_open', 'true')
+      localStorage.setItem('bachelor_expense_modal_open_v2', 'true')
     } catch {}
     setIsAddModalOpen(true)
   }
 
   const handleCloseAddModal = () => {
     try {
-      sessionStorage.removeItem('bachelor_expense_modal_open')
-      sessionStorage.removeItem('bachelor_expense_modal_draft')
+      localStorage.removeItem('bachelor_expense_modal_open_v2')
+      localStorage.removeItem('bachelor_expense_modal_draft_v2')
     } catch {}
     setIsAddModalOpen(false)
   }

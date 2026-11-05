@@ -28,12 +28,12 @@ import { useAuthStore } from '@/app/store/useAuthStore'
 import type { ExpenseScope } from '@/types/database'
 import { compressVoucherImage } from '@/utils/imageCompression'
 
-const DRAFT_KEY = 'bachelor_expense_modal_draft'
-const MODAL_OPEN_KEY = 'bachelor_expense_modal_open'
+const DRAFT_KEY = 'bachelor_expense_modal_draft_v2'
+const MODAL_OPEN_KEY = 'bachelor_expense_modal_open_v2'
 
 function getSavedDraft() {
   try {
-    const raw = sessionStorage.getItem(DRAFT_KEY)
+    const raw = localStorage.getItem(DRAFT_KEY)
     if (raw) return JSON.parse(raw)
   } catch {}
   return null
@@ -126,7 +126,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       description,
     }
     try {
-      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
     } catch {}
   }, [
     isOpen,
@@ -143,13 +143,102 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
   const clearDraft = () => {
     try {
-      sessionStorage.removeItem(DRAFT_KEY)
-      sessionStorage.removeItem(MODAL_OPEN_KEY)
+      localStorage.removeItem(DRAFT_KEY)
+      localStorage.removeItem(MODAL_OPEN_KEY)
     } catch {}
   }
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
+
+  // In-App Live Camera Viewfinder State
+  const [isLiveCameraOpen, setIsLiveCameraOpen] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+
+  const stopCameraStream = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+    }
+  }
+
+  const handleStartCamera = async () => {
+    setErrorMsg(null)
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      cameraInputRef.current?.click()
+      return
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+        audio: false,
+      })
+
+      streamRef.current = stream
+      setIsLiveCameraOpen(true)
+    } catch (err: any) {
+      console.warn('getUserMedia failed, falling back to camera input:', err)
+      stopCameraStream()
+      cameraInputRef.current?.click()
+    }
+  }
+
+  // Bind stream to video element when live camera opens
+  useEffect(() => {
+    if (isLiveCameraOpen && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current
+      videoRef.current.play().catch((err) => {
+        console.warn('Video playback error:', err)
+      })
+    }
+  }, [isLiveCameraOpen])
+
+  useEffect(() => {
+    return () => {
+      stopCameraStream()
+    }
+  }, [])
+
+  const handleCapturePhoto = () => {
+    if (!videoRef.current) return
+    const video = videoRef.current
+
+    const canvas = document.createElement('canvas')
+    canvas.width = video.videoWidth || 1280
+    canvas.height = video.videoHeight || 720
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return
+        const file = new File([blob], `voucher_${Date.now()}.jpg`, {
+          type: 'image/jpeg',
+          lastModified: Date.now(),
+        })
+
+        processSelectedFile(file)
+        stopCameraStream()
+        setIsLiveCameraOpen(false)
+      },
+      'image/jpeg',
+      0.85
+    )
+  }
+
+  const handleCloseLiveCamera = () => {
+    stopCameraStream()
+    setIsLiveCameraOpen(false)
+  }
 
   const { profile } = useAuthStore()
   const isAdmin = profile?.role === 'SUPER_ADMIN' || profile?.role === 'ADMIN'
@@ -732,26 +821,33 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <label
-                    htmlFor="expense-voucher-file"
-                    className="cursor-pointer p-3 rounded-xl border border-dashed border-slate-700 bg-slate-900/90 hover:bg-slate-800 hover:border-indigo-400 flex items-center justify-center gap-2 text-slate-200 hover:text-indigo-300 transition-all text-xs font-semibold select-none shadow-sm active:scale-[0.98]"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      try {
+                        localStorage.setItem(MODAL_OPEN_KEY, 'true')
+                      } catch {}
+                      fileInputRef.current?.click()
+                    }}
+                    className="p-3 rounded-xl border border-dashed border-slate-700 bg-slate-900/90 hover:bg-slate-800 hover:border-indigo-400 flex items-center justify-center gap-2 text-slate-200 hover:text-indigo-300 transition-all text-xs font-semibold select-none shadow-sm active:scale-[0.98]"
                   >
                     <Upload className="w-4 h-4 text-indigo-400" />
                     <span>ছবি বা PDF ফাইল সিলেক্ট করুন</span>
-                  </label>
+                  </button>
 
-                  <label
-                    htmlFor="expense-voucher-camera"
+                  <button
+                    type="button"
                     onClick={() => {
                       try {
-                        sessionStorage.setItem(MODAL_OPEN_KEY, 'true')
+                        localStorage.setItem(MODAL_OPEN_KEY, 'true')
                       } catch {}
+                      handleStartCamera()
                     }}
-                    className="cursor-pointer p-3 rounded-xl border border-dashed border-emerald-600/40 bg-emerald-950/20 hover:bg-emerald-950/30 hover:border-emerald-400 flex items-center justify-center gap-2 text-emerald-300 transition-all text-xs font-semibold select-none shadow-sm active:scale-[0.98]"
+                    className="p-3 rounded-xl border border-dashed border-emerald-600/40 bg-emerald-950/20 hover:bg-emerald-950/30 hover:border-emerald-400 flex items-center justify-center gap-2 text-emerald-300 transition-all text-xs font-semibold select-none shadow-sm active:scale-[0.98]"
                   >
                     <Camera className="w-4 h-4 text-emerald-400" />
                     <span>ক্যামেরা দিয়ে ছবি তুলুন</span>
-                  </label>
+                  </button>
                 </div>
               </div>
             )}
@@ -800,6 +896,81 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           setCategoryId(newCat.id)
         }}
       />
+
+      {/* In-App Live Camera Viewfinder Overlay */}
+      {isLiveCameraOpen && (
+        <div className="fixed inset-0 z-[70] bg-black/95 backdrop-blur-md flex flex-col items-center justify-between p-4 animate-fade-in">
+          {/* Top Bar */}
+          <div className="w-full max-w-md flex items-center justify-between text-white py-2 px-1">
+            <div className="flex items-center gap-2">
+              <Camera className="w-5 h-5 text-emerald-400" />
+              <span className="text-sm font-bold tracking-wide">ভাউচার লাইভ ক্যামেরা</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleCloseLiveCamera}
+              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Viewfinder with Guide Overlay */}
+          <div className="relative w-full max-w-md flex-1 my-2 rounded-2xl overflow-hidden bg-slate-950 flex items-center justify-center border border-slate-800 shadow-2xl">
+            <video
+              ref={videoRef}
+              playsInline
+              muted
+              autoPlay
+              className="w-full h-full object-cover"
+            />
+            {/* Visual Alignment Guide */}
+            <div className="absolute inset-4 sm:inset-6 border-2 border-dashed border-emerald-400/70 rounded-xl pointer-events-none flex flex-col items-center justify-between p-3">
+              <span className="text-[11px] font-semibold bg-black/70 px-3 py-1 rounded-full text-emerald-300 shadow">
+                ক্যাশ মেমো বা ভাউচারটি ফ্রেমের ভেতর রাখুন
+              </span>
+              <span className="text-[10px] text-white/80 bg-black/60 px-2 py-0.5 rounded">
+                আলোর দিকে ধরুন এবং হাত স্থির রাখুন
+              </span>
+            </div>
+          </div>
+
+          {/* Bottom Controls */}
+          <div className="w-full max-w-md py-4 flex items-center justify-around">
+            <button
+              type="button"
+              onClick={handleCloseLiveCamera}
+              className="px-4 py-2 text-xs font-semibold text-slate-300 bg-slate-800/90 rounded-xl hover:bg-slate-700"
+            >
+              বাতিল
+            </button>
+
+            {/* Shutter Button */}
+            <button
+              type="button"
+              onClick={handleCapturePhoto}
+              className="w-16 h-16 rounded-full border-4 border-white bg-emerald-500 hover:bg-emerald-400 shadow-xl shadow-emerald-500/50 flex items-center justify-center active:scale-95 transition-transform"
+              title="ছবি তুলুন"
+            >
+              <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center">
+                <Camera className="w-6 h-6 text-emerald-600" />
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                stopCameraStream()
+                setIsLiveCameraOpen(false)
+                fileInputRef.current?.click()
+              }}
+              className="px-4 py-2 text-xs font-semibold text-indigo-300 bg-indigo-950/80 border border-indigo-500/40 rounded-xl hover:bg-indigo-900/60"
+            >
+              গ্যালারি
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
