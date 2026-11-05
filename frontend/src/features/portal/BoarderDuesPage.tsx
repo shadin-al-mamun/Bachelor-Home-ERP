@@ -11,6 +11,9 @@ import {
   RefreshCw,
   TrendingDown,
   Info,
+  Calendar,
+  ChevronDown,
+  Layers,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import { useBrandingStore } from '@/app/store/useBrandingStore'
@@ -67,6 +70,44 @@ const MOCK_PORTAL_CHARGES: BoarderCharge[] = [
     updated_at: '2026-10-01T00:00:00Z',
   },
 ]
+
+// Helper to format YYYY-MM into Bengali (e.g. '2026-10' -> 'অক্টোবর ২০২৬')
+const MONTHS_BN: Record<string, string> = {
+  '01': 'জানুয়ারি',
+  '02': 'ফেব্রুয়ারি',
+  '03': 'মার্চ',
+  '04': 'এপ্রিল',
+  '05': 'মে',
+  '06': 'জুন',
+  '07': 'জুলাই',
+  '08': 'আগস্ট',
+  '09': 'সেপ্টেম্বর',
+  '10': 'অক্টোবর',
+  '11': 'নভেম্বর',
+  '12': 'ডিসেম্বর',
+}
+
+const BN_DIGITS: Record<string, string> = {
+  '0': '০',
+  '1': '১',
+  '2': '২',
+  '3': '৩',
+  '4': '৪',
+  '5': '৫',
+  '6': '৬',
+  '7': '৭',
+  '8': '৮',
+  '9': '৯',
+}
+
+function formatYearMonthBn(ym: string): string {
+  if (!ym || ym === 'ALL') return 'সব মাস (সামগ্রিক)'
+  const parts = ym.slice(0, 7).split('-')
+  if (parts.length < 2) return ym
+  const year = parts[0].replace(/\d/g, (d) => BN_DIGITS[d] || d)
+  const month = MONTHS_BN[parts[1]] || parts[1]
+  return `${month} ${year}`
+}
 
 export const BoarderDuesPage: React.FC = () => {
   const { profile } = useAuthStore()
@@ -214,19 +255,100 @@ export const BoarderDuesPage: React.FC = () => {
     healCharges().catch((err) => console.warn('Auto-heal charges error:', err))
   }, [charges])
 
-  const totalBilled = sanitizedCharges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
-  const totalPaidCharges = sanitizedCharges.reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
-  const totalReceipts = allReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
-  const totalPaid = Math.max(totalReceipts, totalPaidCharges)
-  const outstandingDue = Math.max(0, totalBilled - totalPaid)
-  const advanceBalance = Math.max(0, totalPaid - totalBilled)
+  // Month Selection State
+  const [selectedMonth, setSelectedMonth] = useState<string>('')
 
-  const mealCharges = sanitizedCharges
+  const currentYm = React.useMemo(() => new Date().toISOString().slice(0, 7), [])
+
+  // Dynamic list of unique available billing/receipt months
+  const availableMonths = React.useMemo(() => {
+    const monthSet = new Set<string>()
+    monthSet.add(currentYm)
+
+    sanitizedCharges.forEach((c) => {
+      if (c.billing_month) {
+        monthSet.add(c.billing_month.slice(0, 7))
+      }
+    })
+
+    allReceipts.forEach((r) => {
+      const d = r.receipt_date || r.created_at
+      if (d) {
+        monthSet.add(d.slice(0, 7))
+      }
+    })
+
+    return Array.from(monthSet).sort().reverse()
+  }, [sanitizedCharges, allReceipts, currentYm])
+
+  // Automatically select the most relevant month (newest with actual charges)
+  useEffect(() => {
+    if (sanitizedCharges.length > 0) {
+      const hasChargeInSelected =
+        selectedMonth &&
+        (selectedMonth === 'ALL' || sanitizedCharges.some((c) => c.billing_month?.startsWith(selectedMonth)))
+
+      if (!hasChargeInSelected) {
+        const newestMonthWithCharge = availableMonths.find((m) =>
+          sanitizedCharges.some((c) => c.billing_month?.startsWith(m))
+        )
+        if (newestMonthWithCharge) {
+          setSelectedMonth(newestMonthWithCharge)
+        }
+      }
+    } else if (!selectedMonth && availableMonths.length > 0) {
+      setSelectedMonth(availableMonths[0])
+    }
+  }, [availableMonths, sanitizedCharges, selectedMonth])
+
+  const isAllMonths = selectedMonth === 'ALL'
+  const selectedMonthLabel = isAllMonths ? 'সব মাস' : formatYearMonthBn(selectedMonth)
+
+  // Lifetime metrics (authoritative net ledger across all time)
+  const totalLifetimeBilled = sanitizedCharges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+  const totalLifetimePaidCharges = sanitizedCharges.reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
+  const totalLifetimeReceipts = allReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
+  const totalLifetimePaid = Math.max(totalLifetimeReceipts, totalLifetimePaidCharges)
+  const outstandingDue = Math.max(0, totalLifetimeBilled - totalLifetimePaid)
+  const advanceBalance = Math.max(0, totalLifetimePaid - totalLifetimeBilled)
+
+  // Filtered charges for selected month or all time
+  const monthChargesList = React.useMemo(() => {
+    if (isAllMonths) return sanitizedCharges
+    return sanitizedCharges.filter((c) => c.billing_month?.startsWith(selectedMonth))
+  }, [sanitizedCharges, isAllMonths, selectedMonth])
+
+  // Filtered receipts for selected month or all time
+  const monthReceiptsList = React.useMemo(() => {
+    if (isAllMonths) return allReceipts
+    return allReceipts.filter((r) => {
+      const d = r.receipt_date || r.created_at || ''
+      return d.startsWith(selectedMonth)
+    })
+  }, [allReceipts, isAllMonths, selectedMonth])
+
+  // Display metrics according to active month view
+  const displayBilled = isAllMonths
+    ? totalLifetimeBilled
+    : monthChargesList.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+
+  const monthPaidCharges = monthChargesList.reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
+  const monthReceiptsTotal = monthReceiptsList.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
+  const displayPaid = isAllMonths
+    ? totalLifetimePaid
+    : Math.max(monthPaidCharges, monthReceiptsTotal)
+
+  const displayMealCharges = monthChargesList
     .filter((c) => c.charge_type === 'MEAL')
     .reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
 
-  // Filter charges by status tab
-  const filteredCharges = sanitizedCharges.filter((c) => {
+  const monthDue = monthChargesList.reduce((sum, c) => {
+    const isPaid = c.status === 'PAID' || Number(c.due_amount || 0) <= 0
+    return sum + (isPaid ? 0 : Number(c.due_amount ?? (Number(c.amount) - Number(c.paid_amount))) || 0)
+  }, 0)
+
+  // Filter charges for the table by selected month & status tab
+  const filteredCharges = monthChargesList.filter((c) => {
     const isPaid = c.status === 'PAID' || Number(c.due_amount || 0) <= 0
     if (chargeFilter === 'UNPAID') return !isPaid
     if (chargeFilter === 'PAID') return isPaid
@@ -347,25 +469,99 @@ export const BoarderDuesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. Top Metric Cards */}
+      {/* 2. Month Selector & Filter Controls */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
+            <Calendar className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-white">বিলিং ও পেমেন্ট বিবরণী</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                {isAllMonths ? 'সব মাস' : selectedMonthLabel}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              {isAllMonths
+                ? 'শুরু থেকে আজ পর্যন্ত সকল বিল ও পেমেন্টের সামগ্রিক লাইফটাইম হিসাব প্রদর্শিত হচ্ছে।'
+                : `${selectedMonthLabel} মাসের ধার্যকৃত চার্জ ও পরিশোধের বিস্তারিত হিসাব প্রদর্শিত হচ্ছে।`}
+            </p>
+          </div>
+        </div>
+
+        {/* Dropdown & Quick Actions */}
+        <div className="flex items-center gap-2 flex-wrap self-end md:self-auto">
+          <div className="relative">
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="appearance-none bg-slate-950 text-white font-semibold text-xs rounded-xl pl-3.5 pr-9 py-2.5 border border-slate-700 hover:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all cursor-pointer shadow-sm"
+            >
+              {availableMonths.map((ym) => (
+                <option key={ym} value={ym} className="bg-slate-950 text-white">
+                  {formatYearMonthBn(ym)} {ym === currentYm ? ' (চলতি মাস)' : ''}
+                </option>
+              ))}
+              <option value="ALL" className="bg-slate-950 text-indigo-300 font-bold">
+                সব মাস (শুরু থেকে আজ পর্যন্ত সামগ্রিক)
+              </option>
+            </select>
+            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+
+          {selectedMonth !== 'ALL' && (
+            <button
+              type="button"
+              onClick={() => setSelectedMonth('ALL')}
+              className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 transition-all flex items-center gap-1.5"
+              title="শুরু থেকে আজ পর্যন্ত সব হিসাব একসাথে দেখুন"
+            >
+              <Layers className="w-3.5 h-3.5 text-indigo-400" />
+              <span>সব মাস</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 3. Top Metric Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Outstanding Due */}
-        <div className={`p-4 sm:p-5 rounded-2xl bg-slate-900/60 border ${outstandingDue > 0 ? 'border-amber-500/30' : 'border-emerald-500/30'} relative overflow-hidden space-y-2`}>
+        {/* Card 1: Outstanding Due or Advance Balance */}
+        <div
+          className={`p-4 sm:p-5 rounded-2xl bg-slate-900/60 border ${
+            outstandingDue > 0 ? 'border-amber-500/30' : 'border-emerald-500/30'
+          } relative overflow-hidden space-y-2`}
+        >
           <div className="flex items-center justify-between text-slate-400 text-xs">
             <span>সর্বমোট বকেয়া</span>
-            <AlertCircle className={`w-4 h-4 ${outstandingDue > 0 ? 'text-amber-400' : 'text-emerald-400'}`} />
+            <AlertCircle
+              className={`w-4 h-4 ${outstandingDue > 0 ? 'text-amber-400' : 'text-emerald-400'}`}
+            />
           </div>
-          <div className={`text-xl sm:text-2xl font-black font-mono ${outstandingDue > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+          <div
+            className={`text-xl sm:text-2xl font-black font-mono ${
+              outstandingDue > 0 ? 'text-amber-400' : 'text-emerald-400'
+            }`}
+          >
             {formatCurrencyBn(outstandingDue)}
           </div>
-          <div className="text-[11px] text-slate-400 flex items-center justify-between gap-2">
+          <div className="text-[11px] text-slate-400 flex items-center justify-between gap-2 flex-wrap">
             {outstandingDue > 0 ? (
               <span className="text-amber-400 font-medium">পরিশোধ বাকি রয়েছে</span>
             ) : (
               <span className="text-emerald-400 font-medium">কোনো বকেয়া নেই</span>
             )}
             {advanceBalance > 0 && (
-              <span className="text-cyan-400 font-semibold font-mono">অগ্রিম: {formatCurrencyBn(advanceBalance)}</span>
+              <span className="text-cyan-400 font-semibold font-mono">
+                অগ্রিম: {formatCurrencyBn(advanceBalance)}
+              </span>
+            )}
+            {!isAllMonths && (
+              <span className="text-[10px] text-slate-400">
+                {monthDue > 0
+                  ? `(${selectedMonthLabel}-এ বাকি: ${formatCurrencyBn(monthDue)})`
+                  : `(${selectedMonthLabel} পরিশোধিত)`}
+              </span>
             )}
           </div>
         </div>
@@ -373,42 +569,79 @@ export const BoarderDuesPage: React.FC = () => {
         {/* Card 2: Total Paid */}
         <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2">
           <div className="flex items-center justify-between text-slate-400 text-xs">
-            <span>মোট পরিশোধিত</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span className="flex items-center gap-1.5 min-w-0">
+              <span className="truncate">মোট পরিশোধিত</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
+                {isAllMonths ? 'সর্বমোট' : selectedMonthLabel}
+              </span>
+            </span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           </div>
           <div className="text-xl sm:text-2xl font-black font-mono text-emerald-400">
-            {formatCurrencyBn(totalPaid)}
+            {formatCurrencyBn(displayPaid)}
           </div>
-          <div className="text-[11px] text-slate-400">
-            {allReceipts.length} টি মানি রিসিপ্ট
+          <div className="text-[11px] text-slate-400 flex items-center justify-between gap-1 flex-wrap">
+            <span>
+              {isAllMonths
+                ? `${allReceipts.length} টি মানি রিসিপ্ট (সর্বমোট)`
+                : monthReceiptsList.length > 0
+                ? `${monthReceiptsList.length} টি মানি রিসিপ্ট`
+                : displayPaid > 0
+                ? 'বিল বাবদ পরিশোধ সমন্বয়'
+                : 'এই মাসে কোনো জমা নেই'}
+            </span>
+            {!isAllMonths && totalLifetimePaid > displayPaid && (
+              <span className="text-[10px] text-slate-500 font-mono">
+                মোট: {formatCurrencyBn(totalLifetimePaid)}
+              </span>
+            )}
           </div>
         </div>
 
         {/* Card 3: Total Billed */}
         <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2">
           <div className="flex items-center justify-between text-slate-400 text-xs">
-            <span>মোট ধার্যকৃত চার্জ</span>
-            <TrendingDown className="w-4 h-4 text-indigo-400" />
+            <span className="flex items-center gap-1.5 min-w-0">
+              <span className="truncate">মোট ধার্যকৃত চার্জ</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 shrink-0">
+                {isAllMonths ? 'সর্বমোট' : selectedMonthLabel}
+              </span>
+            </span>
+            <TrendingDown className="w-4 h-4 text-indigo-400 shrink-0" />
           </div>
           <div className="text-xl sm:text-2xl font-black font-mono text-white">
-            {formatCurrencyBn(totalBilled)}
+            {formatCurrencyBn(displayBilled)}
           </div>
-          <div className="text-[11px] text-slate-400">
-            সিট ও খাবারের সর্বমোট চার্জ
+          <div className="text-[11px] text-slate-400 flex items-center justify-between gap-1 flex-wrap">
+            <span>
+              {isAllMonths
+                ? 'সিট ও খাবারের সর্বমোট চার্জ'
+                : `${monthChargesList.length} টি খাতের ধার্যকৃত বিল`}
+            </span>
+            {!isAllMonths && totalLifetimeBilled > displayBilled && (
+              <span className="text-[10px] text-slate-500 font-mono">
+                মোট: {formatCurrencyBn(totalLifetimeBilled)}
+              </span>
+            )}
           </div>
         </div>
 
         {/* Card 4: Meal Bill Portion */}
         <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2">
           <div className="flex items-center justify-between text-slate-400 text-xs">
-            <span>খাবার বিল চার্জ</span>
-            <ReceiptIcon className="w-4 h-4 text-sky-400" />
+            <span className="flex items-center gap-1.5 min-w-0">
+              <span className="truncate">খাবার বিল চার্জ</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-sky-500/10 text-sky-400 border border-sky-500/20 shrink-0">
+                {isAllMonths ? 'সর্বমোট' : selectedMonthLabel}
+              </span>
+            </span>
+            <ReceiptIcon className="w-4 h-4 text-sky-400 shrink-0" />
           </div>
           <div className="text-xl sm:text-2xl font-black font-mono text-sky-400">
-            {formatCurrencyBn(mealCharges)}
+            {formatCurrencyBn(displayMealCharges)}
           </div>
           <div className="text-[11px] text-slate-400">
-            মাসিক মিলের মোট হিসাব
+            {isAllMonths ? 'শুরু থেকে খাবারের মোট হিসাব' : `${selectedMonthLabel} মাসের মিল খরচ`}
           </div>
         </div>
       </div>
@@ -515,10 +748,26 @@ export const BoarderDuesPage: React.FC = () => {
                       <td colSpan={9} className="py-12 text-center text-slate-500">
                         <div className="max-w-xs mx-auto space-y-2">
                           <Info className="w-8 h-8 text-slate-600 mx-auto" />
-                          <p className="font-medium text-slate-400">কোনো ধার্যকৃত বিল পাওয়া যায়নি।</p>
-                          <p className="text-[11px] text-slate-500">
-                            হোস্টেল অফিস থেকে নতুন মাসের সিট বা মিল বিল জেনারেট করা হলে এখানে দেখতে পাবেন।
+                          <p className="font-medium text-slate-400">
+                            {isAllMonths
+                              ? 'কোনো ধার্যকৃত বিল পাওয়া যায়নি।'
+                              : `${selectedMonthLabel}-এ কোনো ধার্যকৃত বিল পাওয়া যায়নি।`}
                           </p>
+                          <p className="text-[11px] text-slate-500">
+                            {isAllMonths
+                              ? 'হোস্টেল অফিস থেকে নতুন মাসের সিট বা মিল বিল জেনারেট করা হলে এখানে দেখতে পাবেন।'
+                              : 'সব মাসের পূর্ববর্তী রেকর্ড দেখতে "সব মাস" বেছে নিন।'}
+                          </p>
+                          {!isAllMonths && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedMonth('ALL')}
+                              className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600 hover:text-white border border-indigo-500/30 text-xs font-semibold transition-all cursor-pointer"
+                            >
+                              <Layers className="w-3.5 h-3.5" />
+                              <span>সব মাসের বিল দেখুন</span>
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -579,6 +828,20 @@ export const BoarderDuesPage: React.FC = () => {
         {/* Tab 2: Receipts Table */}
         {activeTab === 'receipts' && (
           <div className="space-y-4">
+            {!isAllMonths && monthReceiptsList.length === 0 && allReceipts.length > 0 && (
+              <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs text-slate-400 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <span>
+                  {selectedMonthLabel}-এ সরাসরি কোনো আলাদা রিসিপ্ট পাওয়া যায়নি; আপনার সর্বমোট পরিশোধিত রিসিপ্টগুলো নিচে প্রদর্শিত হচ্ছে:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedMonth('ALL')}
+                  className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold underline self-start sm:self-auto shrink-0 cursor-pointer"
+                >
+                  সব মাস নির্বাচন করুন
+                </button>
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="bg-slate-950 text-slate-400 text-[11px] uppercase tracking-wider font-semibold border-b border-slate-800">
@@ -615,7 +878,7 @@ export const BoarderDuesPage: React.FC = () => {
                       </td>
                     </tr>
                   ) : (
-                    allReceipts.map((rec) => (
+                    ((isAllMonths || monthReceiptsList.length > 0) ? monthReceiptsList : allReceipts).map((rec) => (
                       <tr key={rec.id} className="hover:bg-slate-800/30 transition-colors">
                         <td className="py-3.5 px-3 font-mono font-bold text-emerald-400 whitespace-nowrap">
                           {rec.receipt_number}
