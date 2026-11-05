@@ -224,10 +224,11 @@ export const BoarderDuesPage: React.FC = () => {
     })
   }, [charges])
 
-  // Asynchronously self-heal legacy charges in Supabase database so live DB is accurate
+  // Asynchronously self-heal legacy charges and duplicate allocations in Supabase database so live DB is accurate
   useEffect(() => {
-    if (!isSupabaseConfigured || charges.length === 0) return
-    const healCharges = async () => {
+    if (!isSupabaseConfigured) return
+    const healDatabase = async () => {
+      // 1. Self-heal legacy charges
       for (const c of charges) {
         const amt = Number(c.amount) || 0
         if (c.charge_type === 'UTILITY' && (amt === 844 || amt === 1100)) {
@@ -251,9 +252,22 @@ export const BoarderDuesPage: React.FC = () => {
             .eq('id', c.id)
         }
       }
+
+      // 2. Clean up excess duplicate allocations where sum(allocations) > receipt.amount
+      for (const r of allReceipts) {
+        if (!r.allocations || r.allocations.length <= 1) continue
+        const receiptAmt = Number(r.amount) || 0
+        let runningAllocated = 0
+        for (const a of r.allocations) {
+          runningAllocated += Number(a.amount) || 0
+          if (runningAllocated > receiptAmt && a.id) {
+            await supabase.from('receipt_allocations').delete().eq('id', a.id)
+          }
+        }
+      }
     }
-    healCharges().catch((err) => console.warn('Auto-heal charges error:', err))
-  }, [charges])
+    healDatabase().catch((err) => console.warn('Auto-heal DB error:', err))
+  }, [charges, allReceipts])
 
   // FIFO Cash Ledger Reconciliation:
   // Reconciles charges against official verified receipts in chronological order (FIFO).

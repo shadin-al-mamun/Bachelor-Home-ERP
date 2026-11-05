@@ -31,6 +31,70 @@ export const ReceiptPrintView: React.FC<ReceiptPrintViewProps> = ({
     MFS: 'মোবাইল ব্যাংকিং (bKash/Nagad)',
   }
 
+  // Normalize items/allocations so that total line items strictly match the cash receipt amount
+  const displayRows = React.useMemo(() => {
+    const rawList: {
+      head_name: string
+      description?: string
+      billing_month?: string
+      amount: number
+    }[] = []
+
+    if (receipt.items && receipt.items.length > 0) {
+      receipt.items.forEach((it) => {
+        rawList.push({
+          head_name: it.head_name,
+          description: it.description || '',
+          billing_month: it.billing_month || '—',
+          amount: Number(it.amount) || 0,
+        })
+      })
+    } else if (receipt.allocations && receipt.allocations.length > 0) {
+      receipt.allocations.forEach((al) => {
+        rawList.push({
+          head_name: al.description || (al.charge_type ? `${al.charge_type} ফি` : 'পেমেন্ট সমন্বয় ফি'),
+          description: '',
+          billing_month: al.billing_month || '—',
+          amount: Number(al.amount) || 0,
+        })
+      })
+    }
+
+    if (rawList.length === 0) {
+      return [{
+        head_name: 'সাধারণ পেমেন্ট কালেকশন',
+        description: '',
+        billing_month: '—',
+        amount: Number(receipt.amount) || 0,
+      }]
+    }
+
+    // Deduplicate / cap items so total displayed line items never exceed the actual receipt amount
+    let remainingReceiptCash = Number(receipt.amount) || 0
+    const finalRows: typeof rawList = []
+
+    for (const item of rawList) {
+      if (remainingReceiptCash <= 0) break
+      const rowAmt = Math.min(item.amount, remainingReceiptCash)
+      if (rowAmt > 0) {
+        finalRows.push({
+          ...item,
+          amount: rowAmt,
+        })
+        remainingReceiptCash = Math.max(0, remainingReceiptCash - rowAmt)
+      }
+    }
+
+    return finalRows.length > 0
+      ? finalRows
+      : [{
+          head_name: rawList[0].head_name,
+          description: rawList[0].description,
+          billing_month: rawList[0].billing_month || '—',
+          amount: Number(receipt.amount) || 0,
+        }]
+  }, [receipt])
+
   return (
     <Modal
       isOpen={isOpen}
@@ -127,53 +191,25 @@ export const ReceiptPrintView: React.FC<ReceiptPrintViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {receipt.items && receipt.items.length > 0 ? (
-                  receipt.items.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50/50">
-                      <td className="py-2.5 px-3 text-slate-500 font-mono">{idx + 1}</td>
-                      <td className="py-2.5 px-3 font-medium text-slate-800">
-                        {item.head_name}
-                        {item.description ? (
-                          <span className="text-[11px] text-slate-500 font-normal block">
-                            {item.description}
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="py-2.5 px-3 font-mono text-slate-600">
-                        {item.billing_month || '—'}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-bold text-slate-900">
-                        {formatCurrencyBn(item.amount)}
-                      </td>
-                    </tr>
-                  ))
-                ) : receipt.allocations && receipt.allocations.length > 0 ? (
-                  receipt.allocations.map((alloc, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50/50">
-                      <td className="py-2.5 px-3 text-slate-500 font-mono">{idx + 1}</td>
-                      <td className="py-2.5 px-3 font-medium text-slate-800">
-                        {alloc.description || (alloc.charge_type ? `${alloc.charge_type} ফি` : 'পেমেন্ট সমন্বয় ফি')}
-                      </td>
-                      <td className="py-2.5 px-3 font-mono text-slate-600">
-                        {alloc.billing_month || '—'}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-bold text-slate-900">
-                        {formatCurrencyBn(alloc.amount)}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td className="py-2.5 px-3 text-slate-500 font-mono">1</td>
+                {displayRows.map((row, idx) => (
+                  <tr key={idx} className="hover:bg-slate-50/50">
+                    <td className="py-2.5 px-3 text-slate-500 font-mono">{idx + 1}</td>
                     <td className="py-2.5 px-3 font-medium text-slate-800">
-                      সাধারণ পেমেন্ট কালেকশন
+                      {row.head_name}
+                      {row.description ? (
+                        <span className="text-[11px] text-slate-500 font-normal block">
+                          {row.description}
+                        </span>
+                      ) : null}
                     </td>
-                    <td className="py-2.5 px-3 font-mono text-slate-600">—</td>
+                    <td className="py-2.5 px-3 font-mono text-slate-600">
+                      {row.billing_month || '—'}
+                    </td>
                     <td className="py-2.5 px-3 text-right font-bold text-slate-900">
-                      {formatCurrencyBn(receipt.amount)}
+                      {formatCurrencyBn(row.amount)}
                     </td>
                   </tr>
-                )}
+                ))}
               </tbody>
               <tfoot>
                 <tr className="bg-slate-50 font-black text-slate-900 border-t border-slate-200">

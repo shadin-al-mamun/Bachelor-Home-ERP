@@ -22,6 +22,7 @@ export interface ExtendedReceipt extends Receipt {
   collector_name: string
   account_name: string
   allocations?: {
+    id?: string
     charge_id: string
     charge_type: string
     billing_month: string
@@ -211,7 +212,16 @@ export function useReceipts(filters?: ReceiptFilters) {
           *,
           boarder:boarders (full_name, boarder_code, phone_number),
           destination_account:financial_accounts (account_name),
+          receipt_items (
+            id,
+            head_code,
+            head_name,
+            amount,
+            billing_month,
+            description
+          ),
           receipt_allocations (
+            id,
             allocated_amount,
             charge:boarder_charges (id, charge_type, billing_month, description)
           )
@@ -230,7 +240,40 @@ export function useReceipts(filters?: ReceiptFilters) {
         query = query.eq('payment_method', filters.paymentMethod)
       }
 
-      const { data, error } = await query
+      let { data, error } = await query
+      if (error && error.message?.includes('receipt_items')) {
+        // Fallback gracefully without receipt_items if relation not present
+        let fallbackQuery = supabase
+          .from('receipts')
+          .select(`
+            *,
+            boarder:boarders (full_name, boarder_code, phone_number),
+            destination_account:financial_accounts (account_name),
+            receipt_allocations (
+              id,
+              allocated_amount,
+              charge:boarder_charges (id, charge_type, billing_month, description)
+            )
+          `)
+          .order('created_at', { ascending: false })
+
+        if (filters?.status === 'VALID') {
+          fallbackQuery = fallbackQuery.eq('is_void', false)
+        } else if (filters?.status === 'VOID') {
+          fallbackQuery = fallbackQuery.eq('is_void', true)
+        }
+        if (filters?.boarderId) {
+          fallbackQuery = fallbackQuery.eq('boarder_id', filters.boarderId)
+        }
+        if (filters?.paymentMethod && filters.paymentMethod !== 'ALL') {
+          fallbackQuery = fallbackQuery.eq('payment_method', filters.paymentMethod)
+        }
+
+        const res = await fallbackQuery
+        data = res.data
+        error = res.error
+      }
+
       if (error) {
         console.warn('Failed to fetch receipts from Supabase:', error.message)
         return []
@@ -242,6 +285,31 @@ export function useReceipts(filters?: ReceiptFilters) {
         let acc = r.destination_account
         if (Array.isArray(acc)) acc = acc.length > 0 ? acc[0] : null
 
+        const items = (r.receipt_items || []).map((it: any) => ({
+          id: it.id,
+          receipt_id: it.receipt_id || r.id,
+          head_code: it.head_code,
+          head_name: it.head_name || it.head_code,
+          amount: Number(it.amount) || 0,
+          billing_month: it.billing_month,
+          description: it.description,
+          charge_id: it.charge_id || null,
+          created_at: it.created_at || r.created_at || '',
+        }))
+
+        const allocations = (r.receipt_allocations || []).map((ra: any) => {
+          let ch = ra.charge
+          if (Array.isArray(ch)) ch = ch.length > 0 ? ch[0] : null
+          return {
+            id: ra.id,
+            charge_id: ch?.id,
+            charge_type: ch?.charge_type,
+            billing_month: ch?.billing_month,
+            description: ch?.description,
+            amount: Number(ra.allocated_amount) || 0,
+          }
+        })
+
         return {
           ...r,
           boarder_name: b?.full_name || r.boarder_name || 'অজানা বর্ডার',
@@ -249,17 +317,8 @@ export function useReceipts(filters?: ReceiptFilters) {
           boarder_phone: b?.phone_number || r.boarder_phone || '',
           collector_name: 'ম্যানেজার',
           account_name: acc?.account_name || 'ক্যাশ একাউন্ট',
-          allocations: (r.receipt_allocations || []).map((ra: any) => {
-            let ch = ra.charge
-            if (Array.isArray(ch)) ch = ch.length > 0 ? ch[0] : null
-            return {
-              charge_id: ch?.id,
-              charge_type: ch?.charge_type,
-              billing_month: ch?.billing_month,
-              description: ch?.description,
-              amount: ra.allocated_amount,
-            }
-          }),
+          items,
+          allocations,
         }
       }) as ExtendedReceipt[]
 
