@@ -104,69 +104,92 @@ export const MonthlyCollectionSheetView: React.FC<MonthlyCollectionSheetViewProp
         <table className="monthly-sheet-table w-full min-w-[1450px] border-collapse border-[1.5px] border-black text-[11px] leading-normal text-black text-center select-text">
           <thead>
             {/* Header Tier 1 */}
-            <tr className="bg-slate-100 font-bold border-b border-black h-11">
-              <th rowSpan={2} className="border border-black px-1.5 py-2 w-[3.5%] min-w-[42px] text-center align-middle font-bold">
+            <tr className="font-bold h-12">
+              <th rowSpan={2} className="bg-slate-100 border border-black px-1.5 py-2 w-[3.5%] min-w-[42px] text-center align-middle font-bold">
                 ক্রঃনং
               </th>
-              <th rowSpan={2} className="border border-black px-2 py-2 w-[15%] min-w-[170px] text-center align-middle font-bold">
-                সদস্যের নাম ও মোবাইল নম্বর
+              <th rowSpan={2} className="bg-slate-100 border border-black px-2 py-2 w-[15%] min-w-[170px] text-center align-middle font-bold">
+                <div className="flex flex-col items-center justify-center leading-tight">
+                  <span>সদস্যের নাম ও</span>
+                  <span>মোবাইল নম্বর</span>
+                </div>
               </th>
-              <th rowSpan={2} className="border border-black px-1.5 py-2 w-[6.5%] min-w-[80px] text-center align-middle font-bold">
-                এডভান্স ভাড়া
+              <th rowSpan={2} className="bg-slate-100 border border-black px-1.5 py-2 w-[6.5%] min-w-[80px] text-center align-middle font-bold">
+                <div className="flex flex-col items-center justify-center leading-tight">
+                  <span>এডভান্স</span>
+                  <span>ভাড়া</span>
+                </div>
               </th>
-              <th rowSpan={2} className="border border-black px-1.5 py-2 w-[7%] min-w-[85px] text-center align-middle font-bold">
-                পূর্ববর্তী মাসের পাওনা
+              <th rowSpan={2} className="bg-slate-100 border border-black px-1.5 py-2 w-[7%] min-w-[85px] text-center align-middle font-bold">
+                <div className="flex flex-col items-center justify-center leading-tight">
+                  <span>পূর্ববর্তী</span>
+                  <span>মাসের</span>
+                  <span>পাওনা</span>
+                </div>
               </th>
-              <th rowSpan={2} className="border border-black px-1.5 py-2 w-[7.5%] min-w-[95px] text-center align-middle font-bold">
-                পূর্ববর্তী মাসের পাওনা আদায়
+              <th rowSpan={2} className="bg-slate-100 border border-black px-1.5 py-2 w-[7.5%] min-w-[95px] text-center align-middle font-bold">
+                <div className="flex flex-col items-center justify-center leading-tight">
+                  <span>পূর্ববর্তী</span>
+                  <span>মাসের</span>
+                  <span>পাওনা আদায়</span>
+                </div>
               </th>
-              <th colSpan={4} className="border border-black px-1.5 py-1.5 text-center font-bold">
+              <th colSpan={4} className="bg-slate-100 border border-black px-1.5 py-1.5 text-center font-bold">
                 চলতি মাসে আদায়
               </th>
-              <th rowSpan={2} className="border border-black px-1.5 py-2 w-[7.5%] min-w-[95px] text-center align-middle font-bold">
-                চলতি মাসের মোট আদায়
+              <th rowSpan={2} className="bg-slate-100 border border-black px-1.5 py-2 w-[7.5%] min-w-[95px] text-center align-middle font-bold">
+                <div className="flex flex-col items-center justify-center leading-tight">
+                  <span>চলতি মাসের</span>
+                  <span>মোট আদায়</span>
+                </div>
               </th>
-              <th colSpan={3} className="border border-black px-1.5 py-1.5 text-center font-bold">
+              <th colSpan={3} className="bg-slate-100 border border-black px-1.5 py-1.5 text-center font-bold">
                 চলতি মাসের খরচাদি
               </th>
-              <th rowSpan={2} className="border border-black px-1.5 py-2 w-[7.5%] min-w-[95px] text-center align-middle font-bold">
-                চলতি মাসের মোট খরচ
+              <th rowSpan={2} className="bg-slate-100 border border-black px-1.5 py-2 w-[7.5%] min-w-[95px] text-center align-middle font-bold">
+                <div className="flex flex-col items-center justify-center leading-tight">
+                  <span>চলতি</span>
+                  <span>মাসের মোট</span>
+                  <span>খরচ</span>
+                </div>
               </th>
-              <th rowSpan={2} className="border border-black px-1.5 py-2 w-[7.5%] min-w-[95px] text-center align-middle font-bold">
-                দেনা/পাওনা
+              <th rowSpan={2} className="bg-slate-100 border border-black px-1.5 py-2 w-[7.5%] min-w-[95px] text-center align-middle font-bold">
+                <div className="flex flex-col items-center justify-center leading-tight">
+                  <span>দেনা / পাওনা</span>
+                </div>
               </th>
             </tr>
 
             {/* Header Tier 2 (Sub-headers) */}
-            <tr className="bg-slate-100 font-bold border-b border-black h-9">
+            <tr className="font-bold h-9">
               {/* Under চলতি মাসে আদায় */}
-              <th className="border border-black px-1 py-1.5 w-[5.5%] min-w-[70px] text-center align-middle font-bold">১ম</th>
-              <th className="border border-black px-1 py-1.5 w-[5.5%] min-w-[70px] text-center align-middle font-bold">২য়</th>
-              <th className="border border-black px-1 py-1.5 w-[5.5%] min-w-[70px] text-center align-middle font-bold">৩য়</th>
-              <th className="border border-black px-1 py-1.5 w-[5.5%] min-w-[70px] text-center align-middle font-bold">৪র্থ</th>
+              <th className="bg-slate-100 border border-black px-1 py-1.5 w-[5.5%] min-w-[70px] text-center align-middle font-bold">১ম</th>
+              <th className="bg-slate-100 border border-black px-1 py-1.5 w-[5.5%] min-w-[70px] text-center align-middle font-bold">২য়</th>
+              <th className="bg-slate-100 border border-black px-1 py-1.5 w-[5.5%] min-w-[70px] text-center align-middle font-bold">৩য়</th>
+              <th className="bg-slate-100 border border-black px-1 py-1.5 w-[5.5%] min-w-[70px] text-center align-middle font-bold">৪র্থ</th>
               {/* Under চলতি মাসের খরচাদি */}
-              <th className="border border-black px-1 py-1.5 w-[6%] min-w-[75px] text-center align-middle font-bold">সিট ভাড়া</th>
-              <th className="border border-black px-1 py-1.5 w-[5.5%] min-w-[70px] text-center align-middle font-bold">সার্ভিস চার্জ</th>
-              <th className="border border-black px-1 py-1.5 w-[5.5%] min-w-[70px] text-center align-middle font-bold">মিল খরচ</th>
+              <th className="bg-slate-100 border border-black px-1 py-1.5 w-[6%] min-w-[75px] text-center align-middle font-bold">সিট ভাড়া</th>
+              <th className="bg-slate-100 border border-black px-1 py-1.5 w-[5.5%] min-w-[70px] text-center align-middle font-bold">সার্ভিস চার্জ</th>
+              <th className="bg-slate-100 border border-black px-1 py-1.5 w-[5.5%] min-w-[70px] text-center align-middle font-bold">মিল খরচ</th>
             </tr>
 
             {/* Header Tier 3 (Column numbers row: ১ to ১৫) */}
-            <tr className="bg-slate-200/80 font-bold border-b-[1.5px] border-black text-[10px] text-slate-800 h-7">
-              <th className="border border-black py-1 text-center align-middle">১</th>
-              <th className="border border-black py-1 text-center align-middle">২</th>
-              <th className="border border-black py-1 text-center align-middle">৩</th>
-              <th className="border border-black py-1 text-center align-middle">৪</th>
-              <th className="border border-black py-1 text-center align-middle">৫</th>
-              <th className="border border-black py-1 text-center align-middle">৬</th>
-              <th className="border border-black py-1 text-center align-middle">৭</th>
-              <th className="border border-black py-1 text-center align-middle">৮</th>
-              <th className="border border-black py-1 text-center align-middle">৯</th>
-              <th className="border border-black py-1 text-center align-middle">১০</th>
-              <th className="border border-black py-1 text-center align-middle">১১</th>
-              <th className="border border-black py-1 text-center align-middle">১২</th>
-              <th className="border border-black py-1 text-center align-middle">১৩</th>
-              <th className="border border-black py-1 text-center align-middle">১৪</th>
-              <th className="border border-black py-1 text-center align-middle">১৫</th>
+            <tr className="font-bold text-[10px] text-slate-800 h-7">
+              <th className="bg-slate-200 border border-black py-1 text-center align-middle">১</th>
+              <th className="bg-slate-200 border border-black py-1 text-center align-middle">২</th>
+              <th className="bg-slate-200 border border-black py-1 text-center align-middle">৩</th>
+              <th className="bg-slate-200 border border-black py-1 text-center align-middle">৪</th>
+              <th className="bg-slate-200 border border-black py-1 text-center align-middle">৫</th>
+              <th className="bg-slate-200 border border-black py-1 text-center align-middle">৬</th>
+              <th className="bg-slate-200 border border-black py-1 text-center align-middle">৭</th>
+              <th className="bg-slate-200 border border-black py-1 text-center align-middle">৮</th>
+              <th className="bg-slate-200 border border-black py-1 text-center align-middle">৯</th>
+              <th className="bg-slate-200 border border-black py-1 text-center align-middle">১০</th>
+              <th className="bg-slate-200 border border-black py-1 text-center align-middle">১১</th>
+              <th className="bg-slate-200 border border-black py-1 text-center align-middle">১২</th>
+              <th className="bg-slate-200 border border-black py-1 text-center align-middle">১৩</th>
+              <th className="bg-slate-200 border border-black py-1 text-center align-middle">১৪</th>
+              <th className="bg-slate-200 border border-black py-1 text-center align-middle">১৫</th>
             </tr>
           </thead>
 

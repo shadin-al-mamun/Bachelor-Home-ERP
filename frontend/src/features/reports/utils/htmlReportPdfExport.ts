@@ -54,6 +54,16 @@ export async function exportHtmlToPDF(
         t.style.maxWidth = 'none'
         t.style.borderCollapse = 'collapse'
       })
+
+      // Ensure tr elements have no borders or backgrounds that could slice rowspan cells in html2canvas
+      const trs = clonedElement.querySelectorAll('tr')
+      trs.forEach((tr) => {
+        const el = tr as HTMLElement
+        el.style.border = 'none'
+        el.style.borderBottom = 'none'
+        el.style.borderTop = 'none'
+        el.style.backgroundColor = 'transparent'
+      })
     },
   })
 
