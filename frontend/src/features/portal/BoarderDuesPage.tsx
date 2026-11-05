@@ -255,6 +255,87 @@ export const BoarderDuesPage: React.FC = () => {
     healCharges().catch((err) => console.warn('Auto-heal charges error:', err))
   }, [charges])
 
+  // FIFO Cash Ledger Reconciliation:
+  // Reconciles charges against official verified receipts in chronological order (FIFO).
+  // Prevents dues from dropping to 0 when partial payment (e.g. 1,000 Tk) was collected.
+  const reconciledCharges = React.useMemo(() => {
+    if (sanitizedCharges.length === 0) return []
+
+    const totalReceipts = allReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
+    // If no receipts are recorded at all, fallback to charges as-is
+    if (allReceipts.length === 0 && totalReceipts === 0) {
+      return sanitizedCharges
+    }
+
+    // Chronologically sort charges (oldest billing month & due date first for FIFO allocation)
+    const sorted = [...sanitizedCharges].sort((a, b) => {
+      const mA = a.billing_month || ''
+      const mB = b.billing_month || ''
+      if (mA !== mB) return mA.localeCompare(mB)
+      const dA = a.due_date || a.created_at || ''
+      const dB = b.due_date || b.created_at || ''
+      return dA.localeCompare(dB)
+    })
+
+    let remainingCash = totalReceipts
+    const chargeAllocations = new Map<string, { paid: number; due: number; status: ChargeStatus }>()
+
+    for (const c of sorted) {
+      const amt = Number(c.amount) || 0
+      const allocated = Math.min(remainingCash, amt)
+      remainingCash = Math.max(0, remainingCash - allocated)
+      const due = Math.max(0, amt - allocated)
+      const status: ChargeStatus = due <= 0 ? 'PAID' : allocated > 0 ? 'PARTIALLY_PAID' : 'UNPAID'
+
+      chargeAllocations.set(c.id, {
+        paid: allocated,
+        due,
+        status,
+      })
+    }
+
+    // Preserve original list ordering while applying authoritative reconciled paid/due/status
+    return sanitizedCharges.map((c) => {
+      const alloc = chargeAllocations.get(c.id)
+      if (!alloc) return c
+      return {
+        ...c,
+        paid_amount: alloc.paid,
+        due_amount: alloc.due,
+        status: alloc.status,
+      }
+    })
+  }, [sanitizedCharges, allReceipts])
+
+  // Asynchronously synchronize any misaligned charge statuses in Supabase (e.g. charge marked PAID when due remains)
+  useEffect(() => {
+    if (!isSupabaseConfigured || reconciledCharges.length === 0) return
+    const syncMisalignedCharges = async () => {
+      for (const rc of reconciledCharges) {
+        const rawCharge = charges.find((c) => c.id === rc.id)
+        if (!rawCharge) continue
+
+        const rawDue = Number(rawCharge.due_amount)
+        const rawStatus = rawCharge.status
+        const rawPaid = Number(rawCharge.paid_amount) || 0
+
+        // If live DB charge differs from authoritative cash FIFO allocation
+        if (rawStatus !== rc.status || Math.abs(rawPaid - rc.paid_amount) > 0.01 || Math.abs(rawDue - (rc.due_amount ?? 0)) > 0.01) {
+          await supabase
+            .from('boarder_charges')
+            .update({
+              paid_amount: rc.paid_amount,
+              due_amount: rc.due_amount,
+              status: rc.status,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', rc.id)
+        }
+      }
+    }
+    syncMisalignedCharges().catch((err) => console.warn('Charge sync error:', err))
+  }, [charges, reconciledCharges])
+
   // Month Selection State
   const [selectedMonth, setSelectedMonth] = useState<string>('')
 
@@ -265,7 +346,7 @@ export const BoarderDuesPage: React.FC = () => {
     const monthSet = new Set<string>()
     monthSet.add(currentYm)
 
-    sanitizedCharges.forEach((c) => {
+    reconciledCharges.forEach((c) => {
       if (c.billing_month) {
         monthSet.add(c.billing_month.slice(0, 7))
       }
@@ -279,18 +360,18 @@ export const BoarderDuesPage: React.FC = () => {
     })
 
     return Array.from(monthSet).sort().reverse()
-  }, [sanitizedCharges, allReceipts, currentYm])
+  }, [reconciledCharges, allReceipts, currentYm])
 
   // Automatically select the most relevant month (newest with actual charges)
   useEffect(() => {
-    if (sanitizedCharges.length > 0) {
+    if (reconciledCharges.length > 0) {
       const hasChargeInSelected =
         selectedMonth &&
-        (selectedMonth === 'ALL' || sanitizedCharges.some((c) => c.billing_month?.startsWith(selectedMonth)))
+        (selectedMonth === 'ALL' || reconciledCharges.some((c) => c.billing_month?.startsWith(selectedMonth)))
 
       if (!hasChargeInSelected) {
         const newestMonthWithCharge = availableMonths.find((m) =>
-          sanitizedCharges.some((c) => c.billing_month?.startsWith(m))
+          reconciledCharges.some((c) => c.billing_month?.startsWith(m))
         )
         if (newestMonthWithCharge) {
           setSelectedMonth(newestMonthWithCharge)
@@ -299,24 +380,25 @@ export const BoarderDuesPage: React.FC = () => {
     } else if (!selectedMonth && availableMonths.length > 0) {
       setSelectedMonth(availableMonths[0])
     }
-  }, [availableMonths, sanitizedCharges, selectedMonth])
+  }, [availableMonths, reconciledCharges, selectedMonth])
 
   const isAllMonths = selectedMonth === 'ALL'
   const selectedMonthLabel = isAllMonths ? 'সব মাস' : formatYearMonthBn(selectedMonth)
 
-  // Lifetime metrics (authoritative net ledger across all time)
-  const totalLifetimeBilled = sanitizedCharges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
-  const totalLifetimePaidCharges = sanitizedCharges.reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
+  // Lifetime metrics (authoritative cash ledger across all time)
+  const totalLifetimeBilled = reconciledCharges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+  const totalLifetimePaidCharges = reconciledCharges.reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
   const totalLifetimeReceipts = allReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
-  const totalLifetimePaid = Math.max(totalLifetimeReceipts, totalLifetimePaidCharges)
+  // Authoritative total paid: if receipts exist, total lifetime receipts is authoritative; fallback to paid_amount
+  const totalLifetimePaid = allReceipts.length > 0 ? totalLifetimeReceipts : totalLifetimePaidCharges
   const outstandingDue = Math.max(0, totalLifetimeBilled - totalLifetimePaid)
   const advanceBalance = Math.max(0, totalLifetimePaid - totalLifetimeBilled)
 
   // Filtered charges for selected month or all time
   const monthChargesList = React.useMemo(() => {
-    if (isAllMonths) return sanitizedCharges
-    return sanitizedCharges.filter((c) => c.billing_month?.startsWith(selectedMonth))
-  }, [sanitizedCharges, isAllMonths, selectedMonth])
+    if (isAllMonths) return reconciledCharges
+    return reconciledCharges.filter((c) => c.billing_month?.startsWith(selectedMonth))
+  }, [reconciledCharges, isAllMonths, selectedMonth])
 
   // Filtered receipts for selected month or all time
   const monthReceiptsList = React.useMemo(() => {
@@ -336,15 +418,16 @@ export const BoarderDuesPage: React.FC = () => {
   const monthReceiptsTotal = monthReceiptsList.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
   const displayPaid = isAllMonths
     ? totalLifetimePaid
-    : Math.max(monthPaidCharges, monthReceiptsTotal)
+    : monthPaidCharges > 0
+    ? monthPaidCharges
+    : monthReceiptsTotal
 
   const displayMealCharges = monthChargesList
     .filter((c) => c.charge_type === 'MEAL')
     .reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
 
   const monthDue = monthChargesList.reduce((sum, c) => {
-    const isPaid = c.status === 'PAID' || Number(c.due_amount || 0) <= 0
-    return sum + (isPaid ? 0 : Number(c.due_amount ?? (Number(c.amount) - Number(c.paid_amount))) || 0)
+    return sum + (Number(c.due_amount) || 0)
   }, 0)
 
   // Filter charges for the table by selected month & status tab
@@ -773,9 +856,10 @@ export const BoarderDuesPage: React.FC = () => {
                     </tr>
                   ) : (
                     filteredCharges.map((c) => {
-                      const isPaid = c.status === 'PAID' || Number(c.due_amount || 0) <= 0
-                      const due = isPaid ? 0 : Number(c.due_amount ?? (Number(c.amount) - Number(c.paid_amount))) || 0
-                      const paidAmt = isPaid ? (Number(c.paid_amount) > 0 ? Number(c.paid_amount) : Number(c.amount)) : Number(c.paid_amount || 0)
+                      const amt = Number(c.amount) || 0
+                      const paidAmt = Number(c.paid_amount) || 0
+                      const due = c.due_amount !== undefined ? Number(c.due_amount) : Math.max(0, amt - paidAmt)
+                      const isPaid = c.status === 'PAID' || due <= 0
                       return (
                         <tr key={c.id} className="hover:bg-slate-800/30 transition-colors">
                           <td className="py-3.5 px-3 font-semibold text-white whitespace-nowrap">
