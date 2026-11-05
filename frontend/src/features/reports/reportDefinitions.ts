@@ -156,6 +156,16 @@ export const ALL_REPORTS: ReportDefinition[] = [
     descriptionBn: 'ফ্ল্যাটভিত্তিক ১৫টি কলামে বর্ডারদের এডভান্স, পূর্ববর্তী বকেয়া, কিস্তিতে চলতি আদায়, সিট ভাড়া, সার্ভিস চার্জ, মিল খরচ ও দেনা-পাওনা রেজিস্টার।',
     icon: 'FileSpreadsheet',
   },
+  // 14. Monthly Meal Count Sheet
+  {
+    id: 'MONTHLY_MEAL_COUNT_SHEET',
+    category: 'BOARDER_OPERATIONS',
+    titleEn: 'Monthly Meal Count Sheet',
+    titleBn: 'মাসিক মিল গণনা শীট',
+    descriptionEn: 'Daily 1 to 31 day tracking sheet: Breakfast (0.5), Lunch (1), and Dinner (1) meal counts per flat member with totals.',
+    descriptionBn: 'ফ্ল্যাটভিত্তিক বর্ডারদের ১ থেকে ৩১ তারিখ পর্যন্ত সকাল (০.৫), দুপুর (১) ও রাত (১) মিল চালু/বন্ধের পূর্ণাঙ্গ গণনা ও সর্বমোট রেজিস্টার।',
+    icon: 'UtensilsCrossed',
+  },
   // 14. Boarder Ledger & Dues Aging Report
   {
     id: 'BOARDER_DUES_AGING',

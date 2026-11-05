@@ -448,5 +448,17 @@ export function getReportExportData(reportId: ReportId, data: any): ReportExport
     return { columns, rows: [] }
   }
 
+  // 18. MONTHLY_MEAL_COUNT_SHEET
+  if (reportId === 'MONTHLY_MEAL_COUNT_SHEET') {
+    const columns: ExportColumn[] = [
+      { header: 'ক্রম', key: 'sl', width: 8, align: 'center' },
+      { header: 'নাম', key: 'boarderName', width: 25 },
+      { header: 'তারিখ', key: 'mealType', width: 12, align: 'center' },
+      { header: 'মোট', key: 'total', width: 12, align: 'center' },
+      { header: 'সর্বমোট', key: 'grandTotal', width: 14, align: 'center' },
+    ]
+    return { columns, rows: [] }
+  }
+
   return { columns: [], rows: [] }
 }

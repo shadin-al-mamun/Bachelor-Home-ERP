@@ -18,6 +18,7 @@ import {
   Award,
   Search,
   FileSpreadsheet,
+  UtensilsCrossed,
 } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import type { ReportId, ReportFilterState } from './types'
@@ -27,6 +28,7 @@ import { ReportFilterBar } from './components/ReportFilterBar'
 import { ReportTableRenderer } from './components/ReportTableRenderer'
 import { ExportActions } from './components/ExportActions'
 import { MonthlyCollectionSheetModal } from './components/MonthlyCollectionSheetModal'
+import { MonthlyMealSheetModal } from './components/MonthlyMealSheetModal'
 import { getReportExportData } from './reportExportData'
 import {
   type ExportMetadata,
@@ -54,6 +56,7 @@ const REPORT_ICONS: Record<string, React.ElementType> = {
   Trash2,
   Award,
   FileSpreadsheet,
+  UtensilsCrossed,
 }
 
 export const ReportsHubPage: React.FC = () => {
@@ -74,6 +77,12 @@ export const ReportsHubPage: React.FC = () => {
       searchParams.get('openSheetModal') === 'true'
     )
   })
+  const [isMonthlyMealSheetModalOpen, setIsMonthlyMealSheetModalOpen] = useState<boolean>(() => {
+    return (
+      searchParams.get('openMonthlyMealSheet') === 'true' ||
+      searchParams.get('openMealSheet') === 'true'
+    )
+  })
 
   // Synchronize modal state if url param changes
   useEffect(() => {
@@ -83,6 +92,12 @@ export const ReportsHubPage: React.FC = () => {
     ) {
       setIsMonthlySheetModalOpen(true)
     }
+    if (
+      searchParams.get('openMonthlyMealSheet') === 'true' ||
+      searchParams.get('openMealSheet') === 'true'
+    ) {
+      setIsMonthlyMealSheetModalOpen(true)
+    }
   }, [searchParams])
 
   const handleCloseMonthlySheetModal = () => {
@@ -91,6 +106,16 @@ export const ReportsHubPage: React.FC = () => {
       const next = new URLSearchParams(searchParams)
       next.delete('openMonthlySheet')
       next.delete('openSheetModal')
+      setSearchParams(next, { replace: true })
+    }
+  }
+
+  const handleCloseMonthlyMealSheetModal = () => {
+    setIsMonthlyMealSheetModalOpen(false)
+    if (searchParams.has('openMonthlyMealSheet') || searchParams.has('openMealSheet')) {
+      const next = new URLSearchParams(searchParams)
+      next.delete('openMonthlyMealSheet')
+      next.delete('openMealSheet')
       setSearchParams(next, { replace: true })
     }
   }
@@ -350,6 +375,12 @@ export const ReportsHubPage: React.FC = () => {
       <MonthlyCollectionSheetModal
         isOpen={isMonthlySheetModalOpen}
         onClose={handleCloseMonthlySheetModal}
+      />
+
+      {/* Monthly Meal Count Sheet Modal Popup */}
+      <MonthlyMealSheetModal
+        isOpen={isMonthlyMealSheetModalOpen}
+        onClose={handleCloseMonthlyMealSheetModal}
       />
     </div>
   )
