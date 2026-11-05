@@ -19,8 +19,6 @@ export const ReceiptPrintView: React.FC<ReceiptPrintViewProps> = ({
 }) => {
   const { orgName, tagline, address, phone, logoUrl, receiptFooterNote } = useBrandingStore()
 
-  if (!receipt) return null
-
   const handlePrint = () => {
     window.print()
   }
@@ -33,6 +31,8 @@ export const ReceiptPrintView: React.FC<ReceiptPrintViewProps> = ({
 
   // Normalize items/allocations so that total line items strictly match the cash receipt amount
   const displayRows = React.useMemo(() => {
+    if (!receipt) return []
+
     const rawList: {
       head_name: string
       description?: string
@@ -94,6 +94,8 @@ export const ReceiptPrintView: React.FC<ReceiptPrintViewProps> = ({
           amount: Number(receipt.amount) || 0,
         }]
   }, [receipt])
+
+  if (!receipt) return null
 
   return (
     <Modal
