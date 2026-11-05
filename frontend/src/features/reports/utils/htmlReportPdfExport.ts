@@ -4,6 +4,7 @@ import jsPDF from 'jspdf'
 export interface HtmlExportPdfOptions {
   orientation?: 'landscape' | 'portrait'
   marginMm?: number
+  minWidth?: number
 }
 
 /**
@@ -17,23 +18,25 @@ export async function exportHtmlToPDF(
   options?: HtmlExportPdfOptions
 ): Promise<void> {
   const orientation = options?.orientation || 'landscape'
-  const marginMm = options?.marginMm ?? 6
+  const marginMm = options?.marginMm ?? 5
+  const baseMinWidth = options?.minWidth ?? 1600
 
-  // Ensure target element scroll width is respected so columns are never cut off
-  const targetScrollWidth = Math.max(element.scrollWidth, element.clientWidth, 1200)
+  // Ensure target element scroll width is respected so columns are never cramped
+  const targetScrollWidth = Math.max(element.scrollWidth, element.clientWidth, baseMinWidth)
 
-  // Capture rendered element at 2x scale for crystal-clear readability
+  // Capture rendered element at 2.2x scale for ultra-sharp typography & crisp border lines
   const canvas = await html2canvas(element, {
-    scale: 2,
+    scale: 2.2,
     useCORS: true,
     backgroundColor: '#ffffff',
     logging: false,
-    windowWidth: targetScrollWidth + 100,
+    windowWidth: targetScrollWidth + 80,
     onclone: (_clonedDoc, clonedElement) => {
       // Force cloned tree to render at full width without any horizontal scrollbars or clipping
       clonedElement.style.overflow = 'visible'
       clonedElement.style.width = `${targetScrollWidth}px`
       clonedElement.style.maxWidth = 'none'
+      clonedElement.style.padding = '12px 16px'
 
       const scrollWrappers = clonedElement.querySelectorAll('.overflow-x-auto')
       scrollWrappers.forEach((w) => {
@@ -43,11 +46,13 @@ export async function exportHtmlToPDF(
         el.style.maxWidth = 'none'
       })
 
-      // Ensure all tables inside the cloned element render cleanly
+      // Ensure all tables inside the cloned element render cleanly with full width
       const tables = clonedElement.querySelectorAll('table')
       tables.forEach((t) => {
         t.style.width = '100%'
+        t.style.minWidth = `${targetScrollWidth - 40}px`
         t.style.maxWidth = 'none'
+        t.style.borderCollapse = 'collapse'
       })
     },
   })
@@ -69,12 +74,18 @@ export async function exportHtmlToPDF(
 
   // If single page fits within printable boundary
   if (totalImgHeight <= printHeight) {
+    // Vertically balance the table if it's shorter than the page
+    const verticalTop =
+      totalImgHeight < printHeight - 30
+        ? Math.max(marginMm, Math.min(14, (pdfPageHeight - totalImgHeight) / 3))
+        : marginMm
+
     const imgData = canvas.toDataURL('image/png')
     pdf.addImage(
       imgData,
       'PNG',
       marginMm,
-      marginMm,
+      verticalTop,
       printWidth,
       totalImgHeight,
       undefined,
