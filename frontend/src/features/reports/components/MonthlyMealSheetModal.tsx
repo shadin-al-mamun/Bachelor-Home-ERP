@@ -18,6 +18,7 @@ import {
 import { getAvailableMonthOptions } from '../api/useMonthlyCollectionSheetData'
 import { MonthlyMealSheetView } from './MonthlyMealSheetView'
 import { exportMonthlyMealSheetToExcel } from '../utils/monthlyMealSheetExcelExport'
+import { exportHtmlToPDF } from '../utils/htmlReportPdfExport'
 
 interface MonthlyMealSheetModalProps {
   isOpen: boolean
@@ -79,10 +80,17 @@ export const MonthlyMealSheetModal: React.FC<MonthlyMealSheetModalProps> = ({
   if (!isOpen) return null
 
   // Trigger print / PDF download
-  const handleDownloadPDF = () => {
-    setTimeout(() => {
+  const handleDownloadPDF = async () => {
+    const el = document.querySelector('.monthly-meal-container') as HTMLElement
+    if (el) {
+      await exportHtmlToPDF(
+        el,
+        `মাসিক_মিল_গণনা_শীট_${selectedFlatCode}_${selectedMonthBn.replace('/', '_')}`,
+        { orientation: 'landscape' }
+      )
+    } else {
       window.print()
-    }, 150)
+    }
   }
 
   // Trigger Excel export
@@ -291,3 +299,4 @@ export const MonthlyMealSheetModal: React.FC<MonthlyMealSheetModalProps> = ({
   )
 }
 export default MonthlyMealSheetModal
+

@@ -1,32 +1,30 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import {
-  Download,
-  FileDown,
   Building,
   Calendar,
   ChevronLeft,
   ChevronRight,
-  Maximize2,
 } from 'lucide-react'
 import {
   useMonthlyMealSheetData,
 } from '../api/useMonthlyMealSheetData'
 import { getAvailableMonthOptions } from '../api/useMonthlyCollectionSheetData'
 import { MonthlyMealSheetView } from './MonthlyMealSheetView'
-import { MonthlyMealSheetModal } from './MonthlyMealSheetModal'
 import { exportMonthlyMealSheetToExcel } from '../utils/monthlyMealSheetExcelExport'
-import type { ReportFilterState } from '../types'
+import { exportHtmlToPDF } from '../utils/htmlReportPdfExport'
+import type { ReportFilterState, CustomReportExportHandlers } from '../types'
 
 interface MonthlyMealSheetReportPanelProps {
   initialFlatId?: string
   initialMonth?: string
   filters?: ReportFilterState
   onFiltersChange?: (updated: ReportFilterState) => void
+  customExportRef?: React.RefObject<CustomReportExportHandlers | null> | React.MutableRefObject<CustomReportExportHandlers | null>
 }
 
 export const MonthlyMealSheetReportPanel: React.FC<
   MonthlyMealSheetReportPanelProps
-> = ({ initialFlatId, initialMonth, filters, onFiltersChange }) => {
+> = ({ initialFlatId, initialMonth, filters, onFiltersChange, customExportRef }) => {
   const today = new Date()
   const currentYM = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
 
@@ -38,8 +36,6 @@ export const MonthlyMealSheetReportPanel: React.FC<
 
   const [selectedMonth, setSelectedMonth] = useState<string>(derivedMonth)
   const [selectedFlatId, setSelectedFlatId] = useState<string>(derivedFlatId)
-  const [isExportingExcel, setIsExportingExcel] = useState<boolean>(false)
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false)
 
   // Sync when parent filter changes (e.g. from ReportFilterBar)
   useEffect(() => {
@@ -114,31 +110,53 @@ export const MonthlyMealSheetReportPanel: React.FC<
     handleMonthChange(nextYM)
   }
 
-  const handlePrint = () => {
+  const handlePrint = useCallback(() => {
     window.print()
-  }
+  }, [])
 
-  const handleExcel = async () => {
-    try {
-      setIsExportingExcel(true)
-      await exportMonthlyMealSheetToExcel(
-        rows,
-        dayTotals,
-        flatTotals,
-        selectedMonthBn,
-        selectedFlatCode,
-        selectedFlatName,
-        daysInMonth
+  const handleExcel = useCallback(async () => {
+    await exportMonthlyMealSheetToExcel(
+      rows,
+      dayTotals,
+      flatTotals,
+      selectedMonthBn,
+      selectedFlatCode,
+      selectedFlatName,
+      daysInMonth
+    )
+  }, [rows, dayTotals, flatTotals, selectedMonthBn, selectedFlatCode, selectedFlatName, daysInMonth])
+
+  const handlePDF = useCallback(async () => {
+    const el = document.querySelector('.monthly-meal-container') as HTMLElement
+    if (el) {
+      await exportHtmlToPDF(
+        el,
+        `মাসিক_মিল_গণনা_শীট_${selectedFlatCode}_${selectedMonthBn.replace('/', '_')}`,
+        { orientation: 'landscape' }
       )
-    } finally {
-      setIsExportingExcel(false)
     }
-  }
+  }, [selectedFlatCode, selectedMonthBn])
+
+  // Register export handlers so the top header buttons trigger them directly
+  useEffect(() => {
+    if (customExportRef) {
+      customExportRef.current = {
+        exportExcel: handleExcel,
+        exportPDF: handlePDF,
+        print: handlePrint,
+      }
+    }
+    return () => {
+      if (customExportRef) {
+        customExportRef.current = null
+      }
+    }
+  }, [customExportRef, handleExcel, handlePDF, handlePrint])
 
   return (
     <div className="space-y-4">
-      {/* Control Toolbar */}
-      <div className="no-print glass-panel p-3 sm:p-4 rounded-2xl border border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-slate-900/80 shadow-lg">
+      {/* Control Toolbar — Flat & Month Selectors only */}
+      <div className="no-print glass-panel p-3 sm:p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/80 shadow-lg">
         <div className="flex flex-wrap items-center gap-3">
           {/* Flat Dropdown */}
           <div className="flex items-center gap-1.5">
@@ -200,38 +218,9 @@ export const MonthlyMealSheetReportPanel: React.FC<
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Download PDF / Print Button */}
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white shadow-md shadow-amber-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>ডাউনলোড করুন (PDF)</span>
-          </button>
-
-          {/* Excel Export Button */}
-          <button
-            type="button"
-            onClick={handleExcel}
-            disabled={isExportingExcel || rows.length === 0}
-            className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
-          >
-            <FileDown className="w-3.5 h-3.5 text-emerald-400" />
-            <span>{isExportingExcel ? 'প্রস্তুত হচ্ছে...' : 'Excel (.xlsx)'}</span>
-          </button>
-
-          {/* Open in Dedicated Popup Modal Button */}
-          <button
-            type="button"
-            onClick={() => setIsModalOpen(true)}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-700/80 transition-colors cursor-pointer"
-            title="পপআপ উইন্ডোতে সম্পূর্ণ বড় করে দেখুন"
-          >
-            <Maximize2 className="w-4 h-4" />
-          </button>
+        {/* Info hint */}
+        <div className="text-[11px] text-slate-400 font-medium">
+          উপরে ডানপাশের বাটনগুলো ব্যবহার করে <span className="text-amber-400 font-semibold">প্রিন্ট</span>, <span className="text-rose-400 font-semibold">PDF</span> বা <span className="text-emerald-400 font-semibold">Excel</span> ডাউনলোড করুন
         </div>
       </div>
 
@@ -245,14 +234,6 @@ export const MonthlyMealSheetReportPanel: React.FC<
         flatCode={selectedFlatCode}
         flatName={selectedFlatName}
         isLoading={isLoading}
-      />
-
-      {/* Dedicated Popup Modal */}
-      <MonthlyMealSheetModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        initialFlatId={selectedFlatId}
-        initialMonth={selectedMonth}
       />
     </div>
   )

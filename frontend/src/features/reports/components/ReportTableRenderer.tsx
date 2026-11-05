@@ -28,6 +28,7 @@ interface ReportTableRendererProps {
   isLoading: boolean
   filters?: import('../types').ReportFilterState
   onFiltersChange?: (updated: import('../types').ReportFilterState) => void
+  customExportRef?: React.RefObject<import('../types').CustomReportExportHandlers | null> | React.MutableRefObject<import('../types').CustomReportExportHandlers | null>
 }
 
 export const ReportTableRenderer: React.FC<ReportTableRendererProps> = ({
@@ -36,6 +37,7 @@ export const ReportTableRenderer: React.FC<ReportTableRendererProps> = ({
   isLoading,
   filters,
   onFiltersChange,
+  customExportRef,
 }) => {
   // Render loading skeleton
   if (isLoading) {
@@ -964,6 +966,7 @@ export const ReportTableRenderer: React.FC<ReportTableRendererProps> = ({
       <MonthlyCollectionSheetReportPanel
         filters={filters}
         onFiltersChange={onFiltersChange}
+        customExportRef={customExportRef}
       />
     )
   }
@@ -974,6 +977,7 @@ export const ReportTableRenderer: React.FC<ReportTableRendererProps> = ({
       <MonthlyMealSheetReportPanel
         filters={filters}
         onFiltersChange={onFiltersChange}
+        customExportRef={customExportRef}
       />
     )
   }

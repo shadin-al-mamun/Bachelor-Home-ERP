@@ -18,6 +18,7 @@ import {
 } from '../api/useMonthlyCollectionSheetData'
 import { MonthlyCollectionSheetView } from './MonthlyCollectionSheetView'
 import { exportMonthlySheetToExcel } from '../utils/monthlySheetExcelExport'
+import { exportHtmlToPDF } from '../utils/htmlReportPdfExport'
 
 interface MonthlyCollectionSheetModalProps {
   isOpen: boolean
@@ -73,11 +74,17 @@ export const MonthlyCollectionSheetModal: React.FC<MonthlyCollectionSheetModalPr
   if (!isOpen) return null
 
   // Trigger print / PDF download
-  const handleDownloadPDF = () => {
-    // Open native browser print which defaults to "Save as PDF" / Landscape
-    setTimeout(() => {
+  const handleDownloadPDF = async () => {
+    const el = document.querySelector('.monthly-sheet-container') as HTMLElement
+    if (el) {
+      await exportHtmlToPDF(
+        el,
+        `মাসিক_বিল_আদায়ের_শীট_${selectedFlatCode}_${selectedMonthBn.replace('/', '_')}`,
+        { orientation: 'landscape' }
+      )
+    } else {
       window.print()
-    }, 150)
+    }
   }
 
   // Trigger Excel export

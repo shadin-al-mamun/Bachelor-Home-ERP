@@ -52,6 +52,12 @@ export interface ReportFilterState {
   accountId: string
 }
 
+export interface CustomReportExportHandlers {
+  exportPDF?: () => Promise<void> | void
+  exportExcel?: () => Promise<void> | void
+  print?: () => void
+}
+
 export interface DailyIncomeExpenseRow {
   date: string
   rentReceipts: number

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import {
   FileText,
   Calendar,
@@ -21,7 +21,7 @@ import {
   UtensilsCrossed,
 } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
-import type { ReportId, ReportFilterState } from './types'
+import type { ReportId, ReportFilterState, CustomReportExportHandlers } from './types'
 import { ALL_REPORTS, REPORT_CATEGORIES } from './reportDefinitions'
 import { useReportsData } from './api/useReportsData'
 import { ReportFilterBar } from './components/ReportFilterBar'
@@ -71,6 +71,7 @@ export const ReportsHubPage: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL')
   const [searchQuery, setSearchQuery] = useState('')
   const [isExporting, setIsExporting] = useState(false)
+  const customExportRef = useRef<CustomReportExportHandlers | null>(null)
   const [isMonthlySheetModalOpen, setIsMonthlySheetModalOpen] = useState<boolean>(() => {
     return (
       searchParams.get('openMonthlySheet') === 'true' ||
@@ -152,10 +153,21 @@ export const ReportsHubPage: React.FC = () => {
     })
   }, [selectedCategory, searchQuery])
 
+  const isSheetReport =
+    activeReportId === 'MONTHLY_COLLECTION_SHEET' ||
+    activeReportId === 'MONTHLY_MEAL_COUNT_SHEET'
+
   // Handle PDF Export
   const handleExportPDF = async () => {
     setIsExporting(true)
     try {
+      // 1. If custom sheet exporter is registered (e.g. Monthly Collection / Meal Sheet), use high-fidelity HTML PDF
+      if (customExportRef.current?.exportPDF) {
+        await customExportRef.current.exportPDF()
+        return
+      }
+
+      // 2. Standard table PDF fallback
       const { columns, rows, summaryRow } = getReportExportData(activeReportId, data)
       if (!columns.length) return
 
@@ -186,6 +198,13 @@ export const ReportsHubPage: React.FC = () => {
   const handleExportExcel = async () => {
     setIsExporting(true)
     try {
+      // 1. If custom sheet exporter is registered, use high-fidelity Excel template
+      if (customExportRef.current?.exportExcel) {
+        await customExportRef.current.exportExcel()
+        return
+      }
+
+      // 2. Standard table Excel fallback
       const { columns, rows, summaryRow } = getReportExportData(activeReportId, data)
       if (!columns.length) return
 
@@ -211,10 +230,19 @@ export const ReportsHubPage: React.FC = () => {
     }
   }
 
+  // Handle Print
+  const handlePrint = () => {
+    if (customExportRef.current?.print) {
+      customExportRef.current.print()
+    } else {
+      triggerBrowserPrint()
+    }
+  }
+
   return (
     <div className="min-h-screen text-slate-100 p-4 md:p-6 lg:p-8 max-w-[1700px] mx-auto">
       {/* 1. Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      <div className="no-print flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
@@ -233,7 +261,7 @@ export const ReportsHubPage: React.FC = () => {
 
         {/* Export Toolbar */}
         <ExportActions
-          onPrint={triggerBrowserPrint}
+          onPrint={handlePrint}
           onExportPDF={handleExportPDF}
           onExportExcel={handleExportExcel}
           isExporting={isExporting}
@@ -328,7 +356,7 @@ export const ReportsHubPage: React.FC = () => {
         {/* Right Content Area: Filter Toolbar + Data Sheet (9 cols) */}
         <div className="lg:col-span-9 space-y-4">
           {/* Active Report Header Card */}
-          <div className="glass-card p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="no-print glass-card p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-950 text-indigo-300 border border-indigo-800/60">
@@ -344,20 +372,32 @@ export const ReportsHubPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Global Filter Bar */}
-          <ReportFilterBar filters={filters} onChange={setFilters} />
+          {/* Global Filter Bar (Hidden for sheet reports which have their own flat/month pickers) */}
+          {!isSheetReport && (
+            <div className="no-print">
+              <ReportFilterBar filters={filters} onChange={setFilters} />
+            </div>
+          )}
 
           {/* Printable Report Sheet */}
-          <div className="report-print-sheet glass-card p-4 md:p-6 rounded-2xl border border-slate-800 shadow-2xl">
-            {/* Print Header Banner (Only visible during print) */}
-            <div className="print-header-banner hidden">
-              <h1 className="text-xl font-bold text-black">BACHELOR HOME ERP — DHAKA, BANGLADESH</h1>
-              <h2 className="text-base font-semibold text-gray-800">{activeReport.titleEn}</h2>
-              <p className="text-xs text-gray-600">
-                Period: {filters.startDate} to {filters.endDate} | Generated:{' '}
-                {new Date().toLocaleString('en-GB', { timeZone: 'Asia/Dhaka' })}
-              </p>
-            </div>
+          <div
+            className={`report-print-sheet ${
+              isSheetReport
+                ? 'p-0 bg-transparent border-none shadow-none print:p-0 print:m-0'
+                : 'glass-card p-4 md:p-6 rounded-2xl border border-slate-800 shadow-2xl print:p-0 print:border-none print:shadow-none print:bg-white'
+            }`}
+          >
+            {/* Print Header Banner (Only visible during print for standard reports) */}
+            {!isSheetReport && (
+              <div className="print-header-banner hidden">
+                <h1 className="text-xl font-bold text-black">BACHELOR HOME ERP — DHAKA, BANGLADESH</h1>
+                <h2 className="text-base font-semibold text-gray-800">{activeReport.titleEn}</h2>
+                <p className="text-xs text-gray-600">
+                  Period: {filters.startDate} to {filters.endDate} | Generated:{' '}
+                  {new Date().toLocaleString('en-GB', { timeZone: 'Asia/Dhaka' })}
+                </p>
+              </div>
+            )}
 
             {/* Render Active Table */}
             <ReportTableRenderer
@@ -366,6 +406,7 @@ export const ReportsHubPage: React.FC = () => {
               isLoading={isLoading}
               filters={filters}
               onFiltersChange={setFilters}
+              customExportRef={customExportRef}
             />
           </div>
         </div>
