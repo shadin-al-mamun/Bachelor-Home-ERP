@@ -433,8 +433,8 @@ export const BoarderDuesPage: React.FC = () => {
   const displayPaid = isAllMonths
     ? totalLifetimePaid
     : monthPaidCharges > 0
-    ? monthPaidCharges
-    : monthReceiptsTotal
+      ? monthPaidCharges
+      : monthReceiptsTotal
 
   const displayMealCharges = monthChargesList
     .filter((c) => c.charge_type === 'MEAL')
@@ -625,9 +625,8 @@ export const BoarderDuesPage: React.FC = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Outstanding Due or Advance Balance */}
         <div
-          className={`p-4 sm:p-5 rounded-2xl bg-slate-900/60 border ${
-            outstandingDue > 0 ? 'border-amber-500/30' : 'border-emerald-500/30'
-          } relative overflow-hidden space-y-2`}
+          className={`p-4 sm:p-5 rounded-2xl bg-slate-900/60 border ${outstandingDue > 0 ? 'border-amber-500/30' : 'border-emerald-500/30'
+            } relative overflow-hidden space-y-2`}
         >
           <div className="flex items-center justify-between text-slate-400 text-xs">
             <span>সর্বমোট বকেয়া</span>
@@ -636,9 +635,8 @@ export const BoarderDuesPage: React.FC = () => {
             />
           </div>
           <div
-            className={`text-xl sm:text-2xl font-black font-mono ${
-              outstandingDue > 0 ? 'text-amber-400' : 'text-emerald-400'
-            }`}
+            className={`text-xl sm:text-2xl font-black font-mono ${outstandingDue > 0 ? 'text-amber-400' : 'text-emerald-400'
+              }`}
           >
             {formatCurrencyBn(outstandingDue)}
           </div>
@@ -682,10 +680,10 @@ export const BoarderDuesPage: React.FC = () => {
               {isAllMonths
                 ? `${allReceipts.length} টি মানি রিসিপ্ট (সর্বমোট)`
                 : monthReceiptsList.length > 0
-                ? `${monthReceiptsList.length} টি মানি রিসিপ্ট`
-                : displayPaid > 0
-                ? 'বিল বাবদ পরিশোধ সমন্বয়'
-                : 'এই মাসে কোনো জমা নেই'}
+                  ? `${monthReceiptsList.length} টি মানি রিসিপ্ট`
+                  : displayPaid > 0
+                    ? 'বিল বাবদ পরিশোধ সমন্বয়'
+                    : 'এই মাসে কোনো জমা নেই'}
             </span>
             {!isAllMonths && totalLifetimePaid > displayPaid && (
               <span className="text-[10px] text-slate-500 font-mono">
@@ -750,22 +748,20 @@ export const BoarderDuesPage: React.FC = () => {
           <div className="flex items-center gap-2 p-1 rounded-2xl bg-slate-950 border border-slate-800 w-fit">
             <button
               onClick={() => setActiveTab('charges')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
-                activeTab === 'charges'
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${activeTab === 'charges'
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
                   : 'text-slate-400 hover:text-white'
-              }`}
+                }`}
             >
               <FileText className="w-4 h-4" />
               বকেয়া ও বিলের বিবরণ ({charges.length})
             </button>
             <button
               onClick={() => setActiveTab('receipts')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
-                activeTab === 'receipts'
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${activeTab === 'receipts'
                   ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
                   : 'text-slate-400 hover:text-white'
-              }`}
+                }`}
             >
               <ReceiptIcon className="w-4 h-4" />
               পরিশোধিত মানি রিসিপ্ট ({allReceipts.length})
@@ -776,25 +772,22 @@ export const BoarderDuesPage: React.FC = () => {
             <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800 text-xs self-start sm:self-auto">
               <button
                 onClick={() => setChargeFilter('ALL')}
-                className={`px-3 py-1 rounded-lg font-medium transition-colors ${
-                  chargeFilter === 'ALL' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'
-                }`}
+                className={`px-3 py-1 rounded-lg font-medium transition-colors ${chargeFilter === 'ALL' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'
+                  }`}
               >
                 সব বিল
               </button>
               <button
                 onClick={() => setChargeFilter('UNPAID')}
-                className={`px-3 py-1 rounded-lg font-medium transition-colors ${
-                  chargeFilter === 'UNPAID' ? 'bg-rose-500/20 text-rose-300 font-bold' : 'text-slate-400 hover:text-white'
-                }`}
+                className={`px-3 py-1 rounded-lg font-medium transition-colors ${chargeFilter === 'UNPAID' ? 'bg-rose-500/20 text-rose-300 font-bold' : 'text-slate-400 hover:text-white'
+                  }`}
               >
                 বকেয়া
               </button>
               <button
                 onClick={() => setChargeFilter('PAID')}
-                className={`px-3 py-1 rounded-lg font-medium transition-colors ${
-                  chargeFilter === 'PAID' ? 'bg-emerald-500/20 text-emerald-300 font-bold' : 'text-slate-400 hover:text-white'
-                }`}
+                className={`px-3 py-1 rounded-lg font-medium transition-colors ${chargeFilter === 'PAID' ? 'bg-emerald-500/20 text-emerald-300 font-bold' : 'text-slate-400 hover:text-white'
+                  }`}
               >
                 পরিশোধিত
               </button>
@@ -995,11 +988,10 @@ export const BoarderDuesPage: React.FC = () => {
                         </td>
                         <td className="py-3.5 px-3 text-center whitespace-nowrap">
                           <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              rec.is_void
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${rec.is_void
                                 ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
                                 : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                            }`}
+                              }`}
                           >
                             {rec.is_void ? 'বাতিল' : 'বৈধ রিসিপ্ট'}
                           </span>
