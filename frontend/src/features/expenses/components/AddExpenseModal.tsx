@@ -26,6 +26,18 @@ import {
 } from '../api/useExpenses'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import type { ExpenseScope } from '@/types/database'
+import { compressVoucherImage } from '@/utils/imageCompression'
+
+const DRAFT_KEY = 'bachelor_expense_modal_draft'
+const MODAL_OPEN_KEY = 'bachelor_expense_modal_open'
+
+function getSavedDraft() {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch {}
+  return null
+}
 
 interface AddExpenseModalProps {
   isOpen: boolean
@@ -71,28 +83,70 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const { data: flats = [] } = useExpenseFlats()
   const recordMutation = useRecordExpenseMutation()
 
-  // Form State
-  const [selectedScope, setSelectedScope] = useState<ExpenseScope>('HOSTEL_MARKET')
+  const savedDraft = useMemo(() => getSavedDraft(), [])
+
+  // Form State (restored from draft if available)
+  const [selectedScope, setSelectedScope] = useState<ExpenseScope>(
+    savedDraft?.selectedScope || 'HOSTEL_MARKET'
+  )
   const [expenseDate, setExpenseDate] = useState<string>(
-    new Date().toISOString().slice(0, 10)
+    savedDraft?.expenseDate || new Date().toISOString().slice(0, 10)
   )
   const [billingMonth, setBillingMonth] = useState<string>(
-    new Date().toISOString().slice(0, 7)
+    savedDraft?.billingMonth || new Date().toISOString().slice(0, 7)
   )
-  const [categoryId, setCategoryId] = useState<string>('')
-  const [amount, setAmount] = useState<string>('')
-  const [sourceAccountId, setSourceAccountId] = useState<string>('')
-  const [flatId, setFlatId] = useState<string>('')
-  const [vendorName, setVendorName] = useState<string>('')
-  const [description, setDescription] = useState<string>('')
+  const [categoryId, setCategoryId] = useState<string>(savedDraft?.categoryId || '')
+  const [amount, setAmount] = useState<string>(savedDraft?.amount || '')
+  const [sourceAccountId, setSourceAccountId] = useState<string>(savedDraft?.sourceAccountId || '')
+  const [flatId, setFlatId] = useState<string>(savedDraft?.flatId || '')
+  const [vendorName, setVendorName] = useState<string>(savedDraft?.vendorName || '')
+  const [description, setDescription] = useState<string>(savedDraft?.description || '')
 
   // Voucher File & Preview State
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [isCompressing, setIsCompressing] = useState<boolean>(false)
   const [isDragging, setIsDragging] = useState<boolean>(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [successInfo, setSuccessInfo] = useState<{ voucherNo: string } | null>(null)
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState<boolean>(false)
+
+  // Persist draft while user types
+  useEffect(() => {
+    if (!isOpen) return
+    const draft = {
+      selectedScope,
+      expenseDate,
+      billingMonth,
+      categoryId,
+      amount,
+      sourceAccountId,
+      flatId,
+      vendorName,
+      description,
+    }
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+    } catch {}
+  }, [
+    isOpen,
+    selectedScope,
+    expenseDate,
+    billingMonth,
+    categoryId,
+    amount,
+    sourceAccountId,
+    flatId,
+    vendorName,
+    description,
+  ])
+
+  const clearDraft = () => {
+    try {
+      sessionStorage.removeItem(DRAFT_KEY)
+      sessionStorage.removeItem(MODAL_OPEN_KEY)
+    } catch {}
+  }
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
@@ -158,39 +212,51 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
   if (!isOpen) return null
 
-  // Handle file processing
-  const processSelectedFile = (file: File) => {
-    if (file.size > 10 * 1024 * 1024) {
-      setErrorMsg('ফাইল সাইজ সর্বোচ্চ ১০ মেগাবাইট (10MB) পর্যন্ত হতে পারবে।')
-      return
-    }
-
-    setSelectedFile(file)
+  // Handle file processing with automatic client-side compression
+  const processSelectedFile = async (rawFile: File) => {
     setErrorMsg(null)
+    setIsCompressing(true)
+    try {
+      // Compress large smartphone camera photos (e.g. 15MB down to ~300KB-500KB)
+      const file = await compressVoucherImage(rawFile)
+      if (file.size > 10 * 1024 * 1024) {
+        setErrorMsg('ফাইল সাইজ সর্বোচ্চ ১০ মেগাবাইট (10MB) পর্যন্ত হতে পারবে।')
+        return
+      }
 
-    if (file.type.startsWith('image/')) {
-      const url = URL.createObjectURL(file)
-      setPreviewUrl(url)
-    } else {
-      setPreviewUrl(null)
+      setSelectedFile(file)
+      if (file.type.startsWith('image/')) {
+        const url = URL.createObjectURL(file)
+        setPreviewUrl(url)
+      } else {
+        setPreviewUrl(null)
+      }
+    } catch (err: any) {
+      console.warn('Image compression fallback:', err)
+      setSelectedFile(rawFile)
+      if (rawFile.type.startsWith('image/')) {
+        setPreviewUrl(URL.createObjectURL(rawFile))
+      }
+    } finally {
+      setIsCompressing(false)
     }
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      processSelectedFile(file)
+      await processSelectedFile(file)
     }
     // Reset input value so selecting the same file again fires onChange
     e.target.value = ''
   }
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(false)
     const file = e.dataTransfer.files?.[0]
     if (file) {
-      processSelectedFile(file)
+      await processSelectedFile(file)
     }
   }
 
@@ -265,6 +331,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
       const res = await recordMutation.mutateAsync(payload)
       setSuccessInfo({ voucherNo: res.expense_voucher_no || res.voucher_number || 'EXP-CREATED' })
+      clearDraft()
 
       setTimeout(() => {
         setSuccessInfo(null)
@@ -294,7 +361,11 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             </div>
           </div>
           <button
-            onClick={onClose}
+            type="button"
+            onClick={() => {
+              clearDraft()
+              onClose()
+            }}
             className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -597,7 +668,12 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               className="sr-only"
             />
 
-            {selectedFile ? (
+            {isCompressing ? (
+              <div className="p-4 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 flex items-center justify-center gap-3 text-indigo-300 text-xs font-semibold animate-pulse">
+                <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                <span>ভাউচারের ছবি অপটিমাইজ ও কম্প্রেস করা হচ্ছে...</span>
+              </div>
+            ) : selectedFile ? (
               <div className="p-3.5 rounded-2xl bg-slate-950/90 border border-emerald-500/40 flex items-center justify-between gap-3 animate-fade-in shadow-inner">
                 <div className="flex items-center gap-3 min-w-0">
                   {previewUrl ? (
@@ -616,7 +692,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                       {selectedFile.name}
                     </p>
                     <p className="text-[11px] text-slate-400">
-                      {(selectedFile.size / 1024).toFixed(1)} KB • {selectedFile.type.includes('pdf') ? 'PDF ভাউচার' : 'ছবি সংযুক্তি'}
+                      {(selectedFile.size / 1024).toFixed(1)} KB • {selectedFile.type.includes('pdf') ? 'PDF ভাউচার' : 'ছবি সংযুক্তি (অপটিমাইজড)'}
                     </p>
                   </div>
                 </div>
@@ -666,6 +742,11 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
                   <label
                     htmlFor="expense-voucher-camera"
+                    onClick={() => {
+                      try {
+                        sessionStorage.setItem(MODAL_OPEN_KEY, 'true')
+                      } catch {}
+                    }}
                     className="cursor-pointer p-3 rounded-xl border border-dashed border-emerald-600/40 bg-emerald-950/20 hover:bg-emerald-950/30 hover:border-emerald-400 flex items-center justify-center gap-2 text-emerald-300 transition-all text-xs font-semibold select-none shadow-sm active:scale-[0.98]"
                   >
                     <Camera className="w-4 h-4 text-emerald-400" />
@@ -680,7 +761,10 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           <div className="pt-4 border-t border-slate-800 flex items-center justify-end gap-3 shrink-0">
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => {
+                clearDraft()
+                onClose()
+              }}
               disabled={recordMutation.isPending}
               className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
             >

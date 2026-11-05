@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
+import { compressVoucherImage } from '@/utils/imageCompression'
 import type {
   Expense,
   ExpenseCategory,
@@ -279,7 +280,10 @@ let MOCK_EXPENSES: ExtendedExpense[] = []
 // Storage Helper: Upload Voucher Receipt
 // ==============================================================================
 
-export async function uploadVoucherFile(file: File): Promise<string> {
+export async function uploadVoucherFile(rawFile: File): Promise<string> {
+  // Compress large camera photos automatically to prevent memory spikes & upload errors
+  const file = await compressVoucherImage(rawFile)
+
   if (!isSupabaseConfigured) {
     // Return Object URL or base64 representation for seamless local development
     return new Promise((resolve) => {
@@ -291,15 +295,24 @@ export async function uploadVoucherFile(file: File): Promise<string> {
     })
   }
 
-  const fileExt = file.name.split('.').pop()
+  let fileExt = file.name?.includes('.') ? file.name.split('.').pop()?.toLowerCase() : ''
+  if (!fileExt || fileExt === 'blob' || fileExt.length > 5) {
+    if (file.type.includes('png')) fileExt = 'png'
+    else if (file.type.includes('webp')) fileExt = 'webp'
+    else if (file.type.includes('pdf')) fileExt = 'pdf'
+    else fileExt = 'jpg'
+  }
   const fileName = `voucher_${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`
   const filePath = `vouchers/${fileName}`
+
+  const contentType = file.type || (fileExt === 'pdf' ? 'application/pdf' : 'image/jpeg')
 
   const { error: uploadError } = await supabase.storage
     .from('expense-receipts')
     .upload(filePath, file, {
       cacheControl: '3600',
       upsert: false,
+      contentType,
     })
 
   if (uploadError) {

@@ -49,11 +49,32 @@ export const ExpenseListPage: React.FC = () => {
   const [dateFilter, setDateFilter] = useState<'ALL' | 'TODAY' | 'THIS_MONTH'>('ALL')
 
   // Modals
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [isAddModalOpen, setIsAddModalOpen] = useState(() => {
+    try {
+      return sessionStorage.getItem('bachelor_expense_modal_open') === 'true'
+    } catch {
+      return false
+    }
+  })
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
   const [previewExpense, setPreviewExpense] = useState<ExtendedExpense | null>(null)
   const [rejectExpense, setRejectExpense] = useState<ExtendedExpense | null>(null)
   const [copiedVoucher, setCopiedVoucher] = useState<string | null>(null)
+
+  const handleOpenAddModal = () => {
+    try {
+      sessionStorage.setItem('bachelor_expense_modal_open', 'true')
+    } catch {}
+    setIsAddModalOpen(true)
+  }
+
+  const handleCloseAddModal = () => {
+    try {
+      sessionStorage.removeItem('bachelor_expense_modal_open')
+      sessionStorage.removeItem('bachelor_expense_modal_draft')
+    } catch {}
+    setIsAddModalOpen(false)
+  }
 
   // API Queries
   const filters: ExpenseFilters = useMemo(
@@ -180,7 +201,7 @@ export const ExpenseListPage: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={handleOpenAddModal}
             className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-semibold text-xs shadow-lg shadow-indigo-600/30 flex items-center gap-2 transition-all active:scale-[0.98]"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
@@ -597,7 +618,7 @@ export const ExpenseListPage: React.FC = () => {
       {/* Add Expense Modal */}
       <AddExpenseModal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={handleCloseAddModal}
       />
 
       {/* Voucher Lightbox Preview Modal */}
