@@ -109,26 +109,30 @@ export const MonthlyCollectionSheetView: React.FC<MonthlyCollectionSheetViewProp
                 ক্রঃনং
               </th>
               <th rowSpan={2} className="bg-slate-100 border border-black px-2 py-2 w-[15%] min-w-[170px] text-center align-middle font-bold">
-                <div className="flex flex-col items-center justify-center leading-tight">
+                <span className="sr-only">সদস্যের নাম ও মোবাইল নম্বর</span>
+                <div aria-hidden="true" className="flex flex-col items-center justify-center leading-tight">
                   <span>সদস্যের নাম ও</span>
                   <span>মোবাইল নম্বর</span>
                 </div>
               </th>
               <th rowSpan={2} className="bg-slate-100 border border-black px-1.5 py-2 w-[6.5%] min-w-[80px] text-center align-middle font-bold">
-                <div className="flex flex-col items-center justify-center leading-tight">
+                <span className="sr-only">এডভান্স ভাড়া</span>
+                <div aria-hidden="true" className="flex flex-col items-center justify-center leading-tight">
                   <span>এডভান্স</span>
                   <span>ভাড়া</span>
                 </div>
               </th>
               <th rowSpan={2} className="bg-slate-100 border border-black px-1.5 py-2 w-[7%] min-w-[85px] text-center align-middle font-bold">
-                <div className="flex flex-col items-center justify-center leading-tight">
+                <span className="sr-only">পূর্ববর্তী মাসের পাওনা</span>
+                <div aria-hidden="true" className="flex flex-col items-center justify-center leading-tight">
                   <span>পূর্ববর্তী</span>
                   <span>মাসের</span>
                   <span>পাওনা</span>
                 </div>
               </th>
               <th rowSpan={2} className="bg-slate-100 border border-black px-1.5 py-2 w-[7.5%] min-w-[95px] text-center align-middle font-bold">
-                <div className="flex flex-col items-center justify-center leading-tight">
+                <span className="sr-only">পূর্ববর্তী মাসের পাওনা আদায়</span>
+                <div aria-hidden="true" className="flex flex-col items-center justify-center leading-tight">
                   <span>পূর্ববর্তী</span>
                   <span>মাসের</span>
                   <span>পাওনা আদায়</span>
@@ -138,7 +142,8 @@ export const MonthlyCollectionSheetView: React.FC<MonthlyCollectionSheetViewProp
                 চলতি মাসে আদায়
               </th>
               <th rowSpan={2} className="bg-slate-100 border border-black px-1.5 py-2 w-[7.5%] min-w-[95px] text-center align-middle font-bold">
-                <div className="flex flex-col items-center justify-center leading-tight">
+                <span className="sr-only">চলতি মাসের মোট আদায়</span>
+                <div aria-hidden="true" className="flex flex-col items-center justify-center leading-tight">
                   <span>চলতি মাসের</span>
                   <span>মোট আদায়</span>
                 </div>
@@ -147,14 +152,16 @@ export const MonthlyCollectionSheetView: React.FC<MonthlyCollectionSheetViewProp
                 চলতি মাসের খরচাদি
               </th>
               <th rowSpan={2} className="bg-slate-100 border border-black px-1.5 py-2 w-[7.5%] min-w-[95px] text-center align-middle font-bold">
-                <div className="flex flex-col items-center justify-center leading-tight">
+                <span className="sr-only">চলতি মাসের মোট খরচ</span>
+                <div aria-hidden="true" className="flex flex-col items-center justify-center leading-tight">
                   <span>চলতি</span>
                   <span>মাসের মোট</span>
                   <span>খরচ</span>
                 </div>
               </th>
               <th rowSpan={2} className="bg-slate-100 border border-black px-1.5 py-2 w-[7.5%] min-w-[95px] text-center align-middle font-bold">
-                <div className="flex flex-col items-center justify-center leading-tight">
+                <span className="sr-only">দেনা/পাওনা</span>
+                <div aria-hidden="true" className="flex flex-col items-center justify-center leading-tight">
                   <span>দেনা / পাওনা</span>
                 </div>
               </th>

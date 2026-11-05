@@ -198,7 +198,7 @@ export function useAddManualCharge() {
         return { success: true, charge: newCharge }
       }
 
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('boarder_charges')
         .insert({
           boarder_id: params.boarderId,
@@ -211,6 +211,24 @@ export function useAddManualCharge() {
         })
         .select()
         .single()
+
+      if (error && params.chargeType === 'SECURITY_DEPOSIT' && (error.message?.includes('invalid input value for enum') || error.message?.includes('enum'))) {
+        const fallbackRes = await supabase
+          .from('boarder_charges')
+          .insert({
+            boarder_id: params.boarderId,
+            charge_type: 'OTHER',
+            billing_month: params.billingMonth,
+            amount: params.amount,
+            due_date: params.dueDate,
+            description: `[SECURITY_DEPOSIT] ${params.description}`,
+            created_by: (await supabase.auth.getUser()).data.user?.id,
+          })
+          .select()
+          .single()
+        data = fallbackRes.data
+        error = fallbackRes.error
+      }
 
       if (error) throw new Error(error.message || 'ম্যানুয়াল চার্জ তৈরিতে সমস্যা হয়েছে।')
       return { success: true, charge: data }

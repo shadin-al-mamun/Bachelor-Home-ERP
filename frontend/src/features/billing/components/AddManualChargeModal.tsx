@@ -14,6 +14,7 @@ interface AddManualChargeModalProps {
 }
 
 const CHARGE_TYPE_OPTIONS: { value: ChargeType; label: string }[] = [
+  { value: 'SECURITY_DEPOSIT', label: 'জামানত সংগ্রহ (Security Deposit)' },
   { value: 'UTILITY', label: 'ইউটিলিটি চার্জ (Utility)' },
   { value: 'PENALTY', label: 'জরিমানা / লেট ফি (Penalty)' },
   { value: 'ADMISSION_FEE', label: 'ভর্তি ফি (Admission Fee)' },
@@ -130,7 +131,16 @@ export const AddManualChargeModal: React.FC<AddManualChargeModalProps> = ({
           </label>
           <select
             value={boarderId}
-            onChange={(e) => setBoarderId(e.target.value)}
+            onChange={(e) => {
+              const newBId = e.target.value
+              setBoarderId(newBId)
+              if (chargeType === 'SECURITY_DEPOSIT') {
+                const b = boarders.find((item) => item.id === newBId)
+                if (b && (b.active_allocation?.security_deposit || b.active_allocation?.monthly_rent)) {
+                  setAmount(b.active_allocation.security_deposit || b.active_allocation.monthly_rent || 0)
+                }
+              }
+            }}
             disabled={Boolean(preSelectedBoarderId)}
             className="w-full px-3 py-2 bg-slate-900/80 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-primary-500"
             required
@@ -153,7 +163,19 @@ export const AddManualChargeModal: React.FC<AddManualChargeModalProps> = ({
             </label>
             <select
               value={chargeType}
-              onChange={(e) => setChargeType(e.target.value as ChargeType)}
+              onChange={(e) => {
+                const newType = e.target.value as ChargeType
+                setChargeType(newType)
+                if (newType === 'SECURITY_DEPOSIT') {
+                  if (!description || description === 'ইউটিলিটি বিল') {
+                    setDescription('জামানত সংগ্রহ (Security Deposit)')
+                  }
+                  const b = boarders.find((item) => item.id === boarderId)
+                  if (b && (b.active_allocation?.security_deposit || b.active_allocation?.monthly_rent)) {
+                    setAmount(b.active_allocation.security_deposit || b.active_allocation.monthly_rent || 0)
+                  }
+                }
+              }}
               className="w-full px-3 py-2 bg-slate-900/80 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
               required
             >

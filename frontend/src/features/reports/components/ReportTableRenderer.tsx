@@ -797,7 +797,10 @@ export const ReportTableRenderer: React.FC<ReportTableRendererProps> = ({
   // 14. SECURITY_DEPOSITS
   if (reportId === 'SECURITY_DEPOSITS') {
     const rows = (data?.securityDeposits ?? []) as SecurityDepositRow[]
-    const sumDeposit = rows.reduce((s, r) => s + r.securityDepositPaid, 0)
+    const sumBilled = rows.reduce((s, r) => s + (r.securityDepositBilled || 0), 0)
+    const sumPaid = rows.reduce((s, r) => s + (r.securityDepositPaid || 0), 0)
+    const sumAdjusted = rows.reduce((s, r) => s + (r.securityDepositAdjusted || 0), 0)
+    const sumHeld = rows.reduce((s, r) => s + (r.securityDepositHeld !== undefined ? r.securityDepositHeld : r.securityDepositPaid), 0)
 
     return (
       <div className="overflow-x-auto rounded-xl border border-slate-800">
@@ -808,41 +811,57 @@ export const ReportTableRenderer: React.FC<ReportTableRendererProps> = ({
               <th className="py-3 px-4">কোড</th>
               <th className="py-3 px-4">ফ্ল্যাট ও সিট</th>
               <th className="py-3 px-4">ভর্তির তারিখ</th>
-              <th className="py-3 px-4 text-right">সংরক্ষিত জামানত (Deposit)</th>
-              <th className="py-3 px-4 text-center">স্থিতি (Status)</th>
+              <th className="py-3 px-4 text-right">ধার্য জামানত</th>
+              <th className="py-3 px-4 text-right">সংগৃহীত জামানত</th>
+              <th className="py-3 px-4 text-right">সমন্বয়কৃত জামানত</th>
+              <th className="py-3 px-4 text-right text-teal-300">সংরক্ষিত স্থিতি</th>
+              <th className="py-3 px-4 text-center">বর্তমান অবস্থা</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-8 text-center text-slate-500">কোনো জামানতের তথ্য পাওয়া যায়নি।</td>
+                <td colSpan={9} className="py-8 text-center text-slate-500">কোনো জামানতের তথ্য পাওয়া যায়নি।</td>
               </tr>
             ) : (
-              rows.map((r, i) => (
-                <tr key={i} className={i % 2 === 0 ? 'bg-slate-900/30' : 'bg-slate-800/20'}>
-                  <td className="py-3 px-4 font-semibold text-slate-200">{r.boarderName}</td>
-                  <td className="py-3 px-4 font-mono text-slate-400 text-[11px]">{r.boarderCode}</td>
-                  <td className="py-3 px-4 text-slate-300">{r.flatName} • {r.seatName}</td>
-                  <td className="py-3 px-4 text-slate-400">{formatDate(r.allocationStart)}</td>
-                  <td className="py-3 px-4 text-right font-bold text-teal-400">{formatBDT(r.securityDepositPaid)}</td>
-                  <td className="py-3 px-4 text-center">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      r.status.includes('HELD')
-                        ? 'bg-teal-950 text-teal-300 border border-teal-800'
-                        : 'bg-slate-800 text-slate-400'
-                    }`}>
-                      {r.status}
-                    </span>
-                  </td>
-                </tr>
-              ))
+              rows.map((r, i) => {
+                const heldAmount = r.securityDepositHeld !== undefined ? r.securityDepositHeld : r.securityDepositPaid
+                return (
+                  <tr key={i} className={i % 2 === 0 ? 'bg-slate-900/30' : 'bg-slate-800/20'}>
+                    <td className="py-3 px-4 font-semibold text-slate-200">{r.boarderName}</td>
+                    <td className="py-3 px-4 font-mono text-slate-400 text-[11px]">{r.boarderCode}</td>
+                    <td className="py-3 px-4 text-slate-300">{r.flatName} • {r.seatName}</td>
+                    <td className="py-3 px-4 text-slate-400">{formatDate(r.allocationStart)}</td>
+                    <td className="py-3 px-4 text-right font-mono text-slate-300">{formatBDT(r.securityDepositBilled)}</td>
+                    <td className="py-3 px-4 text-right font-mono font-bold text-emerald-400">{formatBDT(r.securityDepositPaid)}</td>
+                    <td className="py-3 px-4 text-right font-mono text-amber-400">
+                      {(r.securityDepositAdjusted || 0) > 0 ? formatBDT(r.securityDepositAdjusted!) : '—'}
+                    </td>
+                    <td className="py-3 px-4 text-right font-mono font-black text-teal-400">{formatBDT(heldAmount)}</td>
+                    <td className="py-3 px-4 text-center">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        r.status.includes('HELD') || r.status.includes('সংরক্ষিত')
+                          ? 'bg-teal-950 text-teal-300 border border-teal-800'
+                          : r.status.includes('ADJUSTED') || r.status.includes('সমন্বয়')
+                            ? 'bg-amber-950 text-amber-300 border border-amber-800'
+                            : 'bg-slate-800 text-slate-400'
+                      }`}>
+                        {r.status}
+                      </span>
+                    </td>
+                  </tr>
+                )
+              })
             )}
           </tbody>
           {rows.length > 0 && (
             <tfoot className="bg-slate-900 font-bold border-t-2 border-slate-700 text-slate-200">
               <tr>
-                <td colSpan={4} className="py-3 px-4">তহবিলে মোট সংরক্ষিত সিকিউরিটি জামানত</td>
-                <td className="py-3 px-4 text-right text-teal-400 text-sm">{formatBDT(sumDeposit)}</td>
+                <td colSpan={4} className="py-3 px-4">সর্বমোট যোগফল</td>
+                <td className="py-3 px-4 text-right text-slate-300 font-mono">{formatBDT(sumBilled)}</td>
+                <td className="py-3 px-4 text-right text-emerald-400 font-mono">{formatBDT(sumPaid)}</td>
+                <td className="py-3 px-4 text-right text-amber-400 font-mono">{formatBDT(sumAdjusted)}</td>
+                <td className="py-3 px-4 text-right text-teal-400 text-sm font-mono">{formatBDT(sumHeld)}</td>
                 <td></td>
               </tr>
             </tfoot>

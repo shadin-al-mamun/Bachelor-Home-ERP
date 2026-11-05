@@ -222,6 +222,8 @@ export interface SecurityDepositRow {
   allocationStart: string
   securityDepositBilled: number
   securityDepositPaid: number
+  securityDepositAdjusted?: number
+  securityDepositHeld?: number
   status: string
   currentAllocationStatus: string
 }

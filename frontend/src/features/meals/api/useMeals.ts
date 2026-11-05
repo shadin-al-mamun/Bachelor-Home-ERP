@@ -73,6 +73,7 @@ export interface BoarderOption {
   seat_code?: string
   building_name?: string
   monthly_rent?: number
+  security_deposit?: number
   admission_date?: string
   status?: string
 }

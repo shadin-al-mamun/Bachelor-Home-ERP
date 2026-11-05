@@ -536,6 +536,62 @@ export function useRecordReceiptMutation() {
         }
       }
 
+      const isAdjustment =
+        params.paymentMethod === 'ADJUSTMENT' ||
+        params.remarks?.includes('[DEPOSIT_ADJUSTMENT]') ||
+        params.reference?.includes('[DEPOSIT_ADJUSTMENT]')
+
+      // If adjusting from Security Deposit, do NOT credit cash drawer or financial accounts
+      if (isAdjustment) {
+        try {
+          const authUser = (await supabase.auth.getUser()).data.user
+          const receiptNo = `RCT-${new Date().getFullYear().toString().slice(-2)}${String(Date.now()).slice(-6)}`
+
+          const { data: recData, error: recError } = await supabase
+            .from('receipts')
+            .insert({
+              receipt_number: receiptNo,
+              boarder_id: params.boarderId,
+              received_by: authUser?.id || (await supabase.from('profiles').select('id').limit(1)).data?.[0]?.id,
+              destination_account_id: params.destinationAccountId,
+              amount: totalAmount,
+              payment_method: 'CASH', // Safe fallback for Postgres enum
+              transaction_reference: params.reference || '[DEPOSIT_ADJUSTMENT]',
+              receipt_date: params.collectionDate || new Date().toISOString(),
+              remarks: params.remarks || '[DEPOSIT_ADJUSTMENT] জামানত থেকে সমন্বয়',
+              is_void: false,
+            })
+            .select()
+            .single()
+
+          if (!recError && recData) {
+            // Insert receipt items if table exists
+            try {
+              const itemRows = items.map((i) => ({
+                receipt_id: recData.id,
+                head_code: i.head_code,
+                head_name: i.head_name,
+                amount: i.amount,
+                billing_month: i.billing_month,
+                description: i.description,
+              }))
+              await supabase.from('receipt_items').insert(itemRows)
+            } catch (itemErr) {
+              console.warn('receipt_items insertion skipped:', itemErr)
+            }
+
+            return {
+              success: true,
+              receipt_id: recData.id,
+              receipt_number: recData.receipt_number,
+              receipt: recData,
+            }
+          }
+        } catch (directInsertErr) {
+          console.warn('Direct adjustment receipt insert failed, falling back to RPC:', directInsertErr)
+        }
+      }
+
       // Try unified multi-head collection RPC first
       try {
         const { data, error } = await supabase.rpc('fn_record_unified_collection', {

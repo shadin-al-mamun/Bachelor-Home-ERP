@@ -14,6 +14,7 @@ import {
   Calendar,
   ChevronDown,
   Layers,
+  ShieldCheck,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import { useBrandingStore } from '@/app/store/useBrandingStore'
@@ -269,20 +270,104 @@ export const BoarderDuesPage: React.FC = () => {
     healDatabase().catch((err) => console.warn('Auto-heal DB error:', err))
   }, [charges, allReceipts])
 
+  // Helper functions to identify Security Deposit vs Regular Monthly Operations
+  const isDepositReceipt = (r: ExtendedReceipt) => {
+    if (r.payment_method === 'ADJUSTMENT') return false
+    if (r.remarks?.includes('[DEPOSIT_ADJUSTMENT]') || r.transaction_reference?.includes('[DEPOSIT_ADJUSTMENT]')) return false
+    if (r.items?.some((i) => i.head_code === 'SECURITY_DEPOSIT' || i.head_name?.includes('জামানত'))) return true
+    if (r.remarks?.includes('জামানত সংগ্রহ') || r.remarks?.includes('সিকিউরিটি জামানত') || r.remarks?.includes('[SECURITY_DEPOSIT]')) return true
+    if (r.transaction_reference?.includes('জামানত সংগ্রহ') || r.transaction_reference?.includes('সিকিউরিটি জামানত') || r.transaction_reference?.includes('[SECURITY_DEPOSIT]')) return true
+    return false
+  }
+
+  const isDepositAdjustment = (r: ExtendedReceipt) => {
+    if (r.payment_method === 'ADJUSTMENT') return true
+    if (r.remarks?.includes('[DEPOSIT_ADJUSTMENT]') || r.transaction_reference?.includes('[DEPOSIT_ADJUSTMENT]')) return true
+    if (r.remarks?.includes('জামানত থেকে সমন্বয়') || r.transaction_reference?.includes('জামানত থেকে সমন্বয়')) return true
+    return false
+  }
+
+  const isDepositCharge = (c: BoarderCharge) => {
+    if (c.charge_type === 'SECURITY_DEPOSIT') return true
+    if (c.description?.includes('[SECURITY_DEPOSIT]') || c.description?.includes('জামানত সংগ্রহ') || c.description?.includes('সিকিউরিটি জামানত')) return true
+    return false
+  }
+
+  // Security Deposit Reserve calculation (Intact custody vs Adjustments)
+  const depositStats = React.useMemo(() => {
+    const allocDeposit =
+      Number((currentBoarder as any)?.active_allocation?.security_deposit) ||
+      Number(currentBoarder?.security_deposit) ||
+      0
+    let recDeposit = 0
+    let adjusted = 0
+
+    allReceipts.forEach((r) => {
+      if (isDepositAdjustment(r)) {
+        adjusted += Number(r.amount) || 0
+      } else if (isDepositReceipt(r)) {
+        recDeposit += Number(r.amount) || 0
+      }
+    })
+
+    const chargeDeposit = sanitizedCharges
+      .filter((c) => isDepositCharge(c))
+      .reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+
+    const initial = Math.max(allocDeposit, recDeposit, chargeDeposit)
+    const held = Math.max(0, initial - adjusted)
+
+    return {
+      initialDeposit: initial,
+      adjustedDeposit: adjusted,
+      heldDeposit: held,
+    }
+  }, [currentBoarder, allReceipts, sanitizedCharges])
+
   // FIFO Cash Ledger Reconciliation:
-  // Reconciles charges against official verified receipts in chronological order (FIFO).
-  // Prevents dues from dropping to 0 when partial payment (e.g. 1,000 Tk) was collected.
+  // Reconciles regular charges against regular payments and explicit deposit adjustments.
+  // Preserves security deposit reserve intact without letting regular monthly charges auto-consume it.
   const reconciledCharges = React.useMemo(() => {
     if (sanitizedCharges.length === 0) return []
 
-    const totalReceipts = allReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
     // If no receipts are recorded at all, fallback to charges as-is
-    if (allReceipts.length === 0 && totalReceipts === 0) {
+    if (allReceipts.length === 0) {
       return sanitizedCharges
     }
 
-    // Chronologically sort charges (oldest billing month & due date first for FIFO allocation)
-    const sorted = [...sanitizedCharges].sort((a, b) => {
+    // 1. Classify receipts
+    let totalRegularReceipts = 0
+    let totalAdjustments = 0
+    let totalDepositReceipts = 0
+
+    allReceipts.forEach((r) => {
+      if (isDepositAdjustment(r)) {
+        totalAdjustments += Number(r.amount) || 0
+      } else if (isDepositReceipt(r)) {
+        totalDepositReceipts += Number(r.amount) || 0
+      } else {
+        totalRegularReceipts += Number(r.amount) || 0
+      }
+    })
+
+    // If boarder has an un-tagged legacy deposit from active allocation:
+    let depositFund = Math.max(depositStats.initialDeposit, totalDepositReceipts)
+    let regularCash = totalRegularReceipts
+
+    // If deposit was not explicitly tagged as a separate receipt, but total receipts includes it:
+    if (totalDepositReceipts === 0 && depositFund > 0 && totalRegularReceipts >= depositFund) {
+      regularCash = Math.max(0, totalRegularReceipts - depositFund)
+    }
+
+    // Cash available to pay regular operational monthly bills:
+    // Regular payments + any explicitly adjusted security deposit amounts
+    let availableOperationalCash = regularCash + totalAdjustments
+
+    const chargeAllocations = new Map<string, { paid: number; due: number; status: ChargeStatus }>()
+
+    // Separate deposit charges from regular charges
+    const regularCharges = sanitizedCharges.filter((c) => !isDepositCharge(c))
+    const sortedRegular = [...regularCharges].sort((a, b) => {
       const mA = a.billing_month || ''
       const mB = b.billing_month || ''
       if (mA !== mB) return mA.localeCompare(mB)
@@ -291,13 +376,29 @@ export const BoarderDuesPage: React.FC = () => {
       return dA.localeCompare(dB)
     })
 
-    let remainingCash = totalReceipts
-    const chargeAllocations = new Map<string, { paid: number; due: number; status: ChargeStatus }>()
-
-    for (const c of sorted) {
+    // Allocate available operational cash to regular charges via FIFO
+    for (const c of sortedRegular) {
       const amt = Number(c.amount) || 0
-      const allocated = Math.min(remainingCash, amt)
-      remainingCash = Math.max(0, remainingCash - allocated)
+      const allocated = Math.min(availableOperationalCash, amt)
+      availableOperationalCash = Math.max(0, availableOperationalCash - allocated)
+      const due = Math.max(0, amt - allocated)
+      const status: ChargeStatus = due <= 0 ? 'PAID' : allocated > 0 ? 'PARTIALLY_PAID' : 'UNPAID'
+
+      chargeAllocations.set(c.id, {
+        paid: allocated,
+        due,
+        status,
+      })
+    }
+
+    // For deposit charges (if any billed):
+    // They are matched against the deposit fund
+    let remainingDepositFund = depositFund
+    const depositCharges = sanitizedCharges.filter((c) => isDepositCharge(c))
+    for (const c of depositCharges) {
+      const amt = Number(c.amount) || 0
+      const allocated = Math.min(remainingDepositFund, amt)
+      remainingDepositFund = Math.max(0, remainingDepositFund - allocated)
       const due = Math.max(0, amt - allocated)
       const status: ChargeStatus = due <= 0 ? 'PAID' : allocated > 0 ? 'PARTIALLY_PAID' : 'UNPAID'
 
@@ -319,7 +420,7 @@ export const BoarderDuesPage: React.FC = () => {
         status: alloc.status,
       }
     })
-  }, [sanitizedCharges, allReceipts])
+  }, [sanitizedCharges, allReceipts, depositStats])
 
   // Asynchronously synchronize any misaligned charge statuses in Supabase (e.g. charge marked PAID when due remains)
   useEffect(() => {
@@ -400,11 +501,18 @@ export const BoarderDuesPage: React.FC = () => {
   const selectedMonthLabel = isAllMonths ? 'সব মাস' : formatYearMonthBn(selectedMonth)
 
   // Lifetime metrics (authoritative cash ledger across all time)
-  const totalLifetimeBilled = reconciledCharges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
-  const totalLifetimePaidCharges = reconciledCharges.reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
-  const totalLifetimeReceipts = allReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
-  // Authoritative total paid: if receipts exist, total lifetime receipts is authoritative; fallback to paid_amount
-  const totalLifetimePaid = allReceipts.length > 0 ? totalLifetimeReceipts : totalLifetimePaidCharges
+  // Regular operational charges (excluding isolated security deposit charges)
+  const regularCharges = React.useMemo(() => reconciledCharges.filter((c) => !isDepositCharge(c)), [reconciledCharges])
+  const totalLifetimeBilled = regularCharges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+  const totalLifetimePaidCharges = regularCharges.reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
+
+  // Operational receipts (regular receipts + explicit deposit adjustments)
+  const operationalReceipts = React.useMemo(() => {
+    return allReceipts.filter((r) => !isDepositReceipt(r))
+  }, [allReceipts])
+
+  const totalOperationalReceipts = operationalReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
+  const totalLifetimePaid = totalOperationalReceipts > 0 ? totalOperationalReceipts : totalLifetimePaidCharges
   const outstandingDue = Math.max(0, totalLifetimeBilled - totalLifetimePaid)
   const advanceBalance = Math.max(0, totalLifetimePaid - totalLifetimeBilled)
 
@@ -426,10 +534,10 @@ export const BoarderDuesPage: React.FC = () => {
   // Display metrics according to active month view
   const displayBilled = isAllMonths
     ? totalLifetimeBilled
-    : monthChargesList.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+    : monthChargesList.filter((c) => !isDepositCharge(c)).reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
 
-  const monthPaidCharges = monthChargesList.reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
-  const monthReceiptsTotal = monthReceiptsList.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
+  const monthPaidCharges = monthChargesList.filter((c) => !isDepositCharge(c)).reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
+  const monthReceiptsTotal = monthReceiptsList.filter((r) => !isDepositReceipt(r)).reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
   const displayPaid = isAllMonths
     ? totalLifetimePaid
     : monthPaidCharges > 0
@@ -440,7 +548,7 @@ export const BoarderDuesPage: React.FC = () => {
     .filter((c) => c.charge_type === 'MEAL')
     .reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
 
-  const monthDue = monthChargesList.reduce((sum, c) => {
+  const monthDue = monthChargesList.filter((c) => !isDepositCharge(c)).reduce((sum, c) => {
     return sum + (Number(c.due_amount) || 0)
   }, 0)
 
@@ -460,6 +568,8 @@ export const BoarderDuesPage: React.FC = () => {
         return 'খাবার বিল (Meal Bill)'
       case 'UTILITY':
         return 'ইউটিলিটি চার্জ'
+      case 'SECURITY_DEPOSIT':
+        return 'জামানত সংগ্রহ (Security Deposit)'
       case 'ADMISSION_FEE':
         return 'ভর্তি / সার্ভিস চার্জ'
       case 'PENALTY':
@@ -506,6 +616,12 @@ export const BoarderDuesPage: React.FC = () => {
         return <span className="text-indigo-400 font-medium">মোবাইল ব্যাংকিং (MFS)</span>
       case 'BANK_TRANSFER':
         return <span className="text-sky-400 font-medium">ব্যাংক ট্রান্সফার</span>
+      case 'ADJUSTMENT':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/10 text-teal-400 border border-teal-500/30">
+            <ShieldCheck className="w-3 h-3" /> জামানত থেকে সমন্বয়
+          </span>
+        )
       default:
         return <span className="text-slate-400">{method}</span>
     }
@@ -621,8 +737,8 @@ export const BoarderDuesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. Top Metric Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* 3. Top Metric Cards (5-Card Isolated Ledger with Security Deposit Reserve) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         {/* Card 1: Outstanding Due or Advance Balance */}
         <div
           className={`p-4 sm:p-5 rounded-2xl bg-slate-900/60 border ${outstandingDue > 0 ? 'border-amber-500/30' : 'border-emerald-500/30'
@@ -667,7 +783,7 @@ export const BoarderDuesPage: React.FC = () => {
             <span className="flex items-center gap-1.5 min-w-0">
               <span className="truncate">মোট পরিশোধিত</span>
               <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
-                {isAllMonths ? 'সর্বমোট' : selectedMonthLabel}
+                {isAllMonths ? 'বিল আদায়' : selectedMonthLabel}
               </span>
             </span>
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -678,7 +794,7 @@ export const BoarderDuesPage: React.FC = () => {
           <div className="text-[11px] text-slate-400 flex items-center justify-between gap-1 flex-wrap">
             <span>
               {isAllMonths
-                ? `${allReceipts.length} টি মানি রিসিপ্ট (সর্বমোট)`
+                ? `${operationalReceipts.length} টি ভাউচার (বিল আদায়)`
                 : monthReceiptsList.length > 0
                   ? `${monthReceiptsList.length} টি মানি রিসিপ্ট`
                   : displayPaid > 0
@@ -693,7 +809,37 @@ export const BoarderDuesPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Card 3: Total Billed */}
+        {/* Card 3: Security Deposit Reserve (সংরক্ষিত জামানত) */}
+        <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/60 border border-teal-500/30 space-y-2 relative overflow-hidden">
+          <div className="flex items-center justify-between text-slate-400 text-xs">
+            <span className="flex items-center gap-1.5 min-w-0">
+              <span className="truncate">সংরক্ষিত জামানত</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-teal-500/10 text-teal-300 border border-teal-500/20 shrink-0">
+                রিজার্ভ
+              </span>
+            </span>
+            <ShieldCheck className="w-4 h-4 text-teal-400 shrink-0" />
+          </div>
+          <div className="text-xl sm:text-2xl font-black font-mono text-teal-400">
+            {formatCurrencyBn(depositStats.heldDeposit)}
+          </div>
+          <div className="text-[11px] text-slate-400 flex items-center justify-between gap-1 flex-wrap">
+            <span>
+              {depositStats.adjustedDeposit > 0
+                ? `মূল: ${formatCurrencyBn(depositStats.initialDeposit)}`
+                : depositStats.heldDeposit > 0
+                  ? 'হোস্টেল ছাড়ার সময় সমন্বয়যোগ্য'
+                  : 'কোনো জামানত জমা নেই'}
+            </span>
+            {depositStats.adjustedDeposit > 0 && (
+              <span className="text-[10px] text-teal-300 font-mono">
+                সমন্বয়: {formatCurrencyBn(depositStats.adjustedDeposit)}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Card 4: Total Billed */}
         <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2">
           <div className="flex items-center justify-between text-slate-400 text-xs">
             <span className="flex items-center gap-1.5 min-w-0">
@@ -721,7 +867,7 @@ export const BoarderDuesPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Card 4: Meal Bill Portion */}
+        {/* Card 5: Meal Bill Portion */}
         <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2">
           <div className="flex items-center justify-between text-slate-400 text-xs">
             <span className="flex items-center gap-1.5 min-w-0">

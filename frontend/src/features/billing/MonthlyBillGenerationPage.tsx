@@ -53,6 +53,7 @@ interface FlatRowState {
 }
 
 const CHARGE_TYPE_OPTIONS: { value: ChargeType; label: string }[] = [
+  { value: 'SECURITY_DEPOSIT', label: 'জামানত সংগ্রহ (Security Deposit)' },
   { value: 'UTILITY', label: 'ইউটিলিটি চার্জ (Utility)' },
   { value: 'PENALTY', label: 'জরিমানা / লেট ফি (Penalty)' },
   { value: 'ADMISSION_FEE', label: 'ভর্তি ফি (Admission Fee)' },
@@ -1302,7 +1303,16 @@ export const MonthlyBillGenerationPage: React.FC = () => {
                   <select
                     required
                     value={manualBoarderId}
-                    onChange={(e) => setManualBoarderId(e.target.value)}
+                    onChange={(e) => {
+                      const newId = e.target.value
+                      setManualBoarderId(newId)
+                      if (manualChargeType === 'SECURITY_DEPOSIT') {
+                        const b = activeBoarders.find((item) => item.id === newId)
+                        if (b && (b.active_allocation?.security_deposit || b.active_allocation?.monthly_rent)) {
+                          setManualAmount(b.active_allocation.security_deposit || b.active_allocation.monthly_rent || '')
+                        }
+                      }
+                    }}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:ring-2 focus:ring-rose-500/50"
                   >
                     <option value="">-- বোর্ডার বাছাই করুন --</option>
@@ -1323,7 +1333,19 @@ export const MonthlyBillGenerationPage: React.FC = () => {
                     </label>
                     <select
                       value={manualChargeType}
-                      onChange={(e) => setManualChargeType(e.target.value as ChargeType)}
+                      onChange={(e) => {
+                        const newType = e.target.value as ChargeType
+                        setManualChargeType(newType)
+                        if (newType === 'SECURITY_DEPOSIT') {
+                          if (!manualDescription || manualDescription === 'ইউটিলিটি বিল') {
+                            setManualDescription('জামানত সংগ্রহ (Security Deposit)')
+                          }
+                          const b = activeBoarders.find((item) => item.id === manualBoarderId)
+                          if (b && (b.active_allocation?.security_deposit || b.active_allocation?.monthly_rent)) {
+                            setManualAmount(b.active_allocation.security_deposit || b.active_allocation.monthly_rent || '')
+                          }
+                        }
+                      }}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:ring-2 focus:ring-rose-500/50"
                     >
                       {CHARGE_TYPE_OPTIONS.map((opt) => (

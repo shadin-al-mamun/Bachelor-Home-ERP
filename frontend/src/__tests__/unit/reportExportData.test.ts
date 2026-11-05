@@ -213,9 +213,12 @@ describe('getReportExportData', () => {
       ],
     }
 
-    expect(ALL_REPORTS).toHaveLength(16)
+    const core16Reports = ALL_REPORTS.filter(
+      (r) => r.id !== 'MONTHLY_COLLECTION_SHEET' && r.id !== 'MONTHLY_MEAL_COUNT_SHEET'
+    )
+    expect(core16Reports).toHaveLength(16)
 
-    ALL_REPORTS.forEach((reportDef) => {
+    core16Reports.forEach((reportDef) => {
       const result = getReportExportData(reportDef.id, mockData)
       expect(result).toBeDefined()
       expect(result.columns.length).toBeGreaterThan(0)

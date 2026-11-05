@@ -6,6 +6,7 @@ import {
   useFinancialAccounts,
   useRecordReceiptMutation,
   useUnpaidCharges,
+  useReceipts,
   type ExtendedReceipt,
   type UnifiedCollectionItem,
 } from '../api/useReceipts'
@@ -25,6 +26,8 @@ import {
   Calendar,
   Zap,
   CheckCircle2,
+  ShieldCheck,
+  Sparkles,
 } from 'lucide-react'
 import { CreateFinancialAccountModal } from '@/features/finance/components/CreateFinancialAccountModal'
 
@@ -45,6 +48,7 @@ const DEFAULT_HEADS: { code: string; name: string }[] = [
   { code: 'SEAT_RENT', name: 'সিট ভাড়া (Seat Rent)' },
   { code: 'MEAL_BILL', name: 'মিল বিল (Meal Bill)' },
   { code: 'MISC_BILL', name: 'ফ্ল্যাট বিবিধ বিল (Misc Bill)' },
+  { code: 'SECURITY_DEPOSIT', name: 'জামানত সংগ্রহ (Security Deposit)' },
   { code: 'ADVANCE', name: 'অগ্রিম জমা (Advance)' },
   { code: 'FINE', name: 'জরিমানা / বিলম্ব ফি (Fine)' },
   { code: 'OTHER', name: 'অন্যান্য সার্ভিস চার্জ (Other)' },
@@ -61,6 +65,7 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
 
   const [boarderId, setBoarderId] = useState(preSelectedBoarderId || '')
   const { data: unpaidCharges = [] } = useUnpaidCharges(boarderId)
+  const { data: boarderReceipts = [] } = useReceipts({ boarderId: boarderId || undefined, status: 'VALID' })
 
   const duesMap = useMemo(() => {
     const map = new Map<string, (typeof duesList)[0]>()
@@ -71,6 +76,59 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
   const boarderDueSummary = useMemo(() => {
     return boarderId ? duesMap.get(boarderId) : undefined
   }, [boarderId, duesMap])
+
+  const selectedBoarder = useMemo(() => {
+    return boarders.find((b) => b.id === boarderId)
+  }, [boarders, boarderId])
+
+  // Security Deposit Reserve Computation
+  const depositDetails = useMemo(() => {
+    if (!boarderId || !selectedBoarder) {
+      return { totalDeposit: 0, adjustedDeposit: 0, availableDeposit: 0 }
+    }
+
+    const allocDeposit = Number(selectedBoarder.active_allocation?.security_deposit) || 0
+    let receiptDeposit = 0
+    let adjustedDeposit = 0
+
+    boarderReceipts.forEach((r) => {
+      const isAdjustment =
+        r.payment_method === 'ADJUSTMENT' ||
+        r.remarks?.includes('[DEPOSIT_ADJUSTMENT]') ||
+        r.transaction_reference?.includes('[DEPOSIT_ADJUSTMENT]') ||
+        r.remarks?.includes('জামানত থেকে সমন্বয়') ||
+        r.transaction_reference?.includes('জামানত থেকে সমন্বয়')
+
+      if (isAdjustment) {
+        adjustedDeposit += Number(r.amount) || 0
+      } else {
+        const hasDepositItem = r.items?.some(
+          (i) => i.head_code === 'SECURITY_DEPOSIT' || i.head_name?.includes('জামানত')
+        )
+        if (hasDepositItem) {
+          receiptDeposit += Number(r.amount) || 0
+        }
+      }
+    })
+
+    const totalDeposit = Math.max(allocDeposit, receiptDeposit)
+    const availableDeposit = Math.max(0, totalDeposit - adjustedDeposit)
+
+    return {
+      totalDeposit,
+      adjustedDeposit,
+      availableDeposit,
+    }
+  }, [boarderId, selectedBoarder, boarderReceipts])
+
+  const [isAdjustingFromDeposit, setIsAdjustingFromDeposit] = useState(false)
+  const [depositAdjustAmount, setDepositAdjustAmount] = useState<number | ''>('')
+
+  // When boarderId changes or modal opens, reset adjustment state
+  useEffect(() => {
+    setIsAdjustingFromDeposit(false)
+    setDepositAdjustAmount('')
+  }, [boarderId, isOpen])
 
   const currentMonthStr = useMemo(() => new Date().toISOString().slice(0, 7), [])
   const [billingMonth, setBillingMonth] = useState(currentMonthStr)
@@ -139,10 +197,6 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
   const totalAmount = useMemo(() => {
     return items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
   }, [items])
-
-  const selectedBoarder = useMemo(() => {
-    return boarders.find((b) => b.id === boarderId)
-  }, [boarders, boarderId])
 
   const duesBreakdown = useMemo(() => {
     let rentDue = 0
@@ -253,6 +307,70 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
     setItems(newItems)
   }
 
+  const handleApplyDepositAdjustment = (adjAmount: number) => {
+    let remainingAdj = adjAmount
+    const newItems: ItemRow[] = []
+
+    if (duesBreakdown.rentDue > 0 && remainingAdj > 0) {
+      const take = Math.min(remainingAdj, duesBreakdown.rentDue)
+      newItems.push({
+        head_code: 'SEAT_RENT',
+        head_name: 'সিট ভাড়া',
+        amount: take,
+        description: 'জামানত থেকে সিট ভাড়া সমন্বয়',
+      })
+      remainingAdj -= take
+    }
+
+    if (duesBreakdown.mealDue > 0 && remainingAdj > 0) {
+      const take = Math.min(remainingAdj, duesBreakdown.mealDue)
+      newItems.push({
+        head_code: 'MEAL_BILL',
+        head_name: 'মিল বিল',
+        amount: take,
+        description: 'জামানত থেকে মিল বিল সমন্বয়',
+      })
+      remainingAdj -= take
+    }
+
+    if (duesBreakdown.utilityDue > 0 && remainingAdj > 0) {
+      const take = Math.min(remainingAdj, duesBreakdown.utilityDue)
+      newItems.push({
+        head_code: 'MISC_BILL',
+        head_name: 'বিবিধ বিল',
+        amount: take,
+        description: 'জামানত থেকে ইউটিলিটি বিল সমন্বয়',
+      })
+      remainingAdj -= take
+    }
+
+    if (duesBreakdown.otherDue > 0 && remainingAdj > 0) {
+      const take = Math.min(remainingAdj, duesBreakdown.otherDue)
+      newItems.push({
+        head_code: 'OTHER',
+        head_name: 'অন্যান্য',
+        amount: take,
+        description: 'জামানত থেকে অন্যান্য চার্জ সমন্বয়',
+      })
+      remainingAdj -= take
+    }
+
+    if (newItems.length === 0 || remainingAdj > 0) {
+      if (newItems.length > 0) {
+        newItems[0].amount += remainingAdj
+      } else {
+        newItems.push({
+          head_code: 'ADVANCE',
+          head_name: 'জামানত সমন্বয়',
+          amount: adjAmount,
+          description: 'জামানত থেকে বকেয়া সমন্বয়',
+        })
+      }
+    }
+
+    setItems(newItems)
+  }
+
   const getHeadDue = (headCode: string) => {
     if (headCode === 'SEAT_RENT') return duesBreakdown.rentDue
     if (headCode === 'MEAL_BILL') return duesBreakdown.mealDue
@@ -294,10 +412,12 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
       return
     }
 
-    if (!destinationAccountId) {
+    if (!destinationAccountId && !isAdjustingFromDeposit) {
       setErrorMsg('অনুগ্রহ করে জমার অ্যাকাউন্ট নির্বাচন করুন।')
       return
     }
+
+    const effectiveAccountId = destinationAccountId || accounts[0]?.id || 'deposit-adjustment-account'
 
     // Filter active items > 0
     const activeItems: UnifiedCollectionItem[] = items
@@ -316,16 +436,23 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
     }
 
     try {
-      const selectedAccount = accounts.find((a) => a.id === destinationAccountId)
+      const selectedAccount = accounts.find((a) => a.id === effectiveAccountId)
+      const finalPaymentMethod = isAdjustingFromDeposit ? 'ADJUSTMENT' : paymentMethod
+      const finalReference = isAdjustingFromDeposit
+        ? (reference.trim() ? `[DEPOSIT_ADJUSTMENT] ${reference.trim()}` : '[DEPOSIT_ADJUSTMENT] জামানত থেকে সমন্বয়')
+        : (reference.trim() || undefined)
+      const finalRemarks = isAdjustingFromDeposit
+        ? (remarks.trim() ? `[DEPOSIT_ADJUSTMENT] ${remarks.trim()}` : '[DEPOSIT_ADJUSTMENT] জামানত তহবিল থেকে বকেয়া সমন্বয়')
+        : (remarks.trim() || undefined)
 
       const result = await recordReceiptMutation.mutateAsync({
         boarderId,
-        destinationAccountId,
-        paymentMethod,
+        destinationAccountId: effectiveAccountId,
+        paymentMethod: finalPaymentMethod,
         amount: totalAmount,
         collectionDate: new Date(collectionDate).toISOString(),
-        reference: reference.trim() || undefined,
-        remarks: remarks.trim() || undefined,
+        reference: finalReference,
+        remarks: finalRemarks,
         items: activeItems,
       })
 
@@ -338,14 +465,14 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
         boarder_phone: selectedBoarder?.phone_number,
         received_by: 'current-manager',
         collector_name: 'দায়িত্বপ্রাপ্ত ম্যানেজার',
-        destination_account_id: destinationAccountId,
-        account_name: selectedAccount?.account_name || 'ক্যাশ অ্যাকাউন্ট',
+        destination_account_id: effectiveAccountId,
+        account_name: isAdjustingFromDeposit ? 'জামানত তহবিল (ক্যাশবহির্ভূত)' : (selectedAccount?.account_name || 'ক্যাশ অ্যাকাউন্ট'),
         amount: totalAmount,
-        payment_method: paymentMethod,
-        transaction_reference: reference.trim() || undefined,
+        payment_method: finalPaymentMethod,
+        transaction_reference: finalReference,
         receipt_date: new Date(collectionDate).toISOString(),
         is_void: false,
-        remarks: remarks.trim() || undefined,
+        remarks: finalRemarks,
         created_at: new Date().toISOString(),
         items: activeItems.map((item, idx) => ({
           id: `item-${idx}`,
@@ -565,6 +692,120 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
             </div>
           )}
 
+          {/* Security Deposit Adjustment Section */}
+          {selectedBoarder && depositDetails.availableDeposit > 0 && (
+            <div className="p-4 rounded-2xl border-2 border-teal-500/40 bg-teal-950/20 shadow-lg shadow-teal-950/10 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-teal-500/20 text-teal-400 border border-teal-500/30 flex items-center justify-center shrink-0">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-teal-300">
+                        সংরক্ষিত জামানত স্থিতি: {formatCurrencyBn(depositDetails.availableDeposit)}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                        ডিপোজিট ফান্ড
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-slate-400 block mt-0.5">
+                      {depositDetails.adjustedDeposit > 0
+                        ? `পূর্বে সমন্বয় হয়েছে: ${formatCurrencyBn(depositDetails.adjustedDeposit)} (মূল জামানত: ${formatCurrencyBn(depositDetails.totalDeposit)})`
+                        : 'হোস্টেল তহবিলে এই বর্ডারের জামানত সংরক্ষিত রয়েছে'}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextState = !isAdjustingFromDeposit
+                    setIsAdjustingFromDeposit(nextState)
+                    if (nextState) {
+                      const defaultAdj = Math.min(
+                        duesBreakdown.totalDue > 0 ? duesBreakdown.totalDue : depositDetails.availableDeposit,
+                        depositDetails.availableDeposit
+                      )
+                      setDepositAdjustAmount(defaultAdj)
+                      handleApplyDepositAdjustment(defaultAdj)
+                    } else {
+                      setDepositAdjustAmount('')
+                    }
+                  }}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer self-start sm:self-center shrink-0 ${
+                    isAdjustingFromDeposit
+                      ? 'bg-teal-500 text-slate-950 shadow-md shadow-teal-500/30'
+                      : 'bg-slate-800 text-teal-300 border border-teal-500/40 hover:bg-teal-950/40'
+                  }`}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>{isAdjustingFromDeposit ? 'সমন্বয় সক্রিয়' : 'জামানত থেকে সমন্বয় করুন'}</span>
+                </button>
+              </div>
+
+              {isAdjustingFromDeposit && (
+                <div className="pt-2.5 border-t border-teal-500/20 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div className="flex-1 space-y-1">
+                      <label className="text-[11px] font-semibold text-slate-300">
+                        সমন্বয়ের পরিমাণ (সর্বোচ্চ {formatCurrencyBn(depositDetails.availableDeposit)}):
+                      </label>
+                      <input
+                        type="number"
+                        max={depositDetails.availableDeposit}
+                        min={1}
+                        value={depositAdjustAmount}
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? '' : Number(e.target.value)
+                          const clamped = typeof val === 'number' ? Math.min(val, depositDetails.availableDeposit) : ''
+                          setDepositAdjustAmount(clamped)
+                          if (typeof clamped === 'number') {
+                            handleApplyDepositAdjustment(clamped)
+                          }
+                        }}
+                        className="w-full px-3 py-2 bg-slate-950 border border-teal-500/50 rounded-xl text-white font-mono text-xs focus:outline-none focus:ring-1 focus:ring-teal-400"
+                        placeholder="টাকার পরিমাণ লিখুন..."
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 pt-1 sm:pt-4">
+                      {duesBreakdown.totalDue > 0 && duesBreakdown.totalDue <= depositDetails.availableDeposit && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const val = Math.min(duesBreakdown.totalDue, depositDetails.availableDeposit)
+                            setDepositAdjustAmount(val)
+                            handleApplyDepositAdjustment(val)
+                          }}
+                          className="px-2.5 py-2 rounded-xl text-[11px] font-semibold bg-slate-800 hover:bg-slate-700 text-teal-300 border border-teal-500/30 cursor-pointer"
+                        >
+                          বকেয়া সমান ({formatCurrencyBn(duesBreakdown.totalDue)})
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDepositAdjustAmount(depositDetails.availableDeposit)
+                          handleApplyDepositAdjustment(depositDetails.availableDeposit)
+                        }}
+                        className="px-2.5 py-2 rounded-xl text-[11px] font-semibold bg-slate-800 hover:bg-slate-700 text-teal-300 border border-teal-500/30 cursor-pointer"
+                      >
+                        পুরো জামানত ({formatCurrencyBn(depositDetails.availableDeposit)})
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-teal-950/40 border border-teal-500/20 text-[11px] text-teal-300 flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-teal-400 mt-0.5" />
+                    <span>
+                      <strong>ক্যাশবহির্ভূত সমন্বয়:</strong> এই টাকা নতুন করে ক্যাশে জমা হবে না, কারণ তা আগেই জামানত হিসেবে ক্যাশে জমা নেওয়া হয়েছে। সংরক্ষিত জামানত থেকে এই অংক কর্তন হয়ে বর্তমান বিল পরিশোধ হবে।
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Multi-head Breakdown Matrix */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -678,67 +919,86 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
             </div>
           </div>
 
-          {/* Payment Method & Destination Account */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-800">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                <CreditCard className="w-3.5 h-3.5 text-indigo-400" />
-                পেমেন্ট মাধ্যম <span className="text-rose-400">*</span>
-              </label>
-              <select
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
-              >
-                <option value="CASH">নগদ ক্যাশ (Cash)</option>
-                <option value="MFS">বিকাশ / নগদ (MFS)</option>
-                <option value="BANK_TRANSFER">ব্যাংক ট্রান্সফার (Bank Transfer)</option>
-              </select>
+          {/* Payment Method & Destination Account (Or Non-Cash Deposit Adjustment Banner) */}
+          {isAdjustingFromDeposit ? (
+            <div className="p-3.5 rounded-2xl bg-teal-950/40 border border-teal-500/30 flex items-start sm:items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-teal-500/20 text-teal-400 shrink-0">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div className="flex-1 space-y-0.5">
+                <div className="text-xs font-bold text-teal-200 flex items-center gap-2">
+                  <span>পেমেন্ট মাধ্যম: জামানত থেকে সমন্বয় (Deposit Adjustment)</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] bg-teal-500/20 text-teal-300 font-semibold border border-teal-500/30">
+                    ক্যাশবহির্ভূত ট্রানজ্যাকশন
+                  </span>
+                </div>
+                <div className="text-[11px] text-teal-300/80 leading-relaxed">
+                  এই সমন্বয়ের কারণে ক্যাশ ড্রয়ার বা ব্যাংক অ্যাকাউন্টে কোনো নতুন টাকা যোগ হবে না। সংরক্ষিত জামানতের তহবিল থেকে এই অংকটি স্বয়ংক্রিয়ভাবে কর্তন হয়ে বর্তমান বিল পরিশোধে যুক্ত হবে।
+                </div>
+              </div>
             </div>
-
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-800">
+              <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                  <Wallet className="w-3.5 h-3.5 text-emerald-400" />
-                  জমার অ্যাকাউন্ট (Destination Account) <span className="text-rose-400">*</span>
+                  <CreditCard className="w-3.5 h-3.5 text-indigo-400" />
+                  পেমেন্ট মাধ্যম <span className="text-rose-400">*</span>
                 </label>
-                <button
-                  type="button"
-                  onClick={() => setIsCreateAccountModalOpen(true)}
-                  className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-400 hover:text-emerald-300 transition-colors"
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
                 >
-                  <Plus className="w-3 h-3" />
-                  নতুন অ্যাকাউন্ট
-                </button>
+                  <option value="CASH">নগদ ক্যাশ (Cash)</option>
+                  <option value="MFS">বিকাশ / নগদ (MFS)</option>
+                  <option value="BANK_TRANSFER">ব্যাংক ট্রান্সফার (Bank Transfer)</option>
+                </select>
               </div>
 
-              {accounts.length === 0 ? (
-                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-2">
-                  <span className="text-[11px] text-amber-300">কোনো জমার অ্যাকাউন্ট পাওয়া যায়নি।</span>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                    <Wallet className="w-3.5 h-3.5 text-emerald-400" />
+                    জমার অ্যাকাউন্ট (Destination Account) <span className="text-rose-400">*</span>
+                  </label>
                   <button
                     type="button"
                     onClick={() => setIsCreateAccountModalOpen(true)}
-                    className="px-2.5 py-1 text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg inline-flex items-center gap-1"
+                    className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-400 hover:text-emerald-300 transition-colors"
                   >
-                    <Plus className="w-3 h-3" /> তৈরি করুন
+                    <Plus className="w-3 h-3" />
+                    নতুন অ্যাকাউন্ট
                   </button>
                 </div>
-              ) : (
-                <select
-                  value={destinationAccountId}
-                  onChange={(e) => setDestinationAccountId(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-emerald-500"
-                  required
-                >
-                  {accounts.map((acc) => (
-                    <option key={acc.id} value={acc.id}>
-                      {acc.account_name} ({formatCurrencyBn(acc.current_balance)})
-                    </option>
-                  ))}
-                </select>
-              )}
+
+                {accounts.length === 0 ? (
+                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-amber-300">কোনো জমার অ্যাকাউন্ট পাওয়া যায়নি।</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsCreateAccountModalOpen(true)}
+                      className="px-2.5 py-1 text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg inline-flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" /> তৈরি করুন
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    value={destinationAccountId}
+                    onChange={(e) => setDestinationAccountId(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-emerald-500"
+                    required
+                  >
+                    {accounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.account_name} ({formatCurrencyBn(acc.current_balance)})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Reference & Remarks */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -785,10 +1045,23 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
                 data-testid="submit-receipt-btn"
                 isLoading={recordReceiptMutation.isPending}
                 disabled={!boarderId || totalAmount <= 0}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4"
+                className={
+                  isAdjustingFromDeposit
+                    ? 'bg-teal-600 hover:bg-teal-500 text-white font-bold px-4 shadow-md shadow-teal-600/30'
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4'
+                }
               >
-                <Receipt className="w-3.5 h-3.5 mr-1.5" />
-                রিসিপ্ট নিশ্চিত ও সেভ করুন
+                {isAdjustingFromDeposit ? (
+                  <>
+                    <ShieldCheck className="w-3.5 h-3.5 mr-1.5" />
+                    জামানত থেকে সমন্বয় নিশ্চিত করুন
+                  </>
+                ) : (
+                  <>
+                    <Receipt className="w-3.5 h-3.5 mr-1.5" />
+                    রিসিপ্ট নিশ্চিত ও সেভ করুন
+                  </>
+                )}
               </Button>
             </div>
           </div>

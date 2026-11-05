@@ -221,6 +221,7 @@ export function useReportsData(filters: ReportFilterState) {
           void_by,
           void_at,
           remarks,
+          transaction_reference,
           boarder_id,
           boarder:boarders(id, full_name, boarder_code, phone_number),
           account:financial_accounts(id, account_name, account_type),
@@ -303,6 +304,7 @@ export function useReportsData(filters: ReportFilterState) {
           due_amount,
           status,
           due_date,
+          description,
           boarder:boarders(id, full_name, boarder_code, phone_number)
         `)
         .order('due_date', { ascending: true })
@@ -1137,7 +1139,61 @@ export function useReportsData(filters: ReportFilterState) {
         const seat = extractSingle(alloc.seat)
         const room = extractSingle(seat?.room)
         const flat = extractSingle(room?.flat)
-        const secAmt = Number(alloc.security_deposit) || 0
+        const bId = alloc.boarder_id || bInfo.id
+        const allocSecAmt = Number(alloc.security_deposit) || 0
+
+        // Security Deposit billed from manual charges (e.g. from Monthly Bill Generation -> Other Charges -> SECURITY_DEPOSIT)
+        const billedDepositCharges = rawCharges
+          .filter(
+            (c) =>
+              c.boarder_id === bId &&
+              (c.charge_type === 'SECURITY_DEPOSIT' ||
+                c.description?.includes('[SECURITY_DEPOSIT]') ||
+                c.description?.includes('জামানত সংগ্রহ'))
+          )
+          .reduce((s, c) => s + (Number(c.amount) || 0), 0)
+
+        // Security Deposit collected from receipts
+        const paidDepositReceipts = rawReceipts
+          .filter(
+            (r) =>
+              !r.is_void &&
+              r.boarder_id === bId &&
+              (r.remarks?.includes('[SECURITY_DEPOSIT]') ||
+                r.transaction_reference?.includes('[SECURITY_DEPOSIT]') ||
+                r.remarks?.includes('জামানত সংগ্রহ') ||
+                r.transaction_reference?.includes('জামানত সংগ্রহ') ||
+                r.remarks?.includes('সিকিউরিটি জামানত') ||
+                r.transaction_reference?.includes('সিকিউরিটি জামানত'))
+          )
+          .reduce((s, r) => s + (Number(r.amount) || 0), 0)
+
+        // Security Deposit adjusted against unpaid dues
+        const adjustedDeposit = rawReceipts
+          .filter(
+            (r) =>
+              !r.is_void &&
+              r.boarder_id === bId &&
+              (r.payment_method === 'ADJUSTMENT' ||
+                r.remarks?.includes('[DEPOSIT_ADJUSTMENT]') ||
+                r.transaction_reference?.includes('[DEPOSIT_ADJUSTMENT]') ||
+                r.remarks?.includes('জামানত থেকে সমন্বয়') ||
+                r.transaction_reference?.includes('জামানত থেকে সমন্বয়'))
+          )
+          .reduce((s, r) => s + (Number(r.amount) || 0), 0)
+
+        const totalBilled = Math.max(allocSecAmt, billedDepositCharges, paidDepositReceipts)
+        const totalPaid = Math.max(allocSecAmt, paidDepositReceipts)
+        const held = Math.max(0, totalPaid - adjustedDeposit)
+
+        let statusText = 'তহবিলে সংরক্ষিত (HELD)'
+        if (held <= 0 && adjustedDeposit > 0) {
+          statusText = 'সম্পূর্ণ সমন্বয়কৃত (ADJUSTED)'
+        } else if (alloc.status !== 'ACTIVE') {
+          statusText = 'অব্যাহতি (RELEASED)'
+        } else if (totalPaid < totalBilled) {
+          statusText = 'আংশিক জমা'
+        }
 
         return {
           boarderName: bInfo.fullName,
@@ -1145,9 +1201,11 @@ export function useReportsData(filters: ReportFilterState) {
           flatName: flat?.name || 'ফ্ল্যাট ৪এ',
           seatName: seat?.seat_name || 'সিট',
           allocationStart: alloc.start_date || startDate,
-          securityDepositBilled: secAmt,
-          securityDepositPaid: secAmt,
-          status: alloc.status === 'ACTIVE' ? 'HELD_IN_CUSTODY' : 'RELEASED / REFUNDED',
+          securityDepositBilled: totalBilled,
+          securityDepositPaid: totalPaid,
+          securityDepositAdjusted: adjustedDeposit,
+          securityDepositHeld: held,
+          status: statusText,
           currentAllocationStatus: alloc.status || 'ACTIVE',
         }
       })

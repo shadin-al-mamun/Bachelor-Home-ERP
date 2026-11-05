@@ -47,6 +47,10 @@ vi.mock('@/features/billing/api/useReceipts', () => ({
     data: boarderId ? MOCK_UNPAID_CHARGES : [],
     isLoading: false,
   }),
+  useReceipts: () => ({
+    data: [],
+    isLoading: false,
+  }),
   useRecordReceiptMutation: () => ({
     mutateAsync: vi.fn(),
     isPending: false,
