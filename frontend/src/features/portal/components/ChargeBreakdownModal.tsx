@@ -14,6 +14,7 @@ import {
   Calendar,
   CheckCircle2,
   Building2,
+  Tag,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { formatCurrencyBn, formatDateBn } from '@/utils/date'
@@ -344,6 +345,24 @@ export const ChargeBreakdownModal: React.FC<ChargeBreakdownModalProps> = ({
           colorClass: 'text-indigo-400',
           borderClass: 'border-indigo-500/30',
           bgClass: 'bg-indigo-500/10',
+        }
+      case 'ADMISSION_FEE':
+        return {
+          title: 'এককালীন অফেরতযোগ্য সার্ভিস চার্জের বিবরণ',
+          badgeText: 'এককালীন অফেরতযোগ্য সার্ভিস চার্জ',
+          icon: <Tag className="w-5 h-5 text-emerald-400" />,
+          colorClass: 'text-emerald-400',
+          borderClass: 'border-emerald-500/30',
+          bgClass: 'bg-emerald-500/10',
+        }
+      case 'SECURITY_DEPOSIT':
+        return {
+          title: 'সিকিউরিটি জামানতের বিবরণ ও স্থিতি',
+          badgeText: 'জামানত সংগ্রহ (Security Deposit)',
+          icon: <ShieldCheck className="w-5 h-5 text-teal-400" />,
+          colorClass: 'text-teal-400',
+          borderClass: 'border-teal-500/30',
+          bgClass: 'bg-teal-500/10',
         }
       default:
         return {

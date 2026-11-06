@@ -54,9 +54,9 @@ interface FlatRowState {
 
 const CHARGE_TYPE_OPTIONS: { value: ChargeType; label: string }[] = [
   { value: 'SECURITY_DEPOSIT', label: 'জামানত সংগ্রহ (Security Deposit)' },
+  { value: 'ADMISSION_FEE', label: 'এককালীন অফেরতযোগ্য সার্ভিস চার্জ (Admission Service Charge)' },
   { value: 'UTILITY', label: 'ইউটিলিটি চার্জ (Utility)' },
   { value: 'PENALTY', label: 'জরিমানা / লেট ফি (Penalty)' },
-  { value: 'ADMISSION_FEE', label: 'ভর্তি ফি (Admission Fee)' },
   { value: 'MEAL', label: 'খাবার সমন্বয় ফি (Meal Adjustment)' },
   { value: 'OTHER', label: 'অন্যান্য সার্ভিস ফি (Other Fee)' },
 ]
@@ -1311,6 +1311,11 @@ export const MonthlyBillGenerationPage: React.FC = () => {
                         if (b && (b.active_allocation?.security_deposit || b.active_allocation?.monthly_rent)) {
                           setManualAmount(b.active_allocation.security_deposit || b.active_allocation.monthly_rent || '')
                         }
+                      } else if (manualChargeType === 'ADMISSION_FEE') {
+                        setManualAmount(500)
+                        if (!manualDescription || manualDescription === 'ইউটিলিটি বিল') {
+                          setManualDescription('এককালীন অফেরতযোগ্য সার্ভিস চার্জ (Admission Service Charge)')
+                        }
                       }
                     }}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:ring-2 focus:ring-rose-500/50"
@@ -1337,13 +1342,18 @@ export const MonthlyBillGenerationPage: React.FC = () => {
                         const newType = e.target.value as ChargeType
                         setManualChargeType(newType)
                         if (newType === 'SECURITY_DEPOSIT') {
-                          if (!manualDescription || manualDescription === 'ইউটিলিটি বিল') {
+                          if (!manualDescription || manualDescription === 'ইউটিলিটি বিল' || manualDescription.includes('সার্ভিস চার্জ')) {
                             setManualDescription('জামানত সংগ্রহ (Security Deposit)')
                           }
                           const b = activeBoarders.find((item) => item.id === manualBoarderId)
                           if (b && (b.active_allocation?.security_deposit || b.active_allocation?.monthly_rent)) {
                             setManualAmount(b.active_allocation.security_deposit || b.active_allocation.monthly_rent || '')
                           }
+                        } else if (newType === 'ADMISSION_FEE') {
+                          if (!manualDescription || manualDescription === 'ইউটিলিটি বিল' || manualDescription.includes('জামানত')) {
+                            setManualDescription('এককালীন অফেরতযোগ্য সার্ভিস চার্জ (Admission Service Charge)')
+                          }
+                          setManualAmount(500)
                         }
                       }}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:ring-2 focus:ring-rose-500/50"

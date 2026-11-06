@@ -571,7 +571,7 @@ export const BoarderDuesPage: React.FC = () => {
       case 'SECURITY_DEPOSIT':
         return 'জামানত সংগ্রহ (Security Deposit)'
       case 'ADMISSION_FEE':
-        return 'ভর্তি / সার্ভিস চার্জ'
+        return 'এককালীন অফেরতযোগ্য সার্ভিস চার্জ'
       case 'PENALTY':
         return 'বিলম্ব জরিমানা'
       default:

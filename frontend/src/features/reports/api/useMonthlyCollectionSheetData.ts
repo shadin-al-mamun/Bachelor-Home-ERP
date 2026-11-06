@@ -490,6 +490,7 @@ export function useMonthlyCollectionSheetData(
         return (
           bMonth === activeMonthPrefix &&
           (c.charge_type === 'UTILITY' ||
+            c.charge_type === 'ADMISSION_FEE' ||
             (c.charge_type as string) === 'SERVICE_CHARGE' ||
             (c.charge_type as string) === 'OTHER' ||
             (c.charge_type as string) === 'MISC')

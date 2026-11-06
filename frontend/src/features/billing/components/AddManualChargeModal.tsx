@@ -15,9 +15,9 @@ interface AddManualChargeModalProps {
 
 const CHARGE_TYPE_OPTIONS: { value: ChargeType; label: string }[] = [
   { value: 'SECURITY_DEPOSIT', label: 'জামানত সংগ্রহ (Security Deposit)' },
+  { value: 'ADMISSION_FEE', label: 'এককালীন অফেরতযোগ্য সার্ভিস চার্জ (Admission Service Charge)' },
   { value: 'UTILITY', label: 'ইউটিলিটি চার্জ (Utility)' },
   { value: 'PENALTY', label: 'জরিমানা / লেট ফি (Penalty)' },
-  { value: 'ADMISSION_FEE', label: 'ভর্তি ফি (Admission Fee)' },
   { value: 'MEAL', label: 'খাবার সমন্বয় ফি (Meal Adjustment)' },
   { value: 'OTHER', label: 'অন্যান্য সার্ভিস ফি (Other Fee)' },
 ]
@@ -139,6 +139,11 @@ export const AddManualChargeModal: React.FC<AddManualChargeModalProps> = ({
                 if (b && (b.active_allocation?.security_deposit || b.active_allocation?.monthly_rent)) {
                   setAmount(b.active_allocation.security_deposit || b.active_allocation.monthly_rent || 0)
                 }
+              } else if (chargeType === 'ADMISSION_FEE') {
+                setAmount(500)
+                if (!description || description === 'ইউটিলিটি বিল') {
+                  setDescription('এককালীন অফেরতযোগ্য সার্ভিস চার্জ (Admission Service Charge)')
+                }
               }
             }}
             disabled={Boolean(preSelectedBoarderId)}
@@ -167,13 +172,18 @@ export const AddManualChargeModal: React.FC<AddManualChargeModalProps> = ({
                 const newType = e.target.value as ChargeType
                 setChargeType(newType)
                 if (newType === 'SECURITY_DEPOSIT') {
-                  if (!description || description === 'ইউটিলিটি বিল') {
+                  if (!description || description === 'ইউটিলিটি বিল' || description.includes('সার্ভিস চার্জ')) {
                     setDescription('জামানত সংগ্রহ (Security Deposit)')
                   }
                   const b = boarders.find((item) => item.id === boarderId)
                   if (b && (b.active_allocation?.security_deposit || b.active_allocation?.monthly_rent)) {
                     setAmount(b.active_allocation.security_deposit || b.active_allocation.monthly_rent || 0)
                   }
+                } else if (newType === 'ADMISSION_FEE') {
+                  if (!description || description === 'ইউটিলিটি বিল' || description.includes('জামানত')) {
+                    setDescription('এককালীন অফেরতযোগ্য সার্ভিস চার্জ (Admission Service Charge)')
+                  }
+                  setAmount(500)
                 }
               }}
               className="w-full px-3 py-2 bg-slate-900/80 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"

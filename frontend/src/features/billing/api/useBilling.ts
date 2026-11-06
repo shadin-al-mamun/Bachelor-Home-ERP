@@ -212,7 +212,7 @@ export function useAddManualCharge() {
         .select()
         .single()
 
-      if (error && params.chargeType === 'SECURITY_DEPOSIT' && (error.message?.includes('invalid input value for enum') || error.message?.includes('enum'))) {
+      if (error && (params.chargeType === 'SECURITY_DEPOSIT' || params.chargeType === 'ADMISSION_FEE') && (error.message?.includes('invalid input value for enum') || error.message?.includes('enum'))) {
         const fallbackRes = await supabase
           .from('boarder_charges')
           .insert({
@@ -221,7 +221,7 @@ export function useAddManualCharge() {
             billing_month: params.billingMonth,
             amount: params.amount,
             due_date: params.dueDate,
-            description: `[SECURITY_DEPOSIT] ${params.description}`,
+            description: `[${params.chargeType}] ${params.description}`,
             created_by: (await supabase.auth.getUser()).data.user?.id,
           })
           .select()

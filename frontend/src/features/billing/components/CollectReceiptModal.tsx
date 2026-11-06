@@ -49,6 +49,7 @@ const DEFAULT_HEADS: { code: string; name: string }[] = [
   { code: 'MEAL_BILL', name: 'মিল বিল (Meal Bill)' },
   { code: 'MISC_BILL', name: 'ফ্ল্যাট বিবিধ বিল (Misc Bill)' },
   { code: 'SECURITY_DEPOSIT', name: 'জামানত সংগ্রহ (Security Deposit)' },
+  { code: 'ADMISSION_FEE', name: 'এককালীন সার্ভিস চার্জ (Admission Fee)' },
   { code: 'ADVANCE', name: 'অগ্রিম জমা (Advance)' },
   { code: 'FINE', name: 'জরিমানা / বিলম্ব ফি (Fine)' },
   { code: 'OTHER', name: 'অন্যান্য সার্ভিস চার্জ (Other)' },
@@ -375,7 +376,7 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
     if (headCode === 'SEAT_RENT') return duesBreakdown.rentDue
     if (headCode === 'MEAL_BILL') return duesBreakdown.mealDue
     if (headCode === 'MISC_BILL') return duesBreakdown.utilityDue
-    if (headCode === 'OTHER' || headCode === 'FINE') return duesBreakdown.otherDue
+    if (headCode === 'OTHER' || headCode === 'FINE' || headCode === 'ADMISSION_FEE') return duesBreakdown.otherDue
     return 0
   }
 
