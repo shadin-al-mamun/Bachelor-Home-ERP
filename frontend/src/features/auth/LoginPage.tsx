@@ -62,7 +62,12 @@ const KNOWN_PHONE_ACCOUNT_MAP: Record<string, { email: string; role: UserRole; n
   '01800000001': {
     email: 'manager@bachelorhome.erp',
     role: 'MANAGER',
-    name: 'ম্যানেজার তানভীর',
+    name: 'ম্যানেজার তানভীর (ম্যানেজার ১)',
+  },
+  '01800000002': {
+    email: 'manager2@bachelorhome.erp',
+    role: 'MANAGER',
+    name: 'ম্যানেজার মেহেদী (ম্যানেজার ২)',
   },
   '01600000001': {
     email: 'applicant@bachelorhome.erp',
@@ -550,9 +555,12 @@ export const LoginPage: React.FC = () => {
           avatar_url: matched.photo_url || undefined,
         })
       } else {
+        const known = KNOWN_PHONE_ACCOUNT_MAP[phone]
         setDemoUser(role, {
+          id: phone === '01800000002' ? 'p-manager-2' : phone === '01800000001' ? 'p-manager-1' : undefined,
           phone_number: phone,
           email: demoEmail,
+          full_name: known?.name || undefined,
         })
       }
       handleRoleRedirect(role)
@@ -775,10 +783,22 @@ export const LoginPage: React.FC = () => {
                 className="p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-primary-500/40 text-left transition-all group"
               >
                 <div className="font-semibold text-white group-hover:text-primary-300 text-xs flex items-center justify-between">
-                  <span>ম্যানেজার তানভীর</span>
-                  <span className="text-[10px] text-indigo-400 bg-indigo-950/60 px-1.5 py-0.5 rounded">Manager</span>
+                  <span>ম্যানেজার ১ (তানভীর)</span>
+                  <span className="text-[10px] text-indigo-400 bg-indigo-950/60 px-1.5 py-0.5 rounded">Mgr 1</span>
                 </div>
                 <div className="text-[11px] text-slate-400 font-mono mt-0.5">📱 01800000001</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickDemo('MANAGER', '01800000002', 'manager2@bachelorhome.erp')}
+                className="p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-primary-500/40 text-left transition-all group"
+              >
+                <div className="font-semibold text-white group-hover:text-primary-300 text-xs flex items-center justify-between">
+                  <span>ম্যানেজার ২ (মেহেদী)</span>
+                  <span className="text-[10px] text-indigo-400 bg-indigo-950/60 px-1.5 py-0.5 rounded">Mgr 2</span>
+                </div>
+                <div className="text-[11px] text-slate-400 font-mono mt-0.5">📱 01800000002</div>
               </button>
 
               <button
@@ -791,18 +811,6 @@ export const LoginPage: React.FC = () => {
                   <span className="text-[10px] text-amber-400 bg-amber-950/60 px-1.5 py-0.5 rounded">Boarder</span>
                 </div>
                 <div className="text-[11px] text-slate-400 font-mono mt-0.5">📱 01711223344</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickDemo('BOARDER', '01912345678', 'rakibul.hasan@example.com')}
-                className="p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-primary-500/40 text-left transition-all group"
-              >
-                <div className="font-semibold text-white group-hover:text-primary-300 text-xs flex items-center justify-between">
-                  <span>বর্ডার (রাকিবুল)</span>
-                  <span className="text-[10px] text-amber-400 bg-amber-950/60 px-1.5 py-0.5 rounded">Boarder</span>
-                </div>
-                <div className="text-[11px] text-slate-400 font-mono mt-0.5">📱 01912345678</div>
               </button>
             </div>
           </div>

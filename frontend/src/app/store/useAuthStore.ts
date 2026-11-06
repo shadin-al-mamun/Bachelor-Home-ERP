@@ -203,8 +203,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   setDemoUser: (role: UserRole, customProfile?: Partial<Profile>) => {
-    const userId = customProfile?.id || '00000000-0000-0000-0000-000000000099'
-    const userEmail = customProfile?.email || `${role.toLowerCase()}@bachelorhome.erp`
+    const isManager2 =
+      customProfile?.id === 'p-manager-2' ||
+      customProfile?.phone_number === '01800000002' ||
+      customProfile?.email === 'manager2@bachelorhome.erp'
+
+    const defaultId =
+      role === 'SUPER_ADMIN'
+        ? 'p-owner'
+        : role === 'MANAGER'
+        ? (isManager2 ? 'p-manager-2' : 'p-manager-1')
+        : role === 'APPLICANT'
+        ? 'p-applicant'
+        : 'p-imran'
+
+    const userId = customProfile?.id || defaultId
+    const defaultEmail =
+      role === 'SUPER_ADMIN'
+        ? 'shadin0158@gmail.com'
+        : role === 'MANAGER'
+        ? (isManager2 ? 'manager2@bachelorhome.erp' : 'manager@bachelorhome.erp')
+        : `${role.toLowerCase()}@bachelorhome.erp`
+    const userEmail = customProfile?.email || defaultEmail
 
     const mockUser: Partial<User> = {
       id: userId,
@@ -216,16 +236,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       role === 'SUPER_ADMIN'
         ? 'হোস্টেল এডমিন (মালিক)'
         : role === 'MANAGER'
-        ? 'ম্যানেজার তানভীর'
+        ? (isManager2 ? 'ম্যানেজার মেহেদী (ম্যানেজার ২)' : 'ম্যানেজার তানভীর (ম্যানেজার ১)')
         : role === 'APPLICANT'
         ? 'নতুন আবেদনকারী'
         : 'বর্ডার রাকিবুল'
+
+    const defaultPhone =
+      role === 'SUPER_ADMIN'
+        ? '01712394767'
+        : role === 'MANAGER'
+        ? (isManager2 ? '01800000002' : '01800000001')
+        : '01711000000'
 
     const mockProfile: Profile = {
       id: userId,
       email: userEmail,
       full_name: customProfile?.full_name || defaultName,
-      phone_number: customProfile?.phone_number || '01711000000',
+      phone_number: customProfile?.phone_number || defaultPhone,
       role,
       is_active: true,
       preferred_language: 'bn',

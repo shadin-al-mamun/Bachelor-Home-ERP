@@ -14,6 +14,7 @@ import {
   type RecordTransferInput,
 } from '../api/useFinance'
 import { useExpenseAccounts } from '@/features/expenses/api/useExpenses'
+import { getVisibleFinancialAccounts } from '@/features/billing/api/useReceipts'
 import { useAuthStore } from '@/app/store/useAuthStore'
 
 interface AddTransferModalProps {
@@ -44,24 +45,12 @@ export const AddTransferModal: React.FC<AddTransferModalProps> = ({
   const { profile } = useAuthStore()
   const isAdmin = profile?.role === 'SUPER_ADMIN' || profile?.role === 'ADMIN'
 
-  // Filter accounts belonging to manager
-  const managerAccounts = React.useMemo(() => {
-    return accounts.filter((a) => {
-      if (profile?.id && a.assigned_manager_id === profile.id) return true
-      if (a.account_type === 'CASH_MANAGER') return true
-      const name = a.account_name.toLowerCase()
-      if (name.includes('manager') || a.account_name.includes('ম্যানেজার')) return true
-      return false
-    })
-  }, [accounts, profile?.id])
-
   // Source accounts (From):
   // Admins can transfer from ANY account.
-  // Managers can ONLY transfer OUT from their own manager cash custody account!
+  // Managers can ONLY transfer OUT from their own assigned manager cash custody account!
   const availableSourceAccounts = React.useMemo(() => {
-    if (isAdmin) return accounts
-    return managerAccounts.length > 0 ? managerAccounts : accounts
-  }, [isAdmin, accounts, managerAccounts])
+    return getVisibleFinancialAccounts(accounts, profile)
+  }, [accounts, profile])
 
   // Destination accounts (To):
   // Can be any account EXCEPT the currently selected source account.
@@ -108,7 +97,7 @@ export const AddTransferModal: React.FC<AddTransferModalProps> = ({
       return
     }
 
-    if (!isAdmin && !managerAccounts.some((a) => a.id === fromAccountId)) {
+    if (!isAdmin && !availableSourceAccounts.some((a) => a.id === fromAccountId)) {
       setErrorMsg('ম্যানেজার শুধুমাত্র নিজের ম্যানেজার ক্যাশ একাউন্ট থেকে অন্য একাউন্টে টাকা পাঠাতে পারবেন। অন্য একাউন্ট থেকে অর্থ স্থানান্তরের অনুমতি নেই।')
       return
     }

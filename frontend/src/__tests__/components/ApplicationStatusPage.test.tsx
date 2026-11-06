@@ -51,3 +51,4 @@ describe('ApplicationStatusPage - Dynamic Hostel Phone Number', () => {
     expect(screen.getByText(/ব্যাচেলর হোম ঢাকা — আবেদনকারী ট্র্যাকিং পোর্টাল/i)).toBeInTheDocument()
   })
 })
+

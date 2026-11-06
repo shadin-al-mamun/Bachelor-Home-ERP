@@ -5,6 +5,11 @@ import { Input } from '@/components/common/Input'
 import { queryClient } from '@/lib/queryClient'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
 import type { FinancialAccount, FinancialAccountType } from '@/types/database'
+import { useUsersList } from '@/features/governance/api/useUserManagement'
+import {
+  getStoredFinancialAccounts,
+  saveStoredFinancialAccounts,
+} from '@/features/billing/api/useReceipts'
 import {
   Wallet,
   Building2,
@@ -12,6 +17,7 @@ import {
   Banknote,
   CheckCircle2,
   AlertCircle,
+  UserCheck,
 } from 'lucide-react'
 
 interface CreateFinancialAccountModalProps {
@@ -27,11 +33,15 @@ export const CreateFinancialAccountModal: React.FC<CreateFinancialAccountModalPr
   onAccountCreated,
   accountToEdit,
 }) => {
+  const { data: usersList = [] } = useUsersList()
+  const managerUsers = usersList.filter((u) => u.role === 'MANAGER' || u.role === 'ADMIN')
+
   const [accountName, setAccountName] = useState('')
   const [accountType, setAccountType] = useState<FinancialAccountType>('CASH_OWNER')
   const [accountNumber, setAccountNumber] = useState('')
   const [bankName, setBankName] = useState('')
   const [openingBalance, setOpeningBalance] = useState<number>(0)
+  const [assignedManagerId, setAssignedManagerId] = useState<string>('')
   const [isLoading, setIsLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
@@ -41,6 +51,7 @@ export const CreateFinancialAccountModal: React.FC<CreateFinancialAccountModalPr
     setAccountNumber('')
     setBankName('')
     setOpeningBalance(0)
+    setAssignedManagerId('')
     setErrorMsg(null)
   }, [])
 
@@ -51,6 +62,7 @@ export const CreateFinancialAccountModal: React.FC<CreateFinancialAccountModalPr
       setAccountNumber(accountToEdit.account_number || '')
       setBankName(accountToEdit.bank_name || '')
       setOpeningBalance(accountToEdit.current_balance)
+      setAssignedManagerId(accountToEdit.assigned_manager_id || '')
       setErrorMsg(null)
     } else {
       resetForm()
@@ -75,6 +87,7 @@ export const CreateFinancialAccountModal: React.FC<CreateFinancialAccountModalPr
         account_number: accountNumber.trim() || null,
         bank_name: bankName.trim() || (accountType === 'MFS' ? 'bKash/Nagad' : accountType === 'BANK' ? 'Bank' : 'Cash Safe'),
         current_balance: Math.max(0, Number(openingBalance) || 0),
+        assigned_manager_id: assignedManagerId ? assignedManagerId : null,
         is_active: true,
       }
 
@@ -102,15 +115,32 @@ export const CreateFinancialAccountModal: React.FC<CreateFinancialAccountModalPr
           resultAccount = data as FinancialAccount
         }
       } else {
-        // Offline / demo fallback
-        resultAccount = {
-          id: accountToEdit ? accountToEdit.id : 'fa-' + Date.now(),
-          ...payload,
-          account_number: payload.account_number || '',
-          bank_name: payload.bank_name || '',
-          created_at: accountToEdit ? accountToEdit.created_at : new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        } as FinancialAccount
+        // Offline / demo fallback with localStorage persistence
+        const allAccounts = getStoredFinancialAccounts()
+        if (accountToEdit) {
+          resultAccount = {
+            ...accountToEdit,
+            ...payload,
+            account_number: payload.account_number || '',
+            bank_name: payload.bank_name || '',
+            updated_at: new Date().toISOString(),
+          } as FinancialAccount
+          const idx = allAccounts.findIndex((a) => a.id === accountToEdit.id)
+          if (idx !== -1) {
+            allAccounts[idx] = resultAccount
+          }
+        } else {
+          resultAccount = {
+            id: 'fa-' + Date.now(),
+            ...payload,
+            account_number: payload.account_number || '',
+            bank_name: payload.bank_name || '',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          } as FinancialAccount
+          allAccounts.push(resultAccount)
+        }
+        saveStoredFinancialAccounts(allAccounts)
       }
 
       // Invalidate queries so all dropdowns and balance cards across the app immediately update
@@ -246,6 +276,32 @@ export const CreateFinancialAccountModal: React.FC<CreateFinancialAccountModalPr
             value={bankName}
             onChange={(e) => setBankName(e.target.value)}
           />
+        </div>
+
+        {/* Designated Manager (Cash Custody) */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <UserCheck className="w-3.5 h-3.5 text-indigo-400" />
+              <span>দায়িত্বপ্রাপ্ত ম্যানেজার (Cash Custodian)</span>
+            </span>
+            <span className="text-[10px] text-indigo-400 font-normal">এডমিন নির্ধারিত</span>
+          </label>
+          <select
+            value={assignedManagerId}
+            onChange={(e) => setAssignedManagerId(e.target.value)}
+            className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="">-- কোনো নির্দিষ্ট ম্যানেজার নেই (উন্মুক্ত) --</option>
+            {managerUsers.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.full_name} ({m.phone_number})
+              </option>
+            ))}
+          </select>
+          <span className="text-[11px] text-slate-400 block">
+            নির্দিষ্ট ম্যানেজার নির্বাচন করলে শুধুমাত্র ঐ ম্যানেজার তার আইডি থেকে এই অ্যাকাউন্টে লেনদেন ও হিসাব দেখতে পারবেন।
+          </span>
         </div>
 
         {/* Initial / Opening Balance */}

@@ -65,19 +65,9 @@ export function useBillingHeads() {
   })
 }
 
-const MOCK_ACCOUNTS: FinancialAccount[] = [
-  {
-    id: '11111111-0000-0000-0000-000000000001',
-    account_name: 'Hostel Main Account (মেইন একাউন্ট)',
-    account_type: 'CASH_OWNER',
-    account_number: 'MAIN-VAULT-01',
-    bank_name: 'Hostel Central Safe / Vault',
-    opening_balance: 0,
-    current_balance: 0,
-    is_active: true,
-    created_at: '2026-01-01T00:00:00Z',
-    updated_at: '2026-10-15T00:00:00Z',
-  },
+export const ACCOUNTS_STORAGE_KEY = 'bachelor_erp_financial_accounts'
+
+export const MOCK_ACCOUNTS: FinancialAccount[] = [
   {
     id: '11111111-0000-0000-0000-000000000002',
     account_name: 'Manager Cash Box (ম্যানেজার ক্যাশ)',
@@ -85,7 +75,33 @@ const MOCK_ACCOUNTS: FinancialAccount[] = [
     account_number: 'MGR-CASH-01',
     bank_name: 'Manager Shift Cash Drawer',
     opening_balance: 0,
+    current_balance: 12404,
+    is_active: true,
+    assigned_manager_id: 'p-manager-1',
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-10-15T00:00:00Z',
+  },
+  {
+    id: '11111111-0000-0000-0000-000000000004',
+    account_name: 'ম্যানেজার ক্যাশ ড্রয়ার',
+    account_type: 'CASH_MANAGER',
+    account_number: 'MGR-CASH-02',
+    bank_name: 'Cash Safe',
+    opening_balance: 0,
     current_balance: 0,
+    is_active: true,
+    assigned_manager_id: 'p-manager-2',
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-10-15T00:00:00Z',
+  },
+  {
+    id: '11111111-0000-0000-0000-000000000001',
+    account_name: 'Hostel Main Account (মেইন একাউন্ট)',
+    account_type: 'CASH_OWNER',
+    account_number: 'MAIN-VAULT-01',
+    bank_name: 'Hostel Central Safe / Vault',
+    opening_balance: 2000,
+    current_balance: 24050,
     is_active: true,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-10-15T00:00:00Z',
@@ -96,13 +112,94 @@ const MOCK_ACCOUNTS: FinancialAccount[] = [
     account_type: 'BANK',
     account_number: 'ADM-BANK-01',
     bank_name: 'Hostel Operating Bank Account',
-    opening_balance: 0,
-    current_balance: 0,
+    opening_balance: 5000,
+    current_balance: 10000,
     is_active: true,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-10-15T00:00:00Z',
   },
 ]
+
+export function getStoredFinancialAccounts(): FinancialAccount[] {
+  if (typeof window === 'undefined') return MOCK_ACCOUNTS
+  try {
+    const raw = localStorage.getItem(ACCOUNTS_STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to parse local financial accounts:', e)
+  }
+  return MOCK_ACCOUNTS
+}
+
+export function saveStoredFinancialAccounts(accounts: FinancialAccount[]) {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts))
+  } catch (e) {
+    console.warn('Failed to save local financial accounts:', e)
+  }
+}
+
+/**
+ * Resolves the designated manager cash account assigned to a specific manager.
+ */
+export function getManagerAssignedAccount(
+  accounts: FinancialAccount[],
+  managerUserId?: string
+): FinancialAccount | null {
+  if (!managerUserId) return null
+  // 1. Explicitly assigned account
+  const assigned = accounts.find((a) => a.assigned_manager_id === managerUserId)
+  if (assigned) return assigned
+
+  // 2. Fallback for demo/legacy: match by manager role/order
+  const managerCashAccounts = accounts.filter(
+    (a) =>
+      a.account_type === 'CASH_MANAGER' ||
+      a.account_name.toLowerCase().includes('manager') ||
+      a.account_name.includes('ম্যানেজার')
+  )
+
+  if (managerUserId === 'p-manager-2' || managerUserId.endsWith('0002')) {
+    return managerCashAccounts[1] || managerCashAccounts[0] || null
+  }
+
+  return managerCashAccounts[0] || null
+}
+
+/**
+ * Filters visible accounts based on the current user's role and identity.
+ * Super Admin, Admin, Accountant, Auditor can see ALL accounts.
+ * Managers can ONLY see their assigned account.
+ */
+export function getVisibleFinancialAccounts(
+  accounts: FinancialAccount[],
+  user?: import('@/types/database').Profile | null
+): FinancialAccount[] {
+  if (!user) return accounts
+
+  // Admin, Super Admin, Accountant, Auditor can see ALL accounts
+  if (['SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'AUDITOR'].includes(user.role)) {
+    return accounts
+  }
+
+  // Manager: ONLY see their assigned account!
+  if (user.role === 'MANAGER') {
+    const assigned = accounts.filter((a) => a.assigned_manager_id === user.id)
+    if (assigned.length > 0) return assigned
+
+    // Fallback if not yet explicitly mapped
+    const fallback = getManagerAssignedAccount(accounts, user.id)
+    return fallback ? [fallback] : []
+  }
+
+  return []
+}
 
 // Test financial transaction data reset for fresh baseline as instructed by user
 let MOCK_RECEIPTS: ExtendedReceipt[] = []
@@ -336,7 +433,7 @@ export function useFinancialAccounts() {
     queryKey: ['financial-accounts'],
     queryFn: async (): Promise<FinancialAccount[]> => {
       if (!isSupabaseConfigured) {
-        return MOCK_ACCOUNTS
+        return getStoredFinancialAccounts()
       }
 
       try {
@@ -401,7 +498,7 @@ export function useFinancialAccounts() {
       }
 
       // Safe baseline fallback so receipt collection is never blocked
-      return MOCK_ACCOUNTS
+      return getStoredFinancialAccounts()
     },
   })
 }

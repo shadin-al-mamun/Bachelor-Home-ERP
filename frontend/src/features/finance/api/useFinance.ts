@@ -11,6 +11,10 @@ import {
   isUUID,
   generateUUID,
 } from '@/features/expenses/api/useExpenses'
+import {
+  getStoredFinancialAccounts,
+  saveStoredFinancialAccounts,
+} from '@/features/billing/api/useReceipts'
 
 // ==============================================================================
 // Types & Interfaces
@@ -737,6 +741,7 @@ export interface UpdateFinancialAccountInput {
   opening_balance_date?: string
   opening_balance_source?: string | null
   current_balance?: number
+  assigned_manager_id?: string | null
 }
 
 export function useUpdateFinancialAccountMutation() {
@@ -745,7 +750,8 @@ export function useUpdateFinancialAccountMutation() {
   return useMutation({
     mutationFn: async (input: UpdateFinancialAccountInput) => {
       if (!isSupabaseConfigured) {
-        const acc = MOCK_ACCOUNTS.find((a) => a.id === input.id)
+        const allAccounts = getStoredFinancialAccounts()
+        const acc = allAccounts.find((a) => a.id === input.id) || MOCK_ACCOUNTS.find((a) => a.id === input.id)
         if (!acc) throw new Error('অ্যাকাউন্ট খুঁজে পাওয়া যায়নি।')
 
         if (input.account_name !== undefined) acc.account_name = input.account_name
@@ -760,7 +766,9 @@ export function useUpdateFinancialAccountMutation() {
         if (input.opening_balance_date !== undefined) acc.opening_balance_date = input.opening_balance_date
         if (input.opening_balance_source !== undefined) acc.opening_balance_source = input.opening_balance_source || undefined
         if (input.current_balance !== undefined) acc.current_balance = input.current_balance
+        if (input.assigned_manager_id !== undefined) acc.assigned_manager_id = input.assigned_manager_id || null
 
+        saveStoredFinancialAccounts(allAccounts)
         return acc
       }
 
@@ -773,6 +781,7 @@ export function useUpdateFinancialAccountMutation() {
       if (input.opening_balance_date !== undefined) updatePayload.opening_balance_date = input.opening_balance_date
       if (input.opening_balance_source !== undefined) updatePayload.opening_balance_source = input.opening_balance_source
       if (input.current_balance !== undefined) updatePayload.current_balance = input.current_balance
+      if (input.assigned_manager_id !== undefined) updatePayload.assigned_manager_id = input.assigned_manager_id || null
 
       const { data, error } = await supabase
         .from('financial_accounts')

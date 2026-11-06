@@ -25,6 +25,7 @@ import {
   type RecordExpenseInput,
 } from '../api/useExpenses'
 import { useAuthStore } from '@/app/store/useAuthStore'
+import { getVisibleFinancialAccounts } from '@/features/billing/api/useReceipts'
 import type { ExpenseScope } from '@/types/database'
 import { compressVoucherImage } from '@/utils/imageCompression'
 
@@ -243,23 +244,11 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const { profile } = useAuthStore()
   const isAdmin = profile?.role === 'SUPER_ADMIN' || profile?.role === 'ADMIN'
 
-  // Filter accounts belonging to manager
-  const managerAccounts = useMemo(() => {
-    return accounts.filter((a) => {
-      if (profile?.id && a.assigned_manager_id === profile.id) return true
-      if (a.account_type === 'CASH_MANAGER') return true
-      const name = a.account_name.toLowerCase()
-      if (name.includes('manager') || a.account_name.includes('ম্যানেজার')) return true
-      return false
-    })
-  }, [accounts, profile?.id])
-
-  // For Managers: ONLY manager accounts are accessible ("অন্য একাউন্ট তার এখানে আসবে না")
+  // For Managers: ONLY their assigned manager account is accessible
   // For Admins/SuperAdmins: all accounts are accessible
   const availableAccounts = useMemo(() => {
-    if (isAdmin) return accounts
-    return managerAccounts.length > 0 ? managerAccounts : accounts
-  }, [isAdmin, accounts, managerAccounts])
+    return getVisibleFinancialAccounts(accounts, profile)
+  }, [accounts, profile])
 
   // Filter categories by selected scope
   const filteredCategories = useMemo(() => {
@@ -388,7 +377,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       return
     }
 
-    if (!isAdmin && !managerAccounts.some((a) => a.id === sourceAccountId)) {
+    if (!isAdmin && !availableAccounts.some((a) => a.id === sourceAccountId)) {
       setErrorMsg('ম্যানেজার শুধুমাত্র নিজের ম্যানেজার ক্যাশ একাউন্ট থেকেই খরচ এন্ট্রি করতে পারবেন।')
       return
     }

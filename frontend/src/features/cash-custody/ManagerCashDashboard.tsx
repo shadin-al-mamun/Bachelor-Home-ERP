@@ -41,7 +41,15 @@ export const ManagerCashDashboard: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<string>(
     new Date().toISOString().slice(0, 10)
   )
-  const [selectedManagerId, setSelectedManagerId] = useState<string>('usr-mgr1')
+  const [selectedManagerId, setSelectedManagerId] = useState<string>(
+    profile?.role === 'MANAGER' ? (profile?.id || 'p-manager-1') : 'p-manager-1'
+  )
+
+  React.useEffect(() => {
+    if (profile?.role === 'MANAGER' && profile?.id) {
+      setSelectedManagerId(profile.id)
+    }
+  }, [profile?.id, profile?.role])
   const [movementFilter, setMovementFilter] = useState<'ALL' | 'RECEIPT' | 'EXPENSE' | 'TRANSFERS'>('ALL')
 
   // Modals state

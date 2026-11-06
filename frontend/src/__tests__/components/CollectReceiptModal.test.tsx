@@ -43,6 +43,8 @@ vi.mock('@/features/billing/api/useReceipts', () => ({
   useFinancialAccounts: () => ({
     data: MOCK_ACCOUNTS,
   }),
+  getVisibleFinancialAccounts: (accounts: any[]) => accounts || [],
+  getManagerAssignedAccount: (accounts: any[]) => accounts?.[0] || null,
   useUnpaidCharges: (boarderId: string) => ({
     data: boarderId ? MOCK_UNPAID_CHARGES : [],
     isLoading: false,

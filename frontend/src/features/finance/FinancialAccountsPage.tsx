@@ -11,8 +11,12 @@ import {
   Edit3,
   AlertCircle,
   Sparkles,
+  UserCheck,
 } from 'lucide-react'
-import { useFinancialAccounts } from '@/features/billing/api/useReceipts'
+import {
+  useFinancialAccounts,
+  getVisibleFinancialAccounts,
+} from '@/features/billing/api/useReceipts'
 import {
   useUpdateFinancialAccountMutation,
   useIncomes,
@@ -20,6 +24,8 @@ import {
 } from './api/useFinance'
 import { useExpenses } from '@/features/expenses/api/useExpenses'
 import { useReceipts } from '@/features/billing/api/useReceipts'
+import { useAuthStore } from '@/app/store/useAuthStore'
+import { useUsersList } from '@/features/governance/api/useUserManagement'
 import { CreateFinancialAccountModal } from './components/CreateFinancialAccountModal'
 import { formatCurrencyBn, formatDateBn } from '@/utils/date'
 import type { FinancialAccount } from '@/types/database'
@@ -106,11 +112,29 @@ export function computeAccountLedger({
 }
 
 export const FinancialAccountsPage: React.FC = () => {
+  const { profile: currentUser } = useAuthStore()
+  const isAdmin = currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'ADMIN'
+  const isManager = currentUser?.role === 'MANAGER'
+
   const { data: accounts = [], refetch: refetchAccounts } = useFinancialAccounts()
   const { data: receipts = [] } = useReceipts({ status: 'VALID' })
   const { data: expenses = [] } = useExpenses({ status: 'APPROVED' })
   const { data: incomes = [] } = useIncomes()
   const { data: transfers = [] } = useAccountTransfers()
+  const { data: usersList = [] } = useUsersList()
+
+  const managerUsers = useMemo(() => {
+    return usersList.filter((u) => u.role === 'MANAGER' || u.role === 'ADMIN')
+  }, [usersList])
+
+  // Filter accounts visible to the current user (Managers ONLY see their assigned account)
+  const visibleAccounts = useMemo(() => {
+    return getVisibleFinancialAccounts(accounts, currentUser)
+  }, [accounts, currentUser])
+
+  const visibleAccountIds = useMemo(() => {
+    return new Set(visibleAccounts.map((a) => a.id))
+  }, [visibleAccounts])
 
   const updateAccountMutation = useUpdateFinancialAccountMutation()
 
@@ -120,8 +144,8 @@ export const FinancialAccountsPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('')
 
   const selectedAccount = useMemo(() => {
-    return accounts.find((a) => a.id === selectedAccountId) || null
-  }, [accounts, selectedAccountId])
+    return visibleAccounts.find((a) => a.id === selectedAccountId) || null
+  }, [visibleAccounts, selectedAccountId])
 
   // Modals
   const [isCreateAccountOpen, setIsCreateAccountOpen] = useState(false)
@@ -132,15 +156,32 @@ export const FinancialAccountsPage: React.FC = () => {
   const [openingSource, setOpeningSource] = useState<string>('')
   const [modalError, setModalError] = useState<string | null>(null)
 
-  // Total Balance across all accounts (incorporates live or newly initialized opening balance)
+  // Total Balance across visible accounts
   const totalHostelFunds = useMemo(() => {
-    return accounts.reduce((sum, a) => {
+    return visibleAccounts.reduce((sum, a) => {
       const cur = Number(a.current_balance) || 0
       const open = Number(a.opening_balance) || 0
       const effective = cur > 0 ? cur : open
       return sum + effective
     }, 0)
-  }, [accounts])
+  }, [visibleAccounts])
+
+  // Assign or reassign designated manager for an account
+  const handleAssignManager = async (accountId: string, newManagerId: string) => {
+    try {
+      await updateAccountMutation.mutateAsync({
+        id: accountId,
+        assigned_manager_id: newManagerId ? newManagerId : null,
+      })
+    } catch (err: any) {
+      alert(err.message || 'ম্যানেজার নির্ধারণ করতে ব্যর্থ হয়েছে।')
+    }
+  }
+
+  const handleOpenEditAccount = (acc: FinancialAccount) => {
+    setEditingAccount(acc)
+    setIsCreateAccountOpen(true)
+  }
 
   // Open Opening Balance Modal
   const handleOpenOpeningBalance = (acc: FinancialAccount) => {
@@ -182,12 +223,12 @@ export const FinancialAccountsPage: React.FC = () => {
     }
   }
 
-  // Build Comprehensive Running Ledger Entries
+  // Build Comprehensive Running Ledger Entries (Scoped to visible accounts)
   const rawLedgerEntries = useMemo(() => {
     const list: LedgerEntry[] = []
 
-    // 0. Opening Balance entries
-    accounts.forEach((acc) => {
+    // 0. Opening Balance entries for visible accounts
+    visibleAccounts.forEach((acc) => {
       const openBal = Number(acc.opening_balance) || 0
       if (openBal <= 0) return
       list.push({
@@ -208,6 +249,7 @@ export const FinancialAccountsPage: React.FC = () => {
     // 1. Receipts (Bill Collection Credit)
     receipts.forEach((r) => {
       if (r.is_void) return
+      if (!visibleAccountIds.has(r.destination_account_id)) return
       list.push({
         id: `rc-${r.id}`,
         date: r.receipt_date,
@@ -225,6 +267,7 @@ export const FinancialAccountsPage: React.FC = () => {
 
     // 2. Non-rent Incomes (Manager Sales)
     incomes.forEach((inc) => {
+      if (!visibleAccountIds.has(inc.destination_account_id)) return
       list.push({
         id: `inc-${inc.id}`,
         date: inc.income_date,
@@ -243,6 +286,7 @@ export const FinancialAccountsPage: React.FC = () => {
     // 3. Approved Expenses (Debit)
     expenses.forEach((exp) => {
       if (exp.approval_status === 'REJECTED') return
+      if (!visibleAccountIds.has(exp.source_account_id)) return
       list.push({
         id: `exp-${exp.id}`,
         date: exp.expense_date,
@@ -261,39 +305,43 @@ export const FinancialAccountsPage: React.FC = () => {
     // 4. Internal Transfers
     transfers.forEach((trf) => {
       // Outflow for from_account
-      list.push({
-        id: `trf-out-${trf.id}`,
-        date: trf.transfer_date,
-        accountId: trf.from_account_id,
-        accountName: trf.from_account_name,
-        type: 'TRANSFER_OUT',
-        typeLabel: 'স্থানান্তর প্রদান (Debit)',
-        referenceNo: trf.transfer_number,
-        description: `${trf.to_account_name} এ ট্রান্সফার ${trf.remarks ? `(${trf.remarks})` : ''}`,
-        credit: 0,
-        debit: Number(trf.amount) || 0,
-        runningBalance: 0,
-      })
+      if (visibleAccountIds.has(trf.from_account_id)) {
+        list.push({
+          id: `trf-out-${trf.id}`,
+          date: trf.transfer_date,
+          accountId: trf.from_account_id,
+          accountName: trf.from_account_name,
+          type: 'TRANSFER_OUT',
+          typeLabel: 'স্থানান্তর প্রদান (Debit)',
+          referenceNo: trf.transfer_number,
+          description: `${trf.to_account_name} এ ট্রান্সফার ${trf.remarks ? `(${trf.remarks})` : ''}`,
+          credit: 0,
+          debit: Number(trf.amount) || 0,
+          runningBalance: 0,
+        })
+      }
 
       // Inflow for to_account
-      list.push({
-        id: `trf-in-${trf.id}`,
-        date: trf.transfer_date,
-        accountId: trf.to_account_id,
-        accountName: trf.to_account_name,
-        type: 'TRANSFER_IN',
-        typeLabel: 'স্থানান্তর গ্রহণ (Credit)',
-        referenceNo: trf.transfer_number,
-        description: `${trf.from_account_name} থেকে প্রাপ্তি ${trf.remarks ? `(${trf.remarks})` : ''}`,
-        credit: Number(trf.amount) || 0,
-        debit: 0,
-        runningBalance: 0,
-      })
+      if (visibleAccountIds.has(trf.to_account_id)) {
+        list.push({
+          id: `trf-in-${trf.id}`,
+          date: trf.transfer_date,
+          accountId: trf.to_account_id,
+          accountName: trf.to_account_name,
+          type: 'TRANSFER_IN',
+          typeLabel: 'স্থানান্তর গ্রহণ (Credit)',
+          referenceNo: trf.transfer_number,
+          description: `${trf.from_account_name} থেকে প্রাপ্তি ${trf.remarks ? `(${trf.remarks})` : ''}`,
+          credit: Number(trf.amount) || 0,
+          debit: 0,
+          runningBalance: 0,
+        })
+      }
     })
 
     // Sort Chronologically (oldest to newest)
     return list.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-  }, [accounts, receipts, incomes, expenses, transfers])
+  }, [visibleAccounts, visibleAccountIds, receipts, incomes, expenses, transfers])
 
   // Filtered Ledger with account-scoped running balance
   const filteredLedger = useMemo(() => {
@@ -340,16 +388,18 @@ export const FinancialAccountsPage: React.FC = () => {
             <span>টাকা ট্রান্সফার</span>
           </Link>
 
-          <button
-            onClick={() => {
-              setEditingAccount(null)
-              setIsCreateAccountOpen(true)
-            }}
-            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 flex items-center gap-2 transition-all"
-          >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>নতুন অ্যাকাউন্ট তৈরি</span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => {
+                setEditingAccount(null)
+                setIsCreateAccountOpen(true)
+              }}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 flex items-center gap-2 transition-all"
+            >
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <span>নতুন অ্যাকাউন্ট তৈরি</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -361,9 +411,11 @@ export const FinancialAccountsPage: React.FC = () => {
           </div>
           <div>
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-              মোট সমন্বিত হোস্টেল তহবিল (Total Active Funds)
+              {isManager
+                ? 'আমার ম্যানেজার ক্যাশ স্থিতি (Assigned Cash Drawer Balance)'
+                : 'মোট সমন্বিত হোস্টেল তহবিল (Total Active Funds)'}
             </span>
-            <div className="text-2xl sm:text-3xl font-black font-mono text-white mt-0.5">
+            <div className="text-2xl sm:text-3xl font-black font-mono text-emerald-400 mt-0.5">
               {formatCurrencyBn(totalHostelFunds)}
             </div>
           </div>
@@ -371,25 +423,35 @@ export const FinancialAccountsPage: React.FC = () => {
 
         <div className="flex items-center gap-2 text-xs text-slate-400">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span>সকল অ্যাকাউন্টের লাইভ ব্যালেন্স সমন্বিত রয়েছে</span>
+          <span>
+            {isManager
+              ? 'আপনার দায়িত্বপ্রাপ্ত ক্যাশ অ্যাকাউন্টের ব্যালেন্স ও খতিয়ান'
+              : 'সকল অ্যাকাউন্টের লাইভ ব্যালেন্স সমন্বিত রয়েছে'}
+          </span>
         </div>
       </div>
 
       {/* Account Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {accounts.map((acc, index) => {
+        {visibleAccounts.map((acc, index) => {
           const isSelected = selectedAccountId === acc.id
+          const assignedManager = managerUsers.find((u) => u.id === acc.assigned_manager_id)
+
+          const isMgrCash =
+            acc.account_type === 'CASH_MANAGER' ||
+            acc.account_name.toLowerCase().includes('manager') ||
+            acc.account_name.includes('ম্যানেজার')
 
           let badgeLabel = `${index + 1}. অ্যাকাউন্ট`
           let IconComponent = Wallet
 
-          if (acc.id === '11111111-0000-0000-0000-000000000001' || acc.account_name.toLowerCase().includes('main')) {
+          if (acc.id === '11111111-0000-0000-0000-000000000001' || acc.account_name.toLowerCase().includes('main') || acc.account_name.includes('মেইন')) {
             badgeLabel = '১. মেইন অ্যাকাউন্ট (Hostel Main)'
             IconComponent = Building2
-          } else if (acc.id === '11111111-0000-0000-0000-000000000002' || acc.account_name.toLowerCase().includes('manager')) {
-            badgeLabel = '২. ম্যানেজার অ্যাকাউন্ট (Cash Box)'
+          } else if (isMgrCash) {
+            badgeLabel = assignedManager ? `২. ম্যানেজার ক্যাশ • ${assignedManager.full_name}` : '২. ম্যানেজার অ্যাকাউন্ট (Cash Box)'
             IconComponent = Wallet
-          } else if (acc.id === '11111111-0000-0000-0000-000000000003' || acc.account_name.toLowerCase().includes('admin') || acc.account_name.toLowerCase().includes('owner')) {
+          } else if (acc.id === '11111111-0000-0000-0000-000000000003' || acc.account_name.toLowerCase().includes('admin') || acc.account_name.toLowerCase().includes('owner') || acc.account_name.includes('এডমিন')) {
             badgeLabel = '৩. ওনার/অ্যাডমিন অ্যাকাউন্ট (Admin)'
             IconComponent = ShieldCheck
           }
@@ -406,21 +468,37 @@ export const FinancialAccountsPage: React.FC = () => {
               <div>
                 {/* Account Category Badge */}
                 <div className="flex items-center justify-between gap-2 mb-3">
-                  <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                  <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700 truncate max-w-[200px]">
                     {badgeLabel}
                   </span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleOpenOpeningBalance(acc)
-                    }}
-                    className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors"
-                    title="প্রারম্ভিক ব্যালেন্স সেট বা আপডেট করুন"
-                  >
-                    <Edit3 className="w-3 h-3" />
-                    <span>প্রারম্ভিক সেট</span>
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleOpenEditAccount(acc)
+                        }}
+                        className="text-[11px] font-semibold text-slate-400 hover:text-white flex items-center gap-1 transition-colors px-1.5 py-0.5 rounded hover:bg-slate-800"
+                        title="অ্যাকাউন্ট বিবরণী ও ম্যানেজার এডিট করুন"
+                      >
+                        <Edit3 className="w-3 h-3 text-slate-400" />
+                        <span>এডিট</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleOpenOpeningBalance(acc)
+                      }}
+                      className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors px-1.5 py-0.5 rounded hover:bg-slate-800"
+                      title="প্রারম্ভিক ব্যালেন্স সেট বা আপডেট করুন"
+                    >
+                      <Edit3 className="w-3 h-3" />
+                      <span>প্রারম্ভিক সেট</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Account Name & Info */}
@@ -428,7 +506,7 @@ export const FinancialAccountsPage: React.FC = () => {
                   <div className="w-10 h-10 rounded-2xl bg-slate-800 flex items-center justify-center text-slate-200 shrink-0">
                     <IconComponent className="w-5 h-5 text-emerald-400" />
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <h3 className="font-bold text-white text-sm truncate">
                       {acc.account_name}
                     </h3>
@@ -438,8 +516,48 @@ export const FinancialAccountsPage: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Designated Manager (Cash Custody) */}
+                <div className="mt-3.5 pt-2.5 border-t border-slate-800/80 space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-400 flex items-center gap-1.5 text-[11px]">
+                      <UserCheck className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                      <span>দায়িত্বপ্রাপ্ত ম্যানেজার:</span>
+                    </span>
+                    <span
+                      className={`font-semibold text-xs px-2 py-0.5 rounded-lg border truncate max-w-[170px] ${
+                        assignedManager
+                          ? 'bg-indigo-950/60 text-indigo-300 border-indigo-800/60'
+                          : 'bg-slate-800/60 text-slate-400 border-slate-700/60'
+                      }`}
+                    >
+                      {assignedManager ? assignedManager.full_name : 'কোনো নির্দিষ্ট ম্যানেজার নেই'}
+                    </span>
+                  </div>
+
+                  {isAdmin && (
+                    <div className="flex items-center justify-between gap-1.5 pt-1">
+                      <span className="text-[10px] text-slate-400">ম্যানেজার অ্যাসাইন:</span>
+                      <select
+                        value={acc.assigned_manager_id || ''}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => handleAssignManager(acc.id, e.target.value)}
+                        disabled={updateAccountMutation.isPending}
+                        className="px-2 py-1 text-[11px] font-semibold bg-slate-950 border border-slate-700 hover:border-indigo-500 rounded-lg text-indigo-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 max-w-[160px] truncate"
+                        title="এই অ্যাকাউন্টের দায়িত্বপ্রাপ্ত ম্যানেজার নির্বাচন করুন"
+                      >
+                        <option value="">(নির্দিষ্ট নেই)</option>
+                        {managerUsers.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.full_name} ({m.phone_number})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+
                 {/* Balance Metrics */}
-                <div className="mt-4 pt-3 border-t border-slate-800/80 grid grid-cols-2 gap-2 text-xs">
+                <div className="mt-3 pt-3 border-t border-slate-800/80 grid grid-cols-2 gap-2 text-xs">
                   <div>
                     <span className="text-[10px] text-slate-400 block">প্রারম্ভিক ব্যালেন্স:</span>
                     <span className="font-mono font-bold text-slate-300 text-xs">
@@ -538,8 +656,10 @@ export const FinancialAccountsPage: React.FC = () => {
               onChange={(e) => setSelectedAccountId(e.target.value)}
               className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-medium focus:outline-none focus:border-indigo-500"
             >
-              <option value="ALL">সকল অ্যাকাউন্ট একসাথে</option>
-              {accounts.map((a) => (
+              <option value="ALL">
+                {isManager ? 'আমার অ্যাকাউন্ট' : 'সকল অ্যাকাউন্ট একসাথে'}
+              </option>
+              {visibleAccounts.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.account_name}
                 </option>

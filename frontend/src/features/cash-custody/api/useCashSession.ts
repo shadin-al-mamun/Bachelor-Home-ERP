@@ -71,28 +71,85 @@ export interface RecordOwnerDepositInput {
 
 export const MOCK_MANAGERS: Partial<Profile>[] = [
   {
+    id: 'p-manager-1',
+    full_name: 'ম্যানেজার তানভীর (ম্যানেজার ১)',
+    email: 'manager1@bachelorhome.com',
+    phone_number: '01800000001',
+    role: 'MANAGER',
+  },
+  {
+    id: 'p-manager-2',
+    full_name: 'ম্যানেজার মেহেদী (ম্যানেজার ২)',
+    email: 'manager2@bachelorhome.com',
+    phone_number: '01800000002',
+    role: 'MANAGER',
+  },
+  {
     id: 'usr-mgr1',
     full_name: 'হোস্টেল ম্যানেজার (Manager)',
     email: 'manager@bachelorhome.com',
     phone_number: '01711002233',
     role: 'MANAGER',
   },
-  {
-    id: 'usr-mgr2',
-    full_name: 'সহকারী ম্যানেজার (Assistant)',
-    email: 'asst.manager@bachelorhome.com',
-    phone_number: '01822334455',
-    role: 'MANAGER',
-  },
 ]
 
 let MOCK_SESSIONS: ExtendedCashSession[] = [
   {
+    id: 'cs-today-mgr1',
+    manager_id: 'p-manager-1',
+    manager_name: 'ম্যানেজার তানভীর (ম্যানেজার ১)',
+    account_id: '11111111-0000-0000-0000-000000000002',
+    account_name: 'Manager Cash Box (ম্যানেজার ক্যাশ)',
+    session_date: new Date().toISOString().slice(0, 10),
+    opening_cash: 0,
+    cash_receipts: 12404,
+    cash_expenses: 0,
+    cash_deposited_to_owner: 0,
+    cash_handed_over_out: 0,
+    cash_handed_over_in: 0,
+    expected_closing_cash: 12404,
+    actual_counted_cash: null,
+    cash_variance: null,
+    variance_explanation: null,
+    status: 'OPEN',
+    submitted_at: null,
+    reviewed_by: null,
+    reviewed_at: null,
+    reopen_reason: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'cs-today-mgr2',
+    manager_id: 'p-manager-2',
+    manager_name: 'ম্যানেজার মেহেদী (ম্যানেজার ২)',
+    account_id: '11111111-0000-0000-0000-000000000004',
+    account_name: 'ম্যানেজার ক্যাশ ড্রয়ার',
+    session_date: new Date().toISOString().slice(0, 10),
+    opening_cash: 0,
+    cash_receipts: 0,
+    cash_expenses: 0,
+    cash_deposited_to_owner: 0,
+    cash_handed_over_out: 0,
+    cash_handed_over_in: 0,
+    expected_closing_cash: 0,
+    actual_counted_cash: null,
+    cash_variance: null,
+    variance_explanation: null,
+    status: 'OPEN',
+    submitted_at: null,
+    reviewed_by: null,
+    reviewed_at: null,
+    reopen_reason: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
     id: 'cs-today',
     manager_id: 'usr-mgr1',
     manager_name: 'হোস্টেল ম্যানেজার',
-    account_id: 'fa-1',
-    account_name: 'ম্যানেজার ক্যাশ বক্স (Manager Cash)',
+    account_id: '11111111-0000-0000-0000-000000000002',
+    account_name: 'Manager Cash Box (ম্যানেজার ক্যাশ)',
     session_date: new Date().toISOString().slice(0, 10),
     opening_cash: 12500, // Seeded from prior finalized day
     cash_receipts: 14500, // Collected today
@@ -285,20 +342,41 @@ export function useManagerCashSession(managerId?: string, sessionDate?: string) 
     queryKey: ['manager-cash-session', targetManager, targetDate],
     queryFn: async (): Promise<CashSessionDetailsResponse> => {
       if (!isSupabaseConfigured) {
+        const isMgr2 = targetManager === 'p-manager-2' || targetManager.endsWith('0002')
         let session = MOCK_SESSIONS.find(
-          (s) => s.manager_id === targetManager && s.session_date === targetDate
+          (s) =>
+            (s.manager_id === targetManager ||
+              (isMgr2
+                ? s.manager_id === 'p-manager-2'
+                : s.manager_id === 'p-manager-1' || s.manager_id === 'usr-mgr1')) &&
+            s.session_date === targetDate
         )
 
         if (!session) {
-          const priorSession = MOCK_SESSIONS.find((s) => s.session_date < targetDate)
-          const opening = priorSession?.actual_counted_cash ?? priorSession?.expected_closing_cash ?? 12500
+          const accountId = isMgr2
+            ? '11111111-0000-0000-0000-000000000004'
+            : '11111111-0000-0000-0000-000000000002'
+          const accountName = isMgr2
+            ? 'ম্যানেজার ক্যাশ ড্রয়ার'
+            : 'Manager Cash Box (ম্যানেজার ক্যাশ)'
+          const managerName = isMgr2
+            ? 'ম্যানেজার মেহেদী (ম্যানেজার ২)'
+            : 'ম্যানেজার তানভীর (ম্যানেজার ১)'
+
+          const priorSession = MOCK_SESSIONS.find(
+            (s) => s.session_date < targetDate && s.manager_id === targetManager
+          )
+          const opening =
+            priorSession?.actual_counted_cash ??
+            priorSession?.expected_closing_cash ??
+            (isMgr2 ? 0 : 12404)
 
           session = {
             id: `cs-${Date.now()}`,
             manager_id: targetManager,
-            manager_name: 'হোস্টেল ম্যানেজার',
-            account_id: 'fa-1',
-            account_name: 'ম্যানেজার ক্যাশ বক্স (Manager Cash)',
+            manager_name: managerName,
+            account_id: accountId,
+            account_name: accountName,
             session_date: targetDate,
             opening_cash: opening,
             cash_receipts: 0,

@@ -9,6 +9,10 @@ import type {
   Flat,
   Building,
 } from '@/types/database'
+import {
+  MOCK_ACCOUNTS as BASE_MOCK_ACCOUNTS,
+  getStoredFinancialAccounts,
+} from '@/features/billing/api/useReceipts'
 
 // ==============================================================================
 // Types & Interfaces
@@ -175,27 +179,29 @@ export function saveStoredExpenseCategory(category: ExpenseCategory) {
 }
 
 export const MOCK_ACCOUNTS: FinancialAccount[] = [
+  ...BASE_MOCK_ACCOUNTS,
   {
     id: 'fa-1',
     account_name: 'Hostel Main Account (মেইন একাউন্ট)',
     account_type: 'CASH_OWNER',
     account_number: 'MAIN-VAULT-01',
     bank_name: 'হোস্টেল সেন্ট্রাল ক্যাশ ভল্ট',
-    opening_balance: 0,
-    current_balance: 0,
+    opening_balance: 2000,
+    current_balance: 24050,
     is_active: true,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-10-15T00:00:00Z',
   },
   {
     id: 'fa-2',
-    account_name: 'Manager Account (ম্যানেজার ক্যাশ)',
+    account_name: 'Manager Cash Box (ম্যানেজার ক্যাশ)',
     account_type: 'CASH_MANAGER',
     account_number: 'MGR-CASH-01',
     bank_name: 'ম্যানেজার শিফট ড্রয়ার',
     opening_balance: 0,
-    current_balance: 0,
+    current_balance: 12404,
     is_active: true,
+    assigned_manager_id: 'p-manager-1',
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-10-15T00:00:00Z',
   },
@@ -205,8 +211,8 @@ export const MOCK_ACCOUNTS: FinancialAccount[] = [
     account_type: 'BANK',
     account_number: 'ADM-BANK-01',
     bank_name: 'Dutch-Bangla Bank PLC',
-    opening_balance: 0,
-    current_balance: 0,
+    opening_balance: 5000,
+    current_balance: 10000,
     is_active: true,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-10-15T00:00:00Z',
@@ -569,7 +575,7 @@ export function useExpenseAccounts() {
     queryKey: ['financial-accounts'],
     queryFn: async (): Promise<FinancialAccount[]> => {
       if (!isSupabaseConfigured) {
-        return MOCK_ACCOUNTS
+        return getStoredFinancialAccounts()
       }
 
       try {
@@ -586,7 +592,7 @@ export function useExpenseAccounts() {
         console.warn('Expense accounts fetch error:', err)
       }
 
-      return MOCK_ACCOUNTS
+      return getStoredFinancialAccounts()
     },
   })
 }

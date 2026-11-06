@@ -7,7 +7,7 @@ import { useAuthStore } from '@/app/store/useAuthStore'
 import { useBrandingStore } from '@/app/store/useBrandingStore'
 import { useAccessControlStore } from '@/app/store/useAccessControlStore'
 import { isSupabaseConfigured } from '@/lib/supabaseClient'
-import type { UserRole } from '@/types/database'
+import type { UserRole, Profile } from '@/types/database'
 import { Shield } from 'lucide-react'
 
 export const App: React.FC = () => {
@@ -26,8 +26,8 @@ export const App: React.FC = () => {
     initApp()
   }, [initializeAuth])
 
-  const handleRoleSwitch = (role: UserRole) => {
-    setDemoUser(role)
+  const handleRoleSwitch = (role: UserRole, custom?: Partial<Profile>) => {
+    setDemoUser(role, custom)
     if (role === 'BOARDER') {
       router.navigate('/portal/dashboard')
     } else if (role === 'APPLICANT') {
@@ -74,18 +74,60 @@ export const App: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-1">
-              {(['SUPER_ADMIN', 'MANAGER', 'BOARDER', 'APPLICANT'] as UserRole[]).map((role) => (
-                <button
-                  key={role}
-                  onClick={() => handleRoleSwitch(role)}
-                  className={`px-2 py-1 rounded-xl text-[10px] font-bold transition-all ${profile?.role === role
-                      ? 'bg-primary-600 text-white shadow-md shadow-primary-500/30 border border-primary-400/40'
-                      : 'bg-slate-900/60 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700/60'
-                    }`}
-                >
-                  {role === 'SUPER_ADMIN' ? 'এডমিন' : role === 'MANAGER' ? 'ম্যানেজার' : role === 'BOARDER' ? 'বর্ডার' : 'আবেদনকারী'}
-                </button>
-              ))}
+              <button
+                onClick={() => handleRoleSwitch('SUPER_ADMIN')}
+                className={`px-2 py-1 rounded-xl text-[10px] font-bold transition-all ${
+                  profile?.role === 'SUPER_ADMIN'
+                    ? 'bg-primary-600 text-white shadow-md shadow-primary-500/30 border border-primary-400/40'
+                    : 'bg-slate-900/60 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700/60'
+                }`}
+              >
+                এডমিন
+              </button>
+
+              <button
+                onClick={() => handleRoleSwitch('MANAGER', { id: 'p-manager-1', phone_number: '01800000001' })}
+                className={`px-2 py-1 rounded-xl text-[10px] font-bold transition-all ${
+                  profile?.role === 'MANAGER' && profile?.id !== 'p-manager-2'
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30 border border-indigo-400/40'
+                    : 'bg-slate-900/60 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700/60'
+                }`}
+              >
+                ম্যানেজার ১
+              </button>
+
+              <button
+                onClick={() => handleRoleSwitch('MANAGER', { id: 'p-manager-2', phone_number: '01800000002' })}
+                className={`px-2 py-1 rounded-xl text-[10px] font-bold transition-all ${
+                  profile?.role === 'MANAGER' && profile?.id === 'p-manager-2'
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30 border border-indigo-400/40'
+                    : 'bg-slate-900/60 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700/60'
+                }`}
+              >
+                ম্যানেজার ২
+              </button>
+
+              <button
+                onClick={() => handleRoleSwitch('BOARDER')}
+                className={`px-2 py-1 rounded-xl text-[10px] font-bold transition-all ${
+                  profile?.role === 'BOARDER'
+                    ? 'bg-primary-600 text-white shadow-md shadow-primary-500/30 border border-primary-400/40'
+                    : 'bg-slate-900/60 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700/60'
+                }`}
+              >
+                বর্ডার
+              </button>
+
+              <button
+                onClick={() => handleRoleSwitch('APPLICANT')}
+                className={`px-2 py-1 rounded-xl text-[10px] font-bold transition-all ${
+                  profile?.role === 'APPLICANT'
+                    ? 'bg-primary-600 text-white shadow-md shadow-primary-500/30 border border-primary-400/40'
+                    : 'bg-slate-900/60 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700/60'
+                }`}
+              >
+                আবেদনকারী
+              </button>
 
               <button
                 onClick={handleGuestSwitch}
