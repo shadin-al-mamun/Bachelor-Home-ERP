@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Clock,
   ShieldCheck,
@@ -16,14 +17,79 @@ import {
 } from 'lucide-react'
 import { Button, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, Badge } from '@/components/common'
 import { useAuthStore } from '@/app/store/useAuthStore'
-import { isSupabaseConfigured } from '@/lib/supabaseClient'
+import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
 import { useBoarders } from '@/features/boarders/api/useBoarders'
 import { formatDateBn } from '@/utils/date'
+import { useBrandingStore } from '@/app/store/useBrandingStore'
 
 export const ApplicationStatusPage: React.FC = () => {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const branding = useBrandingStore()
   const { profile, signOut, setDemoUser } = useAuthStore()
   const { data: boarders = [] } = useBoarders()
+
+  // Initialize and synchronize hostel settings & branding
+  useEffect(() => {
+    branding.initializeBranding()
+    const handleSync = () => {
+      queryClient.invalidateQueries({ queryKey: ['live-organization-settings'] })
+      queryClient.invalidateQueries({ queryKey: ['manager-helpline'] })
+      branding.initializeBranding()
+    }
+    window.addEventListener('bachelor_erp_branding_updated', handleSync)
+    return () => {
+      window.removeEventListener('bachelor_erp_branding_updated', handleSync)
+    }
+  }, [queryClient, branding])
+
+  // Fetch live organization settings directly from database
+  const { data: orgSettings } = useQuery({
+    queryKey: ['live-organization-settings'],
+    queryFn: async () => {
+      if (!isSupabaseConfigured) return null
+      const { data, error } = await supabase
+        .from('organization_settings')
+        .select('*')
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (error) {
+        console.warn('Error fetching live organization settings:', error.message)
+        return null
+      }
+      return data
+    },
+    staleTime: 1000,
+    refetchOnWindowFocus: true,
+  })
+
+  // Dynamic Manager / Hostel Helpline Lookup from system profiles
+  const { data: managerContact } = useQuery({
+    queryKey: ['manager-helpline'],
+    enabled: isSupabaseConfigured,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('full_name, phone_number, role')
+        .in('role', ['MANAGER', 'SUPER_ADMIN'])
+        .order('role', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      return data
+    },
+  })
+
+  // Phone number configured in hostel settings, fallback to manager/admin phone or standard helpline
+  const helplinePhone =
+    orgSettings?.phone?.trim() ||
+    branding?.phone?.trim() ||
+    orgSettings?.emergency_contact?.trim() ||
+    branding?.emergencyContact?.trim() ||
+    managerContact?.phone_number?.trim() ||
+    '01712394767'
+
+  const hostelName = orgSettings?.org_name || branding?.orgName || 'ব্যাচেলর হোম ইআরপি'
 
   // Match the applicant by stored ID or code or profile email
   const currentApplicant = useMemo(() => {
@@ -86,7 +152,7 @@ export const ApplicationStatusPage: React.FC = () => {
             বর্ডার ভর্তি আবেদন স্ট্যাটাস
           </h1>
           <p className="text-xs text-slate-400">
-            ব্যাচেলর হোম ইআরপি — আবেদনকারী ট্র্যাকিং পোর্টাল
+            {hostelName} — আবেদনকারী ট্র্যাকিং পোর্টাল
           </p>
         </div>
 
@@ -231,7 +297,15 @@ export const ApplicationStatusPage: React.FC = () => {
             {/* Helpline Notice */}
             <div className="p-3 rounded-xl bg-slate-900/40 border border-slate-800/80 flex items-center gap-3 text-xs text-slate-400">
               <HelpCircle className="w-4 h-4 text-primary-400 shrink-0" />
-              <span>যেকোনো প্রয়োজনে হোস্টেল অফিসে যোগাযোগ করুন: 01700-000000</span>
+              <span>
+                যেকোনো প্রয়োজনে হোস্টেল অফিসে যোগাযোগ করুন:{' '}
+                <a
+                  href={`tel:${helplinePhone.replace(/\s+/g, '')}`}
+                  className="text-primary-400 hover:text-primary-300 font-mono font-medium hover:underline inline-flex items-center gap-1"
+                >
+                  {helplinePhone}
+                </a>
+              </span>
             </div>
           </CardContent>
 
