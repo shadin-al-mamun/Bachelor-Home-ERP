@@ -446,6 +446,31 @@ export function useUnpaidCharges(boarderId?: string) {
   })
 }
 
+export function useBoarderAllCharges(boarderId?: string) {
+  return useQuery({
+    queryKey: ['boarder-all-charges-modal', boarderId],
+    enabled: Boolean(boarderId),
+    queryFn: async (): Promise<BoarderCharge[]> => {
+      if (!isSupabaseConfigured) {
+        return []
+      }
+
+      const { data, error } = await supabase
+        .from('boarder_charges')
+        .select('*')
+        .eq('boarder_id', boarderId!)
+        .neq('status', 'VOID')
+        .order('created_at', { ascending: true })
+
+      if (error) {
+        console.warn('boarder all charges fetch failed:', error.message)
+        return []
+      }
+      return (data || []) as BoarderCharge[]
+    },
+  })
+}
+
 // ==============================================================================
 // Mutations
 // ==============================================================================

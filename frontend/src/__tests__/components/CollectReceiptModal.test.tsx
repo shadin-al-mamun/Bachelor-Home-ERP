@@ -47,6 +47,10 @@ vi.mock('@/features/billing/api/useReceipts', () => ({
     data: boarderId ? MOCK_UNPAID_CHARGES : [],
     isLoading: false,
   }),
+  useBoarderAllCharges: (boarderId: string) => ({
+    data: boarderId ? MOCK_UNPAID_CHARGES : [],
+    isLoading: false,
+  }),
   useReceipts: () => ({
     data: [],
     isLoading: false,

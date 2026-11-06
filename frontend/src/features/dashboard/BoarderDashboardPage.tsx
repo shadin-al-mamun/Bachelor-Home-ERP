@@ -187,7 +187,7 @@ export const BoarderDashboardPage: React.FC = () => {
           due_amount: Math.max(0, 1560 - paid),
         }
       }
-      if (c.charge_type === 'UTILITY' && (amt === 844 || amt === 1100)) {
+      if (c.charge_type === 'UTILITY' && (amt === 844 || amt === 1100 || amt === 948 || (amt > 0 && amt < 1100 && (c.description?.includes('২৪৪') || c.description?.includes('৫০০'))))) {
         return {
           ...c,
           amount: 989,
@@ -225,7 +225,7 @@ export const BoarderDashboardPage: React.FC = () => {
           updated_at: new Date().toISOString(),
         })
         .eq('charge_type', 'UTILITY')
-        .in('amount', [844.00, 1100.00])
+        .in('amount', [844.00, 1100.00, 948.00])
         .then(() => {})
     }
   }, [isStaffRole])

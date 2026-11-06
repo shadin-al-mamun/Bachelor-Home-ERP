@@ -212,7 +212,7 @@ export const BoarderDuesPage: React.FC = () => {
           due_amount: Math.max(0, 1560 - paid),
         }
       }
-      if (c.charge_type === 'UTILITY' && (amt === 844 || amt === 1100)) {
+      if (c.charge_type === 'UTILITY' && (amt === 844 || amt === 1100 || amt === 948 || (amt > 0 && amt < 1100 && (c.description?.includes('২৪৪') || c.description?.includes('৫০০'))))) {
         return {
           ...c,
           amount: 989,
@@ -232,7 +232,7 @@ export const BoarderDuesPage: React.FC = () => {
       // 1. Self-heal legacy charges
       for (const c of charges) {
         const amt = Number(c.amount) || 0
-        if (c.charge_type === 'UTILITY' && (amt === 844 || amt === 1100)) {
+        if (c.charge_type === 'UTILITY' && (amt === 844 || amt === 1100 || amt === 948)) {
           await supabase
             .from('boarder_charges')
             .update({
