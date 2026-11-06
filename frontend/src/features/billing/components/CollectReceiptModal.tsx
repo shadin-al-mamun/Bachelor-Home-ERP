@@ -338,6 +338,36 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
         }
       }
 
+      // 4. Calculate any unpaid deposit charges if billed
+      let totalDepositReceipts = 0
+      boarderReceipts.forEach((r) => {
+        if (r.is_void) return
+        const isDep =
+          r.items?.some((i) => i.head_code === 'SECURITY_DEPOSIT' || i.head_name?.includes('জামানত')) ||
+          r.remarks?.includes('[SECURITY_DEPOSIT]') ||
+          r.remarks?.includes('জামানত সংগ্রহ') ||
+          r.transaction_reference?.includes('[SECURITY_DEPOSIT]') ||
+          r.transaction_reference?.includes('জামানত সংগ্রহ')
+        if (isDep) {
+          totalDepositReceipts += Number(r.amount) || 0
+        }
+      })
+
+      let remainingDepositFund = totalDepositReceipts
+      const depositCharges = sanitized.filter(
+        (c) =>
+          c.charge_type === 'SECURITY_DEPOSIT' ||
+          c.description?.includes('[SECURITY_DEPOSIT]') ||
+          c.description?.includes('জামানত সংগ্রহ')
+      )
+      for (const c of depositCharges) {
+        const amt = Number(c.amount) || 0
+        const allocated = Math.min(remainingDepositFund, amt)
+        remainingDepositFund = Math.max(0, remainingDepositFund - allocated)
+        const due = Math.max(0, amt - allocated)
+        otherDue += due
+      }
+
       const totalDue = rentDue + mealDue + utilityDue + otherDue
       return {
         rentDue,

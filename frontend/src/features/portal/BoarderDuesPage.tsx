@@ -495,20 +495,33 @@ export const BoarderDuesPage: React.FC = () => {
   const selectedMonthLabel = isAllMonths ? 'সব মাস' : formatYearMonthBn(selectedMonth)
 
   // Lifetime metrics (authoritative cash ledger across all time)
-  // Regular operational charges (excluding isolated security deposit charges)
-  const regularCharges = React.useMemo(() => reconciledCharges.filter((c) => !isDepositCharge(c)), [reconciledCharges])
-  const totalLifetimeBilled = regularCharges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
-  const totalLifetimePaidCharges = regularCharges.reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
+  // Grand total of ALL charges generated across all time (including security deposit, rent, meal, utility)
+  const totalLifetimeCharges = React.useMemo(() => {
+    return reconciledCharges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+  }, [reconciledCharges])
 
-  // Operational receipts (regular receipts + explicit deposit adjustments)
-  const operationalReceipts = React.useMemo(() => {
-    return allReceipts.filter((r) => !isDepositReceipt(r))
+  // Grand total of ALL receipts collected across all time
+  const totalLifetimeReceipts = React.useMemo(() => {
+    return allReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
   }, [allReceipts])
 
+  const totalLifetimePaidCharges = React.useMemo(() => {
+    return reconciledCharges.reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
+  }, [reconciledCharges])
+
+  const totalLifetimePaid = totalLifetimeReceipts > 0 ? totalLifetimeReceipts : totalLifetimePaidCharges
+
+  // Authoritative total due across all charges
+  const outstandingDue = React.useMemo(() => {
+    return reconciledCharges.reduce((sum, c) => sum + (Number(c.due_amount) || 0), 0)
+  }, [reconciledCharges])
+
+  // Regular operational surplus advance balance (if operational cash exceeds regular charges)
+  const regularCharges = React.useMemo(() => reconciledCharges.filter((c) => !isDepositCharge(c)), [reconciledCharges])
+  const totalRegularBilled = regularCharges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+  const operationalReceipts = React.useMemo(() => allReceipts.filter((r) => !isDepositReceipt(r)), [allReceipts])
   const totalOperationalReceipts = operationalReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
-  const totalLifetimePaid = totalOperationalReceipts > 0 ? totalOperationalReceipts : totalLifetimePaidCharges
-  const outstandingDue = Math.max(0, totalLifetimeBilled - totalLifetimePaid)
-  const advanceBalance = Math.max(0, totalLifetimePaid - totalLifetimeBilled)
+  const advanceBalance = Math.max(0, totalOperationalReceipts - totalRegularBilled)
 
   // Filtered charges for selected month or all time
   const monthChargesList = React.useMemo(() => {
@@ -527,22 +540,22 @@ export const BoarderDuesPage: React.FC = () => {
 
   // Display metrics according to active month view
   const displayBilled = isAllMonths
-    ? totalLifetimeBilled
-    : monthChargesList.filter((c) => !isDepositCharge(c)).reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+    ? totalLifetimeCharges
+    : monthChargesList.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
 
-  const monthPaidCharges = monthChargesList.filter((c) => !isDepositCharge(c)).reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
-  const monthReceiptsTotal = monthReceiptsList.filter((r) => !isDepositReceipt(r)).reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
+  const monthPaidCharges = monthChargesList.reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
+  const monthReceiptsTotal = monthReceiptsList.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
   const displayPaid = isAllMonths
     ? totalLifetimePaid
-    : monthPaidCharges > 0
-      ? monthPaidCharges
-      : monthReceiptsTotal
+    : monthReceiptsTotal > 0
+      ? monthReceiptsTotal
+      : monthPaidCharges
 
   const displayMealCharges = monthChargesList
     .filter((c) => c.charge_type === 'MEAL')
     .reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
 
-  const monthDue = monthChargesList.filter((c) => !isDepositCharge(c)).reduce((sum, c) => {
+  const monthDue = monthChargesList.reduce((sum, c) => {
     return sum + (Number(c.due_amount) || 0)
   }, 0)
 
@@ -777,7 +790,7 @@ export const BoarderDuesPage: React.FC = () => {
             <span className="flex items-center gap-1.5 min-w-0">
               <span className="truncate">মোট পরিশোধিত</span>
               <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
-                {isAllMonths ? 'বিল আদায়' : selectedMonthLabel}
+                {isAllMonths ? 'সর্বমোট' : selectedMonthLabel}
               </span>
             </span>
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -788,7 +801,7 @@ export const BoarderDuesPage: React.FC = () => {
           <div className="text-[11px] text-slate-400 flex items-center justify-between gap-1 flex-wrap">
             <span>
               {isAllMonths
-                ? `${operationalReceipts.length} টি ভাউচার (বিল আদায়)`
+                ? `${allReceipts.length} টি মানি রিসিপ্ট ভাউচার`
                 : monthReceiptsList.length > 0
                   ? `${monthReceiptsList.length} টি মানি রিসিপ্ট`
                   : displayPaid > 0
@@ -856,12 +869,12 @@ export const BoarderDuesPage: React.FC = () => {
           <div className="text-[11px] text-slate-400 flex items-center justify-between gap-1 flex-wrap">
             <span>
               {isAllMonths
-                ? 'সিট ও খাবারের সর্বমোট চার্জ'
+                ? `${reconciledCharges.length} টি ধার্যকৃত বিলের মোট অংক`
                 : `${monthChargesList.length} টি খাতের ধার্যকৃত বিল`}
             </span>
-            {!isAllMonths && totalLifetimeBilled > displayBilled && (
+            {!isAllMonths && totalLifetimeCharges > displayBilled && (
               <span className="text-[10px] text-slate-500 font-mono">
-                মোট: {formatCurrencyBn(totalLifetimeBilled)}
+                মোট: {formatCurrencyBn(totalLifetimeCharges)}
               </span>
             )}
           </div>
