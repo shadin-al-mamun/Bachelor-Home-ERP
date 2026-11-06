@@ -271,13 +271,14 @@ export const BoarderDuesPage: React.FC = () => {
   }, [charges, allReceipts])
 
   // Helper functions to identify Security Deposit vs Regular Monthly Operations
-  const isDepositReceipt = (r: ExtendedReceipt) => {
-    if (r.payment_method === 'ADJUSTMENT') return false
-    if (r.remarks?.includes('[DEPOSIT_ADJUSTMENT]') || r.transaction_reference?.includes('[DEPOSIT_ADJUSTMENT]')) return false
-    if (r.items?.some((i) => i.head_code === 'SECURITY_DEPOSIT' || i.head_name?.includes('জামানত'))) return true
-    if (r.remarks?.includes('জামানত সংগ্রহ') || r.remarks?.includes('সিকিউরিটি জামানত') || r.remarks?.includes('[SECURITY_DEPOSIT]')) return true
-    if (r.transaction_reference?.includes('জামানত সংগ্রহ') || r.transaction_reference?.includes('সিকিউরিটি জামানত') || r.transaction_reference?.includes('[SECURITY_DEPOSIT]')) return true
-    return false
+  const isDepositItem = (item: any) => {
+    return (
+      item.head_code === 'SECURITY_DEPOSIT' ||
+      item.head_name?.includes('জামানত') ||
+      item.description?.includes('জামানত') ||
+      item.head_name?.includes('[SECURITY_DEPOSIT]') ||
+      item.description?.includes('[SECURITY_DEPOSIT]')
+    )
   }
 
   const isDepositAdjustment = (r: ExtendedReceipt) => {
@@ -285,6 +286,53 @@ export const BoarderDuesPage: React.FC = () => {
     if (r.remarks?.includes('[DEPOSIT_ADJUSTMENT]') || r.transaction_reference?.includes('[DEPOSIT_ADJUSTMENT]')) return true
     if (r.remarks?.includes('জামানত থেকে সমন্বয়') || r.transaction_reference?.includes('জামানত থেকে সমন্বয়')) return true
     return false
+  }
+
+  // Decompose a receipt into exact item-level breakdown (Security Deposit vs Regular Operations vs Adjustments)
+  const getReceiptBreakdown = (r: ExtendedReceipt) => {
+    const totalAmount = Number(r.amount) || 0
+    if (r.is_void) {
+      return { depositAmount: 0, adjustmentAmount: 0, regularAmount: 0 }
+    }
+
+    if (isDepositAdjustment(r)) {
+      return { depositAmount: 0, adjustmentAmount: totalAmount, regularAmount: 0 }
+    }
+
+    // If receipt has explicit line items (receipt_items), calculate exact item-by-item breakdown
+    if (r.items && r.items.length > 0) {
+      let depositAmt = 0
+      let regularAmt = 0
+      r.items.forEach((it) => {
+        const itemVal = Number(it.amount) || 0
+        if (isDepositItem(it)) {
+          depositAmt += itemVal
+        } else {
+          regularAmt += itemVal
+        }
+      })
+
+      return {
+        depositAmount: depositAmt,
+        adjustmentAmount: 0,
+        regularAmount: regularAmt,
+      }
+    }
+
+    // Fallback for legacy receipts without receipt_items
+    const isLegacyDeposit =
+      r.remarks?.includes('জামানত সংগ্রহ') ||
+      r.remarks?.includes('সিকিউরিটি জামানত') ||
+      r.remarks?.includes('[SECURITY_DEPOSIT]') ||
+      r.transaction_reference?.includes('জামানত সংগ্রহ') ||
+      r.transaction_reference?.includes('সিকিউরিটি জামানত') ||
+      r.transaction_reference?.includes('[SECURITY_DEPOSIT]')
+
+    if (isLegacyDeposit) {
+      return { depositAmount: totalAmount, adjustmentAmount: 0, regularAmount: 0 }
+    }
+
+    return { depositAmount: 0, adjustmentAmount: 0, regularAmount: totalAmount }
   }
 
   const isDepositCharge = (c: BoarderCharge) => {
@@ -303,11 +351,9 @@ export const BoarderDuesPage: React.FC = () => {
     let adjusted = 0
 
     allReceipts.forEach((r) => {
-      if (isDepositAdjustment(r)) {
-        adjusted += Number(r.amount) || 0
-      } else if (isDepositReceipt(r)) {
-        recDeposit += Number(r.amount) || 0
-      }
+      const b = getReceiptBreakdown(r)
+      recDeposit += b.depositAmount
+      adjusted += b.adjustmentAmount
     })
 
     const paidChargeDeposit = sanitizedCharges
@@ -343,13 +389,10 @@ export const BoarderDuesPage: React.FC = () => {
     let totalDepositReceipts = 0
 
     allReceipts.forEach((r) => {
-      if (isDepositAdjustment(r)) {
-        totalAdjustments += Number(r.amount) || 0
-      } else if (isDepositReceipt(r)) {
-        totalDepositReceipts += Number(r.amount) || 0
-      } else {
-        totalRegularReceipts += Number(r.amount) || 0
-      }
+      const b = getReceiptBreakdown(r)
+      totalRegularReceipts += b.regularAmount
+      totalDepositReceipts += b.depositAmount
+      totalAdjustments += b.adjustmentAmount
     })
 
     // Cash available to pay regular operational monthly bills:
@@ -519,8 +562,12 @@ export const BoarderDuesPage: React.FC = () => {
   // Regular operational surplus advance balance (if operational cash exceeds regular charges)
   const regularCharges = React.useMemo(() => reconciledCharges.filter((c) => !isDepositCharge(c)), [reconciledCharges])
   const totalRegularBilled = regularCharges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
-  const operationalReceipts = React.useMemo(() => allReceipts.filter((r) => !isDepositReceipt(r)), [allReceipts])
-  const totalOperationalReceipts = operationalReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
+  const totalOperationalReceipts = React.useMemo(() => {
+    return allReceipts.reduce((sum, r) => {
+      const b = getReceiptBreakdown(r)
+      return sum + b.regularAmount + b.adjustmentAmount
+    }, 0)
+  }, [allReceipts])
   const advanceBalance = Math.max(0, totalOperationalReceipts - totalRegularBilled)
 
   // Filtered charges for selected month or all time

@@ -107,11 +107,27 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
 
       if (isAdjustment) {
         adjustedDeposit += Number(r.amount) || 0
+      } else if (r.items && r.items.length > 0) {
+        let dep = 0
+        r.items.forEach((it) => {
+          if (
+            it.head_code === 'SECURITY_DEPOSIT' ||
+            it.head_name?.includes('জামানত') ||
+            it.description?.includes('জামানত')
+          ) {
+            dep += Number(it.amount) || 0
+          }
+        })
+        receiptDeposit += dep
       } else {
-        const hasDepositItem = r.items?.some(
-          (i) => i.head_code === 'SECURITY_DEPOSIT' || i.head_name?.includes('জামানত')
-        )
-        if (hasDepositItem) {
+        const isDep =
+          r.remarks?.includes('জামানত সংগ্রহ') ||
+          r.remarks?.includes('সিকিউরিটি জামানত') ||
+          r.remarks?.includes('[SECURITY_DEPOSIT]') ||
+          r.transaction_reference?.includes('জামানত সংগ্রহ') ||
+          r.transaction_reference?.includes('সিকিউরিটি জামানত') ||
+          r.transaction_reference?.includes('[SECURITY_DEPOSIT]')
+        if (isDep) {
           receiptDeposit += Number(r.amount) || 0
         }
       }
@@ -193,8 +209,8 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
           paymentMethod === 'CASH'
             ? accounts.find((a) => a.account_type === 'CASH_MANAGER' || a.account_type === 'CASH_OWNER')
             : paymentMethod === 'MFS'
-            ? accounts.find((a) => a.account_type === 'MFS')
-            : accounts.find((a) => a.account_type === 'BANK')
+              ? accounts.find((a) => a.account_type === 'MFS')
+              : accounts.find((a) => a.account_type === 'BANK')
 
         setDestinationAccountId(preferred ? preferred.id : accounts[0].id)
       }
@@ -218,20 +234,6 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
               updated_at: new Date().toISOString(),
             })
             .eq('id', c.id)
-        }
-        if (c.charge_type === 'RENT' && amt === 3200 && c.billing_month?.startsWith('2026-11')) {
-          const due = Number(c.due_amount)
-          if (due !== 449) {
-            await supabase
-              .from('boarder_charges')
-              .update({
-                paid_amount: 2751,
-                due_amount: 449,
-                status: 'PARTIALLY_PAID',
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', c.id)
-          }
         }
       }
     }
@@ -271,9 +273,11 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
         return c
       })
 
-      // 2. Classify receipts
+      // 2. Classify receipts into operational cash vs deposit cash
       let totalRegularReceipts = 0
       let totalAdjustments = 0
+      let totalDepositReceipts = 0
+
       boarderReceipts.forEach((r) => {
         if (r.is_void) return
         const isAdj =
@@ -282,16 +286,33 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
           r.transaction_reference?.includes('[DEPOSIT_ADJUSTMENT]') ||
           r.remarks?.includes('জামানত থেকে সমন্বয়') ||
           r.transaction_reference?.includes('জামানত থেকে সমন্বয়')
+
         if (isAdj) {
           totalAdjustments += Number(r.amount) || 0
+        } else if (r.items && r.items.length > 0) {
+          r.items.forEach((it) => {
+            const itemVal = Number(it.amount) || 0
+            if (
+              it.head_code === 'SECURITY_DEPOSIT' ||
+              it.head_name?.includes('জামানত') ||
+              it.description?.includes('জামানত')
+            ) {
+              totalDepositReceipts += itemVal
+            } else {
+              totalRegularReceipts += itemVal
+            }
+          })
         } else {
           const isDep =
-            r.items?.some((i) => i.head_code === 'SECURITY_DEPOSIT' || i.head_name?.includes('জামানত')) ||
-            r.remarks?.includes('[SECURITY_DEPOSIT]') ||
             r.remarks?.includes('জামানত সংগ্রহ') ||
-            r.transaction_reference?.includes('[SECURITY_DEPOSIT]') ||
-            r.transaction_reference?.includes('জামানত সংগ্রহ')
-          if (!isDep) {
+            r.remarks?.includes('সিকিউরিটি জামানত') ||
+            r.remarks?.includes('[SECURITY_DEPOSIT]') ||
+            r.transaction_reference?.includes('জামানত সংগ্রহ') ||
+            r.transaction_reference?.includes('সিকিউরিটি জামানত') ||
+            r.transaction_reference?.includes('[SECURITY_DEPOSIT]')
+          if (isDep) {
+            totalDepositReceipts += Number(r.amount) || 0
+          } else {
             totalRegularReceipts += Number(r.amount) || 0
           }
         }
@@ -339,20 +360,6 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
       }
 
       // 4. Calculate any unpaid deposit charges if billed
-      let totalDepositReceipts = 0
-      boarderReceipts.forEach((r) => {
-        if (r.is_void) return
-        const isDep =
-          r.items?.some((i) => i.head_code === 'SECURITY_DEPOSIT' || i.head_name?.includes('জামানত')) ||
-          r.remarks?.includes('[SECURITY_DEPOSIT]') ||
-          r.remarks?.includes('জামানত সংগ্রহ') ||
-          r.transaction_reference?.includes('[SECURITY_DEPOSIT]') ||
-          r.transaction_reference?.includes('জামানত সংগ্রহ')
-        if (isDep) {
-          totalDepositReceipts += Number(r.amount) || 0
-        }
-      })
-
       let remainingDepositFund = totalDepositReceipts
       const depositCharges = sanitized.filter(
         (c) =>
@@ -734,7 +741,7 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
                 value={billingMonth}
                 onChange={(e) => setBillingMonth(e.target.value)}
                 onClick={(e) => {
-                  try { e.currentTarget.showPicker?.() } catch {}
+                  try { e.currentTarget.showPicker?.() } catch { }
                 }}
                 className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs font-mono focus:outline-none focus:border-indigo-500 cursor-pointer [color-scheme:dark]"
                 required
@@ -751,7 +758,7 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
                 value={collectionDate}
                 onChange={(e) => setCollectionDate(e.target.value)}
                 onClick={(e) => {
-                  try { e.currentTarget.showPicker?.() } catch {}
+                  try { e.currentTarget.showPicker?.() } catch { }
                 }}
                 className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs font-mono focus:outline-none focus:border-emerald-500 cursor-pointer [color-scheme:dark]"
                 required
@@ -762,21 +769,19 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
           {/* Boarder Info & Live Dues Status Card */}
           {selectedBoarder && (
             <div
-              className={`p-3.5 rounded-2xl border transition-all ${
-                duesBreakdown.hasDues
+              className={`p-3.5 rounded-2xl border transition-all ${duesBreakdown.hasDues
                   ? 'bg-rose-950/20 border-rose-500/30 shadow-lg shadow-rose-950/20'
                   : 'bg-emerald-950/20 border-emerald-500/30'
-              }`}
+                }`}
             >
               {/* Main row: Boarder Info & Total Due + Action */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5 text-xs text-slate-300">
                   <div
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                      duesBreakdown.hasDues
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${duesBreakdown.hasDues
                         ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
                         : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    }`}
+                      }`}
                   >
                     <User className="w-4 h-4" />
                   </div>
@@ -914,11 +919,10 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
                       setDepositAdjustAmount('')
                     }
                   }}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer self-start sm:self-center shrink-0 ${
-                    isAdjustingFromDeposit
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer self-start sm:self-center shrink-0 ${isAdjustingFromDeposit
                       ? 'bg-teal-500 text-slate-950 shadow-md shadow-teal-500/30'
                       : 'bg-slate-800 text-teal-300 border border-teal-500/40 hover:bg-teal-950/40'
-                  }`}
+                    }`}
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>{isAdjustingFromDeposit ? 'সমন্বয় সক্রিয়' : 'জামানত থেকে সমন্বয় করুন'}</span>
