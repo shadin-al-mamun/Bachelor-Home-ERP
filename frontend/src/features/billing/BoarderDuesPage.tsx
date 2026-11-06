@@ -1,10 +1,11 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
   useBoarderDuesSummary,
   type DuesFilters,
 } from './api/useBilling'
 import { useFlats } from '@/features/accommodation/api/useAccommodation'
+import { useOwnerDashboard } from '@/features/dashboard/api/useOwnerDashboard'
 import { CollectReceiptModal } from './components/CollectReceiptModal'
 import { Button } from '@/components/common/Button'
 import { Badge } from '@/components/common/Badge'
@@ -24,12 +25,57 @@ import {
   Building2,
   RefreshCw,
   ExternalLink,
+  Calendar,
 } from 'lucide-react'
 
 export const BoarderDuesPage: React.FC = () => {
   const [search, setSearch] = useState('')
   const [selectedFlat, setSelectedFlat] = useState('ALL')
   const [overdueOnly, setOverdueOnly] = useState(false)
+
+  // Dedicated Financial Month Filter (matches Dashboard)
+  const currentDhakaMonthStr = () => {
+    const dhakaNow = new Date()
+    const utc = dhakaNow.getTime() + dhakaNow.getTimezoneOffset() * 60000
+    const dhaka = new Date(utc + 3600000 * 6)
+    return `${dhaka.getFullYear()}-${String(dhaka.getMonth() + 1).padStart(2, '0')}`
+  }
+
+  const [selectedMonth, setSelectedMonth] = useState<string>(currentDhakaMonthStr)
+  const isAllMonths = selectedMonth === 'ALL'
+
+  // Month options for dropdown (matches Dashboard)
+  const monthOptions = useMemo(() => {
+    const options: { value: string; label: string }[] = []
+    const dhakaNow = new Date()
+    const utc = dhakaNow.getTime() + dhakaNow.getTimezoneOffset() * 60000
+    const dhaka = new Date(utc + 3600000 * 6)
+    const currentYear = dhaka.getFullYear()
+    const currentMonth = dhaka.getMonth()
+
+    const monthNamesBn = [
+      'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+      'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
+    ]
+
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(currentYear, currentMonth - i, 1)
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, '0')
+      const val = `${y}-${m}`
+      const label = `${monthNamesBn[d.getMonth()]} ${y}${i === 0 ? ' (চলতি মাস)' : ''}`
+      options.push({ value: val, label })
+    }
+
+    options.push({ value: 'ALL', label: 'সব মাস (সর্বমোট)' })
+    return options
+  }, [])
+
+  const selectedMonthLabel = useMemo(() => {
+    if (selectedMonth === 'ALL') return 'সব মাস'
+    const opt = monthOptions.find((o) => o.value === selectedMonth)
+    return opt ? opt.label.replace(' (চলতি মাস)', '') : selectedMonth
+  }, [selectedMonth, monthOptions])
 
   // Modals state
   const [isCollectModalOpen, setIsCollectModalOpen] = useState(false)
@@ -43,13 +89,31 @@ export const BoarderDuesPage: React.FC = () => {
 
   const { data: duesData = [], isLoading, refetch, isFetching } = useBoarderDuesSummary(filters)
   const { data: flats = [] } = useFlats()
+  const { data: dashboard, isFetching: isFetchingDashboard, refetch: refetchDashboard } = useOwnerDashboard(selectedMonth)
 
   // High-level metrics calculation
-  const totalBilled = duesData.reduce((sum, d) => sum + (Number(d.total_billed) || 0), 0)
-  const totalPaid = duesData.reduce((sum, d) => sum + (Number(d.total_paid) || 0), 0)
-  const totalOutstanding = duesData.reduce((sum, d) => sum + (Number(d.outstanding_due) || 0), 0)
+  const totalLifetimeBilled = duesData.reduce((sum, d) => sum + (Number(d.total_billed) || 0), 0)
+  const totalLifetimePaid = duesData.reduce((sum, d) => sum + (Number(d.total_paid) || 0), 0)
+  const totalLifetimeOutstanding = duesData.reduce((sum, d) => sum + (Number(d.outstanding_due) || 0), 0)
   const totalOverdue = duesData.reduce((sum, d) => sum + (Number(d.overdue_amount) || 0), 0)
   const overdueCount = duesData.filter((d) => Number(d.overdue_amount) > 0).length
+
+  // Monthly vs All-Time display metrics (mirroring Dashboard metrics)
+  const displayBilled = isAllMonths
+    ? totalLifetimeBilled
+    : (dashboard?.kpis?.total_billed_month ?? totalLifetimeBilled)
+
+  const displayPaid = isAllMonths
+    ? totalLifetimePaid
+    : (dashboard?.kpis?.total_collected_month ?? totalLifetimePaid)
+
+  const collectionRate = isAllMonths
+    ? (totalLifetimeBilled > 0 ? Math.round((totalLifetimePaid / totalLifetimeBilled) * 100) : 0)
+    : (dashboard?.kpis?.collection_rate ?? (displayBilled > 0 ? Math.round((displayPaid / displayBilled) * 100) : 0))
+
+  const displayDues = isAllMonths
+    ? totalLifetimeOutstanding
+    : (dashboard?.kpis?.month_dues ?? Math.max(0, displayBilled - displayPaid))
 
   return (
     <div className="space-y-6">
@@ -73,11 +137,14 @@ export const BoarderDuesPage: React.FC = () => {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => refetch()}
-            disabled={isFetching}
+            onClick={() => {
+              refetch()
+              refetchDashboard()
+            }}
+            disabled={isFetching || isFetchingDashboard}
             className="text-xs"
           >
-            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isFetching ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isFetching || isFetchingDashboard ? 'animate-spin' : ''}`} />
             রিফ্রেশ
           </Button>
 
@@ -146,56 +213,150 @@ export const BoarderDuesPage: React.FC = () => {
         </Link>
       </div>
 
-      {/* KPI Cards */}
+      {/* KPI Section Control Header with Financial Month Selector */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+          <h2 className="text-sm font-bold text-white tracking-wide flex items-center gap-2">
+            <span>মাসিক বিল ও আদায় পারফরম্যান্স</span>
+            <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+              {isAllMonths ? 'সর্বমোট' : selectedMonthLabel}
+            </span>
+          </h2>
+        </div>
+
+        {/* Dedicated Financial Month Selector (Matches Dashboard) */}
+        <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 rounded-2xl px-3 py-1.5 shadow-md self-start sm:self-auto">
+          <Calendar className="w-4 h-4 text-emerald-400 shrink-0" />
+          <label htmlFor="billing-month-filter" className="text-[11px] font-medium text-slate-300 shrink-0">
+            হিসাব মাস:
+          </label>
+          <select
+            id="billing-month-filter"
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="appearance-auto bg-slate-950 border border-emerald-500/40 text-emerald-300 text-xs font-semibold rounded-xl px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer hover:border-emerald-400 transition-colors"
+          >
+            {monthOptions.map((opt) => (
+              <option key={opt.value} value={opt.value} className="bg-slate-900 text-white py-1">
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* KPI Cards (Matches Dashboard Monthly Behavior) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Billed */}
-        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur flex items-center justify-between">
-          <div>
-            <span className="text-xs font-medium text-slate-400 block mb-1">সর্বমোট ধার্যকৃত বিল</span>
-            <span className="text-xl font-black text-white">{formatCurrencyBn(totalBilled)}</span>
-            <span className="text-[11px] text-slate-500 block mt-0.5">সবসময়ের মোট চার্জ</span>
+        {/* Card 1: Total Billed */}
+        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur flex items-center justify-between relative overflow-hidden group">
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-medium text-slate-400 block">
+                {isAllMonths ? 'সর্বমোট ধার্যকৃত বিল' : 'ধার্যকৃত বিল'}
+              </span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded font-semibold bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                {isAllMonths ? 'সর্বমোট' : selectedMonthLabel}
+              </span>
+            </div>
+            <span className="text-xl font-black font-mono text-white block">
+              {formatCurrencyBn(displayBilled)}
+            </span>
+            <div className="flex items-center justify-between gap-1 text-[11px] text-slate-400 flex-wrap">
+              <span>{isAllMonths ? 'সবসময়ের মোট চার্জ' : `${selectedMonthLabel} মাসের মোট বিল`}</span>
+              {!isAllMonths && totalLifetimeBilled > displayBilled && (
+                <span className="text-[10px] text-slate-500 font-mono">
+                  মোট: {formatCurrencyBn(totalLifetimeBilled)}
+                </span>
+              )}
+            </div>
           </div>
-          <div className="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+          <div className="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
             <TrendingUp className="w-5 h-5" />
           </div>
         </div>
 
-        {/* Total Collected */}
-        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur flex items-center justify-between">
-          <div>
-            <span className="text-xs font-medium text-slate-400 block mb-1">মোট আদায়কৃত টাকা</span>
-            <span className="text-xl font-black text-emerald-400">{formatCurrencyBn(totalPaid)}</span>
-            <span className="text-[11px] text-emerald-500/80 block mt-0.5">
-              আদায় হার: {totalBilled > 0 ? Math.round((totalPaid / totalBilled) * 100) : 0}%
+        {/* Card 2: Total Collected */}
+        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur flex items-center justify-between relative overflow-hidden group">
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-medium text-slate-400 block">
+                {isAllMonths ? 'মোট আদায়কৃত টাকা' : 'আদায়কৃত টাকা'}
+              </span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                {collectionRate}% আদায়
+              </span>
+            </div>
+            <span className="text-xl font-black font-mono text-emerald-400 block">
+              {formatCurrencyBn(displayPaid)}
             </span>
+            <div className="flex items-center justify-between gap-1 text-[11px] text-emerald-500/80 flex-wrap">
+              <span>
+                {isAllMonths
+                  ? `আদায় হার: ${collectionRate}%`
+                  : `${selectedMonthLabel}-এ সংগৃহীত`}
+              </span>
+              {!isAllMonths && totalLifetimePaid > displayPaid && (
+                <span className="text-[10px] text-slate-500 font-mono">
+                  মোট: {formatCurrencyBn(totalLifetimePaid)}
+                </span>
+              )}
+            </div>
           </div>
-          <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+          <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
             <DollarSign className="w-5 h-5" />
           </div>
         </div>
 
-        {/* Total Outstanding Due */}
-        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur flex items-center justify-between">
-          <div>
-            <span className="text-xs font-medium text-slate-400 block mb-1">মোট বকেয়া (Dues)</span>
-            <span className="text-xl font-black text-rose-400">{formatCurrencyBn(totalOutstanding)}</span>
-            <span className="text-[11px] text-rose-500/80 block mt-0.5">বর্তমান অমীমাংসিত পাওনা</span>
+        {/* Card 3: Total Outstanding Due */}
+        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur flex items-center justify-between relative overflow-hidden group">
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-medium text-slate-400 block">
+                {isAllMonths ? 'মোট বকেয়া (Dues)' : 'বকেয়া পাওনা'}
+              </span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${
+                displayDues > 0
+                  ? 'bg-rose-500/10 text-rose-300 border border-rose-500/20'
+                  : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+              }`}>
+                {displayDues > 0 ? 'বকেয়া' : 'পরিশোধিত'}
+              </span>
+            </div>
+            <span className="text-xl font-black font-mono text-rose-400 block">
+              {formatCurrencyBn(displayDues)}
+            </span>
+            <div className="flex items-center justify-between gap-1 text-[11px] text-rose-500/80 flex-wrap">
+              <span>{isAllMonths ? 'বর্তমান অমীমাংসিত পাওনা' : `${selectedMonthLabel} মাসের বাকি`}</span>
+              {!isAllMonths && totalLifetimeOutstanding > displayDues && (
+                <span className="text-[10px] text-slate-500 font-mono">
+                  সর্বমোট: {formatCurrencyBn(totalLifetimeOutstanding)}
+                </span>
+              )}
+            </div>
           </div>
-          <div className="w-11 h-11 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+          <div className="w-11 h-11 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 shrink-0">
             <CreditCard className="w-5 h-5" />
           </div>
         </div>
 
-        {/* Overdue Amount & Alert */}
-        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur flex items-center justify-between">
-          <div>
-            <span className="text-xs font-medium text-amber-400 block mb-1">মেয়াদোত্তীর্ণ (Overdue)</span>
-            <span className="text-xl font-black text-amber-400">{formatCurrencyBn(totalOverdue)}</span>
-            <span className="text-[11px] text-amber-500 block mt-0.5">
+        {/* Card 4: Overdue Amount & Alert */}
+        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur flex items-center justify-between relative overflow-hidden group">
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-medium text-amber-400 block">মেয়াদোত্তীর্ণ (Overdue)</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                {overdueCount > 0 ? `${overdueCount} জন` : '০ জন'}
+              </span>
+            </div>
+            <span className="text-xl font-black font-mono text-amber-400 block">
+              {formatCurrencyBn(totalOverdue)}
+            </span>
+            <span className="text-[11px] text-amber-500 block">
               {overdueCount} জন বর্ডারের ডেডলাইন উত্তীর্ণ
             </span>
           </div>
-          <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+          <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
             <AlertTriangle className="w-5 h-5" />
           </div>
         </div>
