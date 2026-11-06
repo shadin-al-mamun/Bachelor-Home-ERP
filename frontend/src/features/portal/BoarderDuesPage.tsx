@@ -212,7 +212,7 @@ export const BoarderDuesPage: React.FC = () => {
           due_amount: Math.max(0, 1560 - paid),
         }
       }
-      if (c.charge_type === 'UTILITY' && (amt === 844 || amt === 1100 || (amt > 0 && amt < 1100 && (c.description?.includes('২৪৪') || c.description?.includes('৫০০'))))) {
+      if (c.charge_type === 'UTILITY' && (amt === 844 || amt === 1100)) {
         return {
           ...c,
           amount: 989,
@@ -350,18 +350,10 @@ export const BoarderDuesPage: React.FC = () => {
       }
     })
 
-    // If boarder has an un-tagged legacy deposit from active allocation:
-    let depositFund = Math.max(depositStats.initialDeposit, totalDepositReceipts)
-    let regularCash = totalRegularReceipts
-
-    // If deposit was not explicitly tagged as a separate receipt, but total receipts includes it:
-    if (totalDepositReceipts === 0 && depositFund > 0 && totalRegularReceipts >= depositFund) {
-      regularCash = Math.max(0, totalRegularReceipts - depositFund)
-    }
-
     // Cash available to pay regular operational monthly bills:
     // Regular payments + any explicitly adjusted security deposit amounts
-    let availableOperationalCash = regularCash + totalAdjustments
+    let availableOperationalCash = totalRegularReceipts + totalAdjustments
+    let depositFund = Math.max(depositStats.initialDeposit, totalDepositReceipts)
 
     const chargeAllocations = new Map<string, { paid: number; due: number; status: ChargeStatus }>()
 

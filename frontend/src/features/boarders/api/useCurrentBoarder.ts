@@ -41,10 +41,33 @@ export function useCurrentBoarder() {
       (profile?.full_name && b.full_name === profile.full_name)
   )
 
-  // 3. Assemble currentBoarder with reliable seat & room info
+  const activeId = seatData?.boarder_id || matchedFromList?.id
+
+  // 3. Query active allocation security_deposit directly
+  const { data: activeAlloc } = useQuery({
+    queryKey: ['boarder-active-allocation', activeId],
+    enabled: Boolean(activeId && isSupabaseConfigured),
+    queryFn: async () => {
+      try {
+        const { data } = await supabase
+          .from('allocations')
+          .select('id, monthly_rent, security_deposit, status, start_date')
+          .eq('boarder_id', activeId!)
+          .eq('status', 'ACTIVE')
+          .maybeSingle()
+        return data
+      } catch (err) {
+        console.warn('active allocation query failed:', err)
+        return null
+      }
+    },
+  })
+
+  // 4. Assemble currentBoarder with reliable seat, room & security deposit info
   let currentBoarder: BoarderOption | null = null
 
   if (seatData && seatData.has_active_seat && seatData.boarder_id) {
+    const deposit = Number(activeAlloc?.security_deposit ?? matchedFromList?.security_deposit ?? 0)
     currentBoarder = {
       id: seatData.boarder_id,
       user_id: profile?.id,
@@ -57,10 +80,12 @@ export function useCurrentBoarder() {
       flat_id: matchedFromList?.flat_id || '',
       flat_name: seatData.flat_name || '',
       building_name: seatData.building_name || '',
-      admission_date: matchedFromList?.admission_date || '',
-      monthly_rent: Number(seatData.monthly_rent || matchedFromList?.monthly_rent || 0),
+      admission_date: matchedFromList?.admission_date || activeAlloc?.start_date || '',
+      monthly_rent: Number(seatData.monthly_rent || activeAlloc?.monthly_rent || matchedFromList?.monthly_rent || 0),
+      security_deposit: deposit,
+      active_allocation: activeAlloc || (deposit > 0 ? { security_deposit: deposit } : undefined),
       status: (seatData.boarder_status as any) || 'ACTIVE',
-    }
+    } as any
   } else if (!isSupabaseConfigured && matchedFromList) {
     currentBoarder = matchedFromList
   } else if (!isStaffRole && !isSupabaseConfigured && boardersList.length > 0) {

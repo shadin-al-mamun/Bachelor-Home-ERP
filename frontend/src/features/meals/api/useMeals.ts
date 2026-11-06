@@ -74,6 +74,7 @@ export interface BoarderOption {
   building_name?: string
   monthly_rent?: number
   security_deposit?: number
+  active_allocation?: any
   admission_date?: string
   status?: string
 }
@@ -421,6 +422,7 @@ export function useMealBoardersList() {
           allocations(
             status,
             monthly_rent,
+            security_deposit,
             start_date,
             seat:seats(
               id,
@@ -487,6 +489,8 @@ export function useMealBoardersList() {
           boarder_code: b.boarder_code,
           phone_number: b.phone_number,
           monthly_rent: Number(activeAlloc?.monthly_rent ?? seat?.default_rent ?? 0),
+          security_deposit: Number(activeAlloc?.security_deposit || 0),
+          active_allocation: activeAlloc || undefined,
           seat_name: seat?.seat_name || seat?.seat_code || '',
           seat_code: seat?.seat_code || '',
           room_name: room?.name || '',

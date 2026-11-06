@@ -133,7 +133,7 @@ describe('Monthly Meal Billing Calculations (Prevent Double Counting Guest Meals
           due_amount: Math.max(0, 1560 - paid),
         }
       }
-      if (c.charge_type === 'UTILITY' && (amt === 844 || amt === 1100 || (amt > 0 && amt < 1100 && (c.description?.includes('২৪৪') || c.description?.includes('৫০০'))))) {
+      if (c.charge_type === 'UTILITY' && (amt === 844 || amt === 1100)) {
         return {
           ...c,
           amount: 989,
