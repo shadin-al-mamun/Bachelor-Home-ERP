@@ -393,8 +393,21 @@ export function useMonthlyCollectionSheetData(
         advanceAmount = Number((boarder as any).advance_amount)
       } else if (boarder.advance_balance && boarder.advance_balance > 0) {
         advanceAmount = boarder.advance_balance
-      } else if (boarder.active_allocation?.security_deposit && boarder.active_allocation.security_deposit > 0) {
-        advanceAmount = boarder.active_allocation.security_deposit
+      } else {
+        const collectedDeposit = bReceipts
+          .filter(
+            (r) =>
+              !r.is_void &&
+              (r.remarks?.includes('[SECURITY_DEPOSIT]') ||
+                r.transaction_reference?.includes('[SECURITY_DEPOSIT]') ||
+                r.remarks?.includes('জামানত সংগ্রহ') ||
+                r.transaction_reference?.includes('জামানত সংগ্রহ') ||
+                r.items?.some((i: any) => i.head_code === 'SECURITY_DEPOSIT' || i.head_name?.includes('জামানত')))
+          )
+          .reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
+        if (collectedDeposit > 0) {
+          advanceAmount = collectedDeposit
+        }
       }
 
       // ----------------------------------------------------------------------

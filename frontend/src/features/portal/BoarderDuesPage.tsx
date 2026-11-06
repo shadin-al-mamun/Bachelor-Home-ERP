@@ -310,15 +310,17 @@ export const BoarderDuesPage: React.FC = () => {
       }
     })
 
-    const chargeDeposit = sanitizedCharges
+    const paidChargeDeposit = sanitizedCharges
       .filter((c) => isDepositCharge(c))
-      .reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+      .reduce((sum, c) => sum + (Number(c.paid_amount) || 0), 0)
 
-    const initial = Math.max(allocDeposit, recDeposit, chargeDeposit)
-    const held = Math.max(0, initial - adjusted)
+    // Deposit is only in custody if actually collected via receipts or paid deposit charges
+    const actualCollected = Math.max(recDeposit, paidChargeDeposit)
+    const held = Math.max(0, actualCollected - adjusted)
 
     return {
-      initialDeposit: initial,
+      targetDeposit: allocDeposit,
+      initialDeposit: actualCollected,
       adjustedDeposit: adjusted,
       heldDeposit: held,
     }
@@ -806,8 +808,12 @@ export const BoarderDuesPage: React.FC = () => {
           <div className="flex items-center justify-between text-slate-400 text-xs">
             <span className="flex items-center gap-1.5 min-w-0">
               <span className="truncate">সংরক্ষিত জামানত</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-teal-500/10 text-teal-300 border border-teal-500/20 shrink-0">
-                রিজার্ভ
+              <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold shrink-0 ${
+                depositStats.heldDeposit > 0
+                  ? 'bg-teal-500/10 text-teal-300 border border-teal-500/20'
+                  : 'bg-slate-800 text-slate-400 border border-slate-700'
+              }`}>
+                {depositStats.heldDeposit > 0 ? 'রিজার্ভ' : 'জমা নেই'}
               </span>
             </span>
             <ShieldCheck className="w-4 h-4 text-teal-400 shrink-0" />
@@ -821,7 +827,9 @@ export const BoarderDuesPage: React.FC = () => {
                 ? `মূল: ${formatCurrencyBn(depositStats.initialDeposit)}`
                 : depositStats.heldDeposit > 0
                   ? 'হোস্টেল ছাড়ার সময় সমন্বয়যোগ্য'
-                  : 'কোনো জামানত জমা নেই'}
+                  : depositStats.targetDeposit > 0
+                    ? `নির্ধারিত: ${formatCurrencyBn(depositStats.targetDeposit)} (এখনো জমা নেই)`
+                    : 'কোনো জামানত জমা নেই'}
             </span>
             {depositStats.adjustedDeposit > 0 && (
               <span className="text-[10px] text-teal-300 font-mono">

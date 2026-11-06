@@ -112,10 +112,12 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
       }
     })
 
-    const totalDeposit = Math.max(allocDeposit, receiptDeposit)
+    // Actual collected deposit into hostel custody (via explicit deposit receipt items or tags)
+    const totalDeposit = receiptDeposit
     const availableDeposit = Math.max(0, totalDeposit - adjustedDeposit)
 
     return {
+      targetDeposit: allocDeposit,
       totalDeposit,
       adjustedDeposit,
       availableDeposit,

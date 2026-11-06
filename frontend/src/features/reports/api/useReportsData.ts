@@ -1183,11 +1183,13 @@ export function useReportsData(filters: ReportFilterState) {
           .reduce((s, r) => s + (Number(r.amount) || 0), 0)
 
         const totalBilled = Math.max(allocSecAmt, billedDepositCharges, paidDepositReceipts)
-        const totalPaid = Math.max(allocSecAmt, paidDepositReceipts)
+        const totalPaid = paidDepositReceipts
         const held = Math.max(0, totalPaid - adjustedDeposit)
 
         let statusText = 'তহবিলে সংরক্ষিত (HELD)'
-        if (held <= 0 && adjustedDeposit > 0) {
+        if (totalPaid === 0 && allocSecAmt > 0) {
+          statusText = 'জামানত অনাদায়ী (PENDING)'
+        } else if (held <= 0 && adjustedDeposit > 0) {
           statusText = 'সম্পূর্ণ সমন্বয়কৃত (ADJUSTED)'
         } else if (alloc.status !== 'ACTIVE') {
           statusText = 'অব্যাহতি (RELEASED)'
