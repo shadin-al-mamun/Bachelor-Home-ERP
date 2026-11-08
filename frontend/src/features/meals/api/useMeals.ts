@@ -66,6 +66,7 @@ export interface BoarderOption {
   full_name: string
   boarder_code: string
   phone_number: string
+  photo_url?: string | null
   flat_id?: string
   flat_name?: string
   room_name?: string
@@ -417,6 +418,7 @@ export function useMealBoardersList() {
           full_name,
           boarder_code,
           phone_number,
+          photo_url,
           admission_date,
           status,
           allocations(

@@ -256,6 +256,7 @@ export interface CreateStaffParams {
   password: string
   role: UserRole
   flatIds?: string[]
+  avatar_url?: string | null
 }
 
 export function useCreateStaffUser() {
@@ -284,7 +285,7 @@ export function useCreateStaffUser() {
           role: params.role,
           is_active: true,
           preferred_language: 'bn',
-          avatar_url: null,
+          avatar_url: params.avatar_url || null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           assigned_flats: (params.flatIds || []).map((fId) => ({
@@ -322,6 +323,7 @@ export function useCreateStaffUser() {
             full_name: cleanName,
             phone_number: cleanPhone,
             role: params.role,
+            avatar_url: params.avatar_url || null,
           },
         },
       })
@@ -359,6 +361,7 @@ export function useCreateStaffUser() {
             phone_number: cleanPhone,
             role: params.role,
             is_active: true,
+            avatar_url: params.avatar_url || null,
             updated_at: new Date().toISOString(),
           })
       } catch (profErr) {
@@ -384,6 +387,59 @@ export function useCreateStaffUser() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users-management-list'] })
+    },
+  })
+}
+
+export function useUpdateAvatarMutation() {
+  const queryClient = useQueryClient()
+  const currentUser = useAuthStore((s) => s.profile)
+  const updateProfileAvatar = useAuthStore((s) => s.updateProfileAvatar)
+
+  return useMutation({
+    mutationFn: async ({ userId, avatarUrl }: { userId: string; avatarUrl: string }) => {
+      if (!isSupabaseConfigured) {
+        const item = FALLBACK_MOCK_PROFILES.find((p) => p.id === userId)
+        if (item) item.avatar_url = avatarUrl
+        if (currentUser?.id === userId) {
+          updateProfileAvatar(avatarUrl)
+        }
+        return { success: true, avatarUrl }
+      }
+
+      // 1. Call update_user_avatar RPC if available
+      try {
+        const { error } = await supabase.rpc('update_user_avatar', {
+          p_user_id: userId,
+          p_avatar_url: avatarUrl,
+        })
+        if (error) throw error
+      } catch (rpcErr) {
+        console.warn('RPC update_user_avatar failed, fallback to direct update:', rpcErr)
+        // Fallback direct table updates
+        await supabase
+          .from('profiles')
+          .update({ avatar_url: avatarUrl, updated_at: new Date().toISOString() })
+          .eq('id', userId)
+
+        await supabase
+          .from('boarders')
+          .update({ photo_url: avatarUrl, updated_at: new Date().toISOString() })
+          .eq('user_id', userId)
+      }
+
+      // If current logged-in user changed their photo, update auth store state
+      if (currentUser?.id === userId) {
+        updateProfileAvatar(avatarUrl)
+      }
+
+      return { success: true, avatarUrl }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users-management-list'] })
+      queryClient.invalidateQueries({ queryKey: ['boarders'] })
+      queryClient.invalidateQueries({ queryKey: ['meal-boarders-list'] })
+      queryClient.invalidateQueries({ queryKey: ['current-boarder'] })
     },
   })
 }

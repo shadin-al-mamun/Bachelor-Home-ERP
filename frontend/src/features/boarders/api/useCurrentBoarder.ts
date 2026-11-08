@@ -74,6 +74,7 @@ export function useCurrentBoarder() {
       full_name: seatData.boarder_name || profile?.full_name || 'বর্ডার',
       boarder_code: seatData.boarder_code || 'BDR',
       phone_number: profile?.phone_number || matchedFromList?.phone_number || '',
+      photo_url: matchedFromList?.photo_url || profile?.avatar_url || null,
       seat_name: seatData.seat_name || seatData.seat_code || 'সিট বরাদ্দ',
       seat_code: seatData.seat_code || '',
       room_name: seatData.room_name || '',

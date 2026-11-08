@@ -135,6 +135,7 @@ export const BoarderDashboardPage: React.FC = () => {
   // Authenticated boarder or dynamic profile info (strictly from real data, zero hardcoded placeholders)
   const boarderName = currentBoarder?.full_name || profile?.full_name || (isStaffRole ? 'অ্যাডমিন ইউজার' : 'বর্ডার')
   const boarderCode = currentBoarder?.boarder_code || (isStaffRole ? 'STAFF' : 'BDR')
+  const boarderPhoto = currentBoarder?.photo_url || profile?.avatar_url || null
 
   // Clean hostel & building name: strictly prioritize real configured branding name over demo seeds
   const rawBuilding = currentBoarder?.building_name || ''
@@ -458,10 +459,18 @@ export const BoarderDashboardPage: React.FC = () => {
 
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
           <div className="flex items-start gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 to-teal-400 p-0.5 shadow-xl shadow-indigo-600/30 shrink-0 flex items-center justify-center">
-              <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center text-indigo-400 font-extrabold text-xl">
-                {boarderName.slice(0, 1)}
-              </div>
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 to-teal-400 p-0.5 shadow-xl shadow-indigo-600/30 shrink-0 flex items-center justify-center overflow-hidden">
+              {boarderPhoto ? (
+                <img
+                  src={boarderPhoto}
+                  alt={boarderName}
+                  className="w-full h-full object-cover rounded-[14px]"
+                />
+              ) : (
+                <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center text-indigo-400 font-extrabold text-xl">
+                  {boarderName.slice(0, 1)}
+                </div>
+              )}
             </div>
 
             <div className="space-y-1">

@@ -29,6 +29,7 @@ import {
 import { useAuthStore } from '@/app/store/useAuthStore'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
 import { createBoarderApplication } from '@/features/boarders/api/useBoarders'
+import { compressProfilePhoto } from '@/utils/imageCompression'
 
 export const RegisterPortal: React.FC = () => {
   const navigate = useNavigate()
@@ -89,7 +90,7 @@ export const RegisterPortal: React.FC = () => {
     setEmergencyContactAddress(permanentAddress || presentAddress)
   }
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setErrorMessage(null)
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0]
@@ -97,17 +98,24 @@ export const RegisterPortal: React.FC = () => {
         setErrorMessage('অনুগ্রহ করে শুধুমাত্র ছবি ফাইল (JPG, PNG, WEBP) আপলোড করুন।')
         return
       }
-      if (file.size > 5 * 1024 * 1024) {
-        setErrorMessage('ছবির সাইজ সর্বোচ্চ ৫ মেগাবাইট হতে পারবে।')
+      if (file.size > 15 * 1024 * 1024) {
+        setErrorMessage('ছবির সাইজ সর্বোচ্চ ১৫ মেগাবাইট হতে পারবে।')
         return
       }
-      setPhotoFile(file)
-      setPhotoFileName(file.name)
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result as string)
+      try {
+        const { file: compressed, dataUrl } = await compressProfilePhoto(file)
+        setPhotoFile(compressed)
+        setPhotoFileName(file.name)
+        setPhotoPreview(dataUrl)
+      } catch (err) {
+        setPhotoFile(file)
+        setPhotoFileName(file.name)
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          setPhotoPreview(reader.result as string)
+        }
+        reader.readAsDataURL(file)
       }
-      reader.readAsDataURL(file)
     }
   }
 
@@ -310,6 +318,19 @@ export const RegisterPortal: React.FC = () => {
       localStorage.setItem('bachelor_erp_last_applicant_id', createdBoarder.id)
       localStorage.setItem('bachelor_erp_last_applicant_code', createdBoarder.boarder_code)
 
+      // Also ensure public.profiles.avatar_url is updated for this applicant user
+      if (isSupabaseConfigured && (createdUserId || createdBoarder.user_id) && finalPhotoUrl) {
+        const uid = createdUserId || createdBoarder.user_id
+        try {
+          await supabase
+            .from('profiles')
+            .update({ avatar_url: finalPhotoUrl })
+            .eq('id', uid)
+        } catch (e) {
+          console.warn('Could not update avatar_url in profiles table:', e)
+        }
+      }
+
       // Set auth state as APPLICANT
       setDemoUser('APPLICANT', {
         id: createdUserId || createdBoarder.user_id || undefined,
@@ -317,6 +338,7 @@ export const RegisterPortal: React.FC = () => {
         email,
         phone_number: phoneNumber,
         role: 'APPLICANT',
+        avatar_url: finalPhotoUrl || undefined,
       })
 
       navigate('/portal/my-application', { replace: true })

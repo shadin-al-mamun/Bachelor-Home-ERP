@@ -19,6 +19,7 @@ interface AuthState {
   hasRole: (roles: UserRole[]) => boolean
   hasFlatAccess: (flatId: string) => boolean
   setDemoUser: (role: UserRole, customProfile?: Partial<Profile>) => void
+  updateProfileAvatar: (avatarUrl: string) => void
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -151,6 +152,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
       }
 
+      // Self-heal avatar_url: if profile.avatar_url is null, check if matching boarder has photo_url
+      if (resolvedProfile && !resolvedProfile.avatar_url && isSupabaseConfigured) {
+        try {
+          const { data: bRow } = await supabase
+            .from('boarders')
+            .select('photo_url')
+            .or(`user_id.eq.${userId},email.eq.${resolvedProfile.email || currentUser?.email}`)
+            .not('photo_url', 'is', null)
+            .limit(1)
+            .maybeSingle()
+
+          if (bRow?.photo_url) {
+            resolvedProfile = { ...resolvedProfile, avatar_url: bRow.photo_url }
+            supabase.from('profiles').update({ avatar_url: bRow.photo_url }).eq('id', userId).then(() => {})
+          }
+        } catch {
+          // ignore
+        }
+      }
+
       // 2. Fetch user flat assignments if manager or operator
       const { data: assignmentsData } = await supabase
         .from('user_flat_assignments')
@@ -169,6 +190,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       console.error('Error fetching user profile:', err)
       set({ isLoading: false, isInitialized: true })
     }
+  },
+
+  updateProfileAvatar: (avatarUrl: string) => {
+    set((state) => ({
+      profile: state.profile ? { ...state.profile, avatar_url: avatarUrl } : null,
+    }))
   },
 
   signOut: async () => {

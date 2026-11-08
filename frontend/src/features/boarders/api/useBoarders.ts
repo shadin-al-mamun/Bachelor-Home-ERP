@@ -822,6 +822,10 @@ export async function createBoarderApplication(input: CreateBoarderInput): Promi
             console.warn('Could not update extra tenant fields after RPC:', updateErr)
           }
         }
+        if (input.photo_url && (rpcData.user_id || validUserId)) {
+          const uid = rpcData.user_id || validUserId
+          supabase.from('profiles').update({ avatar_url: input.photo_url }).eq('id', uid).then(() => {}, () => {})
+        }
         const merged = { ...newBoarder, ...rpcData, ...extraUpdates }
         saveStoredBoarders([merged, ...getStoredBoarders().filter(b => b.id !== merged.id)])
         return merged
@@ -899,6 +903,10 @@ export async function createBoarderApplication(input: CreateBoarderInput): Promi
         console.error('CRITICAL: Supabase boarder insert error:', error.message)
         throw new Error(`আবেদনটি সার্ভারে সংরক্ষণ করা যায়নি: ${error.message}`)
       } else if (data) {
+        if (input.photo_url && (data.user_id || validUserId)) {
+          const uid = data.user_id || validUserId
+          supabase.from('profiles').update({ avatar_url: input.photo_url }).eq('id', uid).then(() => {}, () => {})
+        }
         const merged = { ...newBoarder, ...data }
         saveStoredBoarders([merged, ...getStoredBoarders().filter(b => b.id !== merged.id)])
         return merged

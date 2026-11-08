@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import {
   X,
   UserPlus,
@@ -15,12 +15,16 @@ import {
   Mail,
   Lock,
   User,
+  Camera,
+  Trash2,
 } from 'lucide-react'
 import {
   useCreateStaffUser,
   useAllBuildingsAndFlats,
 } from '../api/useUserManagement'
 import { useAuthStore } from '../../../app/store/useAuthStore'
+import { supabase, isSupabaseConfigured } from '../../../lib/supabaseClient'
+import { compressProfilePhoto } from '../../../utils/imageCompression'
 import type { UserRole } from '../../../types/database'
 
 interface CreateStaffModalProps {
@@ -82,6 +86,10 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [selectedFlatIds, setSelectedFlatIds] = useState<Set<string>>(new Set())
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [isCompressing, setIsCompressing] = useState(false)
+  const photoInputRef = useRef<HTMLInputElement>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   // Success view state
@@ -105,6 +113,9 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
       setPassword(generatePassword())
       setShowPassword(false)
       setSelectedFlatIds(new Set())
+      setPhotoFile(null)
+      setPhotoPreview(null)
+      setIsCompressing(false)
       setErrorMessage(null)
       setIsSuccess(false)
       setCreatedInfo(null)
@@ -154,6 +165,34 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
     setSelectedFlatIds(updated)
   }
 
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setErrorMessage(null)
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0]
+      if (!file.type.startsWith('image/')) {
+        setErrorMessage('অনুগ্রহ করে শুধুমাত্র ছবি ফাইল নির্বাচন করুন।')
+        return
+      }
+
+      setIsCompressing(true)
+      try {
+        const { file: compressed, dataUrl } = await compressProfilePhoto(file)
+        setPhotoFile(compressed)
+        setPhotoPreview(dataUrl)
+      } catch (err) {
+        console.warn('Compression error fallback:', err)
+        setPhotoFile(file)
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          setPhotoPreview(reader.result as string)
+        }
+        reader.readAsDataURL(file)
+      } finally {
+        setIsCompressing(false)
+      }
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMessage(null)
@@ -180,6 +219,28 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
       return
     }
 
+    let finalAvatarUrl: string | null = null
+    if (photoFile && isSupabaseConfigured) {
+      try {
+        const ext = photoFile.name.split('.').pop() || 'jpg'
+        const pPath = `staff/${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`
+        const { data: pData, error: pErr } = await supabase.storage
+          .from('avatars')
+          .upload(pPath, photoFile, { upsert: true, cacheControl: '3600' })
+        if (!pErr && pData) {
+          const { data: pubData } = supabase.storage.from('avatars').getPublicUrl(pData.path)
+          if (pubData?.publicUrl) {
+            finalAvatarUrl = pubData.publicUrl
+          }
+        }
+      } catch (e) {
+        console.warn('Staff photo storage upload failed, using dataUrl fallback:', e)
+        finalAvatarUrl = photoPreview
+      }
+    } else if (photoPreview) {
+      finalAvatarUrl = photoPreview
+    }
+
     try {
       await createStaffMutation.mutateAsync({
         fullName: fullName.trim(),
@@ -188,6 +249,7 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
         password: password.trim(),
         role: selectedRole,
         flatIds: Array.from(selectedFlatIds),
+        avatar_url: finalAvatarUrl,
       })
 
       setCreatedInfo({
@@ -361,6 +423,62 @@ export const CreateStaffModal: React.FC<CreateStaffModalProps> = ({
                   <span>{errorMessage}</span>
                 </div>
               )}
+
+              {/* Profile Photo Picker (Optional) */}
+              <div className="flex items-center gap-4 p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+                <div className="relative group w-14 h-14 rounded-full border-2 border-indigo-500/30 bg-slate-800 flex items-center justify-center overflow-hidden shrink-0">
+                  {photoPreview ? (
+                    <img src={photoPreview} alt="Staff preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="w-6 h-6 text-slate-400" />
+                  )}
+                  {isCompressing && (
+                    <div className="absolute inset-0 bg-slate-950/70 flex items-center justify-center">
+                      <RefreshCw className="w-4 h-4 text-indigo-400 animate-spin" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                    <Camera className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>কর্মকর্তার প্রোফাইল ছবি (ঐচ্ছিক)</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    JPG, PNG বা WEBP (সর্বোচ্চ ১৫ MB)। স্বয়ংক্রিয়ভাবে ক্রপ ও কম্প্রেস হবে।
+                  </p>
+
+                  <div className="mt-2 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => photoInputRef.current?.click()}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
+                    >
+                      {photoPreview ? 'ছবি পরিবর্তন' : 'ছবি নির্বাচন'}
+                    </button>
+                    {photoPreview && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPhotoFile(null)
+                          setPhotoPreview(null)
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 transition-colors inline-flex items-center gap-1"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>মুছে ফেলুন</span>
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handlePhotoSelect}
+                    className="hidden"
+                  />
+                </div>
+              </div>
 
               {/* 1. Full Name & Role */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -13,12 +13,14 @@ import {
   Shield,
   Menu,
   Sparkles,
+  Camera,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import { useBrandingStore } from '@/app/store/useBrandingStore'
 import { Badge, LanguageSwitcher } from '@/components/common'
 import { formatDhakaDate } from '@/utils/date'
 import NotificationDropdown from './NotificationDropdown'
+import { ProfileModal } from '@/components/profile/ProfileModal'
 
 interface HeaderProps {
   onToggleSidebar?: () => void
@@ -31,6 +33,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
   const [dhakaTime, setDhakaTime] = useState(formatDhakaDate(new Date(), 'hh:mm:ss A'))
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(true)
 
   useEffect(() => {
@@ -149,8 +152,14 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
             className="flex items-center gap-2 p-1 pl-2 rounded-xl bg-slate-900/70 hover:bg-slate-800/80 border border-slate-700/80 transition-colors"
           >
-            <div className="w-7 h-7 rounded-lg bg-primary-600/20 border border-primary-500/30 text-primary-300 flex items-center justify-center text-xs font-bold">
-              {profile?.full_name ? profile.full_name[0].toUpperCase() : <User className="w-3.5 h-3.5" />}
+            <div className="w-7 h-7 rounded-lg bg-primary-600/20 border border-primary-500/30 text-primary-300 flex items-center justify-center text-xs font-bold overflow-hidden shrink-0">
+              {profile?.avatar_url ? (
+                <img src={profile.avatar_url} alt={profile.full_name || ''} className="w-full h-full object-cover" />
+              ) : profile?.full_name ? (
+                profile.full_name[0].toUpperCase()
+              ) : (
+                <User className="w-3.5 h-3.5" />
+              )}
             </div>
             <div className="hidden sm:block text-left pr-1">
               <span className="text-xs font-medium text-white block max-w-[120px] truncate">
@@ -165,17 +174,28 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
           {/* User Dropdown Menu */}
           {isUserMenuOpen && (
             <div className="absolute right-0 mt-2 w-64 rounded-2xl glass-card border border-slate-700/80 shadow-2xl p-2 space-y-1 z-50">
-              <div className="px-3 py-2 border-b border-slate-800/80">
-                <p className="text-sm font-semibold text-white truncate">
-                  {profile?.full_name || 'হোস্টেল এডমিন'}
-                </p>
-                <p className="text-xs text-slate-400 truncate">
-                  {profile?.email || 'admin@bachelorhome.erp'}
-                </p>
-                <div className="mt-1.5">
-                  <Badge status="ACTIVE" showDot={true}>
-                    {profile?.role || 'SUPER_ADMIN'}
-                  </Badge>
+              <div className="px-3 py-2 border-b border-slate-800/80 flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-full border border-primary-500/40 bg-slate-800 flex items-center justify-center overflow-hidden shrink-0">
+                  {profile?.avatar_url ? (
+                    <img src={profile.avatar_url} alt={profile.full_name || ''} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-sm font-bold text-primary-300">
+                      {profile?.full_name ? profile.full_name[0].toUpperCase() : 'U'}
+                    </span>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-white truncate">
+                    {profile?.full_name || 'হোস্টেল এডমিন'}
+                  </p>
+                  <p className="text-xs text-slate-400 truncate">
+                    {profile?.email || 'admin@bachelorhome.erp'}
+                  </p>
+                  <div className="mt-1">
+                    <Badge status="ACTIVE" showDot={true}>
+                      {profile?.role || 'SUPER_ADMIN'}
+                    </Badge>
+                  </div>
                 </div>
               </div>
 
@@ -183,6 +203,19 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
                 <Shield className="w-3.5 h-3.5 text-indigo-400" />
                 <span>Zero-Trust RLS Active</span>
               </div>
+
+              {/* Profile & Photo Management Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsUserMenuOpen(false)
+                  setIsProfileModalOpen(true)
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-indigo-300 hover:bg-indigo-500/10 hover:text-indigo-200 transition-colors border border-indigo-500/20 bg-indigo-500/5"
+              >
+                <Camera className="w-4 h-4 text-indigo-400 shrink-0" />
+                <span className="truncate">আমার প্রোফাইল ও ছবি</span>
+              </button>
 
               {/* Branding Link for Admins */}
               {(profile?.role === 'SUPER_ADMIN' || profile?.role === 'ADMIN' || !profile?.role) && (
@@ -210,6 +243,11 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
           )}
         </div>
       </div>
+
+      <ProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+      />
     </header>
   )
 }

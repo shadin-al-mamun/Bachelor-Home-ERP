@@ -11,6 +11,7 @@ import {
   UserPlus,
   KeyRound,
   FileText,
+  Camera,
 } from 'lucide-react'
 import {
   useUsersList,
@@ -19,6 +20,7 @@ import {
 } from './api/useUserManagement'
 import { FlatAssignmentModal } from './components/FlatAssignmentModal'
 import { CreateStaffModal } from './components/CreateStaffModal'
+import { ProfileModal } from '../../components/profile/ProfileModal'
 import { useAuthStore } from '../../app/store/useAuthStore'
 import { Navigate, Link } from 'react-router-dom'
 import type { UserRole } from '../../types/database'
@@ -42,6 +44,7 @@ export const UserManagementPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState('ALL')
   const [selectedUserForFlats, setSelectedUserForFlats] = useState<UserManagementItem | null>(null)
+  const [photoTargetUser, setPhotoTargetUser] = useState<UserManagementItem | null>(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
   const { data: rawUsers = [], isLoading, isError } = useUsersList(searchQuery)
@@ -325,8 +328,12 @@ export const UserManagementPage: React.FC = () => {
                       {/* Name & Avatar */}
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-slate-300 text-xs shrink-0">
-                            {u.full_name?.charAt(0) || 'U'}
+                          <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-slate-300 text-xs shrink-0 overflow-hidden">
+                            {u.avatar_url ? (
+                              <img src={u.avatar_url} alt={u.full_name || ''} className="w-full h-full object-cover" />
+                            ) : (
+                              u.full_name?.charAt(0) || 'U'
+                            )}
                           </div>
                           <div>
                             <span className="font-semibold text-slate-200 block">{u.full_name}</span>
@@ -408,18 +415,32 @@ export const UserManagementPage: React.FC = () => {
 
                       {/* Actions */}
                       <td className="py-3 px-4 text-right">
-                        {canAssignFlats && (
+                        <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
-                            onClick={() => setSelectedUserForFlats(u)}
+                            onClick={() => setPhotoTargetUser(u)}
                             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold
-                              bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/40
+                              bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/40
                               transition-colors"
+                            title="কর্মকর্তার ছবি পরিবর্তন বা আপলোড"
                           >
-                            <Building2 className="w-3.5 h-3.5 text-indigo-400" />
-                            <span>ফ্ল্যাট দায়িত্ব</span>
+                            <Camera className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>ছবি</span>
                           </button>
-                        )}
+
+                          {canAssignFlats && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedUserForFlats(u)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold
+                                bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/40
+                                transition-colors"
+                            >
+                              <Building2 className="w-3.5 h-3.5 text-indigo-400" />
+                              <span>ফ্ল্যাট দায়িত্ব</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )
@@ -438,7 +459,16 @@ export const UserManagementPage: React.FC = () => {
         />
       )}
 
-      {/* 5. Create Staff Modal */}
+      {/* 5. Profile Photo Modal */}
+      {photoTargetUser && (
+        <ProfileModal
+          isOpen={!!photoTargetUser}
+          onClose={() => setPhotoTargetUser(null)}
+          targetUser={photoTargetUser}
+        />
+      )}
+
+      {/* 6. Create Staff Modal */}
       <CreateStaffModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
