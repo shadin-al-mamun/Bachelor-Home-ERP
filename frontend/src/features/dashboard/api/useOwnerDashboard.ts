@@ -303,13 +303,14 @@ export function updateOwnerDashboardMealMetrics(
   tomorrow.setDate(tomorrow.getDate() + 1)
   const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`
 
-  const delta = newState ? 1 : -1
+  const mealWeight = _session === 'BREAKFAST' ? 0.5 : 1.0
+  const delta = (newState ? 1 : -1) * mealWeight
 
   if (dateStr === todayStr) {
-    liveMealMetricsState.active_meals_today = Math.max(0, liveMealMetricsState.active_meals_today + delta)
+    liveMealMetricsState.active_meals_today = Math.max(0, Math.round((liveMealMetricsState.active_meals_today + delta) * 10) / 10)
     liveMealMetricsState.meal_attendance_rate = Math.round((liveMealMetricsState.active_meals_today / 294) * 1000) / 10
   } else if (dateStr === tomorrowStr) {
-    liveMealMetricsState.active_meals_tomorrow = Math.max(0, liveMealMetricsState.active_meals_tomorrow + delta)
+    liveMealMetricsState.active_meals_tomorrow = Math.max(0, Math.round((liveMealMetricsState.active_meals_tomorrow + delta) * 10) / 10)
   }
 }
 
@@ -415,6 +416,8 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
           incomesRes,
           managerAccountsRes,
           activeBoardersRes,
+          allocationsRes,
+          guestBookingsRes,
           mealsTodayRes,
           mealsTomorrowRes,
         ] = await Promise.all([
@@ -427,7 +430,16 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
             .from('financial_accounts')
             .select('id, account_name, account_number, account_type, opening_balance, current_balance, is_active')
             .eq('is_active', true),
-          supabase.from('boarders').select('id').eq('status', 'ACTIVE'),
+          supabase.from('boarders').select('id, status, admission_date').eq('status', 'ACTIVE'),
+          supabase
+            .from('allocations')
+            .select('id, boarder_id, status, start_date, end_date, boarder:boarders(id, status, admission_date)')
+            .eq('status', 'ACTIVE'),
+          supabase
+            .from('guest_meal_bookings')
+            .select('id, meal_date, session, guest_count, status')
+            .in('meal_date', [todayStr, tomorrowStr])
+            .eq('status', 'CONFIRMED'),
           supabase.from('meal_selections').select('boarder_id, breakfast, lunch, dinner').eq('meal_date', todayStr),
           supabase.from('meal_selections').select('boarder_id, breakfast, lunch, dinner').eq('meal_date', tomorrowStr),
         ])
@@ -551,10 +563,50 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
 
         const cashCustody = liveManagerCash
 
-        // Calculate meals using Hostel Mess Opt-Out Policy:
-        // Active residents who have NOT opted out have their meals ON by default (3 meals/day)
-        const activeBoardersList = (activeBoardersRes.data || []) as { id: string }[]
-        const effectiveResidentsCount = activeBoardersList.length || occupiedSeats
+        // Filter currently active seated residents strictly respecting seat allocation start_date & admission_date
+        // Boarders with future allocation dates (e.g. starting next month) are NOT seated yet and NOT counted in meals!
+        const allocations = (allocationsRes.data || []) as any[]
+
+        const validAllocationsToday = allocations.filter((a: any) => {
+          if (!a || (a.status && a.status !== 'ACTIVE')) return false
+          if (a.start_date && a.start_date > todayStr) return false
+          if (a.end_date && a.end_date < todayStr) return false
+          if (a.boarder) {
+            if (a.boarder.status && a.boarder.status !== 'ACTIVE') return false
+            if (a.boarder.admission_date && a.boarder.admission_date > todayStr) return false
+          }
+          return true
+        })
+
+        const validAllocationsTomorrow = allocations.filter((a: any) => {
+          if (!a || (a.status && a.status !== 'ACTIVE')) return false
+          if (a.start_date && a.start_date > tomorrowStr) return false
+          if (a.end_date && a.end_date < tomorrowStr) return false
+          if (a.boarder) {
+            if (a.boarder.status && a.boarder.status !== 'ACTIVE') return false
+            if (a.boarder.admission_date && a.boarder.admission_date > tomorrowStr) return false
+          }
+          return true
+        })
+
+        let residentBoarderIdsToday = Array.from(
+          new Set(validAllocationsToday.map((a: any) => a.boarder_id).filter(Boolean))
+        ) as string[]
+        let residentBoarderIdsTomorrow = Array.from(
+          new Set(validAllocationsTomorrow.map((a: any) => a.boarder_id).filter(Boolean))
+        ) as string[]
+
+        // Fallback if allocations table is empty: filter activeBoardersRes by admission_date
+        if (allocations.length === 0 && (activeBoardersRes.data || []).length > 0) {
+          residentBoarderIdsToday = (activeBoardersRes.data || [])
+            .filter((b: any) => !b.admission_date || b.admission_date <= todayStr)
+            .map((b: any) => b.id)
+          residentBoarderIdsTomorrow = (activeBoardersRes.data || [])
+            .filter((b: any) => !b.admission_date || b.admission_date <= tomorrowStr)
+            .map((b: any) => b.id)
+        }
+
+        const effectiveResidentsToday = residentBoarderIdsToday.length
 
         const todaySelMap = new Map<string, any>(
           (mealsTodayRes.data || []).map((s: any) => [s.boarder_id, s])
@@ -566,22 +618,15 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
         let countToday = 0
         let countTomorrow = 0
 
-        if (activeBoardersList.length > 0) {
-          for (const b of activeBoardersList) {
-            const todaySel = todaySelMap.get(b.id)
+        // Calculate today's resident meals: Opt-Out policy, breakfast = 0.5, lunch = 1.0, dinner = 1.0
+        if (residentBoarderIdsToday.length > 0) {
+          for (const bId of residentBoarderIdsToday) {
+            const todaySel = todaySelMap.get(bId)
             if (todaySel) {
               countToday += (todaySel.breakfast ? 0.5 : 0) + (todaySel.lunch ? 1.0 : 0) + (todaySel.dinner ? 1.0 : 0)
             } else {
               // Opt-Out default: active meals (daily 2.5 meals: 0.5+1+1)
               countToday += 2.5
-            }
-
-            const tomorrowSel = tomorrowSelMap.get(b.id)
-            if (tomorrowSel) {
-              countTomorrow += (tomorrowSel.breakfast ? 0.5 : 0) + (tomorrowSel.lunch ? 1.0 : 0) + (tomorrowSel.dinner ? 1.0 : 0)
-            } else {
-              // Opt-Out default: active meals (daily 2.5 meals: 0.5+1+1)
-              countTomorrow += 2.5
             }
           }
         } else if (occupiedSeats > 0) {
@@ -592,7 +637,20 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
             if (!s.dinner) turnedOffToday += 1.0
           }
           countToday = Math.max(0, occupiedSeats * 2.5 - turnedOffToday)
+        }
 
+        // Calculate tomorrow's resident meals: Opt-Out policy, breakfast = 0.5, lunch = 1.0, dinner = 1.0
+        if (residentBoarderIdsTomorrow.length > 0) {
+          for (const bId of residentBoarderIdsTomorrow) {
+            const tomorrowSel = tomorrowSelMap.get(bId)
+            if (tomorrowSel) {
+              countTomorrow += (tomorrowSel.breakfast ? 0.5 : 0) + (tomorrowSel.lunch ? 1.0 : 0) + (tomorrowSel.dinner ? 1.0 : 0)
+            } else {
+              // Opt-Out default: active meals (daily 2.5 meals: 0.5+1+1)
+              countTomorrow += 2.5
+            }
+          }
+        } else if (occupiedSeats > 0) {
           let turnedOffTomorrow = 0
           for (const s of (mealsTomorrowRes.data || [])) {
             if (!s.breakfast) turnedOffTomorrow += 0.5
@@ -602,13 +660,25 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
           countTomorrow = Math.max(0, occupiedSeats * 2.5 - turnedOffTomorrow)
         }
 
+        // Add confirmed guest meal bookings (Breakfast = 0.5, Lunch/Dinner = 1.0)
+        const guestBookings = (guestBookingsRes.data || []) as any[]
+        guestBookings.forEach((gb: any) => {
+          const count = Number(gb.guest_count) || 0
+          const weight = gb.session === 'BREAKFAST' ? 0.5 : 1.0
+          if (gb.meal_date === todayStr) {
+            countToday += count * weight
+          } else if (gb.meal_date === tomorrowStr) {
+            countTomorrow += count * weight
+          }
+        })
+
         countToday = Math.round(countToday * 10) / 10
         countTomorrow = Math.round(countTomorrow * 10) / 10
 
-        const maxPossibleMealsToday = effectiveResidentsCount * 2.5
+        const maxPossibleMealsToday = (effectiveResidentsToday || occupiedSeats) * 2.5
         const mealAttendanceRate = maxPossibleMealsToday > 0
           ? Math.min(100, Math.round((countToday / maxPossibleMealsToday) * 1000) / 10)
-          : (effectiveResidentsCount > 0 ? 100 : 0)
+          : (effectiveResidentsToday > 0 ? 100 : 0)
 
         // 1. Live Flat Occupancy
         const { data: realFlats } = await supabase

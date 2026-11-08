@@ -46,11 +46,11 @@ export const FlatBoarderBreakdownModal: React.FC<FlatBoarderBreakdownModalProps>
 
   if (!isOpen) return null
 
-  // Calculate flat meal totals
+  // Calculate flat meal totals (Breakfast = 0.5 meal)
   const totalBreakfast = boarders.filter((b) => b.breakfast).length
   const totalLunch = boarders.filter((b) => b.lunch).length
   const totalDinner = boarders.filter((b) => b.dinner).length
-  const grandTotal = totalBreakfast + totalLunch + totalDinner
+  const grandTotal = Math.round((totalBreakfast * 0.5 + totalLunch * 1.0 + totalDinner * 1.0) * 10) / 10
 
   const handleQuickToggle = async (
     boarderId: string,
@@ -107,21 +107,21 @@ export const FlatBoarderBreakdownModal: React.FC<FlatBoarderBreakdownModalProps>
         {/* Quick Headcount Summary Pills */}
         <div className="grid grid-cols-4 gap-2 text-center text-xs">
           <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/30">
-            <div className="text-[10px] font-semibold text-amber-400">🍳 নাস্তা</div>
+            <div className="text-[10px] font-semibold text-amber-400">🍳 নাস্তা (০.৫ মিল)</div>
             <div className="text-base font-bold font-mono text-amber-300 mt-0.5">
               {totalBreakfast} জন
             </div>
           </div>
 
           <div className="p-2.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30">
-            <div className="text-[10px] font-semibold text-emerald-400">🍛 দুপুর</div>
+            <div className="text-[10px] font-semibold text-emerald-400">🍛 দুপুর (১ মিল)</div>
             <div className="text-base font-bold font-mono text-emerald-300 mt-0.5">
               {totalLunch} জন
             </div>
           </div>
 
           <div className="p-2.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30">
-            <div className="text-[10px] font-semibold text-indigo-400">🍲 রাত</div>
+            <div className="text-[10px] font-semibold text-indigo-400">🍲 রাত (১ মিল)</div>
             <div className="text-base font-bold font-mono text-indigo-300 mt-0.5">
               {totalDinner} জন
             </div>
@@ -161,16 +161,16 @@ export const FlatBoarderBreakdownModal: React.FC<FlatBoarderBreakdownModalProps>
               <thead className="bg-slate-900 border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider sticky top-0 z-10">
                 <tr>
                   <th className="py-2.5 px-3">বর্ডার ও রুম</th>
-                  <th className="py-2.5 px-2 text-center">🍳 নাস্তা</th>
-                  <th className="py-2.5 px-2 text-center">🍛 দুপুর</th>
-                  <th className="py-2.5 px-2 text-center">🍲 রাত</th>
+                  <th className="py-2.5 px-2 text-center">🍳 নাস্তা (০.৫)</th>
+                  <th className="py-2.5 px-2 text-center">🍛 দুপুর (১.০)</th>
+                  <th className="py-2.5 px-2 text-center">🍲 রাত (১.০)</th>
                   <th className="py-2.5 px-3 text-center">মোট মিল</th>
                   {canManage && <th className="py-2.5 px-3 text-right">অ্যাকশন</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {boarders.map((b) => {
-                  const bdrTotal = (b.breakfast ? 1 : 0) + (b.lunch ? 1 : 0) + (b.dinner ? 1 : 0)
+                  const bdrTotal = Math.round(((b.breakfast ? 0.5 : 0) + (b.lunch ? 1.0 : 0) + (b.dinner ? 1.0 : 0)) * 10) / 10
 
                   return (
                     <tr key={b.boarder_id} className="hover:bg-slate-900/40 transition-colors">

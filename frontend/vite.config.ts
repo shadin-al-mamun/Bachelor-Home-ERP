@@ -233,17 +233,18 @@ function sharedApiPlugin(): Plugin {
                 item.override_reason = overrideReason
               }
 
-              // Update live counters if state changed
+              // Update live counters if state changed (Breakfast = 0.5 meal)
               if (oldState !== newState) {
-                const delta = newState ? 1 : -1
+                const mealWeight = sessionKey === 'breakfast' ? 0.5 : 1.0
+                const delta = (newState ? 1 : -1) * mealWeight
                 if (mealDate === todayStr) {
-                  mealsData.active_meals_today = Math.max(0, (mealsData.active_meals_today ?? 185) + delta)
+                  mealsData.active_meals_today = Math.max(0, Math.round(((mealsData.active_meals_today ?? 185) + delta) * 10) / 10)
                   mealsData.meal_attendance_rate =
                     Math.round((mealsData.active_meals_today / 294) * 1000) / 10
                 } else if (mealDate === tomorrowStr) {
                   mealsData.active_meals_tomorrow = Math.max(
                     0,
-                    (mealsData.active_meals_tomorrow ?? 192) + delta
+                    Math.round(((mealsData.active_meals_tomorrow ?? 192) + delta) * 10) / 10
                   )
                 }
               }

@@ -144,7 +144,7 @@ export const KitchenMealSummaryPage: React.FC = () => {
         <div className="p-4 rounded-3xl bg-slate-900/70 border border-amber-500/30 backdrop-blur-sm relative overflow-hidden group print:bg-white print:border-black print:text-black">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-1.5 print:text-black">
-              🍳 সকালের নাস্তা
+              🍳 সকালের নাস্তা (০.৫ মিল)
             </span>
             <span className="text-[10px] font-mono text-slate-400 print:text-black">০৭:৩০-০৯:০০</span>
           </div>
@@ -261,7 +261,7 @@ export const KitchenMealSummaryPage: React.FC = () => {
                 <tr>
                   <th className="py-3 px-3.5">ফ্ল্যাট ও তলা</th>
                   <th className="py-3 px-3 text-center">বর্ডার সংখ্যা</th>
-                  <th className="py-3 px-3 text-center text-amber-400 print:text-black">🍳 সকাল (Breakfast)</th>
+                  <th className="py-3 px-3 text-center text-amber-400 print:text-black">🍳 সকাল (০.৫ মিল)</th>
                   <th className="py-3 px-3 text-center text-emerald-400 print:text-black">🍛 দুপুর (Lunch)</th>
                   <th className="py-3 px-3 text-center text-indigo-400 print:text-black">🍲 রাত (Dinner)</th>
                   <th className="py-3 px-3.5 text-center font-extrabold text-white print:text-black">মোট মিল</th>

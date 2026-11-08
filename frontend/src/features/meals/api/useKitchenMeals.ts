@@ -68,7 +68,7 @@ const MOCK_KITCHEN_FLATS: KitchenFlatSummary[] = [
     breakfast_count: 6,
     lunch_count: 8,
     dinner_count: 7,
-    total_meals: 21,
+    total_meals: 18,
   },
   {
     flat_id: 'flat-2b',
@@ -80,7 +80,7 @@ const MOCK_KITCHEN_FLATS: KitchenFlatSummary[] = [
     breakfast_count: 4,
     lunch_count: 6,
     dinner_count: 6,
-    total_meals: 16,
+    total_meals: 14,
   },
   {
     flat_id: 'flat-3a',
@@ -92,7 +92,7 @@ const MOCK_KITCHEN_FLATS: KitchenFlatSummary[] = [
     breakfast_count: 8,
     lunch_count: 10,
     dinner_count: 9,
-    total_meals: 27,
+    total_meals: 23,
   },
   {
     flat_id: 'flat-3b',
@@ -104,7 +104,7 @@ const MOCK_KITCHEN_FLATS: KitchenFlatSummary[] = [
     breakfast_count: 5,
     lunch_count: 7,
     dinner_count: 8,
-    total_meals: 20,
+    total_meals: 17.5,
   },
   {
     flat_id: 'flat-4a',
@@ -116,7 +116,7 @@ const MOCK_KITCHEN_FLATS: KitchenFlatSummary[] = [
     breakfast_count: 7,
     lunch_count: 8,
     dinner_count: 8,
-    total_meals: 23,
+    total_meals: 19.5,
   },
 ]
 
@@ -236,11 +236,11 @@ export function useKitchenMealSummary(mealDate?: string) {
     queryKey: ['kitchen-meals-summary', targetDate],
     queryFn: async (): Promise<KitchenSummaryResponse> => {
       if (!isSupabaseConfigured) {
-        // Compute grand totals dynamically from mock flats
+        // Compute grand totals dynamically from mock flats (Breakfast weight = 0.5 meal)
         const breakfastCount = MOCK_KITCHEN_FLATS.reduce((sum, f) => sum + f.breakfast_count, 0)
         const lunchCount = MOCK_KITCHEN_FLATS.reduce((sum, f) => sum + f.lunch_count, 0)
         const dinnerCount = MOCK_KITCHEN_FLATS.reduce((sum, f) => sum + f.dinner_count, 0)
-        const totalMeals = breakfastCount + lunchCount + dinnerCount
+        const totalMeals = Math.round((breakfastCount * 0.5 + lunchCount * 1.0 + dinnerCount * 1.0) * 10) / 10
         const totalBoarders = MOCK_KITCHEN_FLATS.reduce((sum, f) => sum + f.total_boarders, 0)
 
         const currentRates = getStoredActiveMealRate()
@@ -264,7 +264,7 @@ export function useKitchenMealSummary(mealDate?: string) {
         }
       }
 
-      // Supabase Query: Join flats with rooms, seats, and allocations
+      // Supabase Query: Join flats with rooms, seats, and allocations (including start_date & end_date)
       const { data: flatsData, error: flatsErr } = await supabase
         .from('flats')
         .select(`
@@ -280,7 +280,14 @@ export function useKitchenMealSummary(mealDate?: string) {
               allocations (
                 id,
                 boarder_id,
-                status
+                status,
+                start_date,
+                end_date,
+                boarder:boarders (
+                  id,
+                  status,
+                  admission_date
+                )
               )
             )
           )
@@ -362,7 +369,18 @@ export function useKitchenMealSummary(mealDate?: string) {
         const flatBoarderIds: string[] = (flat.rooms || [])
           .flatMap((r: any) => r.seats || [])
           .flatMap((s: any) => s.allocations || [])
-          .filter((a: any) => a && (a.status === 'ACTIVE' || !a.status))
+          .filter((a: any) => {
+            if (!a) return false
+            if (a.status && a.status !== 'ACTIVE') return false
+            // Strict date check: boarder must have moved in on or before targetDate
+            if (a.start_date && a.start_date > targetDate) return false
+            if (a.end_date && a.end_date < targetDate) return false
+            if (a.boarder) {
+              if (a.boarder.status && a.boarder.status !== 'ACTIVE') return false
+              if (a.boarder.admission_date && a.boarder.admission_date > targetDate) return false
+            }
+            return true
+          })
           .map((a: any) => a.boarder_id)
           .filter(Boolean)
 
@@ -400,7 +418,8 @@ export function useKitchenMealSummary(mealDate?: string) {
           if (gb.session === 'DINNER') dCount += count
         })
 
-        const tMeals = bCount + lCount + dCount
+        // Breakfast counts as 0.5 meal (সকালের নাস্তা আধা মিল হিসেবে গণ্য)
+        const tMeals = Math.round((bCount * 0.5 + lCount * 1.0 + dCount * 1.0) * 10) / 10
 
         grandBreakfast += bCount
         grandLunch += lCount
@@ -427,7 +446,17 @@ export function useKitchenMealSummary(mealDate?: string) {
           const flatBoarderIds: string[] = (flat.rooms || [])
             .flatMap((r: any) => r.seats || [])
             .flatMap((s: any) => s.allocations || [])
-            .filter((a: any) => a && (a.status === 'ACTIVE' || !a.status))
+            .filter((a: any) => {
+              if (!a) return false
+              if (a.status && a.status !== 'ACTIVE') return false
+              if (a.start_date && a.start_date > targetDate) return false
+              if (a.end_date && a.end_date < targetDate) return false
+              if (a.boarder) {
+                if (a.boarder.status && a.boarder.status !== 'ACTIVE') return false
+                if (a.boarder.admission_date && a.boarder.admission_date > targetDate) return false
+              }
+              return true
+            })
             .map((a: any) => a.boarder_id)
           return guestBookings
             .filter((gb: any) => gb.flat_id === flat.id || flatBoarderIds.includes(gb.boarder_id))
@@ -444,7 +473,8 @@ export function useKitchenMealSummary(mealDate?: string) {
           if (gb.session === 'DINNER') grandDinner += count
         })
 
-      const totalMeals = grandBreakfast + grandLunch + grandDinner
+      // Breakfast counts as 0.5 meal (সকালের নাস্তা আধা মিল হিসেবে গণ্য)
+      const totalMeals = Math.round((grandBreakfast * 0.5 + grandLunch * 1.0 + grandDinner * 1.0) * 10) / 10
       const currentRates = getStoredActiveMealRate()
       const estimatedBudget =
         grandBreakfast * (currentRates.breakfast_rate || 0) +
@@ -489,11 +519,15 @@ export function useFlatBoarderMeals(flatId?: string, mealDate?: string) {
         .select(`
           id,
           status,
+          start_date,
+          end_date,
           boarder:boarders (
             id,
             full_name,
             boarder_code,
-            phone_number
+            phone_number,
+            status,
+            admission_date
           ),
           seat:seats (
             id,
@@ -509,9 +543,17 @@ export function useFlatBoarderMeals(flatId?: string, mealDate?: string) {
 
       if (error) throw new Error(error.message)
 
-      const activeInFlat = (data || []).filter(
-        (row: any) => row.seat?.room?.flat_id === flatId
-      )
+      const activeInFlat = (data || []).filter((row: any) => {
+        if (row.seat?.room?.flat_id !== flatId) return false
+        // Exclude allocations that start after targetDate or ended before targetDate
+        if (row.start_date && row.start_date > targetDate) return false
+        if (row.end_date && row.end_date < targetDate) return false
+        if (row.boarder) {
+          if (row.boarder.status && row.boarder.status !== 'ACTIVE') return false
+          if (row.boarder.admission_date && row.boarder.admission_date > targetDate) return false
+        }
+        return true
+      })
 
       // Fetch meal selections for this date & flat
       const { data: selData, error: selErr } = await supabase
