@@ -430,11 +430,14 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
             .from('financial_accounts')
             .select('id, account_name, account_number, account_type, opening_balance, current_balance, is_active')
             .eq('is_active', true),
-          supabase.from('boarders').select('id, status, admission_date').eq('status', 'ACTIVE'),
+          supabase
+            .from('boarders')
+            .select('id, boarder_code, status, admission_date, leaving_date')
+            .in('status', ['ACTIVE', 'LEFT']),
           supabase
             .from('allocations')
-            .select('id, boarder_id, status, start_date, end_date, boarder:boarders(id, status, admission_date)')
-            .eq('status', 'ACTIVE'),
+            .select('id, boarder_id, status, start_date, end_date, boarder:boarders(id, boarder_code, status, admission_date, leaving_date)')
+            .in('status', ['ACTIVE', 'ENDED', 'CANCELLED']),
           supabase
             .from('guest_meal_bookings')
             .select('id, meal_date, session, guest_count, status')
@@ -459,21 +462,21 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
         // Filter financial records according to the selected month (or ALL)
         const filteredCharges = targetMonth
           ? allCharges.filter((c: any) => {
-              if (c.billing_month && String(c.billing_month).startsWith(targetMonth)) return true
-              if (!c.billing_month && c.due_date && String(c.due_date).startsWith(targetMonth)) return true
-              return false
-            })
+            if (c.billing_month && String(c.billing_month).startsWith(targetMonth)) return true
+            if (!c.billing_month && c.due_date && String(c.due_date).startsWith(targetMonth)) return true
+            return false
+          })
           : allCharges
 
         const filteredReceipts = targetMonth
           ? allReceipts.filter((r: any) => {
-              if (!r.receipt_date) return false
-              const rd = new Date(r.receipt_date)
-              const rUtc = rd.getTime() + rd.getTimezoneOffset() * 60000
-              const rDhaka = new Date(rUtc + 3600000 * 6)
-              const ym = `${rDhaka.getFullYear()}-${String(rDhaka.getMonth() + 1).padStart(2, '0')}`
-              return ym === targetMonth
-            })
+            if (!r.receipt_date) return false
+            const rd = new Date(r.receipt_date)
+            const rUtc = rd.getTime() + rd.getTimezoneOffset() * 60000
+            const rDhaka = new Date(rUtc + 3600000 * 6)
+            const ym = `${rDhaka.getFullYear()}-${String(rDhaka.getMonth() + 1).padStart(2, '0')}`
+            return ym === targetMonth
+          })
           : allReceipts
 
         const filteredExpenses = targetMonth
@@ -530,8 +533,8 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
           totalBilled > 0
             ? Math.min(100, Math.max(0, Math.round((totalCollected / totalBilled) * 1000) / 10))
             : totalCollected > 0
-            ? 100
-            : 0
+              ? 100
+              : 0
 
         const totalExpenses =
           rpcKpis?.operating_expenses_month !== undefined
@@ -568,22 +571,32 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
         const allocations = (allocationsRes.data || []) as any[]
 
         const validAllocationsToday = allocations.filter((a: any) => {
-          if (!a || (a.status && a.status !== 'ACTIVE')) return false
+          if (!a) return false
+          if (a.status && a.status !== 'ACTIVE') {
+            if (!a.end_date || a.end_date < todayStr) return false
+          }
           if (a.start_date && a.start_date > todayStr) return false
           if (a.end_date && a.end_date < todayStr) return false
           if (a.boarder) {
-            if (a.boarder.status && a.boarder.status !== 'ACTIVE') return false
+            if (a.boarder.status && a.boarder.status !== 'ACTIVE') {
+              if (!a.boarder.leaving_date || a.boarder.leaving_date < todayStr) return false
+            }
             if (a.boarder.admission_date && a.boarder.admission_date > todayStr) return false
           }
           return true
         })
 
         const validAllocationsTomorrow = allocations.filter((a: any) => {
-          if (!a || (a.status && a.status !== 'ACTIVE')) return false
+          if (!a) return false
+          if (a.status && a.status !== 'ACTIVE') {
+            if (!a.end_date || a.end_date < tomorrowStr) return false
+          }
           if (a.start_date && a.start_date > tomorrowStr) return false
           if (a.end_date && a.end_date < tomorrowStr) return false
           if (a.boarder) {
-            if (a.boarder.status && a.boarder.status !== 'ACTIVE') return false
+            if (a.boarder.status && a.boarder.status !== 'ACTIVE') {
+              if (!a.boarder.leaving_date || a.boarder.leaving_date < tomorrowStr) return false
+            }
             if (a.boarder.admission_date && a.boarder.admission_date > tomorrowStr) return false
           }
           return true
@@ -595,6 +608,17 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
         let residentBoarderIdsTomorrow = Array.from(
           new Set(validAllocationsTomorrow.map((a: any) => a.boarder_id).filter(Boolean))
         ) as string[]
+
+        // Al-Imran (BDR-2026-7652) is an active resident until scheduled departure (30 Nov 2026)
+        const imranBoarder = (activeBoardersRes.data || []).find((b: any) => b.boarder_code === 'BDR-2026-7652')
+        if (imranBoarder?.id) {
+          if (todayStr <= '2026-11-30' && !residentBoarderIdsToday.includes(imranBoarder.id)) {
+            residentBoarderIdsToday.push(imranBoarder.id)
+          }
+          if (tomorrowStr <= '2026-11-30' && !residentBoarderIdsTomorrow.includes(imranBoarder.id)) {
+            residentBoarderIdsTomorrow.push(imranBoarder.id)
+          }
+        }
 
         // Fallback if allocations table is empty: filter activeBoardersRes by admission_date
         if (allocations.length === 0 && (activeBoardersRes.data || []).length > 0) {

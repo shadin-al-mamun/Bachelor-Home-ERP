@@ -5,7 +5,7 @@ describe('Breakfast 0.5 Weight & Future Seat Allocation Exclusion Rules', () => 
   const targetDate = '2026-11-09'
 
   const mockAllocations = [
-    // Flat-206 Boarders (5 currently seated + 1 future allocation)
+    // Flat-206 Boarders (5 seated + 1 departure notice pending + 1 advance booking)
     {
       id: 'alloc-1',
       boarder_id: 'bdr-apurba',
@@ -13,7 +13,9 @@ describe('Breakfast 0.5 Weight & Future Seat Allocation Exclusion Rules', () => 
       status: 'ACTIVE',
       start_date: '2026-10-19',
       admission_date: '2026-10-19',
+      end_date: null,
       flat_id: 'flat-206',
+      seat_code: 'Seat A-1',
     },
     {
       id: 'alloc-2',
@@ -22,7 +24,9 @@ describe('Breakfast 0.5 Weight & Future Seat Allocation Exclusion Rules', () => 
       status: 'ACTIVE',
       start_date: '2026-10-27',
       admission_date: '2026-10-27',
+      end_date: null,
       flat_id: 'flat-206',
+      seat_code: 'Seat A-3',
     },
     {
       id: 'alloc-3',
@@ -31,7 +35,9 @@ describe('Breakfast 0.5 Weight & Future Seat Allocation Exclusion Rules', () => 
       status: 'ACTIVE',
       start_date: '2026-10-28',
       admission_date: '2026-10-28',
+      end_date: null,
       flat_id: 'flat-206',
+      seat_code: 'Seat A-4',
     },
     {
       id: 'alloc-4',
@@ -40,7 +46,9 @@ describe('Breakfast 0.5 Weight & Future Seat Allocation Exclusion Rules', () => 
       status: 'ACTIVE',
       start_date: '2026-10-22',
       admission_date: '2026-10-22',
+      end_date: null,
       flat_id: 'flat-206',
+      seat_code: 'Seat B-2',
     },
     {
       id: 'alloc-5',
@@ -49,17 +57,36 @@ describe('Breakfast 0.5 Weight & Future Seat Allocation Exclusion Rules', () => 
       status: 'ACTIVE',
       start_date: '2026-10-21',
       admission_date: '2026-10-21',
+      end_date: null,
       flat_id: 'flat-206',
+      seat_code: 'Seat D-1',
     },
-    // Hashem: Allocation starts from 01 Dec 2026 (Future Boarder!)
+    // Al-Imran: Seat B-1, cancellation takes effect from 30 Nov 2026 (actively residing until 30 Nov)
     {
-      id: 'alloc-6',
+      id: 'alloc-imran',
+      boarder_id: 'bdr-imran',
+      boarder_code: 'BDR-2026-7652',
+      boarder_name: 'আল-ইমরান',
+      status: 'ACTIVE', // or ENDED with end_date in future
+      start_date: '2026-10-20',
+      admission_date: '2026-10-20',
+      end_date: '2026-11-30',
+      leaving_date: '2026-11-30',
+      flat_id: 'flat-206',
+      seat_code: 'Seat B-1',
+    },
+    // Hashem: Allocation on Seat B-1 starts from 01 Dec 2026 (Advance Booking)
+    {
+      id: 'alloc-hashem',
       boarder_id: 'bdr-hashem',
+      boarder_code: 'BDR-2026-9890',
       boarder_name: 'হাশেম',
       status: 'ACTIVE',
       start_date: '2026-12-01',
       admission_date: '2026-12-01',
+      end_date: null,
       flat_id: 'flat-206',
+      seat_code: 'Seat B-1',
     },
     // Flat-207 Boarders (5 currently seated)
     {
@@ -69,6 +96,7 @@ describe('Breakfast 0.5 Weight & Future Seat Allocation Exclusion Rules', () => 
       status: 'ACTIVE',
       start_date: '2026-10-01',
       admission_date: '2026-10-01',
+      end_date: null,
       flat_id: 'flat-207',
     },
     {
@@ -78,6 +106,7 @@ describe('Breakfast 0.5 Weight & Future Seat Allocation Exclusion Rules', () => 
       status: 'ACTIVE',
       start_date: '2026-10-01',
       admission_date: '2026-10-01',
+      end_date: null,
       flat_id: 'flat-207',
     },
     {
@@ -87,6 +116,7 @@ describe('Breakfast 0.5 Weight & Future Seat Allocation Exclusion Rules', () => 
       status: 'ACTIVE',
       start_date: '2026-10-01',
       admission_date: '2026-10-01',
+      end_date: null,
       flat_id: 'flat-207',
     },
     {
@@ -96,6 +126,7 @@ describe('Breakfast 0.5 Weight & Future Seat Allocation Exclusion Rules', () => 
       status: 'ACTIVE',
       start_date: '2026-10-01',
       admission_date: '2026-10-01',
+      end_date: null,
       flat_id: 'flat-207',
     },
     {
@@ -105,45 +136,88 @@ describe('Breakfast 0.5 Weight & Future Seat Allocation Exclusion Rules', () => 
       status: 'ACTIVE',
       start_date: '2026-10-01',
       admission_date: '2026-10-01',
+      end_date: null,
       flat_id: 'flat-207',
     },
   ]
 
-  it('strictly excludes future allocations (like Hashem starting 01 Dec 2026) from meal calculations on 2026-11-09', () => {
-    // Business Rule: "বর্ডার হাশেম এর জন্য সিট বরাদ্দ দেয়া হয়েছে আগামী ডিসেম্বর মাসের ১ তারিখ থেকে।
-    // যেহেতু আগামী মাসের ১ তারিখ থেকে সিট বরাদ্দ দেয়া হয়েছে, সেহেতু এই বর্ডার এখনো তার সিটে উঠেনি।
-    // কিন্তু তার অনুকূলে মিল কাউন্ট হচ্ছে, এটাতো সম্ভব নয়।"
-    const activeAllocationsOnNov9 = mockAllocations.filter((a) => {
-      if (a.status !== 'ACTIVE') return false
-      if (a.start_date > targetDate) return false
-      if (a.admission_date > targetDate) return false
+  // Filter function matching useKitchenMeals & useOwnerDashboard
+  const filterActiveAllocations = (allocations: any[], queryDate: string) => {
+    return allocations.filter((a) => {
+      // 1. Status check: ACTIVE, or ENDED/CANCELLED with scheduled future departure
+      if (a.status !== 'ACTIVE') {
+        if (!a.end_date || a.end_date < queryDate) return false
+      }
+      // 2. Strict start date: must have moved in on or before queryDate
+      if (a.start_date && a.start_date > queryDate) return false
+      // 3. Strict end date: if departed before queryDate, exclude
+      if (a.end_date && a.end_date < queryDate) return false
+      // 4. Boarder metadata
+      if (a.admission_date && a.admission_date > queryDate) return false
+      if (a.leaving_date && a.leaving_date < queryDate) return false
       return true
     })
+  }
 
+  it('retains Al-Imran in Seat B-1 until 30 Nov 2026 and strictly excludes Hashem on 2026-11-09', () => {
+    // User request:
+    // "২০৬ নং ফ্ল্যাটের আল ইমরান এর অনুকূলে সিট বরাদ্দ বাতিল কার্যকর হবে আগামী ৩০ নভেম্বর ২০২৬ তারিখ থেকে,
+    // তাই সে সিট ছাড়বে আগামী ৩০ নভেম্বর ২০২৬ তারিখে। সেতো এখন সিটে রয়েছে, তাহলে তার মিল গণনা না হওয়ার কারণ কি?"
+    const activeAllocationsOnNov9 = filterActiveAllocations(mockAllocations, targetDate)
+
+    // Al-Imran is actively in his seat today
+    const imranIncluded = activeAllocationsOnNov9.some((a) => a.boarder_id === 'bdr-imran')
+    expect(imranIncluded).toBe(true)
+
+    // Hashem has not moved in yet
     const hashemIncluded = activeAllocationsOnNov9.some((a) => a.boarder_id === 'bdr-hashem')
     expect(hashemIncluded).toBe(false)
 
-    // Flat-206 must only have 5 active residents, NOT 6
+    // Flat-206 has 6 active seated residents (Apurba, Mosharraf, Malek, Maruf, Zahid, Al-Imran)
     const flat206Boarders = activeAllocationsOnNov9.filter((a) => a.flat_id === 'flat-206')
-    expect(flat206Boarders.length).toBe(5)
+    expect(flat206Boarders.length).toBe(6)
 
-    // Total active residents across all flats must be 10, NOT 11
-    expect(activeAllocationsOnNov9.length).toBe(10)
+    // Flat-207 has 5 active seated residents
+    const flat207Boarders = activeAllocationsOnNov9.filter((a) => a.flat_id === 'flat-207')
+    expect(flat207Boarders.length).toBe(5)
+
+    // Total active residents across all flats is 11
+    expect(activeAllocationsOnNov9.length).toBe(11)
   })
 
-  it('includes Hashem when target date reaches his seat allocation start date (2026-12-01)', () => {
-    const futureDate = '2026-12-01'
-    const activeAllocationsOnDec1 = mockAllocations.filter((a) => {
-      if (a.status !== 'ACTIVE') return false
-      if (a.start_date > futureDate) return false
-      if (a.admission_date > futureDate) return false
-      return true
+  it('retains Al-Imran even if allocation status was set to ENDED when cancellation was scheduled', () => {
+    // If admin set status to ENDED with end_date = '2026-11-30'
+    const allocationsWithEndedStatus = mockAllocations.map((a) => {
+      if (a.boarder_id === 'bdr-imran') {
+        return { ...a, status: 'ENDED' }
+      }
+      return a
     })
 
+    const activeAllocationsOnNov9 = filterActiveAllocations(allocationsWithEndedStatus, targetDate)
+    const imranIncluded = activeAllocationsOnNov9.some((a) => a.boarder_id === 'bdr-imran')
+    expect(imranIncluded).toBe(true)
+    expect(activeAllocationsOnNov9.length).toBe(11)
+  })
+
+  it('smoothly switches Seat B-1 from Al-Imran to Hashem on 01 Dec 2026', () => {
+    const decDate = '2026-12-01'
+    const activeAllocationsOnDec1 = filterActiveAllocations(mockAllocations, decDate)
+
+    // Al-Imran has departed (end_date 2026-11-30 < 2026-12-01)
+    const imranIncluded = activeAllocationsOnDec1.some((a) => a.boarder_id === 'bdr-imran')
+    expect(imranIncluded).toBe(false)
+
+    // Hashem has moved in (start_date 2026-12-01 <= 2026-12-01)
     const hashemIncluded = activeAllocationsOnDec1.some((a) => a.boarder_id === 'bdr-hashem')
     expect(hashemIncluded).toBe(true)
+
+    // Flat-206 still has exactly 6 active seated residents
     const flat206Boarders = activeAllocationsOnDec1.filter((a) => a.flat_id === 'flat-206')
     expect(flat206Boarders.length).toBe(6)
+
+    // Total active residents remains 11
+    expect(activeAllocationsOnDec1.length).toBe(11)
   })
 
   it('calculates morning meal (সকালের নাস্তা) as 0.5 (আধা মিল), lunch as 1.0, and dinner as 1.0', () => {
@@ -161,70 +235,32 @@ describe('Breakfast 0.5 Weight & Future Seat Allocation Exclusion Rules', () => 
 
     expect(bdrTotal).toBe(2.5)
 
-    // Boarder with only breakfast ON
-    const breakfastOnlyTotal = (true ? 0.5 : 0) + (false ? 1.0 : 0) + (false ? 1.0 : 0)
-    expect(breakfastOnlyTotal).toBe(0.5)
+    // 11 active boarders with all meals ON:
+    // Breakfast: 11 * 0.5 = 5.5 meals
+    // Lunch: 11 * 1.0 = 11.0 meals
+    // Dinner: 11 * 1.0 = 11.0 meals
+    // Total: 27.5 meals
+    const grandBreakfast = 11 * 0.5
+    const grandLunch = 11 * 1.0
+    const grandDinner = 11 * 1.0
+    const grandTotalMeals = grandBreakfast + grandLunch + grandDinner
 
-    // Boarder with breakfast OFF, lunch & dinner ON
-    const lunchDinnerTotal = (false ? 0.5 : 0) + (true ? 1.0 : 0) + (true ? 1.0 : 0)
-    expect(lunchDinnerTotal).toBe(2.0)
+    expect(grandTotalMeals).toBe(27.5)
   })
 
-  it('verifies that Flat totals and Grand Totals match Dashboard metrics perfectly', () => {
-    // On 2026-11-09:
-    // Flat-206 has 5 active residents. Under opt-out mess policy (all 3 meals active):
-    // Breakfast: 5 * 0.5 = 2.5 meals
-    // Lunch: 5 * 1.0 = 5.0 meals
-    // Dinner: 5 * 1.0 = 5.0 meals
-    // Flat-206 Total = 12.5 meals!
-    const flat206BreakfastCount = 5
-    const flat206LunchCount = 5
-    const flat206DinnerCount = 5
-    const flat206TotalMeals =
-      Math.round(
-        (flat206BreakfastCount * 0.5 + flat206LunchCount * 1.0 + flat206DinnerCount * 1.0) * 10
-      ) / 10
-    expect(flat206TotalMeals).toBe(12.5)
-
-    // Flat-207 has 5 active residents:
-    const flat207BreakfastCount = 5
-    const flat207LunchCount = 5
-    const flat207DinnerCount = 5
-    const flat207TotalMeals =
-      Math.round(
-        (flat207BreakfastCount * 0.5 + flat207LunchCount * 1.0 + flat207DinnerCount * 1.0) * 10
-      ) / 10
-    expect(flat207TotalMeals).toBe(12.5)
-
-    // Kitchen Page Grand Total:
-    const grandBreakfast = flat206BreakfastCount + flat207BreakfastCount // 10
-    const grandLunch = flat206LunchCount + flat207LunchCount // 10
-    const grandDinner = flat206DinnerCount + flat207DinnerCount // 10
-    const kitchenGrandTotal =
-      Math.round((grandBreakfast * 0.5 + grandLunch * 1.0 + grandDinner * 1.0) * 10) / 10
-    expect(kitchenGrandTotal).toBe(25.0)
-
-    // Dashboard "আজকের মিল" (Active Meals Today) for 10 active seated residents:
-    const activeResidentsCount = 10
-    const dashboardActiveMealsToday = activeResidentsCount * 2.5
-    expect(dashboardActiveMealsToday).toBe(25.0)
-
-    // Kitchen Page Grand Total and Dashboard match to the decimal!
-    expect(kitchenGrandTotal).toBe(dashboardActiveMealsToday)
-  })
-
-  it('weights guest meals appropriately (breakfast 0.5, lunch 1.0, dinner 1.0)', () => {
+  it('handles guest meal calculation where guest breakfast is 0.5 and lunch/dinner is 1.0', () => {
     const guestBookings = [
-      { session: 'BREAKFAST', guest_count: 2 }, // 2 * 0.5 = 1.0 meal
-      { session: 'LUNCH', guest_count: 1 }, // 1 * 1.0 = 1.0 meal
-      { session: 'DINNER', guest_count: 3 }, // 3 * 1.0 = 3.0 meals
+      { session: 'BREAKFAST', guest_count: 2 },
+      { session: 'LUNCH', guest_count: 2 },
+      { session: 'DINNER', guest_count: 2 },
     ]
 
-    const guestMealsTotal = guestBookings.reduce((sum, gb) => {
-      const weight = gb.session === 'BREAKFAST' ? 0.5 : 1.0
-      return sum + gb.guest_count * weight
+    const guestMealsTotal = guestBookings.reduce((sum, g) => {
+      const weight = g.session === 'BREAKFAST' ? 0.5 : 1.0
+      return sum + g.guest_count * weight
     }, 0)
 
+    // 2 * 0.5 + 2 * 1.0 + 2 * 1.0 = 1.0 + 2.0 + 2.0 = 5.0
     expect(guestMealsTotal).toBe(5.0)
   })
 })

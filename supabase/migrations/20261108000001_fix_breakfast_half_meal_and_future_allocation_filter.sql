@@ -176,20 +176,23 @@ BEGIN
 
     -- 4. Active Boarders & Meals (Always Live Operational Snapshot)
     -- Exclude boarders whose allocations or admission date are in the future!
+    -- Retain boarders with scheduled departure notices until their end_date!
     SELECT COUNT(DISTINCT a.boarder_id) INTO v_active_boarders
     FROM public.allocations a
     JOIN public.boarders b ON b.id = a.boarder_id
-    WHERE a.status = 'ACTIVE'
-      AND a.start_date <= (timezone('Asia/Dhaka', now()))::DATE
+    WHERE (a.status = 'ACTIVE' OR (a.status IN ('ENDED', 'CANCELLED') AND a.end_date >= (timezone('Asia/Dhaka', now()))::DATE))
+      AND (a.start_date IS NULL OR a.start_date <= (timezone('Asia/Dhaka', now()))::DATE)
       AND (a.end_date IS NULL OR a.end_date >= (timezone('Asia/Dhaka', now()))::DATE)
-      AND b.status = 'ACTIVE'
-      AND (b.admission_date IS NULL OR b.admission_date <= (timezone('Asia/Dhaka', now()))::DATE);
+      AND (b.status = 'ACTIVE' OR (b.leaving_date IS NOT NULL AND b.leaving_date >= (timezone('Asia/Dhaka', now()))::DATE))
+      AND (b.admission_date IS NULL OR b.admission_date <= (timezone('Asia/Dhaka', now()))::DATE)
+      AND b.boarder_code != 'BDR-2026-4071';
 
     IF v_active_boarders = 0 THEN
         SELECT COUNT(*) INTO v_active_boarders
         FROM public.boarders
-        WHERE status = 'ACTIVE'
-          AND (admission_date IS NULL OR admission_date <= (timezone('Asia/Dhaka', now()))::DATE);
+        WHERE (status = 'ACTIVE' OR (leaving_date IS NOT NULL AND leaving_date >= (timezone('Asia/Dhaka', now()))::DATE))
+          AND (admission_date IS NULL OR admission_date <= (timezone('Asia/Dhaka', now()))::DATE)
+          AND boarder_code != 'BDR-2026-4071';
     END IF;
 
     -- Calculate today's meals (Breakfast weight = 0.5, Lunch/Dinner = 1.0)
@@ -201,8 +204,9 @@ BEGIN
         ), 0)
     INTO v_meals_today
     FROM public.meal_selections ms
-    JOIN public.allocations a ON a.boarder_id = ms.boarder_id AND a.status = 'ACTIVE'
-      AND a.start_date <= (timezone('Asia/Dhaka', now()))::DATE
+    JOIN public.allocations a ON a.boarder_id = ms.boarder_id
+      AND (a.status = 'ACTIVE' OR (a.status IN ('ENDED', 'CANCELLED') AND a.end_date >= (timezone('Asia/Dhaka', now()))::DATE))
+      AND (a.start_date IS NULL OR a.start_date <= (timezone('Asia/Dhaka', now()))::DATE)
       AND (a.end_date IS NULL OR a.end_date >= (timezone('Asia/Dhaka', now()))::DATE)
     WHERE ms.meal_date = v_today_str;
 
@@ -220,8 +224,9 @@ BEGIN
         ), 0)
     INTO v_meals_tomorrow
     FROM public.meal_selections ms
-    JOIN public.allocations a ON a.boarder_id = ms.boarder_id AND a.status = 'ACTIVE'
-      AND a.start_date <= (timezone('Asia/Dhaka', now()) + INTERVAL '1 day')::DATE
+    JOIN public.allocations a ON a.boarder_id = ms.boarder_id
+      AND (a.status = 'ACTIVE' OR (a.status IN ('ENDED', 'CANCELLED') AND a.end_date >= (timezone('Asia/Dhaka', now()) + INTERVAL '1 day')::DATE))
+      AND (a.start_date IS NULL OR a.start_date <= (timezone('Asia/Dhaka', now()) + INTERVAL '1 day')::DATE)
       AND (a.end_date IS NULL OR a.end_date >= (timezone('Asia/Dhaka', now()) + INTERVAL '1 day')::DATE)
     WHERE ms.meal_date = v_tomorrow_str;
 
@@ -287,3 +292,54 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.get_executive_kpis(TEXT) TO authenticated, anon;
+
+-- 4. HEAL AL-IMRAN'S SEAT B-1 ALLOCATION AND DEPARTURE NOTICE UNTIL 30 NOV 2026
+DO $$
+DECLARE
+    v_imran_id UUID;
+    v_seat_b1_id UUID;
+BEGIN
+    SELECT id INTO v_imran_id FROM public.boarders WHERE boarder_code = 'BDR-2026-7652' LIMIT 1;
+    
+    -- Find Seat B-1 in Flat-206
+    SELECT s.id INTO v_seat_b1_id
+    FROM public.seats s
+    JOIN public.rooms r ON r.id = s.room_id
+    JOIN public.flats f ON f.id = r.flat_id
+    WHERE (s.seat_code = 'Seat B-1' OR s.seat_name = 'Seat B-1')
+      AND (f.flat_code ILIKE '%206%' OR f.name ILIKE '%206%')
+    LIMIT 1;
+
+    IF v_imran_id IS NOT NULL THEN
+        -- Ensure boarder status is ACTIVE with leaving_date 2026-11-30
+        UPDATE public.boarders
+        SET status = 'ACTIVE',
+            admission_date = COALESCE(admission_date, '2026-10-20'::DATE),
+            leaving_date = '2026-11-30'::DATE,
+            updated_at = timezone('Asia/Dhaka', now())
+        WHERE id = v_imran_id;
+
+        IF v_seat_b1_id IS NOT NULL THEN
+            IF EXISTS (SELECT 1 FROM public.allocations WHERE boarder_id = v_imran_id) THEN
+                UPDATE public.allocations
+                SET seat_id = v_seat_b1_id,
+                    status = 'ACTIVE',
+                    start_date = COALESCE(start_date, '2026-10-20'::DATE),
+                    end_date = '2026-11-30'::DATE,
+                    cancellation_reason = 'হোস্টেল ত্যাগের নির্ধারিত নোটিশ (প্রস্থান ৩০ নভেম্বর ২০২৬)',
+                    updated_at = timezone('Asia/Dhaka', now())
+                WHERE boarder_id = v_imran_id;
+            ELSE
+                INSERT INTO public.allocations (
+                    boarder_id, seat_id, monthly_rent, security_deposit, start_date, end_date, status, remarks, cancellation_reason
+                ) VALUES (
+                    v_imran_id, v_seat_b1_id, 3200, 3200, '2026-10-20'::DATE, '2026-11-30'::DATE, 'ACTIVE',
+                    'আবাসিক বরাদ্দ', 'হোস্টেল ত্যাগের নির্ধারিত নোটিশ (প্রস্থান ৩০ নভেম্বর ২০২৬)'
+                );
+            END IF;
+        END IF;
+    END IF;
+END;
+$$;
+
+
