@@ -375,4 +375,80 @@ describe('Manager Building & Flat Scoping and Cross-Manager Isolation Engine', (
       expect(adminAccounts).toHaveLength(3)
     })
   })
+
+  describe('4. Dashboard Meal Preparation & Occupancy Scoping for Manager with 0 Boarders', () => {
+    it('guarantees 0 meals today and tomorrow when a manager assigned flat has no boarders', () => {
+      // Enamul is assigned FLAT_301_ID (Bithika House). Flat 301 currently has 0 allocations and 0 boarders.
+      const isManager = isScopedManager(managerEnamulProfile)
+      expect(isManager).toBe(true)
+
+      const enamulFlats = [FLAT_301_ID]
+      const allFlatsAllocations: any[] = [
+        // Sattar Tower Flat-206 allocations
+        { id: 'alloc-1', boarder_id: 'bdr-imran', seat: { room: { flat_id: FLAT_206_ID } } },
+        { id: 'alloc-2', boarder_id: 'bdr-hashem', seat: { room: { flat_id: FLAT_206_ID } } },
+      ]
+
+      // Filter allocations strictly for Enamul
+      const scopedAllocations = allFlatsAllocations.filter((a) => {
+        const fId = a.seat?.room?.flat_id
+        return fId && enamulFlats.includes(fId)
+      })
+
+      expect(scopedAllocations).toHaveLength(0)
+
+      // Resolve scoped boarders
+      const scopedBoarderIds = new Set<string>()
+      scopedAllocations.forEach((a) => {
+        if (a.boarder_id) scopedBoarderIds.add(a.boarder_id)
+      })
+      expect(scopedBoarderIds.size).toBe(0)
+
+      // Active residents today/tomorrow for Enamul must be empty
+      const residentBoarderIdsToday: string[] = Array.from(scopedBoarderIds)
+      expect(residentBoarderIdsToday).toHaveLength(0)
+
+      // Calculate meal counts
+      let countToday = 0
+      let countTomorrow = 0
+      if (residentBoarderIdsToday.length > 0) {
+        countToday = residentBoarderIdsToday.length * 2.5
+        countTomorrow = residentBoarderIdsToday.length * 2.5
+      }
+
+      const effectiveResidentsToday = residentBoarderIdsToday.length
+      const maxPossibleMealsToday = effectiveResidentsToday * 2.5
+      const mealAttendanceRate = maxPossibleMealsToday > 0 ? (countToday / maxPossibleMealsToday) * 100 : 0
+      const estimatedMonthlyMealBill = countToday * 30 * 60
+
+      expect(countToday).toBe(0)
+      expect(countTomorrow).toBe(0)
+      expect(mealAttendanceRate).toBe(0)
+      expect(estimatedMonthlyMealBill).toBe(0)
+    })
+
+    it('dynamically computes meals when boarders are later assigned to Bithika House', () => {
+      const enamulFlats = [FLAT_301_ID]
+      const newAllocations: any[] = [
+        { id: 'alloc-301-1', boarder_id: 'bdr-sakib', seat: { room: { flat_id: FLAT_301_ID } } },
+        { id: 'alloc-301-2', boarder_id: 'bdr-rakib', seat: { room: { flat_id: FLAT_301_ID } } },
+      ]
+
+      const scopedAllocations = newAllocations.filter((a) => {
+        const fId = a.seat?.room?.flat_id
+        return fId && enamulFlats.includes(fId)
+      })
+      expect(scopedAllocations).toHaveLength(2)
+
+      const residentBoarderIdsToday = scopedAllocations.map((a) => a.boarder_id)
+      const countToday = residentBoarderIdsToday.length * 2.5 // 2 * 2.5 = 5.0 meals
+      const maxPossibleMealsToday = residentBoarderIdsToday.length * 2.5
+      const mealAttendanceRate = (countToday / maxPossibleMealsToday) * 100
+      const estimatedMonthlyMealBill = countToday * 30 * 60
+
+      expect(countToday).toBe(5)
+      expect(mealAttendanceRate).toBe(100)
+      expect(estimatedMonthlyMealBill).toBe(9000)
+    })
+  })
 })

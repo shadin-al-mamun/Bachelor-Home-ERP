@@ -115,7 +115,7 @@ export const MonthlyCollectionSheetModal: React.FC<MonthlyCollectionSheetModalPr
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 print:p-0 print:bg-white print:static print:overflow-visible">
       <div className="relative w-full max-w-[1500px] bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] print:max-h-none print:border-none print:shadow-none print:rounded-none print:bg-white">
-        
+
         {/* 1. Modal Header & Control Toolbar (Hidden in print) */}
         <div className="no-print p-4 sm:p-5 border-b border-slate-800 bg-slate-950/70 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">

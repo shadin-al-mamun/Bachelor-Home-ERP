@@ -361,6 +361,38 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
       const targetMonth = isAll ? null : (selectedFinanceMonth || currentMonthStr)
 
       if (!isSupabaseConfigured) {
+        if (isManager) {
+          return {
+            ...MOCK_DASHBOARD_DATA,
+            kpis: {
+              ...MOCK_DASHBOARD_DATA.kpis,
+              total_seats: 0,
+              occupied_seats: 0,
+              vacant_seats: 0,
+              maintenance_seats: 0,
+              occupancy_rate: 0,
+              total_billed_month: 0,
+              total_collected_month: 0,
+              collection_rate: 0,
+              total_outstanding_dues: 0,
+              operating_expenses_month: 0,
+              non_rent_incomes_month: 0,
+              net_operating_income: 0,
+              active_meals_today: 0,
+              active_meals_tomorrow: 0,
+              meal_attendance_rate: 0,
+              estimated_monthly_meal_bill: 0,
+              cash_in_custody: 0,
+              month_dues: 0,
+              selected_month: isAll ? 'ALL' : (targetMonth || currentMonthStr),
+            },
+            cash_flow_trend: [],
+            flat_occupancy: [],
+            dues_aging: [],
+            recent_activities: [],
+          }
+        }
+
         // Fetch from shared dev server API so mobile updates sync to PC instantly
         let serverMetrics: Partial<LiveMealMetrics> = {}
         try {
@@ -406,16 +438,19 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
         const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`
 
         // 0. Try high-precision authoritative RPC first (bypasses RLS or permission discrepancies)
+        // Strictly for global admin roles; managers must calculate strictly from their assigned flats
         let rpcKpis: any = null
-        try {
-          const { data: rpcData, error: rpcErr } = await supabase.rpc('get_executive_kpis', {
-            p_month: isAll ? 'ALL' : targetMonth,
-          })
-          if (!rpcErr && rpcData && typeof rpcData === 'object') {
-            rpcKpis = rpcData
+        if (!isManager) {
+          try {
+            const { data: rpcData, error: rpcErr } = await supabase.rpc('get_executive_kpis', {
+              p_month: isAll ? 'ALL' : targetMonth,
+            })
+            if (!rpcErr && rpcData && typeof rpcData === 'object') {
+              rpcKpis = rpcData
+            }
+          } catch {
+            // Fall back to direct queries
           }
-        } catch {
-          // Fall back to direct queries
         }
 
         // Query live counts in parallel
@@ -693,18 +728,22 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
         ) as string[]
 
         // Al-Imran (BDR-2026-7652) is an active resident until scheduled departure (30 Nov 2026)
-        const imranBoarder = (activeBoardersRes.data || []).find((b: any) => b.boarder_code === 'BDR-2026-7652')
-        if (imranBoarder?.id) {
-          if (todayStr <= '2026-11-30' && !residentBoarderIdsToday.includes(imranBoarder.id)) {
-            residentBoarderIdsToday.push(imranBoarder.id)
-          }
-          if (tomorrowStr <= '2026-11-30' && !residentBoarderIdsTomorrow.includes(imranBoarder.id)) {
-            residentBoarderIdsTomorrow.push(imranBoarder.id)
+        // ONLY include if viewer is Admin OR manager assigned to Flat 206 (where Imran resides)
+        const hasFlat206Access = !isManager || assignedFlats.some((f) => String(f).toLowerCase().includes('206'))
+        if (hasFlat206Access) {
+          const imranBoarder = (activeBoardersRes.data || []).find((b: any) => b.boarder_code === 'BDR-2026-7652')
+          if (imranBoarder?.id) {
+            if (todayStr <= '2026-11-30' && !residentBoarderIdsToday.includes(imranBoarder.id)) {
+              residentBoarderIdsToday.push(imranBoarder.id)
+            }
+            if (tomorrowStr <= '2026-11-30' && !residentBoarderIdsTomorrow.includes(imranBoarder.id)) {
+              residentBoarderIdsTomorrow.push(imranBoarder.id)
+            }
           }
         }
 
-        // Fallback if allocations table is empty: filter activeBoardersRes by admission_date
-        if (allocations.length === 0 && (activeBoardersRes.data || []).length > 0) {
+        // Fallback ONLY when NOT a manager and allocations table is completely empty (e.g. fresh empty db mock)
+        if (!isManager && allocations.length === 0 && (activeBoardersRes.data || []).length > 0) {
           residentBoarderIdsToday = (activeBoardersRes.data || [])
             .filter((b: any) => !b.admission_date || b.admission_date <= todayStr)
             .map((b: any) => b.id)
@@ -736,7 +775,7 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
               countToday += 2.5
             }
           }
-        } else if (occupiedSeats > 0) {
+        } else if (!isManager && occupiedSeats > 0) {
           let turnedOffToday = 0
           for (const s of (mealsTodayRes.data || [])) {
             if (!s.breakfast) turnedOffToday += 0.5
@@ -757,7 +796,7 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
               countTomorrow += 2.5
             }
           }
-        } else if (occupiedSeats > 0) {
+        } else if (!isManager && occupiedSeats > 0) {
           let turnedOffTomorrow = 0
           for (const s of (mealsTomorrowRes.data || [])) {
             if (!s.breakfast) turnedOffTomorrow += 0.5
@@ -782,10 +821,10 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
         countToday = Math.round(countToday * 10) / 10
         countTomorrow = Math.round(countTomorrow * 10) / 10
 
-        const maxPossibleMealsToday = (effectiveResidentsToday || occupiedSeats) * 2.5
+        const maxPossibleMealsToday = (effectiveResidentsToday || (isManager ? 0 : occupiedSeats)) * 2.5
         const mealAttendanceRate = maxPossibleMealsToday > 0
           ? Math.min(100, Math.round((countToday / maxPossibleMealsToday) * 1000) / 10)
-          : (effectiveResidentsToday > 0 ? 100 : 0)
+          : (effectiveResidentsToday > 0 && countToday > 0 ? 100 : 0)
 
         // 1. Live Flat Occupancy
         const { data: rawRealFlats } = await supabase

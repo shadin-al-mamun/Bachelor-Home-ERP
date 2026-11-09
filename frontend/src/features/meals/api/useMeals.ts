@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
+import { useAuthStore } from '@/app/store/useAuthStore'
+import { isScopedManager, canManagerAccessFlat } from '@/utils/managerScoping'
 import {
   updateOwnerDashboardMealMetrics,
   updateOwnerDashboardMealBatch,
@@ -403,10 +405,18 @@ export function useActiveMealRates() {
 
 // 3. Fetch Boarder Options (for Admin / Manager Switcher)
 export function useMealBoardersList() {
+  const { profile, assignedFlats } = useAuthStore()
+  const isManager = isScopedManager(profile)
+
   return useQuery({
-    queryKey: ['meal-boarders-list'],
+    queryKey: ['meal-boarders-list', isManager, assignedFlats],
     queryFn: async (): Promise<BoarderOption[]> => {
       if (!isSupabaseConfigured) {
+        if (isManager) {
+          return MOCK_BOARDERS_FOR_MEAL.filter((b) =>
+            canManagerAccessFlat(b.flat_id, assignedFlats, true)
+          )
+        }
         return MOCK_BOARDERS_FOR_MEAL
       }
 
@@ -466,7 +476,7 @@ export function useMealBoardersList() {
         return []
       }
 
-      return data
+      const boarders = data
         .filter((b: any) => {
           // Strictly require an ACTIVE seat allocation to participate in meal management
           if (!b.allocations) return false
@@ -479,30 +489,38 @@ export function useMealBoardersList() {
           const activeAlloc = Array.isArray(b.allocations)
             ? b.allocations.find((a: any) => a.status === 'ACTIVE')
             : b.allocations
-        const seat = activeAlloc?.seat
-        const room = seat?.room
-        const flat = room?.flat
-        const building = flat?.building
+          const seat = activeAlloc?.seat
+          const room = seat?.room
+          const flat = room?.flat
+          const building = flat?.building
 
-        return {
-          id: b.id,
-          user_id: b.user_id,
-          full_name: b.full_name,
-          boarder_code: b.boarder_code,
-          phone_number: b.phone_number,
-          monthly_rent: Number(activeAlloc?.monthly_rent ?? seat?.default_rent ?? 0),
-          security_deposit: Number(activeAlloc?.security_deposit || 0),
-          active_allocation: activeAlloc || undefined,
-          seat_name: seat?.seat_name || seat?.seat_code || '',
-          seat_code: seat?.seat_code || '',
-          room_name: room?.name || '',
-          flat_id: flat?.id || '',
-          flat_name: flat?.name || '',
-          building_name: building?.name || '',
-          admission_date: b.admission_date || activeAlloc?.start_date || '',
-          status: b.status,
-        }
-      })
+          return {
+            id: b.id,
+            user_id: b.user_id,
+            full_name: b.full_name,
+            boarder_code: b.boarder_code,
+            phone_number: b.phone_number,
+            monthly_rent: Number(activeAlloc?.monthly_rent ?? seat?.default_rent ?? 0),
+            security_deposit: Number(activeAlloc?.security_deposit || 0),
+            active_allocation: activeAlloc || undefined,
+            seat_name: seat?.seat_name || seat?.seat_code || '',
+            seat_code: seat?.seat_code || '',
+            room_name: room?.name || '',
+            flat_id: flat?.id || '',
+            flat_name: flat?.name || '',
+            building_name: building?.name || '',
+            admission_date: b.admission_date || activeAlloc?.start_date || '',
+            status: b.status,
+          }
+        })
+
+      if (isManager) {
+        return boarders.filter((b) =>
+          canManagerAccessFlat(b.flat_id, assignedFlats, true)
+        )
+      }
+
+      return boarders
     },
   })
 }
