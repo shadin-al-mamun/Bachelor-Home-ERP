@@ -59,3 +59,4 @@ describe('Profile Photo & Avatar System', () => {
     expect(profile?.avatar_url).toBe(applicantPhoto)
   })
 })
+

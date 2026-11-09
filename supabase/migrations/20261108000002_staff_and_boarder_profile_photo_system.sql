@@ -290,3 +290,4 @@ WHERE b.user_id = p.id
   AND p.avatar_url IS NOT NULL
   AND p.avatar_url != ''
   AND (b.photo_url IS NULL OR b.photo_url = '');
+

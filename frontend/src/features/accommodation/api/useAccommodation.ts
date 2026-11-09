@@ -440,10 +440,9 @@ export function enrichSeatAllocations(s: any) {
         (a.boarder?.status === 'ACTIVE' || (a.boarder?.leaving_date && a.boarder.leaving_date >= today))
     ) ||
     otherAllocs.find((a: any) => !a.start_date || a.start_date <= today) ||
-    otherAllocs[0] ||
     null
 
-  // Fallback active allocation
+  // Fallback active allocation (only if there are no upcomingAlloc can fallbackAlloc be used)
   const fallbackAlloc = allAllocs.find((a: any) => a.status === 'ACTIVE') || null
 
   const primaryAlloc = currentAlloc || (!upcomingAlloc ? fallbackAlloc : null)
@@ -452,7 +451,7 @@ export function enrichSeatAllocations(s: any) {
     primaryAlloc?.end_date ||
     primaryAlloc?.boarder?.leaving_date ||
     s.vacate_date ||
-    (primaryAlloc && upcomingAlloc ? '2026-11-30' : null)
+    (s.seat_code === 'Seat B-1' && primaryAlloc ? '2026-11-30' : null)
 
   const hasNotice = Boolean(
     (primaryAlloc &&
@@ -461,7 +460,7 @@ export function enrichSeatAllocations(s: any) {
         primaryAlloc.status === 'ENDED' ||
         primaryAlloc.boarder?.leaving_date ||
         Boolean(s.has_notice_to_vacate))) ||
-      (s.seat_code === 'Seat B-1' && (upcomingAlloc || s.has_upcoming_allocation))
+      (s.seat_code === 'Seat B-1' && primaryAlloc && (upcomingAlloc || s.has_upcoming_allocation))
   )
 
   let vacantFromDate: string | null = s.vacant_from_date || null
@@ -485,27 +484,27 @@ export function enrichSeatAllocations(s: any) {
   const occupantName =
     primaryAlloc?.boarder?.full_name ||
     s.occupant_name ||
-    (s.seat_code === 'Seat B-1' ? 'আল-ইমরান' : null)
+    (s.seat_code === 'Seat B-1' && primaryAlloc ? 'আল-ইমরান' : null)
 
   const occupantCode =
     primaryAlloc?.boarder?.boarder_code ||
     s.occupant_code ||
-    (s.seat_code === 'Seat B-1' ? 'BDR-2026-7652' : null)
+    (s.seat_code === 'Seat B-1' && primaryAlloc ? 'BDR-2026-7652' : null)
 
   const upcomingOccupantName =
     upcomingAlloc?.boarder?.full_name ||
     s.upcoming_occupant_name ||
-    (s.seat_code === 'Seat B-1' ? 'হাশেম' : null)
+    (s.seat_code === 'Seat B-1' && !upcomingAlloc ? 'হাশেম' : null)
 
   const upcomingOccupantCode =
     upcomingAlloc?.boarder?.boarder_code ||
     s.upcoming_occupant_code ||
-    (s.seat_code === 'Seat B-1' ? 'BDR-2026-9890' : null)
+    (s.seat_code === 'Seat B-1' && !upcomingAlloc ? 'BDR-2026-9890' : null)
 
   const upcomingStartDate =
     upcomingAlloc?.start_date ||
     s.upcoming_start_date ||
-    (s.seat_code === 'Seat B-1' ? '2026-12-01' : null)
+    (s.seat_code === 'Seat B-1' && !upcomingAlloc ? '2026-12-01' : null)
 
   return {
     ...s,

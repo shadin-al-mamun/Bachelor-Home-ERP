@@ -56,7 +56,7 @@ export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
             (r.seats || [])
               .filter(
                 (s: any) =>
-                  s.status === 'AVAILABLE' ||
+                  (s.status === 'AVAILABLE' && !s.has_upcoming_allocation) ||
                   s.id === preSelectedSeatId ||
                   (s.has_notice_to_vacate && !s.has_upcoming_allocation)
               )
