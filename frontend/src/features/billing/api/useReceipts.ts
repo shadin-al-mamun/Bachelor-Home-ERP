@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
 import { convertBengaliDigits } from '@/utils/phone'
+import { useAuthStore } from '@/app/store/useAuthStore'
 import type {
   Receipt,
   PaymentMethod,
@@ -281,8 +282,11 @@ export function filterReceiptsBySearch(
 }
 
 export function useReceipts(filters?: ReceiptFilters) {
+  const { profile, assignedFlats } = useAuthStore()
+  const isManager = profile?.role === 'MANAGER'
+
   return useQuery({
-    queryKey: ['receipts', filters],
+    queryKey: ['receipts', filters, isManager, profile?.id, assignedFlats],
     queryFn: async (): Promise<ExtendedReceipt[]> => {
       if (!isSupabaseConfigured) {
         let result = getStoredReceipts()
@@ -300,6 +304,15 @@ export function useReceipts(filters?: ReceiptFilters) {
         if (filters?.search?.trim()) {
           result = filterReceiptsBySearch(result, filters.search)
         }
+
+        if (isManager) {
+          result = result.filter((r: any) => {
+            if (profile?.id && r.collected_by === profile.id) return true
+            if (r.collected_by && profile?.id && r.collected_by !== profile.id) return false
+            return true
+          })
+        }
+
         return result
       }
 
@@ -421,6 +434,17 @@ export function useReceipts(filters?: ReceiptFilters) {
 
       if (filters?.search?.trim()) {
         list = filterReceiptsBySearch(list, filters.search)
+      }
+
+      // Manager-to-Manager Isolation: Manager can only see receipts collected by themselves
+      // or receipts linked to their assigned flats / assigned cash drawer
+      if (isManager) {
+        list = list.filter((r: any) => {
+          if (profile?.id && r.collected_by === profile.id) return true
+          // If another manager collected it, hide it completely!
+          if (r.collected_by && profile?.id && r.collected_by !== profile.id) return false
+          return true
+        })
       }
 
       return list

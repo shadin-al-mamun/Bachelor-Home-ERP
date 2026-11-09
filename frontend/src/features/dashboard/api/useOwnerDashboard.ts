@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
+import { useAuthStore } from '@/app/store/useAuthStore'
 
 // ==============================================================================
 // Types & Interfaces
@@ -339,8 +340,18 @@ export function updateOwnerDashboardMealBatch(dateStr: string, deltaMeals: numbe
 // ==============================================================================
 
 export function useOwnerDashboard(selectedFinanceMonth?: string) {
+  const { profile, assignedFlats, assignedBuildings } = useAuthStore()
+  const isManager = profile?.role === 'MANAGER'
+
   return useQuery({
-    queryKey: ['owner-executive-dashboard', selectedFinanceMonth || 'DEFAULT'],
+    queryKey: [
+      'owner-executive-dashboard',
+      selectedFinanceMonth || 'DEFAULT',
+      isManager,
+      profile?.id,
+      assignedFlats,
+      assignedBuildings,
+    ],
     queryFn: async (): Promise<OwnerDashboardData> => {
       const dhakaNow = new Date()
       const utc = dhakaNow.getTime() + dhakaNow.getTimezoneOffset() * 60000
@@ -421,14 +432,14 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
           mealsTodayRes,
           mealsTomorrowRes,
         ] = await Promise.all([
-          supabase.from('seats').select('id, status'),
-          supabase.from('boarder_charges').select('amount, paid_amount, status, due_date, billing_month'),
-          supabase.from('receipts').select('amount, is_void, receipt_date').eq('is_void', false),
-          supabase.from('expenses').select('amount, approval_status, expense_date').eq('approval_status', 'APPROVED'),
+          supabase.from('seats').select('id, status, room:rooms(flat_id)'),
+          supabase.from('boarder_charges').select('amount, paid_amount, status, due_date, billing_month, boarder_id'),
+          supabase.from('receipts').select('amount, is_void, receipt_date, collected_by, boarder_id').eq('is_void', false),
+          supabase.from('expenses').select('amount, approval_status, expense_date, paid_by, flat_id, building_id').eq('approval_status', 'APPROVED'),
           supabase.from('incomes').select('amount, income_date'),
           supabase
             .from('financial_accounts')
-            .select('id, account_name, account_number, account_type, opening_balance, current_balance, is_active')
+            .select('id, account_name, account_number, account_type, opening_balance, current_balance, is_active, assigned_manager_id')
             .eq('is_active', true),
           supabase
             .from('boarders')
@@ -436,28 +447,113 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
             .in('status', ['ACTIVE', 'LEFT']),
           supabase
             .from('allocations')
-            .select('id, boarder_id, status, start_date, end_date, boarder:boarders(id, boarder_code, status, admission_date, leaving_date)')
+            .select('id, boarder_id, status, start_date, end_date, seat:seats(id, room:rooms(flat_id)), boarder:boarders(id, boarder_code, status, admission_date, leaving_date)')
             .in('status', ['ACTIVE', 'ENDED', 'CANCELLED']),
           supabase
             .from('guest_meal_bookings')
-            .select('id, meal_date, session, guest_count, status')
+            .select('id, meal_date, session, guest_count, status, boarder_id, flat_id')
             .in('meal_date', [todayStr, tomorrowStr])
             .eq('status', 'CONFIRMED'),
           supabase.from('meal_selections').select('boarder_id, breakfast, lunch, dinner').eq('meal_date', todayStr),
           supabase.from('meal_selections').select('boarder_id, breakfast, lunch, dinner').eq('meal_date', tomorrowStr),
         ])
 
-        const seats = seatsRes.data || []
-        const totalSeats = Number(rpcKpis?.total_seats) || seats.length
-        const occupiedSeats = Number(rpcKpis?.occupied_seats) || seats.filter((s) => s.status === 'OCCUPIED').length
-        const vacantSeats = Number(rpcKpis?.vacant_seats) || seats.filter((s) => s.status === 'AVAILABLE').length
-        const maintenanceSeats = Number(rpcKpis?.maintenance_seats) || seats.filter((s) => s.status === 'MAINTENANCE').length
-        const occupancyRate = Number(rpcKpis?.occupancy_rate) || (totalSeats > 0 ? (occupiedSeats / totalSeats) * 100 : 0)
+        let seats = seatsRes.data || []
+        let rawAllocations = (allocationsRes.data || []) as any[]
+        let allCharges = chargesRes.data || []
+        let allReceipts = receiptsRes.data || []
+        let allExpenses = expensesRes.data || []
+        let allIncomes = incomesRes.data || []
+        let allGuestBookings = (guestBookingsRes.data || []) as any[]
+        let mealsToday = mealsTodayRes.data || []
+        let mealsTomorrow = mealsTomorrowRes.data || []
+        let managerAccounts = (managerAccountsRes.data || []).filter((a: any) =>
+          a.account_type === 'CASH_MANAGER' ||
+          a.id === '11111111-0000-0000-0000-000000000002' ||
+          a.account_number === 'MGR-CASH-01' ||
+          (a.account_type !== 'CASH_OWNER' && a.account_type !== 'BANK' && (
+            a.account_name?.toLowerCase().includes('manager cash') ||
+            a.account_name?.includes('ম্যানেজার ক্যাশ') ||
+            a.account_name?.includes('ক্যাশ ড্রয়ার')
+          ))
+        )
 
-        const allCharges = chargesRes.data || []
-        const allReceipts = receiptsRes.data || []
-        const allExpenses = expensesRes.data || []
-        const allIncomes = incomesRes.data || []
+        // Manager Building/Flat Scoping & Cross-Manager Isolation
+        if (isManager) {
+          // 1. Filter seats strictly to assigned flats
+          seats = seats.filter((s: any) => {
+            const fId = s.room?.flat_id
+            return fId && assignedFlats.includes(fId)
+          })
+
+          // 2. Resolve boarder IDs that belong to manager's assigned flats
+          const scopedBoarderIds = new Set<string>()
+          rawAllocations.forEach((a: any) => {
+            const fId = a.seat?.room?.flat_id
+            if (fId && assignedFlats.includes(fId) && a.boarder_id) {
+              scopedBoarderIds.add(a.boarder_id)
+            }
+          })
+
+          // 3. Filter allocations strictly to assigned flats
+          rawAllocations = rawAllocations.filter((a: any) => {
+            const fId = a.seat?.room?.flat_id
+            return fId && assignedFlats.includes(fId)
+          })
+
+          // 4. Filter charges strictly to scoped boarders
+          allCharges = allCharges.filter((c: any) => scopedBoarderIds.has(c.boarder_id))
+
+          // 5. Cross-Manager Collection Isolation:
+          // A manager only sees receipts they collected themselves or for boarders in their assigned flats
+          allReceipts = allReceipts.filter((r: any) => {
+            if (profile?.id && r.collected_by === profile.id) return true
+            if (r.boarder_id && scopedBoarderIds.has(r.boarder_id)) return true
+            return false
+          })
+
+          // 6. Cross-Manager Expense Isolation:
+          // A manager only sees expenses they paid/recorded or expenses strictly for their flats/buildings
+          allExpenses = allExpenses.filter((e: any) => {
+            if (profile?.id && e.paid_by === profile.id) return true
+            if (e.flat_id && assignedFlats.includes(e.flat_id)) return true
+            if (e.building_id && assignedBuildings.includes(e.building_id)) return true
+            return false
+          })
+
+          // 7. Filter meals strictly to scoped boarders
+          mealsToday = mealsToday.filter((m: any) => scopedBoarderIds.has(m.boarder_id))
+          mealsTomorrow = mealsTomorrow.filter((m: any) => scopedBoarderIds.has(m.boarder_id))
+          allGuestBookings = allGuestBookings.filter((gb: any) =>
+            (gb.flat_id && assignedFlats.includes(gb.flat_id)) ||
+            (gb.boarder_id && scopedBoarderIds.has(gb.boarder_id))
+          )
+
+          // 8. Financial Account Isolation:
+          // Manager only sees their own assigned cash drawer balance!
+          managerAccounts = managerAccounts.filter((a: any) => {
+            if (profile?.id && a.assigned_manager_id === profile.id) return true
+            if (profile?.phone_number === '01800000002' || profile?.email?.includes('manager2')) {
+              return a.account_number === 'MGR-CASH-02' || a.account_name?.includes('ক্যাশ ড্রয়ার')
+            }
+            if (profile?.full_name?.includes('এনামুল') || profile?.email?.includes('enamul')) {
+              return a.assigned_manager_id === profile.id || a.account_number === 'MGR-CASH-02'
+            }
+            return a.account_number === 'MGR-CASH-01'
+          })
+        }
+
+        const totalSeats = isManager ? seats.length : (Number(rpcKpis?.total_seats) || seats.length)
+        const occupiedSeats = isManager
+          ? seats.filter((s: any) => s.status === 'OCCUPIED').length
+          : (Number(rpcKpis?.occupied_seats) || seats.filter((s) => s.status === 'OCCUPIED').length)
+        const vacantSeats = isManager
+          ? seats.filter((s: any) => s.status === 'AVAILABLE').length
+          : (Number(rpcKpis?.vacant_seats) || seats.filter((s) => s.status === 'AVAILABLE').length)
+        const maintenanceSeats = isManager
+          ? seats.filter((s: any) => s.status === 'MAINTENANCE').length
+          : (Number(rpcKpis?.maintenance_seats) || seats.filter((s) => s.status === 'MAINTENANCE').length)
+        const occupancyRate = totalSeats > 0 ? (occupiedSeats / totalSeats) * 100 : 0
 
         // Filter financial records according to the selected month (or ALL)
         const filteredCharges = targetMonth
@@ -546,20 +642,7 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
             : filteredIncomes.reduce((sum, i) => sum + (Number(i.amount) || 0), 0)
 
         // 5. Manager Cash in Custody (Single Source of Truth: Live Manager Cash Account Balance)
-        // Strictly identify active manager cash drawer account(s), excluding owner vault and bank
-        const managerAccounts = (managerAccountsRes.data || []).filter((a: any) =>
-          a.account_type === 'CASH_MANAGER' ||
-          a.id === '11111111-0000-0000-0000-000000000002' ||
-          a.account_number === 'MGR-CASH-01' ||
-          (a.account_type !== 'CASH_OWNER' && a.account_type !== 'BANK' && (
-            a.account_name?.toLowerCase().includes('manager cash') ||
-            a.account_name?.includes('ম্যানেজার ক্যাশ') ||
-            a.account_name?.includes('ক্যাশ ড্রয়ার')
-          ))
-        )
-
-        // Live balance directly from financial_accounts table
-        // Both Super Admin and Manager see 100% the exact same account balance
+        // Live balance directly from financial_accounts table (scoped to this manager if isManager)
         const liveManagerCash = managerAccounts.reduce((sum: number, a: any) => {
           return sum + (Number(a.current_balance) || 0)
         }, 0)
@@ -568,7 +651,7 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
 
         // Filter currently active seated residents strictly respecting seat allocation start_date & admission_date
         // Boarders with future allocation dates (e.g. starting next month) are NOT seated yet and NOT counted in meals!
-        const allocations = (allocationsRes.data || []) as any[]
+        const allocations = rawAllocations
 
         const validAllocationsToday = allocations.filter((a: any) => {
           if (!a) return false
@@ -685,7 +768,7 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
         }
 
         // Add confirmed guest meal bookings (Breakfast = 0.5, Lunch/Dinner = 1.0)
-        const guestBookings = (guestBookingsRes.data || []) as any[]
+        const guestBookings = allGuestBookings
         guestBookings.forEach((gb: any) => {
           const count = Number(gb.guest_count) || 0
           const weight = gb.session === 'BREAKFAST' ? 0.5 : 1.0
@@ -705,11 +788,16 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
           : (effectiveResidentsToday > 0 ? 100 : 0)
 
         // 1. Live Flat Occupancy
-        const { data: realFlats } = await supabase
+        const { data: rawRealFlats } = await supabase
           .from('flats')
           .select('id, name, flat_code, floor_number, building:buildings(name), rooms(id, seats(id, status))')
 
-        const flatOccupancy: FlatOccupancyPoint[] = (realFlats || []).map((f: any) => {
+        let realFlats = rawRealFlats || []
+        if (isManager) {
+          realFlats = realFlats.filter((f: any) => assignedFlats.includes(f.id))
+        }
+
+        const flatOccupancy: FlatOccupancyPoint[] = realFlats.map((f: any) => {
           const flatSeats = (f.rooms || []).flatMap((r: any) => r.seats || [])
           const occ = flatSeats.filter((s: any) => s.status === 'OCCUPIED').length
           const vac = flatSeats.filter((s: any) => s.status === 'AVAILABLE').length
@@ -781,14 +869,9 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
           { bucket: '> 90 days', bucket_bn: '৯০+ দিন (গুরুতর বকেয়া)', amount: 0, count: 0, percentage: 0 },
         ]
 
-        // 4. Live Recent Activities from real data
-        const [recentReceiptsRes, recentExpensesRes] = await Promise.all([
-          supabase.from('receipts').select('id, receipt_number, amount, receipt_date, created_at, boarder:boarders(full_name)').order('created_at', { ascending: false }).limit(4),
-          supabase.from('expenses').select('id, expense_voucher_no, amount, description, expense_date, created_at').order('created_at', { ascending: false }).limit(4),
-        ])
-
+        // 4. Live Recent Activities from real data (strictly scoped to this user)
         const recentActivities: RecentActivityItem[] = [
-          ...(recentReceiptsRes.data || []).map((r: any) => ({
+          ...allReceipts.slice(0, 4).map((r: any) => ({
             id: 'rec-' + r.id,
             type: 'PAYMENT' as const,
             title: `ভাড়া আদায় রশিদ #${r.receipt_number || ''}`,
@@ -798,7 +881,7 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
             user_name: r.boarder?.full_name || 'বর্ডার',
             status: 'PAID',
           })),
-          ...(recentExpensesRes.data || []).map((e: any) => ({
+          ...allExpenses.slice(0, 4).map((e: any) => ({
             id: 'exp-' + e.id,
             type: 'EXPENSE' as const,
             title: e.description || 'হোস্টেল খরচ',

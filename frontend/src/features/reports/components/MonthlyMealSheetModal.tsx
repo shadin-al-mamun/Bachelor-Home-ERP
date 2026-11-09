@@ -41,7 +41,7 @@ export const MonthlyMealSheetModal: React.FC<MonthlyMealSheetModalProps> = ({
 
   const [selectedMonth, setSelectedMonth] = useState<string>(defaultMonthStr)
   const [selectedFlatId, setSelectedFlatId] = useState<string>(
-    initialFlatId || 'flat-206'
+    initialFlatId || ''
   )
   const [showPreview, setShowPreview] = useState<boolean>(true)
   const [isExportingExcel, setIsExportingExcel] = useState<boolean>(false)
@@ -58,6 +58,15 @@ export const MonthlyMealSheetModal: React.FC<MonthlyMealSheetModalProps> = ({
     selectedMonthBn,
     isLoading,
   } = useMonthlyMealSheetData(selectedMonth, selectedFlatId)
+
+  // Auto-select first available assigned flat if none selected or if selected is not in manager's scope
+  React.useEffect(() => {
+    if (availableFlats && availableFlats.length > 0) {
+      if (!selectedFlatId || !availableFlats.some((f) => f.id === selectedFlatId)) {
+        setSelectedFlatId(availableFlats[0].id)
+      }
+    }
+  }, [availableFlats, selectedFlatId])
 
   const monthOptions = useMemo(() => {
     return getAvailableMonthOptions(selectedMonth)

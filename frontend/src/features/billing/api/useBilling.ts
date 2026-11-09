@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
+import { useAuthStore } from '@/app/store/useAuthStore'
 import type { BoarderCharge, ChargeType } from '@/types/database'
 
 // ==============================================================================
@@ -39,8 +40,11 @@ export interface DuesFilters {
 }
 
 export function useBoarderDuesSummary(filters?: DuesFilters) {
+  const { profile, assignedFlats } = useAuthStore()
+  const isManager = profile?.role === 'MANAGER'
+
   return useQuery({
-    queryKey: ['boarder-dues', filters],
+    queryKey: ['boarder-dues', filters, isManager, assignedFlats],
     queryFn: async (): Promise<BoarderDueSummary[]> => {
       if (!isSupabaseConfigured) {
         let result = [...MOCK_DUES_SUMMARY]
@@ -58,6 +62,14 @@ export function useBoarderDuesSummary(filters?: DuesFilters) {
         }
         if (filters?.overdueOnly) {
           result = result.filter((d) => d.overdue_amount > 0)
+        }
+        if (isManager) {
+          const allowed = new Set(assignedFlats.map((id) => id.toLowerCase()))
+          result = result.filter(
+            (d) =>
+              (d.flat_code && allowed.has(d.flat_code.toLowerCase())) ||
+              (d.flat_name && allowed.has(d.flat_name.toLowerCase()))
+          )
         }
         return result
       }
@@ -88,6 +100,42 @@ export function useBoarderDuesSummary(filters?: DuesFilters) {
       if (filters?.overdueOnly) {
         list = list.filter((d) => Number(d.overdue_amount) > 0)
       }
+
+      if (isManager) {
+        if (assignedFlats.length === 0) return []
+        try {
+          const { data: fRows } = await supabase
+            .from('flats')
+            .select('id, flat_code, name')
+            .in('id', assignedFlats)
+
+          const allowedFlatCodes = new Set(
+            (fRows || [])
+              .flatMap((f: any) => [
+                (f.flat_code || '').toLowerCase(),
+                (f.name || '').toLowerCase(),
+                (f.id || '').toLowerCase(),
+              ])
+              .filter(Boolean)
+          )
+          assignedFlats.forEach((af) => allowedFlatCodes.add(af.toLowerCase()))
+
+          list = list.filter((d) => {
+            const fc = (d.flat_code || '').toLowerCase()
+            const fn = (d.flat_name || '').toLowerCase()
+            return (
+              allowedFlatCodes.has(fc) ||
+              allowedFlatCodes.has(fn) ||
+              Array.from(allowedFlatCodes).some(
+                (af) => (fc && fc.includes(af)) || (fn && fn.includes(af))
+              )
+            )
+          })
+        } catch {
+          // ignore
+        }
+      }
+
       return list
     },
   })

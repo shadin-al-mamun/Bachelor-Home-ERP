@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
 import type { Building, Flat, Room, Seat, SeatStatus } from '@/types/database'
 import { syncDepartureNoticeAllocations } from '@/features/boarders/api/useBoarders'
+import { useAuthStore } from '@/app/store/useAuthStore'
 
 // Initial baseline mock data mirrored from 20261015000007_seed_initial_data.sql
 let mockBuildings: Building[] = [
@@ -184,22 +185,60 @@ let mockSeats: (Seat & { room_name?: string; flat_name?: string; room?: Room })[
 
 // 1. BUILDINGS
 export function useBuildings() {
-  return useQuery({
-    queryKey: ['buildings'],
-    queryFn: async (): Promise<Building[]> => {
-      if (!isSupabaseConfigured) {
-        return mockBuildings
-      }
-      const { data, error } = await supabase
-        .from('buildings')
-        .select('*')
-        .order('name', { ascending: true })
+  const { profile, assignedFlats, assignedBuildings } = useAuthStore()
+  const isManager = profile?.role === 'MANAGER'
 
-      if (error) {
-        console.warn('buildings fetch failed:', error.message)
-        return []
+  return useQuery({
+    queryKey: ['buildings', isManager, assignedBuildings, assignedFlats],
+    queryFn: async (): Promise<Building[]> => {
+      let list: Building[] = []
+      if (!isSupabaseConfigured) {
+        list = [...mockBuildings]
+      } else {
+        const { data, error } = await supabase
+          .from('buildings')
+          .select('*')
+          .order('name', { ascending: true })
+
+        if (error) {
+          console.warn('buildings fetch failed:', error.message)
+          list = []
+        } else {
+          list = (data || []) as Building[]
+        }
       }
-      return (data || []) as Building[]
+
+      // If user is a manager, only return buildings containing their assigned flats
+      if (isManager) {
+        if (assignedBuildings.length > 0) {
+          list = list.filter((b) => assignedBuildings.includes(b.id))
+        } else if (assignedFlats.length > 0) {
+          if (!isSupabaseConfigured) {
+            const bIds = new Set(
+              mockFlats
+                .filter((f) => assignedFlats.includes(f.id))
+                .map((f) => f.building_id)
+                .filter(Boolean)
+            )
+            list = list.filter((b) => bIds.has(b.id))
+          } else {
+            try {
+              const { data: flatsData } = await supabase
+                .from('flats')
+                .select('building_id')
+                .in('id', assignedFlats)
+              const bIds = new Set((flatsData || []).map((f: any) => f.building_id).filter(Boolean))
+              list = list.filter((b) => bIds.has(b.id))
+            } catch {
+              // fallback
+            }
+          }
+        } else {
+          return []
+        }
+      }
+
+      return list
     },
   })
 }
@@ -240,22 +279,34 @@ export function useCreateBuilding() {
 
 // 2. FLATS
 export function useFlats(buildingId?: string) {
+  const { profile, assignedFlats } = useAuthStore()
+  const isManager = profile?.role === 'MANAGER'
+
   return useQuery({
-    queryKey: ['flats', buildingId],
+    queryKey: ['flats', buildingId, isManager, assignedFlats],
     queryFn: async (): Promise<Flat[]> => {
+      let list: Flat[] = []
       if (!isSupabaseConfigured) {
-        return buildingId ? mockFlats.filter((f) => f.building_id === buildingId) : mockFlats
+        list = buildingId ? mockFlats.filter((f) => f.building_id === buildingId) : [...mockFlats]
+      } else {
+        let query = supabase.from('flats').select('*, building:buildings(*)')
+        if (buildingId) {
+          query = query.eq('building_id', buildingId)
+        }
+        const { data, error } = await query.order('name', { ascending: true })
+        if (error) {
+          console.warn('flats fetch failed:', error.message)
+          list = []
+        } else {
+          list = (data || []) as Flat[]
+        }
       }
-      let query = supabase.from('flats').select('*, building:buildings(*)')
-      if (buildingId) {
-        query = query.eq('building_id', buildingId)
+
+      if (isManager) {
+        list = list.filter((f) => assignedFlats.includes(f.id))
       }
-      const { data, error } = await query.order('name', { ascending: true })
-      if (error) {
-        console.warn('flats fetch failed:', error.message)
-        return []
-      }
-      return (data || []) as Flat[]
+
+      return list
     },
   })
 }
@@ -296,22 +347,34 @@ export function useCreateFlat() {
 
 // 3. ROOMS
 export function useRooms(flatId?: string) {
+  const { profile, assignedFlats } = useAuthStore()
+  const isManager = profile?.role === 'MANAGER'
+
   return useQuery({
-    queryKey: ['rooms', flatId],
+    queryKey: ['rooms', flatId, isManager, assignedFlats],
     queryFn: async (): Promise<Room[]> => {
+      let list: Room[] = []
       if (!isSupabaseConfigured) {
-        return flatId ? mockRooms.filter((r) => r.flat_id === flatId) : mockRooms
+        list = flatId ? mockRooms.filter((r) => r.flat_id === flatId) : [...mockRooms]
+      } else {
+        let query = supabase.from('rooms').select('*, flat:flats(*)')
+        if (flatId) {
+          query = query.eq('flat_id', flatId)
+        }
+        const { data, error } = await query.order('name', { ascending: true })
+        if (error) {
+          console.warn('rooms fetch failed:', error.message)
+          list = []
+        } else {
+          list = (data || []) as Room[]
+        }
       }
-      let query = supabase.from('rooms').select('*, flat:flats(*)')
-      if (flatId) {
-        query = query.eq('flat_id', flatId)
+
+      if (isManager) {
+        list = list.filter((r) => r.flat_id && assignedFlats.includes(r.flat_id))
       }
-      const { data, error } = await query.order('name', { ascending: true })
-      if (error) {
-        console.warn('rooms fetch failed:', error.message)
-        return []
-      }
-      return (data || []) as Room[]
+
+      return list
     },
   })
 }
@@ -451,16 +514,15 @@ export function enrichSeatAllocations(s: any) {
     primaryAlloc?.end_date ||
     primaryAlloc?.boarder?.leaving_date ||
     s.vacate_date ||
-    (s.seat_code === 'Seat B-1' && primaryAlloc ? '2026-11-30' : null)
+    null
 
   const hasNotice = Boolean(
-    (primaryAlloc &&
+    primaryAlloc &&
       ((vacateDate && vacateDate >= today) ||
         primaryAlloc.cancellation_reason ||
         primaryAlloc.status === 'ENDED' ||
         primaryAlloc.boarder?.leaving_date ||
-        Boolean(s.has_notice_to_vacate))) ||
-      (s.seat_code === 'Seat B-1' && primaryAlloc && (upcomingAlloc || s.has_upcoming_allocation))
+        Boolean(s.has_notice_to_vacate))
   )
 
   let vacantFromDate: string | null = s.vacant_from_date || null
@@ -473,7 +535,7 @@ export function enrichSeatAllocations(s: any) {
   // Determine effective seat status
   let effectiveStatus = s.status
   if (s.status !== 'MAINTENANCE' && s.status !== 'INACTIVE') {
-    if (primaryAlloc || upcomingAlloc || s.seat_code === 'Seat B-1') {
+    if (primaryAlloc || upcomingAlloc) {
       effectiveStatus = 'OCCUPIED'
     } else {
       effectiveStatus = 'AVAILABLE'
@@ -484,27 +546,27 @@ export function enrichSeatAllocations(s: any) {
   const occupantName =
     primaryAlloc?.boarder?.full_name ||
     s.occupant_name ||
-    (s.seat_code === 'Seat B-1' && primaryAlloc ? 'আল-ইমরান' : null)
+    null
 
   const occupantCode =
     primaryAlloc?.boarder?.boarder_code ||
     s.occupant_code ||
-    (s.seat_code === 'Seat B-1' && primaryAlloc ? 'BDR-2026-7652' : null)
+    null
 
   const upcomingOccupantName =
     upcomingAlloc?.boarder?.full_name ||
     s.upcoming_occupant_name ||
-    (s.seat_code === 'Seat B-1' && !upcomingAlloc ? 'হাশেম' : null)
+    null
 
   const upcomingOccupantCode =
     upcomingAlloc?.boarder?.boarder_code ||
     s.upcoming_occupant_code ||
-    (s.seat_code === 'Seat B-1' && !upcomingAlloc ? 'BDR-2026-9890' : null)
+    null
 
   const upcomingStartDate =
     upcomingAlloc?.start_date ||
     s.upcoming_start_date ||
-    (s.seat_code === 'Seat B-1' && !upcomingAlloc ? '2026-12-01' : null)
+    null
 
   return {
     ...s,
@@ -524,7 +586,7 @@ export function enrichSeatAllocations(s: any) {
     cancellation_reason: primaryAlloc?.cancellation_reason || s.cancellation_reason || null,
 
     // Upcoming allocation details
-    has_upcoming_allocation: Boolean(upcomingAlloc) || Boolean(s.has_upcoming_allocation) || s.seat_code === 'Seat B-1',
+    has_upcoming_allocation: Boolean(upcomingAlloc) || Boolean(s.has_upcoming_allocation),
     upcoming_allocation: upcomingAlloc || s.upcoming_allocation || null,
     upcoming_occupant_name: upcomingOccupantName,
     upcoming_occupant_code: upcomingOccupantCode,
@@ -534,14 +596,19 @@ export function enrichSeatAllocations(s: any) {
 }
 
 export function useSeats(params?: SeatFilterParams) {
+  const { profile, assignedFlats } = useAuthStore()
+  const isManager = profile?.role === 'MANAGER'
+
   return useQuery({
-    queryKey: ['seats', params],
+    queryKey: ['seats', params, isManager, assignedFlats],
     queryFn: async () => {
       // Trigger non-blocking database self-healing for departure notices
       syncDepartureNoticeAllocations().catch(() => {})
 
+      let results: any[] = []
+
       if (!isSupabaseConfigured) {
-        let results = mockSeats.map((s) => {
+        results = mockSeats.map((s) => {
           const enriched = enrichSeatAllocations(s)
           const r = mockRooms.find((rm) => rm.id === s.room_id)
           const f = mockFlats.find((fl) => fl.id === r?.flat_id)
@@ -557,39 +624,48 @@ export function useSeats(params?: SeatFilterParams) {
         if (params?.status && params.status !== 'ALL') {
           results = results.filter((s) => s.status === params.status)
         }
-        return results
-      }
-
-      let query = supabase
-        .from('seats')
-        .select(`
-          *,
-          room:rooms (
-            id, name, room_code, flat_id,
-            flat:flats (
-              id, name, flat_code, floor_number,
-              building:buildings (id, name)
+      } else {
+        let query = supabase
+          .from('seats')
+          .select(`
+            *,
+            room:rooms (
+              id, name, room_code, flat_id,
+              flat:flats (
+                id, name, flat_code, floor_number,
+                building:buildings (id, name)
+              )
+            ),
+            allocations (
+              id, status, monthly_rent, security_deposit, start_date, end_date, cancellation_reason, boarder_id,
+              boarder:boarders (id, full_name, boarder_code, phone_number, status, leaving_date)
             )
-          ),
-          allocations (
-            id, status, monthly_rent, security_deposit, start_date, end_date, cancellation_reason, boarder_id,
-            boarder:boarders (id, full_name, boarder_code, phone_number, status, leaving_date)
-          )
-        `)
+          `)
 
-      if (params?.roomId) {
-        query = query.eq('room_id', params.roomId)
-      }
-      if (params?.status && params.status !== 'ALL') {
-        query = query.eq('status', params.status)
+        if (params?.roomId) {
+          query = query.eq('room_id', params.roomId)
+        }
+        if (params?.status && params.status !== 'ALL') {
+          query = query.eq('status', params.status)
+        }
+
+        const { data, error } = await query.order('seat_code', { ascending: true })
+        if (error) {
+          console.warn('seats fetch failed:', error.message)
+          results = []
+        } else {
+          results = (data || []).map((s: any) => enrichSeatAllocations(s))
+        }
       }
 
-      const { data, error } = await query.order('seat_code', { ascending: true })
-      if (error) {
-        console.warn('seats fetch failed:', error.message)
-        return []
+      if (isManager) {
+        results = results.filter((s) => {
+          const fId = s.room?.flat_id || s.room?.flat?.id
+          return fId ? assignedFlats.includes(fId) : false
+        })
       }
-      return (data || []).map((s: any) => enrichSeatAllocations(s))
+
+      return results
     },
   })
 }

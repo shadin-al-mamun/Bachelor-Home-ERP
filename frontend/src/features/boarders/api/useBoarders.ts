@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
 import type { Boarder, BoarderStatus, AllocationStatus, AllocationHistory, BoarderCharge } from '@/types/database'
+import { useAuthStore } from '@/app/store/useAuthStore'
+import { filterBoardersForManager } from '@/utils/managerScoping'
 
 export interface BoarderWithRelations extends Boarder {
   active_allocation?: {
@@ -933,8 +935,11 @@ export async function createBoarderApplication(input: CreateBoarderInput): Promi
 export const STAFF_ROLES = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'MEAL_OPERATOR', 'AUDITOR']
 
 export function useBoarders(filters?: BoarderFilters) {
+  const { profile, assignedFlats } = useAuthStore()
+  const isManager = profile?.role === 'MANAGER'
+
   return useQuery({
-    queryKey: ['boarders', filters],
+    queryKey: ['boarders', filters, isManager, assignedFlats],
     queryFn: async (): Promise<BoarderWithRelations[]> => {
       if (!isSupabaseConfigured) {
         const remote = await fetchRemoteBoarders()
@@ -955,6 +960,11 @@ export function useBoarders(filters?: BoarderFilters) {
               (b.institution && b.institution.toLowerCase().includes(q))
           )
         }
+
+        if (isManager) {
+          result = filterBoardersForManager(result, assignedFlats, true)
+        }
+
         return result
       }
 
@@ -1180,6 +1190,10 @@ export function useBoarders(filters?: BoarderFilters) {
       let result = filteredList
       if (filters?.status && filters.status !== 'ALL') {
         result = result.filter((b) => b.status === filters.status)
+      }
+
+      if (isManager) {
+        result = filterBoardersForManager(result, assignedFlats, true)
       }
 
       return result

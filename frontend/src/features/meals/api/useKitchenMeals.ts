@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
+import { useAuthStore } from '@/app/store/useAuthStore'
 import {
   getStoredActiveMealRate,
   formatDhakaDate,
@@ -231,17 +232,24 @@ const MOCK_FLAT_BOARDERS_DETAIL: Record<string, FlatBoarderMealItem[]> = {
  */
 export function useKitchenMealSummary(mealDate?: string) {
   const targetDate = mealDate || formatDhakaDate(getDhakaNow())
+  const { profile, assignedFlats } = useAuthStore()
+  const isManager = profile?.role === 'MANAGER'
 
   return useQuery({
-    queryKey: ['kitchen-meals-summary', targetDate],
+    queryKey: ['kitchen-meals-summary', targetDate, isManager, assignedFlats],
     queryFn: async (): Promise<KitchenSummaryResponse> => {
       if (!isSupabaseConfigured) {
+        let mockFlats = [...MOCK_KITCHEN_FLATS]
+        if (isManager) {
+          mockFlats = mockFlats.filter((f) => assignedFlats.includes(f.flat_id))
+        }
+
         // Compute grand totals dynamically from mock flats (Breakfast weight = 0.5 meal)
-        const breakfastCount = MOCK_KITCHEN_FLATS.reduce((sum, f) => sum + f.breakfast_count, 0)
-        const lunchCount = MOCK_KITCHEN_FLATS.reduce((sum, f) => sum + f.lunch_count, 0)
-        const dinnerCount = MOCK_KITCHEN_FLATS.reduce((sum, f) => sum + f.dinner_count, 0)
+        const breakfastCount = mockFlats.reduce((sum, f) => sum + f.breakfast_count, 0)
+        const lunchCount = mockFlats.reduce((sum, f) => sum + f.lunch_count, 0)
+        const dinnerCount = mockFlats.reduce((sum, f) => sum + f.dinner_count, 0)
         const totalMeals = Math.round((breakfastCount * 0.5 + lunchCount * 1.0 + dinnerCount * 1.0) * 10) / 10
-        const totalBoarders = MOCK_KITCHEN_FLATS.reduce((sum, f) => sum + f.total_boarders, 0)
+        const totalBoarders = mockFlats.reduce((sum, f) => sum + f.total_boarders, 0)
 
         const currentRates = getStoredActiveMealRate()
         const estimatedBudget =
@@ -251,9 +259,9 @@ export function useKitchenMealSummary(mealDate?: string) {
 
         return {
           meal_date: targetDate,
-          flats: MOCK_KITCHEN_FLATS,
+          flats: mockFlats,
           grand_totals: {
-            total_flats: MOCK_KITCHEN_FLATS.length,
+            total_flats: mockFlats.length,
             total_boarders: totalBoarders,
             breakfast_count: breakfastCount,
             lunch_count: lunchCount,
@@ -265,7 +273,7 @@ export function useKitchenMealSummary(mealDate?: string) {
       }
 
       // Supabase Query: Join flats with rooms, seats, and allocations (including start_date & end_date)
-      const { data: flatsData, error: flatsErr } = await supabase
+      let flatsQuery = supabase
         .from('flats')
         .select(`
           id,
@@ -297,7 +305,17 @@ export function useKitchenMealSummary(mealDate?: string) {
         .eq('status', 'ACTIVE')
         .order('floor_number', { ascending: true })
 
+      if (isManager) {
+        flatsQuery = flatsQuery.in('id', assignedFlats)
+      }
+
+      const { data: rawFlatsData, error: flatsErr } = await flatsQuery
       if (flatsErr) throw new Error(flatsErr.message)
+
+      let flatsData = rawFlatsData || []
+      if (isManager) {
+        flatsData = flatsData.filter((f: any) => assignedFlats.includes(f.id))
+      }
 
       // Lookup Al-Imran's boarder ID to ensure his presence in Flat-206 until departure date (2026-11-30)
       let imranBoarderId: string | null = null
@@ -508,14 +526,16 @@ export function useKitchenMealSummary(mealDate?: string) {
         })
       )
 
-      guestBookings
-        .filter((gb: any) => !accountedGuestIds.has(gb.id))
-        .forEach((gb: any) => {
-          const count = Number(gb.guest_count) || 0
-          if (gb.session === 'BREAKFAST') grandBreakfast += count
-          if (gb.session === 'LUNCH') grandLunch += count
-          if (gb.session === 'DINNER') grandDinner += count
-        })
+      if (!isManager) {
+        guestBookings
+          .filter((gb: any) => !accountedGuestIds.has(gb.id))
+          .forEach((gb: any) => {
+            const count = Number(gb.guest_count) || 0
+            if (gb.session === 'BREAKFAST') grandBreakfast += count
+            if (gb.session === 'LUNCH') grandLunch += count
+            if (gb.session === 'DINNER') grandDinner += count
+          })
+      }
 
       // Breakfast counts as 0.5 meal (সকালের নাস্তা আধা মিল হিসেবে গণ্য)
       const totalMeals = Math.round((grandBreakfast * 0.5 + grandLunch * 1.0 + grandDinner * 1.0) * 10) / 10
@@ -548,11 +568,16 @@ export function useKitchenMealSummary(mealDate?: string) {
  */
 export function useFlatBoarderMeals(flatId?: string, mealDate?: string) {
   const targetDate = mealDate || formatDhakaDate(getDhakaNow())
+  const { profile, assignedFlats } = useAuthStore()
+  const isManager = profile?.role === 'MANAGER'
 
   return useQuery({
-    queryKey: ['kitchen-flat-boarders', flatId, targetDate],
+    queryKey: ['kitchen-flat-boarders', flatId, targetDate, isManager, assignedFlats],
     queryFn: async (): Promise<FlatBoarderMealItem[]> => {
       if (!flatId) return []
+      if (isManager && !assignedFlats.includes(flatId)) {
+        return []
+      }
 
       if (!isSupabaseConfigured) {
         return MOCK_FLAT_BOARDERS_DETAIL[flatId] || MOCK_FLAT_BOARDERS_DETAIL['flat-2a']

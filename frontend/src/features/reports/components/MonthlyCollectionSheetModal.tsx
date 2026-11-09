@@ -38,7 +38,7 @@ export const MonthlyCollectionSheetModal: React.FC<MonthlyCollectionSheetModalPr
   const defaultMonthStr = initialMonth || `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
 
   const [selectedMonth, setSelectedMonth] = useState<string>(defaultMonthStr)
-  const [selectedFlatId, setSelectedFlatId] = useState<string>(initialFlatId || 'flat-206')
+  const [selectedFlatId, setSelectedFlatId] = useState<string>(initialFlatId || '')
   const [showPreview, setShowPreview] = useState<boolean>(true)
   const [isExportingExcel, setIsExportingExcel] = useState<boolean>(false)
 
@@ -52,6 +52,15 @@ export const MonthlyCollectionSheetModal: React.FC<MonthlyCollectionSheetModalPr
     selectedMonthBn,
     isLoading,
   } = useMonthlyCollectionSheetData(selectedMonth, selectedFlatId)
+
+  // Auto-select first available assigned flat if none selected or if selected is not in manager's scope
+  React.useEffect(() => {
+    if (availableFlats && availableFlats.length > 0) {
+      if (!selectedFlatId || !availableFlats.some((f) => f.id === selectedFlatId)) {
+        setSelectedFlatId(availableFlats[0].id)
+      }
+    }
+  }, [availableFlats, selectedFlatId])
 
   const monthOptions = useMemo(() => {
     return getAvailableMonthOptions(selectedMonth)

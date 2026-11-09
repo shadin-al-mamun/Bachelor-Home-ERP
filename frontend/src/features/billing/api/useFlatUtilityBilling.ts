@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
+import { useAuthStore } from '@/app/store/useAuthStore'
 
 export interface FlatVoucherItem {
   id: string
@@ -173,15 +174,22 @@ const MOCK_PREVIEW_DATA: FlatUtilityPreviewItem[] = [
 export function useFlatUtilityBillingPreview(billingMonth: string) {
   const normMonth = billingMonth.length === 7 ? `${billingMonth}-01` : billingMonth
   const monthPrefix = normMonth.slice(0, 7)
+  const { profile, assignedFlats } = useAuthStore()
+  const isManager = profile?.role === 'MANAGER'
 
   return useQuery({
-    queryKey: ['flat-utility-preview', normMonth],
+    queryKey: ['flat-utility-preview', normMonth, isManager, assignedFlats],
     queryFn: async (): Promise<FlatUtilityPreviewItem[]> => {
       const localDist = loadFlatUtilityDistributionFromStorage(monthPrefix)
       const localInputs = loadFlatUtilityInputsFromStorage(monthPrefix)
 
       if (!isSupabaseConfigured) {
-        return MOCK_PREVIEW_DATA.map((mockItem) => {
+        let mockList = MOCK_PREVIEW_DATA
+        if (isManager) {
+          mockList = mockList.filter((m) => assignedFlats.includes(m.flat_id))
+        }
+
+        return mockList.map((mockItem) => {
           const savedDist = localDist?.[mockItem.flat_id]
           const savedInput = localInputs?.[mockItem.flat_id]
           if (savedDist || savedInput) {
@@ -213,7 +221,11 @@ export function useFlatUtilityBillingPreview(billingMonth: string) {
           { p_billing_month: normMonth }
         )
         if (!rpcErr && Array.isArray(rpcData)) {
-          return (rpcData as FlatUtilityPreviewItem[]).map((item) => {
+          let list = (rpcData as FlatUtilityPreviewItem[])
+          if (isManager) {
+            list = list.filter((item) => assignedFlats.includes(item.flat_id))
+          }
+          return list.map((item) => {
             const savedDist = localDist?.[item.flat_id]
             const savedInput = localInputs?.[item.flat_id]
             if (savedDist || savedInput) {
@@ -263,7 +275,8 @@ export function useFlatUtilityBillingPreview(billingMonth: string) {
           .eq('billing_month', startDate),
       ])
 
-      const flats = flatsRes.data || []
+      const rawFlats = flatsRes.data || []
+      const flats = isManager ? rawFlats.filter((f: any) => assignedFlats.includes(f.id)) : rawFlats
       const rooms = roomsRes.data || []
       const seats = seatsRes.data || []
       const allocations = allocationsRes.data || []

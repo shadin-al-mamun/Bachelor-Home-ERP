@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
 import { compressVoucherImage } from '@/utils/imageCompression'
+import { useAuthStore } from '@/app/store/useAuthStore'
 import type {
   Expense,
   ExpenseCategory,
@@ -338,11 +339,24 @@ export async function uploadVoucherFile(rawFile: File): Promise<string> {
 // ==============================================================================
 
 export function useExpenses(filters?: ExpenseFilters) {
+  const { profile, assignedFlats, assignedBuildings } = useAuthStore()
+  const isManager = profile?.role === 'MANAGER'
+
   return useQuery({
-    queryKey: ['expenses', filters],
+    queryKey: ['expenses', filters, isManager, profile?.id, assignedFlats, assignedBuildings],
     queryFn: async (): Promise<ExtendedExpense[]> => {
       if (!isSupabaseConfigured) {
         let list = [...MOCK_EXPENSES]
+
+        if (isManager) {
+          list = list.filter((e) => {
+            if (profile?.id && e.paid_by === profile.id) return true
+            if (e.flat_id && assignedFlats.includes(e.flat_id)) return true
+            if (e.building_id && assignedBuildings.includes(e.building_id)) return true
+            if (e.paid_by && profile?.id && e.paid_by !== profile.id) return false
+            return false
+          })
+        }
 
         // Status Filter
         if (filters?.status && filters.status !== 'ALL') {
@@ -533,6 +547,18 @@ export function useExpenses(filters?: ExpenseFilters) {
       } else if (filters?.dateRange === 'THIS_MONTH') {
         const monthPrefix = new Date().toISOString().slice(0, 7)
         list = list.filter((e) => e.expense_date && e.expense_date.startsWith(monthPrefix))
+      }
+
+      // 5. Manager-to-Manager Isolation: Manager can ONLY see expenses they paid/recorded
+      // or expenses strictly tied to their assigned flat or building
+      if (isManager) {
+        list = list.filter((e) => {
+          if (profile?.id && e.paid_by === profile.id) return true
+          if (e.flat_id && assignedFlats.includes(e.flat_id)) return true
+          if (e.building_id && assignedBuildings.includes(e.building_id)) return true
+          if (e.paid_by && profile?.id && e.paid_by !== profile.id) return false
+          return false
+        })
       }
 
       return list

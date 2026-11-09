@@ -7,6 +7,7 @@ interface AuthState {
   user: User | null
   profile: Profile | null
   assignedFlats: string[]
+  assignedBuildings: string[]
   isLoading: boolean
   isAuthenticated: boolean
   isInitialized: boolean
@@ -18,7 +19,8 @@ interface AuthState {
   signOut: () => Promise<void>
   hasRole: (roles: UserRole[]) => boolean
   hasFlatAccess: (flatId: string) => boolean
-  setDemoUser: (role: UserRole, customProfile?: Partial<Profile>) => void
+  hasBuildingAccess: (buildingId: string) => boolean
+  setDemoUser: (role: UserRole, customProfile?: Partial<Profile>, customFlats?: string[], customBuildings?: string[]) => void
   updateProfileAvatar: (avatarUrl: string) => void
 }
 
@@ -26,6 +28,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   profile: null,
   assignedFlats: [],
+  assignedBuildings: [],
   isLoading: true,
   isAuthenticated: false,
   isInitialized: false,
@@ -175,14 +178,47 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // 2. Fetch user flat assignments if manager or operator
       const { data: assignmentsData } = await supabase
         .from('user_flat_assignments')
-        .select('flat_id')
+        .select(`
+          flat_id,
+          flat:flats (
+            id,
+            building_id
+          )
+        `)
         .eq('user_id', userId)
 
-      const flats = assignmentsData ? assignmentsData.map((a: { flat_id: string }) => a.flat_id) : []
+      const flats: string[] = []
+      const buildingIds = new Set<string>()
+
+      if (assignmentsData && Array.isArray(assignmentsData)) {
+        assignmentsData.forEach((a: any) => {
+          if (a.flat_id) flats.push(a.flat_id)
+          const bId = a.flat?.building_id
+          if (bId) buildingIds.add(bId)
+        })
+      }
+
+      // If flat join did not return building IDs, resolve them via simple flats select
+      if (flats.length > 0 && buildingIds.size === 0) {
+        try {
+          const { data: fRows } = await supabase
+            .from('flats')
+            .select('id, building_id')
+            .in('id', flats)
+          if (fRows) {
+            fRows.forEach((f: any) => {
+              if (f.building_id) buildingIds.add(f.building_id)
+            })
+          }
+        } catch {
+          // ignore
+        }
+      }
 
       set({
         profile: resolvedProfile,
         assignedFlats: flats,
+        assignedBuildings: Array.from(buildingIds),
         isLoading: false,
         isInitialized: true,
       })
@@ -211,6 +247,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       user: null,
       profile: null,
       assignedFlats: [],
+      assignedBuildings: [],
       isAuthenticated: false,
       isLoading: false,
     })
@@ -229,17 +266,33 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     return assignedFlats.includes(flatId)
   },
 
-  setDemoUser: (role: UserRole, customProfile?: Partial<Profile>) => {
+  hasBuildingAccess: (buildingId: string) => {
+    const { profile, assignedBuildings } = get()
+    if (!profile) return false
+    if (profile.role === 'SUPER_ADMIN' || profile.role === 'ADMIN') return true
+    return assignedBuildings.includes(buildingId)
+  },
+
+  setDemoUser: (
+    role: UserRole,
+    customProfile?: Partial<Profile>,
+    customFlats?: string[],
+    customBuildings?: string[]
+  ) => {
     const isManager2 =
       customProfile?.id === 'p-manager-2' ||
       customProfile?.phone_number === '01800000002' ||
       customProfile?.email === 'manager2@bachelorhome.erp'
 
+    const isEnamul =
+      customProfile?.full_name?.includes('এনামুল') ||
+      customProfile?.email?.includes('enamul')
+
     const defaultId =
       role === 'SUPER_ADMIN'
         ? 'p-owner'
         : role === 'MANAGER'
-        ? (isManager2 ? 'p-manager-2' : 'p-manager-1')
+        ? (isEnamul ? 'p-manager-enamul' : isManager2 ? 'p-manager-2' : 'p-manager-1')
         : role === 'APPLICANT'
         ? 'p-applicant'
         : 'p-imran'
@@ -249,7 +302,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       role === 'SUPER_ADMIN'
         ? 'shadin0158@gmail.com'
         : role === 'MANAGER'
-        ? (isManager2 ? 'manager2@bachelorhome.erp' : 'manager@bachelorhome.erp')
+        ? (isEnamul ? 'enamul@bachelorhome.erp' : isManager2 ? 'manager2@bachelorhome.erp' : 'manager@bachelorhome.erp')
         : `${role.toLowerCase()}@bachelorhome.erp`
     const userEmail = customProfile?.email || defaultEmail
 
@@ -263,7 +316,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       role === 'SUPER_ADMIN'
         ? 'হোস্টেল এডমিন (মালিক)'
         : role === 'MANAGER'
-        ? (isManager2 ? 'ম্যানেজার মেহেদী (ম্যানেজার ২)' : 'ম্যানেজার তানভীর (ম্যানেজার ১)')
+        ? (isEnamul ? 'মোঃ এনামুল হক (ম্যানেজার)' : isManager2 ? 'ম্যানেজার মেহেদী (ম্যানেজার ২)' : 'ম্যানেজার তানভীর (ম্যানেজার ১)')
         : role === 'APPLICANT'
         ? 'নতুন আবেদনকারী'
         : 'বর্ডার রাকিবুল'
@@ -272,7 +325,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       role === 'SUPER_ADMIN'
         ? '01712394767'
         : role === 'MANAGER'
-        ? (isManager2 ? '01800000002' : '01800000001')
+        ? (isEnamul ? '01800000003' : isManager2 ? '01800000002' : '01800000001')
         : '01711000000'
 
     const mockProfile: Profile = {
@@ -288,10 +341,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       updated_at: new Date().toISOString(),
     }
 
+    const defaultAssignedFlats =
+      customFlats !== undefined
+        ? customFlats
+        : role === 'MANAGER'
+        ? (isEnamul ? ['22222222-2222-2222-2222-222222222224'] : ['22222222-2222-2222-2222-222222222222'])
+        : []
+
+    const defaultAssignedBuildings =
+      customBuildings !== undefined
+        ? customBuildings
+        : role === 'MANAGER'
+        ? ['11111111-1111-1111-1111-111111111111']
+        : []
+
     set({
       user: mockUser as User,
       profile: mockProfile,
-      assignedFlats: ['22222222-2222-2222-2222-222222222222'],
+      assignedFlats: defaultAssignedFlats,
+      assignedBuildings: defaultAssignedBuildings,
       isAuthenticated: true,
       isLoading: false,
       isInitialized: true,
