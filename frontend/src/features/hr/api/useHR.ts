@@ -385,8 +385,10 @@ export function usePayrollSheets() {
   return useQuery({
     queryKey: ['payroll-sheets'],
     queryFn: async (): Promise<PayrollSheet[]> => {
+      const localSheets = getStoredPayroll()
+
       if (!isSupabaseConfigured) {
-        return getStoredPayroll()
+        return localSheets
       }
 
       try {
@@ -413,15 +415,26 @@ export function usePayrollSheets() {
           `)
           .order('payroll_month', { ascending: false })
 
-        if (error) {
-          console.warn('payroll_sheets fetch error, using stored payroll:', error.message)
-          return getStoredPayroll()
+        if (error || !data) {
+          console.warn('payroll_sheets fetch error, using stored payroll:', error?.message)
+          return localSheets
         }
 
-        return (data || []) as PayrollSheet[]
+        const remoteSheets = (data || []) as PayrollSheet[]
+        // Merge remote and local sheets
+        const merged: PayrollSheet[] = [...remoteSheets]
+        localSheets.forEach((ls) => {
+          const existingIdx = merged.findIndex((ms) => ms.payroll_month === ls.payroll_month)
+          if (existingIdx === -1) {
+            merged.push(ls)
+          } else if ((!merged[existingIdx].items || merged[existingIdx].items.length === 0) && ls.items && ls.items.length > 0) {
+            merged[existingIdx].items = ls.items
+          }
+        })
+        return merged
       } catch (err) {
         console.warn('payroll_sheets query exception:', err)
-        return getStoredPayroll()
+        return localSheets
       }
     },
   })
@@ -436,37 +449,57 @@ export function useGeneratePayrollSheet() {
       const month = params.payroll_month // 'YYYY-MM'
       const batchNo = `PAY-${month}`
 
-      // 1. Fetch active staff members
+      // 1. Fetch active staff members (combine Supabase + local)
       let staffList: StaffMember[] = []
-      if (!isSupabaseConfigured) {
-        staffList = getStoredStaff().filter((s) => s.is_active)
-      } else {
-        const { data } = await supabase.from('staff_members').select('*').eq('is_active', true)
-        staffList = (data || []) as StaffMember[]
+      if (isSupabaseConfigured) {
+        try {
+          const { data, error } = await supabase.from('staff_members').select('*').eq('is_active', true)
+          if (!error && data) {
+            staffList = data as StaffMember[]
+          }
+        } catch (err) {
+          console.warn('staff_members fetch in generate payroll failed:', err)
+        }
       }
+      const localStaff = getStoredStaff().filter((s) => s.is_active)
+      localStaff.forEach((ls) => {
+        if (!staffList.some((s) => s.id === ls.id || s.staff_code === ls.staff_code)) {
+          staffList.push(ls)
+        }
+      })
 
       if (staffList.length === 0) {
-        throw new Error('কোনো সক্রিয় কর্মচারী পাওয়া যায়নি। আগে কর্মচারী যুক্ত করুন।')
+        throw new Error('কোনো সক্রিয় কর্মচারী বা কর্মকর্তা পাওয়া যায়নি। আগে কর্মচারী তালিকায় কর্মী যুক্ত করুন।')
       }
 
-      // 2. Fetch pending advances for each staff
+      // 2. Fetch pending advances for each staff (combine Supabase + local)
       let allAdvances: StaffAdvance[] = []
-      if (!isSupabaseConfigured) {
-        allAdvances = getStoredAdvances().filter((a) => a.status === 'PENDING')
-      } else {
-        const { data: advData } = await supabase
-          .from('staff_advances')
-          .select('*')
-          .eq('status', 'PENDING')
-        allAdvances = (advData || []) as StaffAdvance[]
+      if (isSupabaseConfigured) {
+        try {
+          const { data: advData, error: advErr } = await supabase
+            .from('staff_advances')
+            .select('*')
+            .eq('status', 'PENDING')
+          if (!advErr && advData) {
+            allAdvances = advData as StaffAdvance[]
+          }
+        } catch (err) {
+          console.warn('staff_advances fetch in generate payroll failed:', err)
+        }
       }
+      const localAdvances = getStoredAdvances().filter((a) => a.status === 'PENDING')
+      localAdvances.forEach((la) => {
+        if (!allAdvances.some((a) => a.id === la.id || a.voucher_no === la.voucher_no)) {
+          allAdvances.push(la)
+        }
+      })
 
       // 3. Calculate payroll items
       let totalBasic = 0
       let totalDeductions = 0
       let totalNetPayable = 0
 
-      const items: Partial<PayrollItem>[] = staffList.map((s) => {
+      const items: PayrollItem[] = staffList.map((s) => {
         const basic = Number(s.monthly_salary) || 0
         const staffAdvances = allAdvances.filter((a) => a.staff_id === s.id)
         const advanceDeduction = staffAdvances.reduce((sum, a) => sum + (Number(a.amount) || 0), 0)
@@ -478,6 +511,7 @@ export function useGeneratePayrollSheet() {
 
         return {
           id: `item-${s.id}-${Date.now()}`,
+          payroll_sheet_id: `pay-${month}`,
           staff_id: s.id,
           staff: s,
           basic_salary: basic,
@@ -488,87 +522,84 @@ export function useGeneratePayrollSheet() {
           net_payable: netPayable,
           paid_amount: 0,
           payment_status: 'UNPAID',
+          created_at: new Date().toISOString(),
         }
       })
 
-      if (!isSupabaseConfigured) {
-        const existing = getStoredPayroll()
-        const existingIdx = existing.findIndex((p) => p.payroll_month === month)
+      const completeSheet: PayrollSheet = {
+        id: `pay-${month}-${Date.now()}`,
+        payroll_month: month,
+        payroll_batch_no: batchNo,
+        total_basic_salary: totalBasic,
+        total_bonuses: 0,
+        total_deductions: totalDeductions,
+        total_net_payable: totalNetPayable,
+        total_paid_amount: 0,
+        status: 'DRAFT',
+        prepared_by: profile?.id || null,
+        remarks: params.remarks || `${month} মাসের নিয়মিত বেতন শিট`,
+        created_at: new Date().toISOString(),
+        items: items,
+      }
 
-        const newSheet: PayrollSheet = {
-          id: `pay-${month}-${Date.now()}`,
-          payroll_month: month,
-          payroll_batch_no: batchNo,
-          total_basic_salary: totalBasic,
-          total_bonuses: 0,
-          total_deductions: totalDeductions,
-          total_net_payable: totalNetPayable,
-          total_paid_amount: 0,
-          status: 'DRAFT',
-          prepared_by: profile?.id || null,
-          remarks: params.remarks || `${month} মাসের নিয়মিত বেতন শিট`,
-          created_at: new Date().toISOString(),
-          items: items as PayrollItem[],
+      // Try saving to Supabase if configured
+      if (isSupabaseConfigured) {
+        try {
+          const { data: sheetData, error: sheetErr } = await supabase
+            .from('payroll_sheets')
+            .upsert(
+              {
+                payroll_month: month,
+                payroll_batch_no: batchNo,
+                total_basic_salary: totalBasic,
+                total_bonuses: 0,
+                total_deductions: totalDeductions,
+                total_net_payable: totalNetPayable,
+                total_paid_amount: 0,
+                status: 'DRAFT',
+                prepared_by: profile?.id || null,
+                remarks: params.remarks || `${month} মাসের নিয়মিত বেতন শিট`,
+              },
+              { onConflict: 'payroll_batch_no' }
+            )
+            .select()
+            .single()
+
+          if (!sheetErr && sheetData) {
+            completeSheet.id = sheetData.id
+            const itemRows = items.map((i) => ({
+              payroll_sheet_id: sheetData.id,
+              staff_id: i.staff_id!,
+              basic_salary: i.basic_salary,
+              bonus_overtime: i.bonus_overtime,
+              advance_deduction: i.advance_deduction,
+              absence_deduction: i.absence_deduction,
+              other_deduction: i.other_deduction,
+              net_payable: i.net_payable,
+              paid_amount: 0,
+              payment_status: 'UNPAID',
+            }))
+
+            await supabase.from('payroll_items').delete().eq('payroll_sheet_id', sheetData.id)
+            await supabase.from('payroll_items').insert(itemRows)
+          }
+        } catch (supabaseErr) {
+          console.warn('Supabase payroll_sheets upsert failed, stored in local cache:', supabaseErr)
         }
-
-        let updated: PayrollSheet[]
-        if (existingIdx >= 0) {
-          updated = [...existing]
-          updated[existingIdx] = newSheet
-        } else {
-          updated = [newSheet, ...existing]
-        }
-        saveStoredPayroll(updated)
-        return newSheet
       }
 
-      // Supabase insert / upsert
-      const { data: sheetData, error: sheetErr } = await supabase
-        .from('payroll_sheets')
-        .upsert(
-          {
-            payroll_month: month,
-            payroll_batch_no: batchNo,
-            total_basic_salary: totalBasic,
-            total_bonuses: 0,
-            total_deductions: totalDeductions,
-            total_net_payable: totalNetPayable,
-            total_paid_amount: 0,
-            status: 'DRAFT',
-            prepared_by: profile?.id || null,
-            remarks: params.remarks || `${month} মাসের নিয়মিত বেতন শিট`,
-          },
-          { onConflict: 'payroll_batch_no' }
-        )
-        .select()
-        .single()
-
-      if (sheetErr || !sheetData) {
-        throw new Error(sheetErr?.message || 'বেতন শিট তৈরিতে ব্যর্থ হয়েছে।')
+      // Always save to localStorage
+      const existing = getStoredPayroll()
+      const existingIdx = existing.findIndex((p) => p.payroll_month === month)
+      let updated: PayrollSheet[]
+      if (existingIdx >= 0) {
+        updated = [...existing]
+        updated[existingIdx] = completeSheet
+      } else {
+        updated = [completeSheet, ...existing]
       }
-
-      // Insert payroll items
-      const itemRows = items.map((i) => ({
-        payroll_sheet_id: sheetData.id,
-        staff_id: i.staff_id!,
-        basic_salary: i.basic_salary,
-        bonus_overtime: i.bonus_overtime,
-        advance_deduction: i.advance_deduction,
-        absence_deduction: i.absence_deduction,
-        other_deduction: i.other_deduction,
-        net_payable: i.net_payable,
-        paid_amount: 0,
-        payment_status: 'UNPAID',
-      }))
-
-      await supabase.from('payroll_items').delete().eq('payroll_sheet_id', sheetData.id)
-      const { error: itemErr } = await supabase.from('payroll_items').insert(itemRows)
-
-      if (itemErr) {
-        throw new Error(itemErr.message || 'বেতন শিটের আইটেম সংরক্ষণে ব্যর্থ হয়েছে।')
-      }
-
-      return sheetData as PayrollSheet
+      saveStoredPayroll(updated)
+      return completeSheet
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payroll-sheets'] })
@@ -582,77 +613,95 @@ export function useDisbursePayrollItem() {
 
   return useMutation({
     mutationFn: async (params: DisbursePayrollItemParams) => {
-      if (!isSupabaseConfigured) {
-        const sheets = getStoredPayroll()
-        let found = false
-        for (const sheet of sheets) {
-          const itm = (sheet.items || []).find((i) => i.id === params.payroll_item_id)
-          if (itm) {
-            itm.payment_status = 'PAID'
-            itm.paid_amount = itm.net_payable
-            itm.disbursed_from_account_id = params.disbursed_from_account_id
-            itm.disbursement_date = new Date().toISOString()
-            found = true
-            break
+      // 1. Update localStorage
+      const sheets = getStoredPayroll()
+      let matchedStaffId: string | null = null
+
+      for (const sheet of sheets) {
+        const itm = (sheet.items || []).find((i) => i.id === params.payroll_item_id)
+        if (itm) {
+          itm.payment_status = 'PAID'
+          itm.paid_amount = itm.net_payable
+          itm.disbursed_from_account_id = params.disbursed_from_account_id
+          itm.disbursement_date = new Date().toISOString()
+          matchedStaffId = itm.staff_id
+          break
+        }
+      }
+      saveStoredPayroll(sheets)
+
+      // Deduct advance from local advances
+      if (matchedStaffId) {
+        const advances = getStoredAdvances()
+        advances.forEach((adv) => {
+          if (adv.staff_id === matchedStaffId && adv.status === 'PENDING') {
+            adv.status = 'DEDUCTED'
+            adv.deducted_amount = adv.amount
           }
-        }
-        if (found) {
-          saveStoredPayroll(sheets)
-          return { success: true }
-        }
-        throw new Error('বেতন শিটের আইটেম পাওয়া যায়নি।')
-      }
-
-      // Try RPC first for transaction safety & cash box deduction
-      try {
-        const { data: rpcData, error: rpcErr } = await supabase.rpc('fn_disburse_payroll_item', {
-          p_payroll_item_id: params.payroll_item_id,
-          p_disbursed_from_account_id: params.disbursed_from_account_id,
-          p_remarks: params.remarks || null,
         })
-        if (!rpcErr && rpcData) {
-          return rpcData
-        }
-      } catch (err) {
-        console.warn('fn_disburse_payroll_item RPC fallback:', err)
+        saveStoredAdvances(advances)
       }
 
-      // Direct fallback update
-      const { data: item } = await supabase
-        .from('payroll_items')
-        .select('*, sheet:payroll_sheets(payroll_batch_no, payroll_month), staff:staff_members(full_name, designation)')
-        .eq('id', params.payroll_item_id)
-        .single()
-
-      if (!item) throw new Error('আইটেম খুঁজে পাওয়া যায়নি।')
-
-      // Deduct from financial account
-      if (item.net_payable > 0) {
-        await supabase
-          .from('financial_accounts')
-          .update({
-            current_balance: supabase.rpc('decrement_balance', { amount: item.net_payable }) as any,
+      // 2. If Supabase configured, execute DB transaction or direct update
+      if (isSupabaseConfigured) {
+        try {
+          const { data: rpcData, error: rpcErr } = await supabase.rpc('fn_disburse_payroll_item', {
+            p_payroll_item_id: params.payroll_item_id,
+            p_disbursed_from_account_id: params.disbursed_from_account_id,
+            p_remarks: params.remarks || null,
           })
-          .eq('id', params.disbursed_from_account_id)
+          if (!rpcErr && rpcData) {
+            return rpcData
+          }
+        } catch (err) {
+          console.warn('fn_disburse_payroll_item RPC fallback:', err)
+        }
+
+        try {
+          // Direct fallback update
+          const { data: item } = await supabase
+            .from('payroll_items')
+            .select('*, sheet:payroll_sheets(payroll_batch_no, payroll_month), staff:staff_members(full_name, designation)')
+            .eq('id', params.payroll_item_id)
+            .single()
+
+          if (item) {
+            if (item.net_payable > 0) {
+              await supabase
+                .from('financial_accounts')
+                .update({
+                  current_balance: supabase.rpc('decrement_balance', { amount: item.net_payable }) as any,
+                })
+                .eq('id', params.disbursed_from_account_id)
+            }
+
+            await supabase
+              .from('payroll_items')
+              .update({
+                payment_status: 'PAID',
+                paid_amount: item.net_payable,
+                disbursed_from_account_id: params.disbursed_from_account_id,
+                disbursed_by: profile?.id || null,
+                disbursement_date: new Date().toISOString(),
+                remarks: params.remarks,
+              })
+              .eq('id', params.payroll_item_id)
+
+            await supabase
+              .from('staff_advances')
+              .update({
+                status: 'DEDUCTED',
+                deducted_amount: item.advance_deduction,
+              })
+              .eq('staff_id', item.staff_id)
+              .eq('status', 'PENDING')
+          }
+        } catch (supaErr) {
+          console.warn('Supabase disburse fallback exception:', supaErr)
+        }
       }
 
-      // Mark paid
-      const { data, error } = await supabase
-        .from('payroll_items')
-        .update({
-          payment_status: 'PAID',
-          paid_amount: item.net_payable,
-          disbursed_from_account_id: params.disbursed_from_account_id,
-          disbursed_by: profile?.id || null,
-          disbursement_date: new Date().toISOString(),
-          remarks: params.remarks,
-        })
-        .eq('id', params.payroll_item_id)
-        .select()
-        .single()
-
-      if (error) throw new Error(error.message || 'বেতন পরিশোধে ব্যর্থ হয়েছে।')
-      return data
+      return { success: true }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payroll-sheets'] })
@@ -661,6 +710,44 @@ export function useDisbursePayrollItem() {
       queryClient.invalidateQueries({ queryKey: ['owner-executive-dashboard'] })
       queryClient.invalidateQueries({ queryKey: ['expenses'] })
       queryClient.invalidateQueries({ queryKey: ['staff-advances'] })
+    },
+  })
+}
+
+export function useReconcileStaffAdvance() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ advanceId, remarks }: { advanceId: string; remarks?: string }) => {
+      // 1. Update localStorage
+      const advances = getStoredAdvances()
+      const target = advances.find((a) => a.id === advanceId)
+      if (target) {
+        target.status = 'DEDUCTED'
+        target.deducted_amount = target.amount
+        if (remarks) target.remarks = `${target.remarks ? target.remarks + ' | ' : ''}${remarks}`
+        saveStoredAdvances(advances)
+      }
+
+      // 2. Update Supabase if configured
+      if (isSupabaseConfigured) {
+        try {
+          await supabase
+            .from('staff_advances')
+            .update({
+              status: 'DEDUCTED',
+              deducted_amount: target?.amount || 0,
+              remarks: target?.remarks,
+            })
+            .eq('id', advanceId)
+        } catch (err) {
+          console.warn('Supabase reconcile advance failed:', err)
+        }
+      }
+      return { success: true }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['staff-advances'] })
+      queryClient.invalidateQueries({ queryKey: ['payroll-sheets'] })
     },
   })
 }

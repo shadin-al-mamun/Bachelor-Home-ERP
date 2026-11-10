@@ -12,7 +12,7 @@ import {
   DollarSign,
 } from 'lucide-react'
 import { Button } from '@/components/common/Button'
-import { useStaffMembers, useStaffAdvances, useRecordStaffAdvance } from './api/useHR'
+import { useStaffMembers, useStaffAdvances, useRecordStaffAdvance, useReconcileStaffAdvance } from './api/useHR'
 import { useFinancialAccounts } from '@/features/billing/api/useReceipts'
 
 export const StaffAdvancePage: React.FC = () => {
@@ -20,6 +20,7 @@ export const StaffAdvancePage: React.FC = () => {
   const { data: advances = [], isLoading, refetch } = useStaffAdvances()
   const { data: accounts = [] } = useFinancialAccounts()
   const recordAdvanceMutation = useRecordStaffAdvance()
+  const reconcileMutation = useReconcileStaffAdvance()
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'DEDUCTED'>('ALL')
@@ -97,6 +98,23 @@ export const StaffAdvancePage: React.FC = () => {
       refetch()
     } catch (err: any) {
       alert(err.message || 'অগ্রিম বেতন সংরক্ষণ করতে ব্যর্থ হয়েছে।')
+    }
+  }
+
+  const handleDirectReconcile = async (advanceId: string, staffName?: string) => {
+    const confirm = window.confirm(
+      `আপনি কি ${staffName || 'এই কর্মীর'} অগ্রিম ভাউচারটি সমন্বয় (Deducted/Reconciled) হিসেবে চিহ্নিত করতে চান?`
+    )
+    if (confirm) {
+      try {
+        await reconcileMutation.mutateAsync({
+          advanceId,
+          remarks: 'সরাসরি সমন্বিত',
+        })
+        refetch()
+      } catch (err: any) {
+        alert(err.message || 'সমন্বয় করতে ব্যর্থ হয়েছে।')
+      }
     }
   }
 
@@ -216,6 +234,14 @@ export const StaffAdvancePage: React.FC = () => {
         </div>
       </div>
 
+      {/* Informational Guidance Banner */}
+      <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3">
+        <Clock className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+        <div className="text-xs text-amber-200/90 leading-relaxed">
+          <span className="font-bold text-amber-300">অগ্রিম বেতন স্বয়ংক্রিয় সমন্বয় তথ্য:</span> কর্মীকে প্রদত্ত অগ্রিম টাকা মাস শেষে <strong>&quot;৩. মাসিক বেতন শিট (Payroll)&quot;</strong>-এ বেতন গণনা ও পরিশোধের সময় স্বয়ংক্রিয়ভাবে মূল বেতন থেকে কর্তন ও সমন্বিত হয়ে যায়। এছাড়া প্রয়োজন হলে আপনি নিচের তালিকা থেকেও <strong>&quot;সরাসরি সমন্বয়&quot;</strong> বাটনে ক্লিক করে তাৎক্ষণিক সমন্বয় করতে পারেন।
+        </div>
+      </div>
+
       {/* Advance Records Table */}
       <div className="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden shadow-xl">
         {isLoading ? (
@@ -238,6 +264,7 @@ export const StaffAdvancePage: React.FC = () => {
                   <th className="py-3 px-4">প্রদানকারী অ্যাকাউন্ট</th>
                   <th className="py-3 px-4 text-center">স্ট্যাটাস</th>
                   <th className="py-3 px-4">মন্তব্য</th>
+                  <th className="py-3 px-4 text-center">অ্যাকশন</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 text-xs">
@@ -303,6 +330,22 @@ export const StaffAdvancePage: React.FC = () => {
 
                     <td className="py-3.5 px-4 text-slate-400 max-w-[180px] truncate">
                       {adv.remarks || '-'}
+                    </td>
+
+                    <td className="py-3.5 px-4 text-center">
+                      {adv.status === 'PENDING' ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDirectReconcile(adv.id, adv.staff?.full_name)}
+                          disabled={reconcileMutation.isPending}
+                          className="text-[11px] h-7 px-2.5 rounded-lg font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                        >
+                          সরাসরি সমন্বয়
+                        </Button>
+                      ) : (
+                        <span className="text-[11px] text-emerald-400 font-medium">সমন্বিত ✓</span>
+                      )}
                     </td>
                   </tr>
                 ))}

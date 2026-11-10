@@ -69,7 +69,7 @@ export const PayrollPage: React.FC = () => {
       await generateMutation.mutateAsync({
         payroll_month: selectedMonth,
       })
-      refetch()
+      await refetch()
     } catch (err: any) {
       alert(err.message || 'বেতন শিট জেনারেট করতে ব্যর্থ হয়েছে।')
     }
@@ -153,8 +153,12 @@ export const PayrollPage: React.FC = () => {
             disabled={generateMutation.isPending}
             className="bg-primary-600 hover:bg-primary-500 text-white font-bold text-xs gap-2 px-4 py-2.5 rounded-xl shadow-lg shadow-primary-500/20"
           >
-            <Zap className="w-4 h-4" />
-            {currentSheet ? 'বেতন শিট পুনর্গণনা করুন' : 'বেতন শিট তৈরি করুন'}
+            <Zap className={`w-4 h-4 ${generateMutation.isPending ? 'animate-spin' : ''}`} />
+            {generateMutation.isPending
+              ? 'বেতন শিট তৈরি হচ্ছে...'
+              : currentSheet
+              ? 'বেতন শিট পুনর্গণনা করুন'
+              : 'বেতন শিট তৈরি করুন'}
           </Button>
         </div>
       </div>
