@@ -330,3 +330,4 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.get_executive_kpis(TEXT) TO authenticated, anon;
+

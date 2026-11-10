@@ -76,6 +76,9 @@ import AccessControlPage from '@/features/governance/AccessControlPage'
 import NoticesPage from '@/features/notices/NoticesPage'
 import BoarderPortalDuesPage from '@/features/portal/BoarderDuesPage'
 import TenantRegistrationFormPage from '@/features/settings/TenantRegistrationFormPage'
+import StaffDirectoryPage from '@/features/hr/StaffDirectoryPage'
+import StaffAdvancePage from '@/features/hr/StaffAdvancePage'
+import PayrollPage from '@/features/hr/PayrollPage'
 
 
 export const router = createBrowserRouter([
@@ -225,6 +228,22 @@ export const router = createBrowserRouter([
       {
         path: 'cash-custody/*',
         element: <ManagerCashDashboard />,
+      },
+      {
+        path: 'hr',
+        element: <StaffDirectoryPage />,
+      },
+      {
+        path: 'hr/staff',
+        element: <StaffDirectoryPage />,
+      },
+      {
+        path: 'hr/advances',
+        element: <StaffAdvancePage />,
+      },
+      {
+        path: 'hr/payroll',
+        element: <PayrollPage />,
       },
       {
         path: 'meals',

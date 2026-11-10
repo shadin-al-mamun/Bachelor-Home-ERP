@@ -230,6 +230,45 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ],
     },
 
+    // Submenu Group: এইচআর ও বেতন (HR & Payroll Management)
+    {
+      type: 'group',
+      id: 'hr_payroll',
+      titleKey: 'nav.hr_payroll',
+      defaultTitle: 'এইচআর ও বেতন ব্যবস্থাপনা',
+      icon: <Users className="w-5 h-5 shrink-0 text-teal-400" />,
+      children: [
+        {
+          id: 'staff_directory',
+          titleKey: 'nav.staff_directory',
+          defaultTitle: '১. কর্মচারী তালিকা (Staff)',
+          href: '/hr/staff',
+          icon: <Users className="w-4 h-4 shrink-0 text-teal-400" />,
+          roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'AUDITOR'],
+          permissionKey: 'hr',
+        },
+        {
+          id: 'staff_advances',
+          titleKey: 'nav.staff_advances',
+          defaultTitle: '২. অগ্রিম বেতন (Advance)',
+          href: '/hr/advances',
+          icon: <Wallet className="w-4 h-4 shrink-0 text-amber-400" />,
+          roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'AUDITOR'],
+          permissionKey: 'hr',
+        },
+        {
+          id: 'payroll_sheets',
+          titleKey: 'nav.payroll_sheets',
+          defaultTitle: '৩. মাসিক বেতন শিট (Payroll)',
+          href: '/hr/payroll',
+          icon: <Receipt className="w-4 h-4 shrink-0 text-emerald-400" />,
+          roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'AUDITOR'],
+          permissionKey: 'hr',
+          badge: 'পে-রোল',
+        },
+      ],
+    },
+
     // Submenu Group: সিস্টেম সেটিংস (System Settings)
     {
       type: 'group',
