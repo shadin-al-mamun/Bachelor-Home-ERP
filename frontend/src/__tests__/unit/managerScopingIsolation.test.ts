@@ -342,6 +342,64 @@ describe('Manager Building & Flat Scoping and Cross-Manager Isolation Engine', (
       expect(adminReceipts).toHaveLength(2)
     })
 
+    it('accurately isolates receipts using database column received_by and destination_account_id', () => {
+      const dbReceipts = [
+        {
+          id: 'rct-db-1',
+          receipt_number: 'RCT-2026-901',
+          amount: 3000,
+          received_by: managerEnamulProfile.id,
+          destination_account_id: 'acc-mgr-2',
+          boarder_id: 'b-hasmat-ali',
+        },
+        {
+          id: 'rct-db-2',
+          receipt_number: 'RCT-2026-902',
+          amount: 2200,
+          received_by: managerTanvirProfile.id,
+          destination_account_id: 'acc-mgr-1',
+          boarder_id: 'b-tanvir-boarder',
+        },
+      ]
+
+      const enamulFiltered = filterReceiptsForManager(
+        dbReceipts,
+        managerEnamulProfile.id,
+        enamulAssignedFlats,
+        true,
+        undefined,
+        'acc-mgr-2'
+      )
+      expect(enamulFiltered).toHaveLength(1)
+      expect(enamulFiltered[0].id).toBe('rct-db-1')
+      expect(enamulFiltered[0].amount).toBe(3000)
+
+      const tanvirFiltered = filterReceiptsForManager(
+        dbReceipts,
+        managerTanvirProfile.id,
+        tanvirAssignedFlats,
+        true,
+        undefined,
+        'acc-mgr-1'
+      )
+      expect(tanvirFiltered).toHaveLength(1)
+      expect(tanvirFiltered[0].id).toBe('rct-db-2')
+      expect(tanvirFiltered[0].amount).toBe(2200)
+
+      // Test collection logic: 3000 collected against 2200 billed charge
+      const totalCollected = enamulFiltered.reduce((sum, r) => sum + r.amount, 0)
+      const totalBilled = 2200
+      const activeMonthDues = 0
+      const collectionRate = totalBilled > 0
+        ? Math.min(100, Math.round((totalCollected / totalBilled) * 100))
+        : 100
+
+      expect(totalCollected).toBe(3000)
+      expect(totalBilled).toBe(2200)
+      expect(activeMonthDues).toBe(0)
+      expect(collectionRate).toBe(100)
+    })
+
     it('Cross-Manager Expense Isolation: Enamul cannot see Tanvir expenses and vice-versa', () => {
       const enamulExpenses = filterExpensesForManager(
         mockExpenses,

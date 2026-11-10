@@ -469,7 +469,7 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
         ] = await Promise.all([
           supabase.from('seats').select('id, status, room:rooms(flat_id)'),
           supabase.from('boarder_charges').select('amount, paid_amount, status, due_date, billing_month, boarder_id'),
-          supabase.from('receipts').select('amount, is_void, receipt_date, collected_by, boarder_id').eq('is_void', false),
+          supabase.from('receipts').select('id, receipt_number, amount, is_void, receipt_date, received_by, destination_account_id, boarder_id').eq('is_void', false),
           supabase.from('expenses').select('amount, approval_status, expense_date, paid_by, flat_id, building_id').eq('approval_status', 'APPROVED'),
           supabase.from('incomes').select('amount, income_date'),
           supabase
@@ -542,7 +542,8 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
           // 5. Cross-Manager Collection Isolation:
           // A manager only sees receipts they collected themselves or for boarders in their assigned flats
           allReceipts = allReceipts.filter((r: any) => {
-            if (profile?.id && r.collected_by === profile.id) return true
+            const collectorId = r.received_by || r.collected_by
+            if (profile?.id && collectorId === profile.id) return true
             if (r.boarder_id && scopedBoarderIds.has(r.boarder_id)) return true
             return false
           })
@@ -606,7 +607,7 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
             const rUtc = rd.getTime() + rd.getTimezoneOffset() * 60000
             const rDhaka = new Date(rUtc + 3600000 * 6)
             const ym = `${rDhaka.getFullYear()}-${String(rDhaka.getMonth() + 1).padStart(2, '0')}`
-            return ym === targetMonth
+            return ym === targetMonth || String(r.receipt_date).startsWith(targetMonth)
           })
           : allReceipts
 
@@ -656,8 +657,10 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
             ? Number(rpcKpis.month_dues)
             : openChargesMonthDues
 
-        // Total billed demand must be at least equal to collected receipts plus outstanding dues
-        const totalBilled = Math.max(rawBilled, totalCollected + activeMonthDues)
+        // Total billed demand: if charges exist for the month, use rawBilled.
+        // If no charges exist yet (e.g. advance collections before bills generated),
+        // fallback to collected + dues so collection rate doesn't divide by zero.
+        const totalBilled = rawBilled > 0 ? rawBilled : (totalCollected + activeMonthDues)
 
         // Collection rate is always logically capped between 0% and 100%
         const collectionRate =
@@ -871,7 +874,7 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
               const rUtc = rd.getTime() + rd.getTimezoneOffset() * 60000
               const rDhaka = new Date(rUtc + 3600000 * 6)
               const ym = `${rDhaka.getFullYear()}-${String(rDhaka.getMonth() + 1).padStart(2, '0')}`
-              return ym === mKey
+              return ym === mKey || String(r.receipt_date).startsWith(mKey)
             })
             .reduce((sum: number, r: any) => sum + (Number(r.amount) || 0), 0)
 

@@ -108,8 +108,8 @@ export const BoarderDuesPage: React.FC = () => {
     : (dashboard?.kpis?.total_collected_month ?? totalLifetimePaid)
 
   const collectionRate = isAllMonths
-    ? (totalLifetimeBilled > 0 ? Math.round((totalLifetimePaid / totalLifetimeBilled) * 100) : 0)
-    : (dashboard?.kpis?.collection_rate ?? (displayBilled > 0 ? Math.round((displayPaid / displayBilled) * 100) : 0))
+    ? (totalLifetimeBilled > 0 ? Math.min(100, Math.round((totalLifetimePaid / totalLifetimeBilled) * 100)) : 0)
+    : (dashboard?.kpis?.collection_rate ?? (displayBilled > 0 ? Math.min(100, Math.round((displayPaid / displayBilled) * 100)) : 0))
 
   const displayDues = isAllMonths
     ? totalLifetimeOutstanding

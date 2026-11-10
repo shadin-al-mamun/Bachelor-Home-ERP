@@ -307,8 +307,9 @@ export function useReceipts(filters?: ReceiptFilters) {
 
         if (isManager) {
           result = result.filter((r: any) => {
-            if (profile?.id && r.collected_by === profile.id) return true
-            if (r.collected_by && profile?.id && r.collected_by !== profile.id) return false
+            const collectorId = r.received_by || r.collected_by
+            if (profile?.id && collectorId === profile.id) return true
+            if (collectorId && profile?.id && collectorId !== profile.id) return false
             return true
           })
         }
@@ -440,9 +441,10 @@ export function useReceipts(filters?: ReceiptFilters) {
       // or receipts linked to their assigned flats / assigned cash drawer
       if (isManager) {
         list = list.filter((r: any) => {
-          if (profile?.id && r.collected_by === profile.id) return true
+          const collectorId = r.received_by || r.collected_by
+          if (profile?.id && collectorId === profile.id) return true
           // If another manager collected it, hide it completely!
-          if (r.collected_by && profile?.id && r.collected_by !== profile.id) return false
+          if (collectorId && profile?.id && collectorId !== profile.id) return false
           return true
         })
       }

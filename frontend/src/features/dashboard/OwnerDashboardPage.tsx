@@ -356,14 +356,16 @@ export const OwnerDashboardPage: React.FC = () => {
 
               <div className="text-2xl sm:text-3xl font-extrabold font-mono text-emerald-300 mt-1.5">
                 ৳{kpis.total_collected_month >= 1000
-                  ? (kpis.total_collected_month / 1000).toFixed(1) + 'k'
+                  ? (kpis.total_collected_month % 1000 === 0
+                      ? (kpis.total_collected_month / 1000).toFixed(0)
+                      : (kpis.total_collected_month / 1000).toFixed(1)) + 'k'
                   : kpis.total_collected_month.toLocaleString('en-IN')}
               </div>
 
               <p className="text-[10px] text-slate-400 mt-1">
-                মোট বিল: ৳{Math.max(
-                  kpis.total_billed_month,
-                  kpis.total_collected_month + (kpis.month_dues ?? kpis.total_outstanding_dues)
+                মোট বিল: ৳{(kpis.total_billed_month > 0
+                  ? kpis.total_billed_month
+                  : (kpis.total_collected_month + (kpis.month_dues ?? kpis.total_outstanding_dues))
                 ).toLocaleString('en-IN')}
               </p>
 

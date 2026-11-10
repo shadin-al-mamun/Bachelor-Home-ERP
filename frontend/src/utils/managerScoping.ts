@@ -187,8 +187,10 @@ export function filterKitchenFlatsForManager<T extends { flat_id: string }>(
 export function filterReceiptsForManager<
   T extends {
     collected_by?: string | null
+    received_by?: string | null
     boarder_id?: string | null
     account_id?: string | null
+    destination_account_id?: string | null
   }
 >(
   receipts: T[],
@@ -203,12 +205,14 @@ export function filterReceiptsForManager<
 
   return receipts.filter((r) => {
     // 1. Receipts collected directly by this manager
-    if (currentUserId && r.collected_by === currentUserId) {
+    const collectorId = r.received_by || r.collected_by
+    if (currentUserId && collectorId === currentUserId) {
       return true
     }
 
     // 2. Receipts deposited into this manager's cash drawer
-    if (assignedAccountId && r.account_id === assignedAccountId) {
+    const accId = r.destination_account_id || r.account_id
+    if (assignedAccountId && accId === assignedAccountId) {
       return true
     }
 
