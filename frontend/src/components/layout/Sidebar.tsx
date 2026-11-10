@@ -245,7 +245,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           href: '/hr/staff',
           icon: <Users className="w-4 h-4 shrink-0 text-teal-400" />,
           roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'AUDITOR'],
-          permissionKey: 'hr',
         },
         {
           id: 'staff_advances',
@@ -254,7 +253,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           href: '/hr/advances',
           icon: <Wallet className="w-4 h-4 shrink-0 text-amber-400" />,
           roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'AUDITOR'],
-          permissionKey: 'hr',
         },
         {
           id: 'payroll_sheets',
@@ -263,7 +261,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           href: '/hr/payroll',
           icon: <Receipt className="w-4 h-4 shrink-0 text-emerald-400" />,
           roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'AUDITOR'],
-          permissionKey: 'hr',
           badge: 'পে-রোল',
         },
       ],
@@ -363,6 +360,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => ({
     meal_management: true,
     billing_finance: true,
+    hr_payroll: true,
     system_settings: true,
   }))
 

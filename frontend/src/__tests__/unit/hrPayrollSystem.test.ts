@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import type { StaffMember, StaffAdvance, PayrollItem, PayrollSheet } from '@/types/hr'
+import type { StaffMember, StaffAdvance, PayrollItem } from '@/types/hr'
 
 describe('HR & Payroll Management Engine', () => {
   const mockStaff: StaffMember[] = [
@@ -179,3 +179,4 @@ describe('HR & Payroll Management Engine', () => {
     expect(rofiqAdvance.deducted_amount).toBe(3000)
   })
 })
+
