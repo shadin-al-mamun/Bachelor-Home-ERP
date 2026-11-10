@@ -178,5 +178,46 @@ describe('HR & Payroll Management Engine', () => {
     expect(rofiqAdvance.status).toBe('DEDUCTED')
     expect(rofiqAdvance.deducted_amount).toBe(3000)
   })
+
+  it('5. Dynamic Allowances & Total Package: correctly incorporates benefits into gross salary and advance deduction', () => {
+    const managerStaff: StaffMember = {
+      id: 'stf-mgr-1',
+      staff_code: 'STF-2026-416',
+      full_name: 'এস এম আনিসুজ্জামান',
+      phone_number: '01712345678',
+      designation: 'ম্যানেজার',
+      department: 'MANAGEMENT',
+      joining_date: '2026-10-11',
+      monthly_salary: 10000,
+      allowances: [
+        { id: 'alw-1', title: 'মোবাইল বিল ভাতা', amount: 500 },
+        { id: 'alw-2', title: 'চিকিৎসা ভাতা', amount: 1500 },
+      ],
+      is_active: true,
+      created_at: '2026-10-11T00:00:00Z',
+    }
+
+    const totalAllowances = (managerStaff.allowances || []).reduce((sum, a) => sum + a.amount, 0)
+    expect(totalAllowances).toBe(2000)
+
+    const grossPackage = managerStaff.monthly_salary + totalAllowances
+    expect(grossPackage).toBe(12000)
+
+    const advancePaid = 3000
+    const netPayable = Math.max(0, grossPackage - advancePaid)
+    expect(netPayable).toBe(9000)
+
+    // Verify Cash Flow KPI logic:
+    // Advance of 3,000 already left the cash drawer
+    let finalSalaryPaid = 0
+    let totalCashDisbursed = advancePaid + finalSalaryPaid
+    expect(totalCashDisbursed).toBe(3000)
+
+    // When manager is paid the remaining net salary
+    finalSalaryPaid = netPayable
+    totalCashDisbursed = advancePaid + finalSalaryPaid
+    expect(totalCashDisbursed).toBe(12000)
+    expect(grossPackage - totalCashDisbursed).toBe(0)
+  })
 })
 

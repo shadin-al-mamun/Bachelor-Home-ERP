@@ -104,12 +104,21 @@ export const PayrollPage: React.FC = () => {
   }
 
   const items = currentSheet?.items || []
-  const totalBasic = currentSheet?.total_basic_salary || items.reduce((s, i) => s + (Number(i.basic_salary) || 0), 0)
+  const totalPureBasic = items.reduce((s, i) => s + (Number(i.basic_salary) || 0), 0)
+  const totalAllowances = items.reduce((s, i) => {
+    const itemAlw = i.allowances || i.staff?.allowances || []
+    return s + (i.allowances_total !== undefined ? Number(i.allowances_total) : itemAlw.reduce((acc, a) => acc + (Number(a.amount) || 0), 0))
+  }, 0)
+  const totalGrossPackage = items.length > 0 
+    ? totalPureBasic + totalAllowances 
+    : Number(currentSheet?.total_basic_salary) || 0
   const totalDeductions =
     currentSheet?.total_deductions || items.reduce((s, i) => s + (Number(i.advance_deduction) || 0), 0)
   const totalNetPayable =
     currentSheet?.total_net_payable || items.reduce((s, i) => s + (Number(i.net_payable) || 0), 0)
   const totalPaid = currentSheet?.total_paid_amount || items.reduce((s, i) => s + (Number(i.paid_amount) || 0), 0)
+  const remainingNetPayable = Math.max(0, totalNetPayable - totalPaid)
+  const totalDisbursedCash = totalDeductions + totalPaid
 
   return (
     <div className="space-y-6">
@@ -167,11 +176,13 @@ export const PayrollPage: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur flex items-center justify-between">
           <div>
-            <span className="text-xs font-medium text-slate-400 block">মোট ধার্যকৃত মূল বেতন</span>
+            <span className="text-xs font-medium text-slate-400 block">মোট ধার্যকৃত বেতন ও ভাতা</span>
             <span className="text-2xl font-black font-mono text-white mt-0.5 block">
-              ৳{totalBasic.toLocaleString('en-IN')}
+              ৳{totalGrossPackage.toLocaleString('en-IN')}
             </span>
-            <span className="text-[11px] text-slate-400">সকল সক্রিয় স্টাফের নির্ধারিত বেতন</span>
+            <span className="text-[11px] text-slate-400">
+              মূল: ৳{totalPureBasic.toLocaleString('en-IN')} + ভাতা: ৳{totalAllowances.toLocaleString('en-IN')}
+            </span>
           </div>
           <div className="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
             <FileText className="w-5 h-5" />
@@ -180,11 +191,11 @@ export const PayrollPage: React.FC = () => {
 
         <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur flex items-center justify-between">
           <div>
-            <span className="text-xs font-medium text-amber-400 block">মোট অগ্রিম কর্তন</span>
+            <span className="text-xs font-medium text-amber-400 block">মোট অগ্রিম কর্তন (পেইড)</span>
             <span className="text-2xl font-black font-mono text-amber-400 mt-0.5 block">
               ৳{totalDeductions.toLocaleString('en-IN')}
             </span>
-            <span className="text-[11px] text-slate-400">মাসের বেতন থেকে কর্তিত অগ্রিম</span>
+            <span className="text-[11px] text-slate-400">কর্মীদের ইতিমধ্যে নগদ পরিশোধিত</span>
           </div>
           <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
             <DollarSign className="w-5 h-5" />
@@ -193,11 +204,11 @@ export const PayrollPage: React.FC = () => {
 
         <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur flex items-center justify-between">
           <div>
-            <span className="text-xs font-medium text-primary-400 block">মোট প্রদেয় বেতন (Net)</span>
+            <span className="text-xs font-medium text-primary-400 block">অবশিষ্ট প্রদেয় নিট বেতন</span>
             <span className="text-2xl font-black font-mono text-primary-300 mt-0.5 block">
-              ৳{totalNetPayable.toLocaleString('en-IN')}
+              ৳{remainingNetPayable.toLocaleString('en-IN')}
             </span>
-            <span className="text-[11px] text-slate-400">কর্তন বাদে চূড়ান্ত প্রদেয় টাকা</span>
+            <span className="text-[11px] text-slate-400">কর্তন বাদে মাস শেষে বকেয়া নিট</span>
           </div>
           <div className="w-11 h-11 rounded-xl bg-primary-500/10 border border-primary-500/20 flex items-center justify-center text-primary-400">
             <Wallet className="w-5 h-5" />
@@ -206,12 +217,14 @@ export const PayrollPage: React.FC = () => {
 
         <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur flex items-center justify-between">
           <div>
-            <span className="text-xs font-medium text-emerald-400 block">পরিশোধিত বেতন</span>
+            <span className="text-xs font-medium text-emerald-400 block">সর্বমোট পরিশোধিত নগদ</span>
             <span className="text-2xl font-black font-mono text-emerald-400 mt-0.5 block">
-              ৳{totalPaid.toLocaleString('en-IN')}
+              ৳{totalDisbursedCash.toLocaleString('en-IN')}
             </span>
             <span className="text-[11px] text-slate-400">
-              বকেয়া: ৳{Math.max(0, totalNetPayable - totalPaid).toLocaleString('en-IN')}
+              {remainingNetPayable === 0 && totalGrossPackage > 0
+                ? 'সম্পূর্ণ পরিশোধিত ✓'
+                : `অগ্রিম: ৳${totalDeductions.toLocaleString('en-IN')} | নিট: ৳${totalPaid.toLocaleString('en-IN')}`}
             </span>
           </div>
           <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
@@ -265,91 +278,110 @@ export const PayrollPage: React.FC = () => {
                 <tr className="border-b border-slate-800 bg-slate-950/80 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                   <th className="py-3 px-4">কর্মচারী ও পদবী</th>
                   <th className="py-3 px-4 text-right">মূল বেতন</th>
+                  <th className="py-3 px-4 text-right">নিয়মিত ভাতা</th>
                   <th className="py-3 px-4 text-right">অগ্রিম কর্তন</th>
-                  <th className="py-3 px-4 text-right">প্রদেয় বেতন (Net)</th>
+                  <th className="py-3 px-4 text-right">প্রদেয় নিট বেতন</th>
                   <th className="py-3 px-4 text-center">স্ট্যাটাস</th>
                   <th className="py-3 px-4 text-right">অ্যাকশন</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 text-xs">
-                {items.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-3.5 px-4 font-semibold text-white">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-primary-400 font-bold shrink-0">
-                          <User className="w-4 h-4" />
+                {items.map((item) => {
+                  const itemAlw = item.allowances || item.staff?.allowances || []
+                  const itemAlwTotal = item.allowances_total !== undefined 
+                    ? Number(item.allowances_total) 
+                    : itemAlw.reduce((acc, a) => acc + (Number(a.amount) || 0), 0)
+
+                  return (
+                    <tr key={item.id} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="py-3.5 px-4 font-semibold text-white">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-primary-400 font-bold shrink-0">
+                            <User className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span>{item.staff?.full_name || 'কর্মচারী'}</span>
+                              {itemAlw.length > 0 && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary-500/10 text-primary-300 border border-primary-500/20 font-medium">
+                                  +{itemAlw.length}টি ভাতা
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[11px] text-primary-400 font-normal block">
+                              {item.staff?.designation || '-'}
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              {item.staff?.staff_code || ''}
+                            </span>
+                          </div>
                         </div>
-                        <div>
-                          <span>{item.staff?.full_name || 'কর্মচারী'}</span>
-                          <span className="text-[11px] text-primary-400 font-normal block">
-                            {item.staff?.designation || '-'}
-                          </span>
-                          <span className="text-[10px] text-slate-500 font-mono">
-                            {item.staff?.staff_code || ''}
-                          </span>
+                      </td>
+
+                      <td className="py-3.5 px-4 text-right font-mono font-medium text-slate-200">
+                        ৳{Number(item.basic_salary).toLocaleString('en-IN')}
+                      </td>
+
+                      <td className="py-3.5 px-4 text-right font-mono font-medium text-primary-300">
+                        {itemAlwTotal > 0 ? `+৳${itemAlwTotal.toLocaleString('en-IN')}` : '৳০'}
+                      </td>
+
+                      <td className="py-3.5 px-4 text-right font-mono font-semibold text-amber-400">
+                        {item.advance_deduction > 0
+                          ? `-৳${Number(item.advance_deduction).toLocaleString('en-IN')}`
+                          : '৳০'}
+                      </td>
+
+                      <td className="py-3.5 px-4 text-right font-mono font-black text-emerald-400 text-sm">
+                        ৳{Number(item.net_payable).toLocaleString('en-IN')}
+                      </td>
+
+                      <td className="py-3.5 px-4 text-center">
+                        <span
+                          className={`text-[10px] px-2.5 py-1 rounded-full font-bold inline-flex items-center gap-1 ${
+                            item.payment_status === 'PAID'
+                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                              : 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
+                          }`}
+                        >
+                          {item.payment_status === 'PAID' ? (
+                            <>
+                              <CheckCircle2 className="w-3 h-3" /> পরিশোধিত ✓
+                            </>
+                          ) : (
+                            <>
+                              <Clock className="w-3 h-3" /> বকেয়া নিট: ৳{Number(item.net_payable).toLocaleString('en-IN')}
+                            </>
+                          )}
+                        </span>
+                      </td>
+
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {item.payment_status !== 'PAID' ? (
+                            <Button
+                              size="sm"
+                              onClick={() => handleOpenPayModal(item)}
+                              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs h-8 px-3 rounded-lg shadow-sm"
+                            >
+                              বেতন পরিশোধ
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setViewingPayslipItem(item)}
+                              className="text-xs h-8 px-2.5 rounded-lg bg-slate-800 text-primary-300 hover:text-white hover:bg-slate-700 flex items-center gap-1 font-semibold"
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                              পে-স্লিপ
+                            </Button>
+                          )}
                         </div>
-                      </div>
-                    </td>
-
-                    <td className="py-3.5 px-4 text-right font-mono font-medium text-slate-200">
-                      ৳{Number(item.basic_salary).toLocaleString('en-IN')}
-                    </td>
-
-                    <td className="py-3.5 px-4 text-right font-mono font-semibold text-amber-400">
-                      {item.advance_deduction > 0
-                        ? `-৳${Number(item.advance_deduction).toLocaleString('en-IN')}`
-                        : '৳০'}
-                    </td>
-
-                    <td className="py-3.5 px-4 text-right font-mono font-black text-emerald-400 text-sm">
-                      ৳{Number(item.net_payable).toLocaleString('en-IN')}
-                    </td>
-
-                    <td className="py-3.5 px-4 text-center">
-                      <span
-                        className={`text-[10px] px-2.5 py-1 rounded-full font-bold inline-flex items-center gap-1 ${
-                          item.payment_status === 'PAID'
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                            : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                        }`}
-                      >
-                        {item.payment_status === 'PAID' ? (
-                          <>
-                            <CheckCircle2 className="w-3 h-3" /> পরিশোধিত
-                          </>
-                        ) : (
-                          <>
-                            <Clock className="w-3 h-3" /> অপরিশোধিত
-                          </>
-                        )}
-                      </span>
-                    </td>
-
-                    <td className="py-3.5 px-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {item.payment_status !== 'PAID' ? (
-                          <Button
-                            size="sm"
-                            onClick={() => handleOpenPayModal(item)}
-                            className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs h-8 px-3 rounded-lg shadow-sm"
-                          >
-                            বেতন পরিশোধ
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setViewingPayslipItem(item)}
-                            className="text-xs h-8 px-2.5 rounded-lg bg-slate-800 text-primary-300 hover:text-white hover:bg-slate-700 flex items-center gap-1 font-semibold"
-                          >
-                            <Printer className="w-3.5 h-3.5" />
-                            পে-স্লিপ
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -386,16 +418,39 @@ export const PayrollPage: React.FC = () => {
                     ৳{Number(payingItem.basic_salary).toLocaleString('en-IN')}
                   </span>
                 </div>
+                {/* Dynamic Allowances in Pay Modal */}
+                {(() => {
+                  const modalAlw = payingItem.allowances || payingItem.staff?.allowances || []
+                  const modalAlwTotal = payingItem.allowances_total !== undefined
+                    ? Number(payingItem.allowances_total)
+                    : modalAlw.reduce((acc, a) => acc + (Number(a.amount) || 0), 0)
+                  
+                  return modalAlw.length > 0 ? (
+                    <div className="pt-1.5 pb-1 border-t border-slate-800/80 space-y-1">
+                      <span className="text-[11px] font-semibold text-primary-300 block">নিয়মিত সুবিধাসমূহ / ভাতা:</span>
+                      {modalAlw.map((alw, idx) => (
+                        <div key={idx} className="flex justify-between text-slate-300 text-[11px] pl-2">
+                          <span>• {alw.title}:</span>
+                          <span className="font-mono text-primary-400">+৳{Number(alw.amount).toLocaleString('en-IN')}</span>
+                        </div>
+                      ))}
+                      <div className="flex justify-between text-xs text-primary-300 font-medium pt-0.5">
+                        <span>মোট নিয়মিত ভাতা:</span>
+                        <span className="font-mono">+৳{modalAlwTotal.toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+                  ) : null
+                })()}
                 {payingItem.advance_deduction > 0 && (
-                  <div className="flex justify-between text-amber-400">
-                    <span>অগ্রিম কর্তন:</span>
+                  <div className="flex justify-between text-amber-400 pt-1 border-t border-slate-800/80">
+                    <span>অগ্রিম কর্তন (ইতিমধ্যে পেইড):</span>
                     <span className="font-mono font-semibold">
                       -৳{Number(payingItem.advance_deduction).toLocaleString('en-IN')}
                     </span>
                   </div>
                 )}
                 <div className="pt-2 border-t border-slate-800 flex justify-between text-sm">
-                  <span className="font-bold text-slate-200">নিট প্রদেয় টাকা:</span>
+                  <span className="font-bold text-slate-200">চূড়ান্ত প্রদেয় নিট টাকা:</span>
                   <span className="font-black font-mono text-emerald-400">
                     ৳{Number(payingItem.net_payable).toLocaleString('en-IN')}
                   </span>
@@ -512,36 +567,64 @@ export const PayrollPage: React.FC = () => {
               </div>
 
               <div className="border border-slate-800 rounded-xl overflow-hidden text-xs">
-                <table className="w-full text-left">
-                  <thead className="bg-slate-900 border-b border-slate-800 text-[11px] text-slate-400 font-bold uppercase">
-                    <tr>
-                      <th className="py-2.5 px-3">বিবরণ (Description)</th>
-                      <th className="py-2.5 px-3 text-right">টাকা (BDT)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/80">
-                    <tr>
-                      <td className="py-2.5 px-3 text-slate-300">নির্ধারিত মাসিক মূল বেতন (Basic Salary)</td>
-                      <td className="py-2.5 px-3 text-right font-mono font-medium text-white">
-                        ৳{Number(viewingPayslipItem.basic_salary).toLocaleString('en-IN')}
-                      </td>
-                    </tr>
-                    {viewingPayslipItem.advance_deduction > 0 && (
-                      <tr className="text-amber-400">
-                        <td className="py-2.5 px-3">অগ্রিম বেতন কর্তন (Advance Deduction)</td>
-                        <td className="py-2.5 px-3 text-right font-mono font-semibold">
-                          -৳{Number(viewingPayslipItem.advance_deduction).toLocaleString('en-IN')}
-                        </td>
-                      </tr>
-                    )}
-                    <tr className="bg-slate-900/60 font-bold text-sm">
-                      <td className="py-3 px-3 text-emerald-400">পরিশোধিত নিট বেতন (Net Paid)</td>
-                      <td className="py-3 px-3 text-right font-mono font-black text-emerald-400">
-                        ৳{Number(viewingPayslipItem.net_payable).toLocaleString('en-IN')}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                {(() => {
+                  const slipAlw = viewingPayslipItem.allowances || viewingPayslipItem.staff?.allowances || []
+                  const slipAlwTotal = viewingPayslipItem.allowances_total !== undefined
+                    ? Number(viewingPayslipItem.allowances_total)
+                    : slipAlw.reduce((acc, a) => acc + (Number(a.amount) || 0), 0)
+                  const gross = Number(viewingPayslipItem.basic_salary) + slipAlwTotal
+
+                  return (
+                    <table className="w-full text-left">
+                      <thead className="bg-slate-900 border-b border-slate-800 text-[11px] text-slate-400 font-bold uppercase">
+                        <tr>
+                          <th className="py-2.5 px-3">বিবরণ (Description)</th>
+                          <th className="py-2.5 px-3 text-right">টাকা (BDT)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/80">
+                        <tr>
+                          <td className="py-2.5 px-3 text-slate-300">নির্ধারিত মাসিক মূল বেতন (Basic Salary)</td>
+                          <td className="py-2.5 px-3 text-right font-mono font-medium text-white">
+                            ৳{Number(viewingPayslipItem.basic_salary).toLocaleString('en-IN')}
+                          </td>
+                        </tr>
+                        {slipAlw.map((alw, idx) => (
+                          <tr key={idx} className="text-primary-300">
+                            <td className="py-2 px-3 pl-5 text-[11px]">
+                              + {alw.title} (নিয়মিত সুবিধা/ভাতা)
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono font-medium">
+                              +৳{Number(alw.amount).toLocaleString('en-IN')}
+                            </td>
+                          </tr>
+                        ))}
+                        {slipAlw.length > 0 && (
+                          <tr className="bg-slate-900/40 text-slate-300 font-semibold">
+                            <td className="py-2 px-3">সর্বমোট বেতন ও ভাতা (Gross Package)</td>
+                            <td className="py-2 px-3 text-right font-mono text-white">
+                              ৳{gross.toLocaleString('en-IN')}
+                            </td>
+                          </tr>
+                        )}
+                        {viewingPayslipItem.advance_deduction > 0 && (
+                          <tr className="text-amber-400">
+                            <td className="py-2.5 px-3">অগ্রিম বেতন কর্তন (Advance Deduction)</td>
+                            <td className="py-2.5 px-3 text-right font-mono font-semibold">
+                              -৳{Number(viewingPayslipItem.advance_deduction).toLocaleString('en-IN')}
+                            </td>
+                          </tr>
+                        )}
+                        <tr className="bg-slate-900/60 font-bold text-sm">
+                          <td className="py-3 px-3 text-emerald-400">পরিশোধিত চূড়ান্ত নিট বেতন (Net Paid)</td>
+                          <td className="py-3 px-3 text-right font-mono font-black text-emerald-400">
+                            ৳{Number(viewingPayslipItem.net_payable).toLocaleString('en-IN')}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  )
+                })()}
               </div>
 
               <div className="pt-8 grid grid-cols-2 gap-4 text-center text-xs text-slate-400">

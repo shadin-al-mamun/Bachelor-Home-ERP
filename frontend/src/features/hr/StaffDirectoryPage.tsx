@@ -12,6 +12,8 @@ import {
   X,
   BadgeCheck,
   Sparkles,
+  PlusCircle,
+  Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/common/Button'
 import { useStaffMembers, useCreateStaffMember, useUpdateStaffMember } from './api/useHR'
@@ -60,6 +62,7 @@ export const StaffDirectoryPage: React.FC = () => {
     assigned_flat_id: '',
     joining_date: new Date().toISOString().slice(0, 10),
     monthly_salary: 0,
+    allowances: [],
     payment_method: 'CASH',
     bank_or_mfs_account: '',
     notes: '',
@@ -84,7 +87,11 @@ export const StaffDirectoryPage: React.FC = () => {
   const activeStaff = staffList.filter((s) => s.is_active).length
   const totalSalaryBudget = staffList
     .filter((s) => s.is_active)
-    .reduce((sum, s) => sum + (Number(s.monthly_salary) || 0), 0)
+    .reduce((sum, s) => {
+      const basic = Number(s.monthly_salary) || 0
+      const alw = (s.allowances || []).reduce((aSum, a) => aSum + (Number(a.amount) || 0), 0)
+      return sum + basic + alw
+    }, 0)
   const kitchenStaff = staffList.filter((s) => s.is_active && s.department === 'KITCHEN').length
 
   const handleOpenAdd = () => {
@@ -102,6 +109,7 @@ export const StaffDirectoryPage: React.FC = () => {
       assigned_flat_id: '',
       joining_date: new Date().toISOString().slice(0, 10),
       monthly_salary: 0,
+      allowances: [],
       payment_method: 'CASH',
       bank_or_mfs_account: '',
       notes: '',
@@ -124,6 +132,7 @@ export const StaffDirectoryPage: React.FC = () => {
       assigned_flat_id: staff.assigned_flat_id || '',
       joining_date: staff.joining_date || new Date().toISOString().slice(0, 10),
       monthly_salary: staff.monthly_salary,
+      allowances: staff.allowances ? JSON.parse(JSON.stringify(staff.allowances)) : [],
       payment_method: staff.payment_method || 'CASH',
       bank_or_mfs_account: staff.bank_or_mfs_account || '',
       notes: staff.notes || '',
@@ -388,6 +397,26 @@ export const StaffDirectoryPage: React.FC = () => {
                   </span>
                 </div>
 
+                {staff.allowances && staff.allowances.length > 0 && (
+                  <>
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span className="text-slate-500 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400" /> অন্যান্য ভাতা:
+                      </span>
+                      <span className="font-bold font-mono text-amber-300 text-xs">
+                        +৳{staff.allowances.reduce((sum, a) => sum + (Number(a.amount) || 0), 0).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-slate-300 bg-slate-950/60 p-1.5 rounded-lg border border-slate-800">
+                      <span className="text-slate-400 font-semibold text-[11px]">সর্বমোট প্যাকেজ:</span>
+                      <span className="font-black font-mono text-primary-300 text-sm">
+                        ৳{(Number(staff.monthly_salary) + staff.allowances.reduce((sum, a) => sum + (Number(a.amount) || 0), 0)).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  </>
+                )}
+
                 {staff.assigned_building && (
                   <div className="flex items-center justify-between text-slate-300">
                     <span className="text-slate-500 flex items-center gap-1.5">
@@ -567,7 +596,7 @@ export const StaffDirectoryPage: React.FC = () => {
                     type="number"
                     required
                     min="0"
-                    placeholder="যেমন: 12000"
+                    placeholder="যেমন: 10000"
                     value={formData.monthly_salary || ''}
                     onChange={(e) => setFormData({ ...formData, monthly_salary: Number(e.target.value) })}
                     className="w-full bg-slate-950 border border-slate-800 text-xs text-emerald-400 font-mono font-bold rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500"
@@ -585,6 +614,99 @@ export const StaffDirectoryPage: React.FC = () => {
                     className="w-full bg-slate-950 border border-slate-800 text-xs text-white rounded-xl px-3 py-2 focus:outline-none focus:border-primary-500"
                   />
                 </div>
+              </div>
+
+              {/* Dynamic Allowances & Extra Benefits Section */}
+              <div className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-slate-200 block flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      ভাতা ও সুবিধাসমূহ (Allowances)
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      মোবাইল বিল, যাতায়াত ভাতা, চিকিৎসা বা বিশেষ ভাতা ইত্যাদি
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      const current = formData.allowances || []
+                      setFormData({
+                        ...formData,
+                        allowances: [
+                          ...current,
+                          { id: `alw-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, title: '', amount: 0 },
+                        ],
+                      })
+                    }}
+                    className="text-xs h-7 px-2.5 rounded-lg bg-primary-500/10 hover:bg-primary-500/20 text-primary-300 border border-primary-500/30 gap-1 font-semibold"
+                  >
+                    <PlusCircle className="w-3.5 h-3.5" />
+                    ভাতা যোগ করুন
+                  </Button>
+                </div>
+
+                {formData.allowances && formData.allowances.length > 0 ? (
+                  <div className="space-y-2 pt-1">
+                    {formData.allowances.map((alw, index) => (
+                      <div key={alw.id} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder="খাতের নাম (যেমন: মোবাইল বিল, যাতায়াত ভাতা)"
+                          value={alw.title}
+                          onChange={(e) => {
+                            const updated = [...(formData.allowances || [])]
+                            updated[index] = { ...updated[index], title: e.target.value }
+                            setFormData({ ...formData, allowances: updated })
+                          }}
+                          className="flex-1 bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-primary-500"
+                        />
+                        <div className="w-32 relative">
+                          <span className="absolute left-2.5 top-1.5 text-xs text-slate-500">৳</span>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="টাকা"
+                            value={alw.amount || ''}
+                            onChange={(e) => {
+                              const updated = [...(formData.allowances || [])]
+                              updated[index] = { ...updated[index], amount: Number(e.target.value) || 0 }
+                              setFormData({ ...formData, allowances: updated })
+                            }}
+                            className="w-full bg-slate-900 border border-slate-700 text-xs text-emerald-400 font-mono font-bold rounded-lg pl-6 pr-2 py-1.5 focus:outline-none focus:border-emerald-500 text-right"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = (formData.allowances || []).filter((_, i) => i !== index)
+                            setFormData({ ...formData, allowances: updated })
+                          }}
+                          className="text-rose-400 hover:text-rose-300 p-1.5 rounded-lg hover:bg-rose-500/10"
+                          title="মুছে ফেলুন"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+
+                    <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
+                      <span className="text-slate-400 font-medium">
+                        মোট ভাতা: ৳{(formData.allowances.reduce((s, a) => s + (Number(a.amount) || 0), 0)).toLocaleString('en-IN')}
+                      </span>
+                      <span className="text-emerald-400 font-bold font-mono">
+                        সর্বমোট মাসিক প্যাকেজ: ৳{((Number(formData.monthly_salary) || 0) + formData.allowances.reduce((s, a) => s + (Number(a.amount) || 0), 0)).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-slate-500 italic">
+                    কোনো অতিরিক্ত ভাতা নির্ধারিত নেই। প্রয়োজন হলে উপরের &quot;ভাতা যোগ করুন&quot; বাটনে ক্লিক করে খাতের নাম ও টাকার পরিমাণ লিখুন।
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

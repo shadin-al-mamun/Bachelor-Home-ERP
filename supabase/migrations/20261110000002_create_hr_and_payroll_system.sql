@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS public.staff_members (
     joining_date DATE NOT NULL DEFAULT CURRENT_DATE,
     resignation_date DATE,
     monthly_salary NUMERIC(12,2) NOT NULL DEFAULT 0.00 CHECK (monthly_salary >= 0),
+    allowances JSONB DEFAULT '[]'::jsonb,
     is_active BOOLEAN NOT NULL DEFAULT true,
     payment_method VARCHAR(50) DEFAULT 'CASH',
     bank_or_mfs_account VARCHAR(100),
@@ -62,6 +63,7 @@ CREATE TABLE IF NOT EXISTS public.payroll_sheets (
     payroll_month VARCHAR(7) NOT NULL, -- e.g. '2026-11'
     payroll_batch_no VARCHAR(50) UNIQUE NOT NULL, -- e.g. 'PAY-2026-11'
     total_basic_salary NUMERIC(14,2) NOT NULL DEFAULT 0.00,
+    total_allowances NUMERIC(14,2) NOT NULL DEFAULT 0.00,
     total_bonuses NUMERIC(14,2) NOT NULL DEFAULT 0.00,
     total_deductions NUMERIC(14,2) NOT NULL DEFAULT 0.00,
     total_net_payable NUMERIC(14,2) NOT NULL DEFAULT 0.00,
@@ -84,6 +86,8 @@ CREATE TABLE IF NOT EXISTS public.payroll_items (
     payroll_sheet_id UUID NOT NULL REFERENCES public.payroll_sheets(id) ON DELETE CASCADE,
     staff_id UUID NOT NULL REFERENCES public.staff_members(id) ON DELETE RESTRICT,
     basic_salary NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+    allowances JSONB DEFAULT '[]'::jsonb,
+    allowances_total NUMERIC(12,2) NOT NULL DEFAULT 0.00,
     bonus_overtime NUMERIC(12,2) NOT NULL DEFAULT 0.00,
     advance_deduction NUMERIC(12,2) NOT NULL DEFAULT 0.00,
     absence_deduction NUMERIC(12,2) NOT NULL DEFAULT 0.00,
@@ -103,6 +107,12 @@ CREATE TABLE IF NOT EXISTS public.payroll_items (
 CREATE INDEX IF NOT EXISTS idx_payroll_items_sheet ON public.payroll_items(payroll_sheet_id);
 CREATE INDEX IF NOT EXISTS idx_payroll_items_staff ON public.payroll_items(staff_id);
 CREATE INDEX IF NOT EXISTS idx_payroll_items_status ON public.payroll_items(payment_status);
+
+-- Ensure dynamic allowances columns exist if tables already created previously
+ALTER TABLE public.staff_members ADD COLUMN IF NOT EXISTS allowances JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.payroll_sheets ADD COLUMN IF NOT EXISTS total_allowances NUMERIC(14,2) NOT NULL DEFAULT 0.00;
+ALTER TABLE public.payroll_items ADD COLUMN IF NOT EXISTS allowances JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.payroll_items ADD COLUMN IF NOT EXISTS allowances_total NUMERIC(12,2) NOT NULL DEFAULT 0.00;
 
 -- 5. ROW LEVEL SECURITY (RLS) POLICIES
 ALTER TABLE public.staff_members ENABLE ROW LEVEL SECURITY;

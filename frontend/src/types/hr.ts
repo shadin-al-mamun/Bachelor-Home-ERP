@@ -10,6 +10,12 @@ export type StaffAdvanceStatus = 'PENDING' | 'DEDUCTED' | 'CANCELLED'
 export type PayrollSheetStatus = 'DRAFT' | 'APPROVED' | 'DISBURSED' | 'CANCELLED'
 export type PayrollPaymentStatus = 'UNPAID' | 'PAID' | 'PARTIALLY_PAID'
 
+export interface StaffAllowance {
+  id: string
+  title: string
+  amount: number
+}
+
 export interface StaffMember {
   id: string
   staff_code: string
@@ -27,7 +33,8 @@ export interface StaffMember {
   assigned_flat?: { id: string; name: string; flat_code: string } | null
   joining_date: string
   resignation_date?: string | null
-  monthly_salary: number
+  monthly_salary: number // মূল বেতন (Basic Salary)
+  allowances?: StaffAllowance[] // অন্যান্য ভাতা ও সুবিধাসমূহ
   is_active: boolean
   payment_method?: string | null
   bank_or_mfs_account?: string | null
@@ -61,6 +68,8 @@ export interface PayrollItem {
   staff_id: string
   staff?: StaffMember | null
   basic_salary: number
+  allowances?: StaffAllowance[]
+  allowances_total?: number
   bonus_overtime: number
   advance_deduction: number
   absence_deduction: number
@@ -109,6 +118,7 @@ export interface CreateStaffMemberParams {
   assigned_flat_id?: string
   joining_date?: string
   monthly_salary: number
+  allowances?: StaffAllowance[]
   payment_method?: string
   bank_or_mfs_account?: string
   notes?: string

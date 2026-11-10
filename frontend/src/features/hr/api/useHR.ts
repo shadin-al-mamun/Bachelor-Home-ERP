@@ -137,6 +137,7 @@ export function useCreateStaffMember() {
           assigned_flat_id: params.assigned_flat_id,
           joining_date: params.joining_date || new Date().toISOString().slice(0, 10),
           monthly_salary: Number(params.monthly_salary) || 0,
+          allowances: params.allowances || [],
           is_active: true,
           payment_method: params.payment_method || 'CASH',
           bank_or_mfs_account: params.bank_or_mfs_account,
@@ -164,6 +165,7 @@ export function useCreateStaffMember() {
           assigned_flat_id: params.assigned_flat_id || null,
           joining_date: params.joining_date || new Date().toISOString().slice(0, 10),
           monthly_salary: Number(params.monthly_salary) || 0,
+          allowances: params.allowances || [],
           payment_method: params.payment_method || 'CASH',
           bank_or_mfs_account: params.bank_or_mfs_account,
           notes: params.notes,
@@ -194,6 +196,7 @@ export function useCreateStaffMember() {
             assigned_flat_id: params.assigned_flat_id || undefined,
             joining_date: params.joining_date || new Date().toISOString().slice(0, 10),
             monthly_salary: Number(params.monthly_salary) || 0,
+            allowances: params.allowances || [],
             is_active: true,
             payment_method: params.payment_method || 'CASH',
             bank_or_mfs_account: params.bank_or_mfs_account,
@@ -365,6 +368,24 @@ export function useRecordStaffAdvance() {
         .single()
 
       if (error) throw new Error(error.message || 'অগ্রিম বেতন সংরক্ষণে ব্যর্থ হয়েছে।')
+
+      // Ensure financial account balance is decremented immediately
+      try {
+        const { data: acc } = await supabase
+          .from('financial_accounts')
+          .select('current_balance')
+          .eq('id', params.disbursed_from_account_id)
+          .single()
+        if (acc) {
+          await supabase
+            .from('financial_accounts')
+            .update({ current_balance: (Number(acc.current_balance) || 0) - Number(params.amount) })
+            .eq('id', params.disbursed_from_account_id)
+        }
+      } catch (accErr) {
+        console.warn('Could not decrement account balance for advance:', accErr)
+      }
+
       return data as StaffAdvance
     },
     onSuccess: () => {
@@ -501,11 +522,13 @@ export function useGeneratePayrollSheet() {
 
       const items: PayrollItem[] = staffList.map((s) => {
         const basic = Number(s.monthly_salary) || 0
+        const alwTotal = (s.allowances || []).reduce((sum, a) => sum + (Number(a.amount) || 0), 0)
+        const grossSalary = basic + alwTotal
         const staffAdvances = allAdvances.filter((a) => a.staff_id === s.id)
         const advanceDeduction = staffAdvances.reduce((sum, a) => sum + (Number(a.amount) || 0), 0)
-        const netPayable = Math.max(0, basic - advanceDeduction)
+        const netPayable = Math.max(0, grossSalary - advanceDeduction)
 
-        totalBasic += basic
+        totalBasic += grossSalary
         totalDeductions += advanceDeduction
         totalNetPayable += netPayable
 
@@ -515,6 +538,8 @@ export function useGeneratePayrollSheet() {
           staff_id: s.id,
           staff: s,
           basic_salary: basic,
+          allowances: s.allowances || [],
+          allowances_total: alwTotal,
           bonus_overtime: 0,
           advance_deduction: advanceDeduction,
           absence_deduction: 0,
