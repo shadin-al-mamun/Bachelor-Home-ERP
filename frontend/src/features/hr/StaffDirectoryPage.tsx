@@ -11,10 +11,12 @@ import {
   XCircle,
   X,
   BadgeCheck,
+  Sparkles,
 } from 'lucide-react'
 import { Button } from '@/components/common/Button'
 import { useStaffMembers, useCreateStaffMember, useUpdateStaffMember } from './api/useHR'
 import { useBuildings } from '@/features/accommodation/api/useAccommodation'
+import { useUsersList } from '@/features/governance/api/useUserManagement'
 import type { StaffMember, StaffDepartment, CreateStaffMemberParams } from '@/types/hr'
 
 const DEPARTMENTS: { value: StaffDepartment; label: string }[] = [
@@ -29,8 +31,15 @@ const DEPARTMENTS: { value: StaffDepartment; label: string }[] = [
 export const StaffDirectoryPage: React.FC = () => {
   const { data: staffList = [], isLoading, refetch } = useStaffMembers()
   const { data: buildings = [] } = useBuildings()
+  const { data: rawUsers = [] } = useUsersList()
   const createMutation = useCreateStaffMember()
   const updateMutation = useUpdateStaffMember()
+
+  const systemOfficers = useMemo(() => {
+    return rawUsers.filter((u) =>
+      ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'MEAL_OPERATOR', 'AUDITOR'].includes(u.role)
+    )
+  }, [rawUsers])
 
   const [search, setSearch] = useState('')
   const [selectedDept, setSelectedDept] = useState<string>('ALL')
@@ -39,6 +48,7 @@ export const StaffDirectoryPage: React.FC = () => {
 
   // Form State
   const [formData, setFormData] = useState<CreateStaffMemberParams>({
+    profile_id: '',
     full_name: '',
     phone_number: '',
     emergency_contact: '',
@@ -80,6 +90,7 @@ export const StaffDirectoryPage: React.FC = () => {
   const handleOpenAdd = () => {
     setEditingStaff(null)
     setFormData({
+      profile_id: '',
       full_name: '',
       phone_number: '',
       emergency_contact: '',
@@ -101,6 +112,7 @@ export const StaffDirectoryPage: React.FC = () => {
   const handleOpenEdit = (staff: StaffMember) => {
     setEditingStaff(staff)
     setFormData({
+      profile_id: staff.profile_id || '',
       full_name: staff.full_name,
       phone_number: staff.phone_number,
       emergency_contact: staff.emergency_contact || '',
@@ -431,6 +443,58 @@ export const StaffDirectoryPage: React.FC = () => {
             </div>
 
             <form onSubmit={handleFormSubmit} className="p-5 space-y-4 overflow-y-auto">
+              {/* Optional Link to System Officer / User */}
+              {!editingStaff && systemOfficers.length > 0 && (
+                <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-primary-400 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      বিদ্যমান সিস্টেম কর্মকর্তা লিংক করুন (ঐচ্ছিক)
+                    </label>
+                    <span className="text-[10px] text-slate-500">ম্যানেজার/কর্মকর্তা হলে নির্বাচন করুন</span>
+                  </div>
+                  <select
+                    value={formData.profile_id || ''}
+                    onChange={(e) => {
+                      const selectedId = e.target.value
+                      if (!selectedId) {
+                        setFormData((prev) => ({ ...prev, profile_id: '' }))
+                        return
+                      }
+                      const user = systemOfficers.find((u) => u.id === selectedId)
+                      if (user) {
+                        const defaultDesig =
+                          user.role === 'MANAGER'
+                            ? 'ম্যানেজার'
+                            : user.role === 'ACCOUNTANT'
+                            ? 'হিসাবরক্ষক (Accountant)'
+                            : user.role === 'MEAL_OPERATOR'
+                            ? 'মিল সুপারভাইজার'
+                            : user.role === 'ADMIN'
+                            ? 'প্রশাসক (Admin)'
+                            : 'কর্মকর্তা'
+                        setFormData((prev) => ({
+                          ...prev,
+                          profile_id: user.id,
+                          full_name: user.full_name || prev.full_name,
+                          phone_number: user.phone_number || prev.phone_number,
+                          designation: defaultDesig,
+                          department: 'MANAGEMENT',
+                        }))
+                      }
+                    }}
+                    className="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-xl px-3 py-2 focus:outline-none focus:border-primary-500"
+                  >
+                    <option value="">-- নতুন নন-ইউজার কর্মী (বাবুর্চি, খালা, গার্ড ইত্যাদি) --</option>
+                    {systemOfficers.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.full_name} ({u.role}) - {u.phone_number}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-slate-300 block mb-1">
@@ -439,7 +503,7 @@ export const StaffDirectoryPage: React.FC = () => {
                   <input
                     type="text"
                     required
-                    placeholder="যেমন: মো. রফিকুল ইসলাম"
+                    placeholder="যেমন: মো. করিম শেখ"
                     value={formData.full_name}
                     onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 text-xs text-white rounded-xl px-3 py-2 focus:outline-none focus:border-primary-500"

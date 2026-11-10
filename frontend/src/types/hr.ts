@@ -97,6 +97,7 @@ export interface PayrollSheet {
 }
 
 export interface CreateStaffMemberParams {
+  profile_id?: string
   full_name: string
   phone_number: string
   emergency_contact?: string

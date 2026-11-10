@@ -404,13 +404,3 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.fn_disburse_payroll_item(UUID, UUID, TEXT) TO authenticated;
 
--- 8. SEED INITIAL BASELINE STAFF (FOR DEMO/OFFLINE AND IMMEDIATE READINESS)
-INSERT INTO public.staff_members (
-    staff_code, full_name, phone_number, emergency_contact, designation, department, monthly_salary, is_active
-) VALUES 
-('STF-2026-001', 'মো. রফিকুল ইসলাম', '01711223344', '01811223344', 'প্রধান বাবুর্চি (Head Cook)', 'KITCHEN', 14000.00, true),
-('STF-2026-002', 'মো. জাহিদ হোসেন', '01722334455', '01822334455', 'সহকারী বাবুর্চি (Assistant Cook)', 'KITCHEN', 9500.00, true),
-('STF-2026-003', 'রহিমা বেগম (খালা)', '01733445566', '01833445566', 'পরিচ্ছন্নতাকর্মী (Cleaner/খালা)', 'CLEANING', 7000.00, true),
-('STF-2026-004', 'মো. আব্দুল জব্বার', '01744556677', '01844556677', 'সিকিউরিটি গার্ড ও দারোয়ান', 'SECURITY', 8500.00, true)
-ON CONFLICT (staff_code) DO NOTHING;
-

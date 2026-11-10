@@ -12,92 +12,31 @@ import type {
   DisbursePayrollItemParams,
 } from '@/types/hr'
 
-const INITIAL_MOCK_STAFF: StaffMember[] = [
-  {
-    id: 'stf-001',
-    staff_code: 'STF-2026-001',
-    full_name: 'মো. রফিকুল ইসলাম',
-    phone_number: '01711223344',
-    emergency_contact: '01811223344',
-    designation: 'প্রধান বাবুর্চি (Head Cook)',
-    department: 'KITCHEN',
-    nid_number: '19852691234567890',
-    avatar_url: '',
-    joining_date: '2025-01-01',
-    monthly_salary: 14000,
-    is_active: true,
-    payment_method: 'CASH',
-    notes: 'অভিজ্ঞ প্রধান বাবুর্চি, খাবার প্রস্তুতির দায়িত্বে নিয়োজিত।',
-    created_at: '2025-01-01T00:00:00Z',
-  },
-  {
-    id: 'stf-002',
-    staff_code: 'STF-2026-002',
-    full_name: 'মো. জাহিদ হোসেন',
-    phone_number: '01722334455',
-    emergency_contact: '01822334455',
-    designation: 'সহকারী বাবুর্চি (Assistant Cook)',
-    department: 'KITCHEN',
-    nid_number: '19922691234567891',
-    avatar_url: '',
-    joining_date: '2025-03-15',
-    monthly_salary: 9500,
-    is_active: true,
-    payment_method: 'CASH',
-    notes: 'সহকারী বাবুর্চি, কিচেন সামগ্রী ধোয়া ও প্রস্তুতি।',
-    created_at: '2025-03-15T00:00:00Z',
-  },
-  {
-    id: 'stf-003',
-    staff_code: 'STF-2026-003',
-    full_name: 'রহিমা বেগম (খালা)',
-    phone_number: '01733445566',
-    emergency_contact: '01833445566',
-    designation: 'পরিচ্ছন্নতাকর্মী (Cleaner/খালা)',
-    department: 'CLEANING',
-    nid_number: '19882691234567892',
-    avatar_url: '',
-    joining_date: '2025-02-01',
-    monthly_salary: 7000,
-    is_active: true,
-    payment_method: 'CASH',
-    notes: 'ফ্ল্যাট ও ওয়াশরুম পরিচ্ছন্নতার দায়িত্বে।',
-    created_at: '2025-02-01T00:00:00Z',
-  },
-  {
-    id: 'stf-004',
-    staff_code: 'STF-2026-004',
-    full_name: 'মো. আব্দুল জব্বার',
-    phone_number: '01744556677',
-    emergency_contact: '01844556677',
-    designation: 'সিকিউরিটি গার্ড ও দারোয়ান',
-    department: 'SECURITY',
-    nid_number: '19792691234567893',
-    avatar_url: '',
-    joining_date: '2024-11-01',
-    monthly_salary: 8500,
-    is_active: true,
-    payment_method: 'CASH',
-    notes: 'প্রধান ফটক ও হোস্টেল সিকিউরিটি তত্ত্বাবধান।',
-    created_at: '2024-11-01T00:00:00Z',
-  },
-]
-
 const LOCAL_STAFF_KEY = 'erp_staff_members_v1'
 const LOCAL_ADVANCES_KEY = 'erp_staff_advances_v1'
 const LOCAL_PAYROLL_KEY = 'erp_payroll_sheets_v1'
 
 function getStoredStaff(): StaffMember[] {
-  if (typeof window === 'undefined') return INITIAL_MOCK_STAFF
+  if (typeof window === 'undefined') return []
   try {
     const raw = localStorage.getItem(LOCAL_STAFF_KEY)
     if (!raw) {
-      localStorage.setItem(LOCAL_STAFF_KEY, JSON.stringify(INITIAL_MOCK_STAFF))
-      return INITIAL_MOCK_STAFF
+      return []
     }
-    return JSON.parse(raw)
+    const parsed: StaffMember[] = JSON.parse(raw)
+    // Strip away any legacy mock demo employees
+    const filtered = parsed.filter(
+      (s) =>
+        !s.id.startsWith('stf-00') &&
+        !s.id.startsWith('stf-mock') &&
+        !['মো. রফিকুল ইসলাম', 'মো. জাহিদ হোসেন', 'রহিমা বেগম (খালা)', 'মো. আব্দুল জব্বার'].includes(s.full_name)
+    )
+    if (filtered.length !== parsed.length) {
+      localStorage.setItem(LOCAL_STAFF_KEY, JSON.stringify(filtered))
+    }
+    return filtered
   } catch {
-    return INITIAL_MOCK_STAFF
+    return []
   }
 }
 
@@ -163,7 +102,11 @@ export function useStaffMembers() {
           return getStoredStaff()
         }
 
-        return (data || []) as StaffMember[]
+        const supabaseStaff = (data || []) as StaffMember[]
+        const localOnlyStaff = getStoredStaff().filter(
+          (local) => !supabaseStaff.some((remote) => remote.id === local.id || remote.staff_code === local.staff_code)
+        )
+        return [...supabaseStaff, ...localOnlyStaff]
       } catch (err) {
         console.warn('staff_members network exception, falling back:', err)
         return getStoredStaff()
@@ -182,6 +125,7 @@ export function useCreateStaffMember() {
         const newStaff: StaffMember = {
           id: `stf-${Date.now()}`,
           staff_code: code,
+          profile_id: params.profile_id || null,
           full_name: params.full_name,
           phone_number: params.phone_number,
           emergency_contact: params.emergency_contact,
@@ -208,6 +152,7 @@ export function useCreateStaffMember() {
         .from('staff_members')
         .insert({
           staff_code: code,
+          profile_id: params.profile_id || null,
           full_name: params.full_name,
           phone_number: params.phone_number,
           emergency_contact: params.emergency_contact,
@@ -226,7 +171,41 @@ export function useCreateStaffMember() {
         .select()
         .single()
 
-      if (error) throw new Error(error.message || 'কর্মচারী তথ্য সংরক্ষণে ব্যর্থ হয়েছে।')
+      if (error) {
+        if (
+          error.message?.includes('schema cache') ||
+          error.message?.includes('staff_members') ||
+          error.code === '42P01' ||
+          error.code === 'PGRST204'
+        ) {
+          console.warn('staff_members table not in Supabase yet, falling back to local storage:', error.message)
+          const fallbackStaff: StaffMember = {
+            id: `stf-local-${Date.now()}`,
+            staff_code: code,
+            profile_id: params.profile_id || null,
+            full_name: params.full_name,
+            phone_number: params.phone_number,
+            emergency_contact: params.emergency_contact,
+            designation: params.designation,
+            department: params.department,
+            nid_number: params.nid_number,
+            avatar_url: params.avatar_url,
+            assigned_building_id: params.assigned_building_id || undefined,
+            assigned_flat_id: params.assigned_flat_id || undefined,
+            joining_date: params.joining_date || new Date().toISOString().slice(0, 10),
+            monthly_salary: Number(params.monthly_salary) || 0,
+            is_active: true,
+            payment_method: params.payment_method || 'CASH',
+            bank_or_mfs_account: params.bank_or_mfs_account,
+            notes: params.notes,
+            created_at: new Date().toISOString(),
+          }
+          const updated = [fallbackStaff, ...getStoredStaff()]
+          saveStoredStaff(updated)
+          return fallbackStaff
+        }
+        throw new Error(error.message || 'কর্মচারী তথ্য সংরক্ষণে ব্যর্থ হয়েছে।')
+      }
       return data as StaffMember
     },
     onSuccess: () => {
@@ -252,7 +231,19 @@ export function useUpdateStaffMember() {
         .select()
         .single()
 
-      if (error) throw new Error(error.message || 'আপডেট করতে ব্যর্থ হয়েছে।')
+      if (error) {
+        if (
+          error.message?.includes('schema cache') ||
+          error.message?.includes('staff_members') ||
+          error.code === '42P01' ||
+          error.code === 'PGRST204'
+        ) {
+          const staff = getStoredStaff().map((s) => (s.id === id ? { ...s, ...updates } : s))
+          saveStoredStaff(staff)
+          return staff.find((s) => s.id === id) as StaffMember
+        }
+        throw new Error(error.message || 'আপডেট করতে ব্যর্থ হয়েছে।')
+      }
       return data as StaffMember
     },
     onSuccess: () => {
