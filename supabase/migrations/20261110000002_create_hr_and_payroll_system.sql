@@ -195,6 +195,7 @@ DECLARE
     v_account_balance NUMERIC;
     v_advance_id UUID;
     v_expense_id UUID;
+    v_category_id UUID;
     v_user_id UUID := auth.uid();
 BEGIN
     IF p_amount <= 0 THEN
@@ -230,27 +231,39 @@ BEGIN
         updated_at = timezone('Asia/Dhaka', now())
     WHERE id = p_disbursed_from_account_id;
 
+    -- Ensure salary expense category exists
+    SELECT id INTO v_category_id
+    FROM public.expense_categories
+    WHERE id = 'a1111111-1111-4111-8111-111111111105'
+       OR name ILIKE '%বেতন%' OR name ILIKE '%Salary%'
+    LIMIT 1;
+
+    IF v_category_id IS NULL THEN
+        INSERT INTO public.expense_categories (id, name, description, is_active)
+        VALUES ('a1111111-1111-4111-8111-111111111105', 'স্টাফ বেতন ও ভাতা', 'কর্মকর্তা ও কর্মচারীদের বেতন, ভাতা ও অগ্রিম সংক্রান্ত ব্যয়', true)
+        ON CONFLICT DO NOTHING;
+        v_category_id := 'a1111111-1111-4111-8111-111111111105';
+    END IF;
+
     -- Create linked expense voucher
     INSERT INTO public.expenses (
         expense_voucher_no,
+        category_id,
         amount,
         expense_date,
         paid_by,
         source_account_id,
-        category,
         description,
-        approval_status,
-        created_by
+        approval_status
     ) VALUES (
         'EXP-' || v_voucher_no,
+        v_category_id,
         p_amount,
         COALESCE(p_advance_date, CURRENT_DATE),
-        v_user_id,
+        COALESCE(v_user_id, (SELECT id FROM public.profiles WHERE role IN ('SUPER_ADMIN', 'ADMIN', 'MANAGER') LIMIT 1)),
         p_disbursed_from_account_id,
-        'SALARY',
-        COALESCE(p_remarks, 'স্টাফ অগ্রিম প্রদান: ' || v_staff_name),
-        'APPROVED',
-        COALESCE(v_user_id, (SELECT id FROM public.profiles LIMIT 1))
+        COALESCE(p_remarks, 'স্টাফ অগ্রিম প্রদান: ' || v_staff_name || ' (ভাউচার: ' || v_voucher_no || ')'),
+        'APPROVED'
     ) RETURNING id INTO v_expense_id;
 
     -- Create staff advance record
@@ -306,6 +319,7 @@ DECLARE
     v_account_balance NUMERIC;
     v_payable NUMERIC;
     v_expense_id UUID;
+    v_category_id UUID;
     v_user_id UUID := auth.uid();
 BEGIN
     SELECT * INTO v_item FROM public.payroll_items WHERE id = p_payroll_item_id;
@@ -345,27 +359,39 @@ BEGIN
             updated_at = timezone('Asia/Dhaka', now())
         WHERE id = p_disbursed_from_account_id;
 
+        -- Ensure salary expense category exists
+        SELECT id INTO v_category_id
+        FROM public.expense_categories
+        WHERE id = 'a1111111-1111-4111-8111-111111111105'
+           OR name ILIKE '%বেতন%' OR name ILIKE '%Salary%'
+        LIMIT 1;
+
+        IF v_category_id IS NULL THEN
+            INSERT INTO public.expense_categories (id, name, description, is_active)
+            VALUES ('a1111111-1111-4111-8111-111111111105', 'স্টাফ বেতন ও ভাতা', 'কর্মকর্তা ও কর্মচারীদের বেতন, ভাতা ও অগ্রিম সংক্রান্ত ব্যয়', true)
+            ON CONFLICT DO NOTHING;
+            v_category_id := 'a1111111-1111-4111-8111-111111111105';
+        END IF;
+
         -- Create expense entry
         INSERT INTO public.expenses (
             expense_voucher_no,
+            category_id,
             amount,
             expense_date,
             paid_by,
             source_account_id,
-            category,
             description,
-            approval_status,
-            created_by
+            approval_status
         ) VALUES (
             'EXP-' || v_sheet.payroll_batch_no || '-' || SUBSTRING(v_staff.staff_code FROM 5),
+            v_category_id,
             v_payable,
             CURRENT_DATE,
-            v_user_id,
+            COALESCE(v_user_id, (SELECT id FROM public.profiles WHERE role IN ('SUPER_ADMIN', 'ADMIN', 'MANAGER') LIMIT 1)),
             p_disbursed_from_account_id,
-            'SALARY',
             COALESCE(p_remarks, v_sheet.payroll_month || ' মাসের বেতন পরিশোধ: ' || v_staff.full_name || ' (' || v_staff.designation || ')'),
-            'APPROVED',
-            COALESCE(v_user_id, (SELECT id FROM public.profiles LIMIT 1))
+            'APPROVED'
         ) RETURNING id INTO v_expense_id;
     END IF;
 

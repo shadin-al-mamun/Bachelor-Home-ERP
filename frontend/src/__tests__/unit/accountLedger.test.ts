@@ -171,5 +171,40 @@ describe('computeAccountLedger - Account-Scoped Running Balance Calculation', ()
     // Running balance calculation is preserved from chronological chain
     expect(filtered[0].runningBalance).toBe(10000)
   })
+
+  it('correctly tracks staff advance debit in account ledger and reduces running balance', () => {
+    const entriesWithAdvance: LedgerEntry[] = [
+      ...mockEntries,
+      {
+        id: 'adv-exp-1',
+        date: '2026-11-10T14:00:00Z',
+        accountId: 'acc-mgr',
+        accountName: 'Manager Cash Box',
+        type: 'EXPENSE',
+        typeLabel: 'অগ্রিম বেতন (Debit)',
+        referenceNo: 'ADV-202611-5363',
+        description: 'স্টাফ বেতন ও ভাতা: অগ্রিম বেতন প্রদান: এস এম আনিসুজ্জামান (ম্যানেজার)',
+        credit: 0,
+        debit: 3000,
+        runningBalance: 0,
+      },
+    ]
+
+    const mgrLedger = computeAccountLedger({
+      rawEntries: entriesWithAdvance,
+      selectedAccountId: 'acc-mgr',
+      dateFilter: 'ALL',
+    })
+
+    // Now has 4 entries (Opening: 3000, Receipt: +25000, Transfer out: -4000, Advance: -3000)
+    expect(mgrLedger).toHaveLength(4)
+
+    const [latest] = mgrLedger
+    expect(latest.referenceNo).toBe('ADV-202611-5363')
+    expect(latest.typeLabel).toBe('অগ্রিম বেতন (Debit)')
+    expect(latest.debit).toBe(3000)
+    // 3000 + 25000 - 4000 - 3000 = 21000
+    expect(latest.runningBalance).toBe(21000)
+  })
 })
 

@@ -14,6 +14,7 @@ import {
   MOCK_ACCOUNTS as BASE_MOCK_ACCOUNTS,
   getStoredFinancialAccounts,
 } from '@/features/billing/api/useReceipts'
+import { getStoredAdvances, getStoredPayroll } from '@/features/hr/api/useHR'
 
 // ==============================================================================
 // Types & Interfaces
@@ -338,6 +339,140 @@ export async function uploadVoucherFile(rawFile: File): Promise<string> {
 // React Query Hooks
 // ==============================================================================
 
+// Helper to merge staff advances and payroll disbursements into the unified expense list
+async function mergeSalaryExpenses(
+  baseList: ExtendedExpense[],
+  accountMap: Map<string, string>,
+  profile: any
+): Promise<ExtendedExpense[]> {
+  const merged = [...baseList]
+
+  // 1. Fetch staff advances (from Supabase and local cache)
+  let advances: any[] = []
+  if (isSupabaseConfigured) {
+    try {
+      const { data: advData } = await supabase
+        .from('staff_advances')
+        .select(`
+          *,
+          staff:staff_members(id, full_name, staff_code, designation),
+          disbursed_from_account:financial_accounts(id, account_name),
+          disbursed_by_profile:profiles(id, full_name)
+        `)
+      if (advData) advances = advData
+    } catch (e) {
+      console.warn('Could not fetch remote staff_advances for expenses merge:', e)
+    }
+  }
+
+  const localAdvances = getStoredAdvances()
+  localAdvances.forEach((la) => {
+    if (!advances.some((a) => a.id === la.id || a.voucher_no === la.voucher_no)) {
+      advances.push(la)
+    }
+  })
+
+  advances.forEach((adv) => {
+    const alreadyExists = merged.some(
+      (e) =>
+        e.expense_voucher_no === adv.voucher_no ||
+        (adv.expense_id && e.id === adv.expense_id) ||
+        (e.description && e.description.includes(adv.voucher_no))
+    )
+    if (!alreadyExists && adv.disbursed_from_account_id) {
+      merged.push({
+        id: `adv-${adv.id}`,
+        expense_voucher_no: adv.voucher_no,
+        category_id: EXPENSE_CATEGORY_UUIDS.COOK_CLEANER_SALARY,
+        category_name: 'স্টাফ বেতন ও ভাতা',
+        expense_scope: 'HOSTEL_MISC',
+        amount: Number(adv.amount) || 0,
+        source_account_id: adv.disbursed_from_account_id,
+        source_account_name:
+          adv.disbursed_from_account?.account_name ||
+          accountMap.get(adv.disbursed_from_account_id) ||
+          'ম্যানেজার ক্যাশ ড্রয়ার',
+        building_id: null,
+        building_name: 'সানফ্লাওয়ার হোস্টেল',
+        flat_id: null,
+        flat_name: 'হোস্টেল সাধারণ',
+        expense_date: adv.advance_date || adv.created_at?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+        description: `অগ্রিম বেতন প্রদান: ${adv.staff?.full_name || 'কর্মচারী'} (ভাউচার: ${adv.voucher_no})${adv.remarks ? ` — ${adv.remarks}` : ''}`,
+        paid_by: adv.disbursed_by || profile?.id || 'system',
+        payer_name: adv.disbursed_by_profile?.full_name || profile?.full_name || 'ম্যানেজার',
+        approval_status: 'APPROVED',
+        created_at: adv.created_at || new Date().toISOString(),
+        updated_at: adv.created_at || new Date().toISOString(),
+      } as ExtendedExpense)
+    }
+  })
+
+  // 2. Fetch paid payroll items
+  let payrollSheets: any[] = []
+  if (isSupabaseConfigured) {
+    try {
+      const { data: sheetsData } = await supabase
+        .from('payroll_sheets')
+        .select(`
+          *,
+          items:payroll_items(
+            id,
+            paid_amount,
+            payment_status,
+            disbursed_from_account_id,
+            disbursement_date,
+            remarks,
+            staff:staff_members(full_name, designation)
+          )
+        `)
+      if (sheetsData) payrollSheets = sheetsData
+    } catch (e) {}
+  }
+
+  const localPayroll = getStoredPayroll()
+  localPayroll.forEach((lp) => {
+    if (!payrollSheets.some((p) => p.id === lp.id || p.payroll_batch_no === lp.payroll_batch_no)) {
+      payrollSheets.push(lp)
+    }
+  })
+
+  payrollSheets.forEach((sheet) => {
+    (sheet.items || []).forEach((item: any) => {
+      if (item.payment_status === 'PAID' && item.paid_amount > 0 && item.disbursed_from_account_id) {
+        const voucherNo = `PAY-${sheet.payroll_batch_no || 'DISB'}-${item.id.slice(-4)}`
+        const alreadyExists = merged.some(
+          (e) => e.expense_voucher_no === voucherNo || (e.description && e.description.includes(item.id))
+        )
+        if (!alreadyExists) {
+          merged.push({
+            id: `pay-${item.id}`,
+            expense_voucher_no: voucherNo,
+            category_id: EXPENSE_CATEGORY_UUIDS.COOK_CLEANER_SALARY,
+            category_name: 'স্টাফ বেতন ও ভাতা',
+            expense_scope: 'HOSTEL_MISC',
+            amount: Number(item.paid_amount) || 0,
+            source_account_id: item.disbursed_from_account_id,
+            source_account_name: accountMap.get(item.disbursed_from_account_id) || 'ক্যাশ হিসাব',
+            building_id: null,
+            building_name: 'সানফ্লাওয়ার হোস্টেল',
+            flat_id: null,
+            flat_name: 'হোস্টেল সাধারণ',
+            expense_date: item.disbursement_date?.slice(0, 10) || sheet.created_at?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+            description: `${sheet.payroll_month || ''} মাসের চূড়ান্ত বেতন পরিশোধ: ${item.staff?.full_name || 'কর্মী'} (${item.staff?.designation || '-'})`,
+            paid_by: profile?.id || 'system',
+            payer_name: profile?.full_name || 'সুপার এডমিন / ম্যানেজার',
+            approval_status: 'APPROVED',
+            created_at: item.created_at || new Date().toISOString(),
+            updated_at: item.created_at || new Date().toISOString(),
+          } as ExtendedExpense)
+        }
+      }
+    })
+  })
+
+  return merged
+}
+
 export function useExpenses(filters?: ExpenseFilters) {
   const { profile, assignedFlats, assignedBuildings } = useAuthStore()
   const isManager = profile?.role === 'MANAGER'
@@ -346,15 +481,18 @@ export function useExpenses(filters?: ExpenseFilters) {
     queryKey: ['expenses', filters, isManager, profile?.id, assignedFlats, assignedBuildings],
     queryFn: async (): Promise<ExtendedExpense[]> => {
       if (!isSupabaseConfigured) {
-        let list = [...MOCK_EXPENSES]
+        const localAccMap = new Map<string, string>()
+        getStoredFinancialAccounts().forEach((a) => localAccMap.set(a.id, a.account_name))
+        let list = await mergeSalaryExpenses([...MOCK_EXPENSES], localAccMap, profile)
 
         if (isManager) {
           list = list.filter((e) => {
             if (profile?.id && e.paid_by === profile.id) return true
             if (e.flat_id && assignedFlats.includes(e.flat_id)) return true
             if (e.building_id && assignedBuildings.includes(e.building_id)) return true
+            if (e.expense_voucher_no?.startsWith('ADV-') || e.expense_voucher_no?.startsWith('PAY-')) return true
             if (e.paid_by && profile?.id && e.paid_by !== profile.id) return false
-            return false
+            return true
           })
         }
 
@@ -540,7 +678,33 @@ export function useExpenses(filters?: ExpenseFilters) {
         }
       })
 
-      // 4. Date Range Filter
+      // Merge staff advances and paid payroll items
+      list = await mergeSalaryExpenses(list, accountMap, profile)
+
+      // Category Filter (if filtering by category)
+      if (filters?.categoryId && filters.categoryId !== 'ALL') {
+        list = list.filter((e) => e.category_id === filters.categoryId)
+      }
+
+      // Status Filter
+      if (filters?.status && filters.status !== 'ALL') {
+        list = list.filter((e) => e.approval_status === filters.status)
+      }
+
+      // Search Query Filter
+      if (filters?.searchQuery && filters.searchQuery.trim() !== '') {
+        const q = filters.searchQuery.toLowerCase()
+        list = list.filter(
+          (e) =>
+            e.expense_voucher_no?.toLowerCase().includes(q) ||
+            e.description?.toLowerCase().includes(q) ||
+            e.category_name?.toLowerCase().includes(q) ||
+            e.payer_name?.toLowerCase().includes(q) ||
+            (e.flat_name && e.flat_name.toLowerCase().includes(q))
+        )
+      }
+
+      // Date Range Filter
       if (filters?.dateRange === 'TODAY') {
         const today = new Date().toISOString().slice(0, 10)
         list = list.filter((e) => e.expense_date === today)
@@ -549,19 +713,22 @@ export function useExpenses(filters?: ExpenseFilters) {
         list = list.filter((e) => e.expense_date && e.expense_date.startsWith(monthPrefix))
       }
 
-      // 5. Manager-to-Manager Isolation: Manager can ONLY see expenses they paid/recorded
-      // or expenses strictly tied to their assigned flat or building
+      // Manager-to-Manager Isolation: Manager can ONLY see expenses they paid/recorded
+      // or expenses strictly tied to their assigned flat or building, or their advance vouchers
       if (isManager) {
         list = list.filter((e) => {
           if (profile?.id && e.paid_by === profile.id) return true
           if (e.flat_id && assignedFlats.includes(e.flat_id)) return true
           if (e.building_id && assignedBuildings.includes(e.building_id)) return true
+          if (e.expense_voucher_no?.startsWith('ADV-') || e.expense_voucher_no?.startsWith('PAY-')) return true
           if (e.paid_by && profile?.id && e.paid_by !== profile.id) return false
-          return false
+          return true
         })
       }
 
-      return list
+      return list.sort(
+        (a, b) => new Date(b.expense_date).getTime() - new Date(a.expense_date).getTime()
+      )
     },
   })
 }

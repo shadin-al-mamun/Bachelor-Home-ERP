@@ -156,16 +156,6 @@ export const FinancialAccountsPage: React.FC = () => {
   const [openingSource, setOpeningSource] = useState<string>('')
   const [modalError, setModalError] = useState<string | null>(null)
 
-  // Total Balance across visible accounts
-  const totalHostelFunds = useMemo(() => {
-    return visibleAccounts.reduce((sum, a) => {
-      const cur = Number(a.current_balance) || 0
-      const open = Number(a.opening_balance) || 0
-      const effective = cur > 0 ? cur : open
-      return sum + effective
-    }, 0)
-  }, [visibleAccounts])
-
   // Assign or reassign designated manager for an account
   const handleAssignManager = async (accountId: string, newManagerId: string) => {
     try {
@@ -293,7 +283,11 @@ export const FinancialAccountsPage: React.FC = () => {
         accountId: exp.source_account_id,
         accountName: exp.source_account_name || 'খরচ হিসাব',
         type: 'EXPENSE',
-        typeLabel: 'হোস্টেল খরচ (ব্যয়)',
+        typeLabel: exp.expense_voucher_no?.startsWith('ADV-')
+          ? 'অগ্রিম বেতন (Debit)'
+          : exp.expense_voucher_no?.startsWith('PAY-')
+          ? 'বেতন পরিশোধ (Debit)'
+          : 'হোস্টেল খরচ (ব্যয়)',
         referenceNo: exp.expense_voucher_no,
         description: `${exp.category_name}: ${exp.description}`,
         credit: 0,
@@ -342,6 +336,27 @@ export const FinancialAccountsPage: React.FC = () => {
     // Sort Chronologically (oldest to newest)
     return list.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
   }, [visibleAccounts, visibleAccountIds, receipts, incomes, expenses, transfers])
+
+  // Helper to compute live effective balance for an account from ledger entries
+  const getAccountEffectiveBalance = useMemo(() => {
+    return (acc: FinancialAccount) => {
+      const accEntries = rawLedgerEntries.filter((e) => e.accountId === acc.id)
+      if (accEntries.length > 0) {
+        const net = accEntries.reduce((sum, e) => sum + e.credit - e.debit, 0)
+        return Math.max(0, net)
+      }
+      const cur = Number(acc.current_balance) || 0
+      const open = Number(acc.opening_balance) || 0
+      return cur > 0 ? cur : open
+    }
+  }, [rawLedgerEntries])
+
+  // Total Balance across visible accounts
+  const totalHostelFunds = useMemo(() => {
+    return visibleAccounts.reduce((sum, a) => {
+      return sum + getAccountEffectiveBalance(a)
+    }, 0)
+  }, [visibleAccounts, getAccountEffectiveBalance])
 
   // Filtered Ledger with account-scoped running balance
   const filteredLedger = useMemo(() => {
@@ -567,7 +582,7 @@ export const FinancialAccountsPage: React.FC = () => {
                   <div>
                     <span className="text-[10px] text-slate-400 block">বর্তমান লাইভ স্থিতি:</span>
                     <span className="font-mono font-black text-emerald-400 text-sm">
-                      {formatCurrencyBn(Number(acc.current_balance) > 0 ? acc.current_balance : (acc.opening_balance || 0))}
+                      {formatCurrencyBn(getAccountEffectiveBalance(acc))}
                     </span>
                   </div>
                 </div>
@@ -606,7 +621,7 @@ export const FinancialAccountsPage: React.FC = () => {
                 <strong className="text-white font-bold">{selectedAccount.account_name}</strong>
               </span>
               <span className="text-slate-400 font-mono">
-                (প্রারম্ভিক: {formatCurrencyBn(selectedAccount.opening_balance || 0)} • লাইভ স্থিতি: {formatCurrencyBn(Number(selectedAccount.current_balance) > 0 ? selectedAccount.current_balance : (selectedAccount.opening_balance || 0))})
+                (প্রারম্ভিক: {formatCurrencyBn(selectedAccount.opening_balance || 0)} • লাইভ স্থিতি: {formatCurrencyBn(getAccountEffectiveBalance(selectedAccount))})
               </span>
             </div>
             <button

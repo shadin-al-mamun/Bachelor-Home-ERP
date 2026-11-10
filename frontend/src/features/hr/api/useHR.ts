@@ -1,6 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
 import { useAuthStore } from '@/app/store/useAuthStore'
+import {
+  getStoredFinancialAccounts,
+  saveStoredFinancialAccounts,
+} from '@/features/billing/api/useReceipts'
 import type {
   StaffMember,
   StaffAdvance,
@@ -12,11 +16,13 @@ import type {
   DisbursePayrollItemParams,
 } from '@/types/hr'
 
+const SALARY_EXPENSE_CATEGORY_ID = 'a1111111-1111-4111-8111-111111111105'
+
 const LOCAL_STAFF_KEY = 'erp_staff_members_v1'
 const LOCAL_ADVANCES_KEY = 'erp_staff_advances_v1'
 const LOCAL_PAYROLL_KEY = 'erp_payroll_sheets_v1'
 
-function getStoredStaff(): StaffMember[] {
+export function getStoredStaff(): StaffMember[] {
   if (typeof window === 'undefined') return []
   try {
     const raw = localStorage.getItem(LOCAL_STAFF_KEY)
@@ -40,12 +46,12 @@ function getStoredStaff(): StaffMember[] {
   }
 }
 
-function saveStoredStaff(staff: StaffMember[]) {
+export function saveStoredStaff(staff: StaffMember[]) {
   if (typeof window === 'undefined') return
   localStorage.setItem(LOCAL_STAFF_KEY, JSON.stringify(staff))
 }
 
-function getStoredAdvances(): StaffAdvance[] {
+export function getStoredAdvances(): StaffAdvance[] {
   if (typeof window === 'undefined') return []
   try {
     const raw = localStorage.getItem(LOCAL_ADVANCES_KEY)
@@ -55,12 +61,12 @@ function getStoredAdvances(): StaffAdvance[] {
   }
 }
 
-function saveStoredAdvances(advances: StaffAdvance[]) {
+export function saveStoredAdvances(advances: StaffAdvance[]) {
   if (typeof window === 'undefined') return
   localStorage.setItem(LOCAL_ADVANCES_KEY, JSON.stringify(advances))
 }
 
-function getStoredPayroll(): PayrollSheet[] {
+export function getStoredPayroll(): PayrollSheet[] {
   if (typeof window === 'undefined') return []
   try {
     const raw = localStorage.getItem(LOCAL_PAYROLL_KEY)
@@ -70,7 +76,7 @@ function getStoredPayroll(): PayrollSheet[] {
   }
 }
 
-function saveStoredPayroll(sheets: PayrollSheet[]) {
+export function saveStoredPayroll(sheets: PayrollSheet[]) {
   if (typeof window === 'undefined') return
   localStorage.setItem(LOCAL_PAYROLL_KEY, JSON.stringify(sheets))
 }
@@ -310,83 +316,142 @@ export function useRecordStaffAdvance() {
   return useMutation({
     mutationFn: async (params: RecordStaffAdvanceParams) => {
       const voucherNo = `ADV-${new Date().toISOString().slice(0, 7).replace('-', '')}-${Math.floor(1000 + Math.random() * 9000)}`
+      const expVoucherNo = `EXP-${voucherNo.replace('ADV-', '')}`
+      const targetDate = params.advance_date || new Date().toISOString().slice(0, 10)
+      const amt = Number(params.amount)
 
-      if (!isSupabaseConfigured) {
-        const staffList = getStoredStaff()
-        const staff = staffList.find((s) => s.id === params.staff_id)
-        const newAdvance: StaffAdvance = {
-          id: `adv-${Date.now()}`,
-          voucher_no: voucherNo,
-          staff_id: params.staff_id,
-          staff: staff || null,
-          amount: Number(params.amount) || 0,
-          advance_date: params.advance_date || new Date().toISOString().slice(0, 10),
-          disbursed_from_account_id: params.disbursed_from_account_id,
-          disbursed_from_account: { id: params.disbursed_from_account_id, account_name: 'ক্যাশ অ্যাকাউন্ট', account_type: 'CASH_MANAGER' },
-          disbursed_by: profile?.id || null,
-          status: 'PENDING',
-          deducted_amount: 0,
-          remarks: params.remarks,
-          created_at: new Date().toISOString(),
-        }
-        const updated = [newAdvance, ...getStoredAdvances()]
-        saveStoredAdvances(updated)
-        return newAdvance
+      let staffList = getStoredStaff()
+      let staff = staffList.find((s) => s.id === params.staff_id)
+      if (!staff && isSupabaseConfigured) {
+        try {
+          const { data } = await supabase.from('staff_members').select('*').eq('id', params.staff_id).maybeSingle()
+          if (data) staff = data as StaffMember
+        } catch (e) {}
       }
 
-      // Try PostgreSQL RPC with automatic cash drawer balance deduction and expense creation
-      try {
-        const { data: rpcData, error: rpcError } = await supabase.rpc('fn_disburse_staff_advance', {
-          p_staff_id: params.staff_id,
-          p_amount: Number(params.amount),
-          p_disbursed_from_account_id: params.disbursed_from_account_id,
-          p_advance_date: params.advance_date || new Date().toISOString().slice(0, 10),
-          p_remarks: params.remarks || null,
-        })
+      const staffName = staff?.full_name || 'কর্মচারী'
+      const description = `অগ্রিম বেতন প্রদান: ${staffName} (ভাউচার: ${voucherNo})${params.remarks ? ' — ' + params.remarks : ''}`
 
-        if (!rpcError && rpcData) {
-          return rpcData
-        }
-      } catch (rpcErr) {
-        console.warn('fn_disburse_staff_advance RPC fallback:', rpcErr)
+      let newAdvance: StaffAdvance = {
+        id: `adv-${Date.now()}`,
+        voucher_no: voucherNo,
+        staff_id: params.staff_id,
+        staff: staff || null,
+        amount: amt,
+        advance_date: targetDate,
+        disbursed_from_account_id: params.disbursed_from_account_id,
+        disbursed_from_account: { id: params.disbursed_from_account_id, account_name: 'ক্যাশ অ্যাকাউন্ট', account_type: 'CASH_MANAGER' },
+        disbursed_by: profile?.id || null,
+        status: 'PENDING',
+        deducted_amount: 0,
+        remarks: params.remarks,
+        created_at: new Date().toISOString(),
       }
 
-      // Direct fallback insert
-      const { data, error } = await supabase
-        .from('staff_advances')
-        .insert({
-          voucher_no: voucherNo,
-          staff_id: params.staff_id,
-          amount: Number(params.amount),
-          advance_date: params.advance_date || new Date().toISOString().slice(0, 10),
-          disbursed_from_account_id: params.disbursed_from_account_id,
-          disbursed_by: profile?.id || null,
-          remarks: params.remarks,
-          status: 'PENDING',
-        })
-        .select()
-        .single()
+      if (isSupabaseConfigured) {
+        let rpcSuccess = false
+        // Try PostgreSQL RPC with automatic cash drawer balance deduction and expense creation
+        try {
+          const { data: rpcData, error: rpcError } = await supabase.rpc('fn_disburse_staff_advance', {
+            p_staff_id: params.staff_id,
+            p_amount: amt,
+            p_disbursed_from_account_id: params.disbursed_from_account_id,
+            p_advance_date: targetDate,
+            p_remarks: params.remarks || null,
+          })
 
-      if (error) throw new Error(error.message || 'অগ্রিম বেতন সংরক্ষণে ব্যর্থ হয়েছে।')
-
-      // Ensure financial account balance is decremented immediately
-      try {
-        const { data: acc } = await supabase
-          .from('financial_accounts')
-          .select('current_balance')
-          .eq('id', params.disbursed_from_account_id)
-          .single()
-        if (acc) {
-          await supabase
-            .from('financial_accounts')
-            .update({ current_balance: (Number(acc.current_balance) || 0) - Number(params.amount) })
-            .eq('id', params.disbursed_from_account_id)
+          if (!rpcError && rpcData) {
+            newAdvance = rpcData
+            rpcSuccess = true
+          }
+        } catch (rpcErr) {
+          console.warn('fn_disburse_staff_advance RPC fallback:', rpcErr)
         }
-      } catch (accErr) {
-        console.warn('Could not decrement account balance for advance:', accErr)
+
+        if (!rpcSuccess) {
+          // Direct fallback:
+          // A. Insert linked expense voucher into expenses table so it immediately reflects in /expenses & account ledger
+          let expId: string | undefined = undefined
+          try {
+            const { data: expRow } = await supabase
+              .from('expenses')
+              .insert({
+                expense_voucher_no: expVoucherNo,
+                category_id: SALARY_EXPENSE_CATEGORY_ID,
+                amount: amt,
+                source_account_id: params.disbursed_from_account_id,
+                expense_date: targetDate,
+                description,
+                paid_by: profile?.id || (await supabase.from('profiles').select('id').limit(1)).data?.[0]?.id,
+                approval_status: 'APPROVED',
+              })
+              .select('id')
+              .single()
+            if (expRow?.id) {
+              expId = expRow.id
+              newAdvance.expense_id = expId
+            }
+          } catch (expErr) {
+            console.warn('Direct expense insert warning for advance:', expErr)
+          }
+
+          // B. Insert staff advance record
+          try {
+            const { data: advRow, error: advErr } = await supabase
+              .from('staff_advances')
+              .insert({
+                voucher_no: voucherNo,
+                staff_id: params.staff_id,
+                amount: amt,
+                advance_date: targetDate,
+                disbursed_from_account_id: params.disbursed_from_account_id,
+                disbursed_by: profile?.id || null,
+                remarks: params.remarks,
+                expense_id: expId || null,
+                status: 'PENDING',
+              })
+              .select()
+              .single()
+
+            if (!advErr && advRow) {
+              newAdvance = advRow as StaffAdvance
+            }
+          } catch (advErr) {
+            console.warn('Direct staff_advances insert warning:', advErr)
+          }
+
+          // C. Ensure financial account balance is decremented immediately in DB
+          try {
+            const { data: acc } = await supabase
+              .from('financial_accounts')
+              .select('current_balance')
+              .eq('id', params.disbursed_from_account_id)
+              .single()
+            if (acc) {
+              await supabase
+                .from('financial_accounts')
+                .update({ current_balance: Math.max(0, (Number(acc.current_balance) || 0) - amt) })
+                .eq('id', params.disbursed_from_account_id)
+            }
+          } catch (accErr) {
+            console.warn('Could not decrement account balance for advance:', accErr)
+          }
+        }
       }
 
-      return data as StaffAdvance
+      // Always maintain local advances cache
+      const updated = [newAdvance, ...getStoredAdvances().filter((a) => a.id !== newAdvance.id && a.voucher_no !== newAdvance.voucher_no)]
+      saveStoredAdvances(updated)
+
+      // Always update local financial accounts cache
+      const allAccs = getStoredFinancialAccounts()
+      const accIdx = allAccs.findIndex((a) => a.id === params.disbursed_from_account_id)
+      if (accIdx >= 0) {
+        allAccs[accIdx].current_balance = Math.max(0, (Number(allAccs[accIdx].current_balance) || 0) - amt)
+        saveStoredFinancialAccounts(allAccs)
+      }
+
+      return newAdvance
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['staff-advances'] })
@@ -394,6 +459,7 @@ export function useRecordStaffAdvance() {
       queryClient.invalidateQueries({ queryKey: ['manager-accounts'] })
       queryClient.invalidateQueries({ queryKey: ['owner-executive-dashboard'] })
       queryClient.invalidateQueries({ queryKey: ['expenses'] })
+      queryClient.invalidateQueries({ queryKey: ['cash-sessions'] })
     },
   })
 }
@@ -667,6 +733,22 @@ export function useDisbursePayrollItem() {
         saveStoredAdvances(advances)
       }
 
+      // Update local financial accounts
+      const allAccs = getStoredFinancialAccounts()
+      const accIdx = allAccs.findIndex((a) => a.id === params.disbursed_from_account_id)
+      let disbursedAmount = 0
+      for (const sheet of sheets) {
+        const itm = (sheet.items || []).find((i) => i.id === params.payroll_item_id)
+        if (itm) {
+          disbursedAmount = itm.net_payable
+          break
+        }
+      }
+      if (accIdx >= 0 && disbursedAmount > 0) {
+        allAccs[accIdx].current_balance = Math.max(0, (Number(allAccs[accIdx].current_balance) || 0) - disbursedAmount)
+        saveStoredFinancialAccounts(allAccs)
+      }
+
       // 2. If Supabase configured, execute DB transaction or direct update
       if (isSupabaseConfigured) {
         try {
@@ -692,12 +774,39 @@ export function useDisbursePayrollItem() {
 
           if (item) {
             if (item.net_payable > 0) {
-              await supabase
-                .from('financial_accounts')
-                .update({
-                  current_balance: supabase.rpc('decrement_balance', { amount: item.net_payable }) as any,
+              const expVoucherNo = `EXP-${item.sheet?.payroll_batch_no || 'PAY'}-${item.id.slice(-4)}`
+              try {
+                await supabase.from('expenses').insert({
+                  expense_voucher_no: expVoucherNo,
+                  category_id: SALARY_EXPENSE_CATEGORY_ID,
+                  amount: item.net_payable,
+                  source_account_id: params.disbursed_from_account_id,
+                  expense_date: new Date().toISOString().slice(0, 10),
+                  description: `${item.sheet?.payroll_month || ''} মাসের চূড়ান্ত বেতন পরিশোধ: ${item.staff?.full_name || 'কর্মী'} (${item.staff?.designation || '-'})`,
+                  paid_by: profile?.id || null,
+                  approval_status: 'APPROVED',
                 })
-                .eq('id', params.disbursed_from_account_id)
+              } catch (e) {
+                console.warn('Could not insert salary disbursement expense:', e)
+              }
+
+              try {
+                const { data: acc } = await supabase
+                  .from('financial_accounts')
+                  .select('current_balance')
+                  .eq('id', params.disbursed_from_account_id)
+                  .single()
+                if (acc) {
+                  await supabase
+                    .from('financial_accounts')
+                    .update({
+                      current_balance: Math.max(0, (Number(acc.current_balance) || 0) - item.net_payable),
+                    })
+                    .eq('id', params.disbursed_from_account_id)
+                }
+              } catch (accErr) {
+                console.warn('Could not decrement account balance for salary disbursement:', accErr)
+              }
             }
 
             await supabase
