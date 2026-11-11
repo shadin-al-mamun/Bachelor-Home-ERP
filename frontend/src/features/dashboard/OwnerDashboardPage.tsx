@@ -17,6 +17,7 @@ import {
   FileSpreadsheet,
   SlidersHorizontal,
   Calendar,
+  User,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '@/app/store/useAuthStore'
@@ -281,7 +282,7 @@ export const OwnerDashboardPage: React.FC = () => {
             </div>
           </div>
 
-          <div className={`grid grid-cols-1 sm:grid-cols-2 ${canViewExecutiveNOI ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3.5 sm:gap-4`}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
             {/* Card 1: 🏢 Occupancy Rate */}
             <div className="p-4 sm:p-5 rounded-3xl bg-slate-900/70 border border-indigo-500/30 backdrop-blur-sm relative overflow-hidden group">
               <div className="flex items-center justify-between">
@@ -503,34 +504,76 @@ export const OwnerDashboardPage: React.FC = () => {
             </div>
 
             {/* Card 5: 💼 Cash in Custody */}
-            <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-br from-amber-950/40 via-slate-900 to-indigo-950/40 border-2 border-amber-500/40 shadow-xl relative overflow-hidden group">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <Receipt className="w-4 h-4 text-amber-400" />
-                  ম্যানেজার ক্যাশ হেফাজত
-                </span>
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-br from-amber-950/40 via-slate-900 to-indigo-950/40 border-2 border-amber-500/40 shadow-xl relative overflow-hidden group flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <Receipt className="w-4 h-4 text-amber-400" />
+                    ম্যানেজার ক্যাশ হেফাজত
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-950/80 text-amber-300 border border-amber-800/50">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      লাইভ ড্রয়ার ক্যাশ
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-2xl sm:text-3xl font-extrabold font-mono text-amber-400 mt-2">
+                  ৳{kpis.cash_in_custody.toLocaleString('en-IN')}
+                </div>
+
+                <p className="text-[10px] text-amber-200/80 mt-0.5">
+                  ড্রয়ারে থাকা মোট নগদ টাকা {kpis.manager_cash_breakdown && kpis.manager_cash_breakdown.length > 0 ? `(${kpis.manager_cash_breakdown.length} জন ম্যানেজার)` : ''}
+                </p>
+
+                {/* Per-Manager Live Cash Breakdown */}
+                {kpis.manager_cash_breakdown && kpis.manager_cash_breakdown.length > 0 ? (
+                  <div className="mt-3 pt-2.5 border-t border-slate-800/80 space-y-1.5">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                      <span>ম্যানেজারভিত্তিক ড্রয়ার ক্যাশ:</span>
+                      <span>ব্যালেন্স</span>
+                    </div>
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto pr-0.5">
+                      {kpis.manager_cash_breakdown.map((item) => (
+                        <div
+                          key={item.account_id}
+                          className="p-2 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-center justify-between gap-2"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <User className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                              <span className="text-xs font-bold text-white truncate">
+                                {item.manager_name}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 block truncate pl-5">
+                              {item.account_name}
+                            </span>
+                          </div>
+                          <span className="text-xs font-black font-mono text-emerald-400 shrink-0">
+                            ৳{item.balance.toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-[10px]">
+                    <span className="text-slate-400">হেফাজতকারী:</span>
+                    <span className="text-slate-300 font-semibold">{kpis.cash_in_custody_source || 'ম্যানেজার ক্যাশ ড্রয়ার'}</span>
+                  </div>
+                )}
               </div>
 
-              {/* Live Indicator Pill */}
-              <div className="mt-1 flex items-center gap-1.5 text-[10px] text-amber-400/90 font-medium">
-                <span className="text-slate-400">স্ট্যাটাস:</span>
-                <span className="px-1.5 py-0.5 rounded bg-amber-950/80 border border-amber-800/50 text-amber-300 text-[9px] font-bold">
-                  লাইভ ড্রয়ার ক্যাশ
-                </span>
-              </div>
-
-              <div className="text-2xl sm:text-3xl font-extrabold font-mono text-amber-400 mt-1.5">
-                ৳{kpis.cash_in_custody.toLocaleString('en-IN')}
-              </div>
-
-              <p className="text-[10px] text-amber-200/80 mt-1">
-                ড্রয়ারে থাকা মোট নগদ টাকা
-              </p>
-
-              <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-[10px]">
-                <span className="text-slate-400">হেফাজতকারী:</span>
-                <span className="text-slate-300 font-semibold">{kpis.cash_in_custody_source || 'ম্যানেজার ক্যাশ ড্রয়ার'}</span>
+              <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+                <Link
+                  to="/finance/accounts"
+                  className="w-full flex items-center justify-between font-bold text-amber-400 hover:text-amber-300 transition-colors"
+                >
+                  <span>সকল ক্যাশ অ্যাকাউন্ট ও খতিয়ান</span>
+                  <span className="text-xs">➔</span>
+                </Link>
               </div>
             </div>
           </div>

@@ -36,6 +36,17 @@ export interface ExecutiveKPIs {
   // 5. Cash in Custody
   cash_in_custody: number // Physical cash held in active manager drawers
   cash_in_custody_source?: string
+  manager_cash_breakdown?: ManagerCashBreakdownItem[]
+}
+
+export interface ManagerCashBreakdownItem {
+  account_id: string
+  account_name: string
+  account_number?: string
+  manager_id?: string | null
+  manager_name: string
+  manager_phone?: string | null
+  balance: number
 }
 
 export interface CashFlowTrendPoint {
@@ -109,7 +120,24 @@ const MOCK_DASHBOARD_DATA: OwnerDashboardData = {
     meal_attendance_rate: 76.5,
     estimated_monthly_meal_bill: 114500,
 
-    cash_in_custody: 38750,
+    cash_in_custody: 8266,
+    cash_in_custody_source: '২ জন ম্যানেজারের ক্যাশ ড্রয়ার',
+    manager_cash_breakdown: [
+      {
+        account_id: '11111111-0000-0000-0000-000000000002',
+        account_name: 'Manager Cash Box (ম্যানেজার ক্যাশ)',
+        account_number: 'MGR-CASH-01',
+        manager_name: 'এস এম আনিসুজ্জামান',
+        balance: 5266,
+      },
+      {
+        account_id: '22222222-0000-0000-0000-000000000002',
+        account_name: 'ম্যানেজার ক্যাশ ড্রয়ার (বিথীকা)',
+        account_number: 'MGR-CASH-02',
+        manager_name: 'মোঃ এনামুল হক',
+        balance: 3000,
+      },
+    ],
   },
 
   cash_flow_trend: [
@@ -466,12 +494,14 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
           guestBookingsRes,
           mealsTodayRes,
           mealsTomorrowRes,
+          transfersRes,
+          profilesRes,
         ] = await Promise.all([
           supabase.from('seats').select('id, status, room:rooms(flat_id)'),
           supabase.from('boarder_charges').select('amount, paid_amount, status, due_date, billing_month, boarder_id'),
           supabase.from('receipts').select('id, receipt_number, amount, is_void, receipt_date, received_by, destination_account_id, boarder_id').eq('is_void', false),
-          supabase.from('expenses').select('amount, approval_status, expense_date, paid_by, flat_id, building_id').eq('approval_status', 'APPROVED'),
-          supabase.from('incomes').select('amount, income_date'),
+          supabase.from('expenses').select('id, amount, approval_status, expense_date, paid_by, flat_id, building_id, source_account_id').eq('approval_status', 'APPROVED'),
+          supabase.from('incomes').select('id, amount, income_date, destination_account_id'),
           supabase
             .from('financial_accounts')
             .select('id, account_name, account_number, account_type, opening_balance, current_balance, is_active, assigned_manager_id')
@@ -491,6 +521,8 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
             .eq('status', 'CONFIRMED'),
           supabase.from('meal_selections').select('boarder_id, breakfast, lunch, dinner').eq('meal_date', todayStr),
           supabase.from('meal_selections').select('boarder_id, breakfast, lunch, dinner').eq('meal_date', tomorrowStr),
+          supabase.from('account_transfers').select('id, from_account_id, to_account_id, amount, transfer_date'),
+          supabase.from('profiles').select('id, full_name, phone_number, role'),
         ])
 
         let seats = seatsRes.data || []
@@ -679,13 +711,80 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
             ? Number(rpcKpis.non_rent_incomes_month)
             : filteredIncomes.reduce((sum, i) => sum + (Number(i.amount) || 0), 0)
 
-        // 5. Manager Cash in Custody (Single Source of Truth: Live Manager Cash Account Balance)
-        // Live balance directly from financial_accounts table (scoped to this manager if isManager)
-        const liveManagerCash = managerAccounts.reduce((sum: number, a: any) => {
-          return sum + (Number(a.current_balance) || 0)
-        }, 0)
+        // 5. Manager Cash in Custody (Single Source of Truth: Authoritative Running Ledger Balance)
+        const allTransfers = (transfersRes?.data || []) as any[]
+        const allProfiles = (profilesRes?.data || []) as any[]
 
-        const cashCustody = liveManagerCash
+        const managerCashBreakdown: ManagerCashBreakdownItem[] = managerAccounts.map((a: any) => {
+          const accId = a.id
+          const openBal = Number(a.opening_balance) || 0
+
+          const creditReceipts = allReceipts
+            .filter((r: any) => r.destination_account_id === accId && !r.is_void)
+            .reduce((sum: number, r: any) => sum + (Number(r.amount) || 0), 0)
+
+          const creditIncomes = allIncomes
+            .filter((inc: any) => inc.destination_account_id === accId)
+            .reduce((sum: number, inc: any) => sum + (Number(inc.amount) || 0), 0)
+
+          const creditTransfers = allTransfers
+            .filter((t: any) => t.to_account_id === accId)
+            .reduce((sum: number, t: any) => sum + (Number(t.amount) || 0), 0)
+
+          const debitExpenses = allExpenses
+            .filter((e: any) => e.source_account_id === accId && e.approval_status !== 'REJECTED')
+            .reduce((sum: number, e: any) => sum + (Number(e.amount) || 0), 0)
+
+          const debitTransfers = allTransfers
+            .filter((t: any) => t.from_account_id === accId)
+            .reduce((sum: number, t: any) => sum + (Number(t.amount) || 0), 0)
+
+          const totalCredits = openBal + creditReceipts + creditIncomes + creditTransfers
+          const totalDebits = debitExpenses + debitTransfers
+          const hasVoucherActivity =
+            creditReceipts + creditIncomes + creditTransfers + debitExpenses + debitTransfers > 0 || openBal > 0
+          const liveBalance = hasVoucherActivity
+            ? Math.max(0, totalCredits - totalDebits)
+            : (Number(a.current_balance) || 0)
+
+          // Background sync to database if drifted
+          if (isSupabaseConfigured && a.id && Number(a.current_balance) !== liveBalance) {
+            supabase
+              .from('financial_accounts')
+              .update({ current_balance: liveBalance })
+              .eq('id', a.id)
+              .then(() => {})
+          }
+
+          // Manager Name Resolution
+          let managerName = 'ম্যানেজার'
+          let managerPhone: string | null = null
+          const assignedUser = allProfiles.find((p: any) => p.id === a.assigned_manager_id)
+          if (assignedUser) {
+            managerName = assignedUser.full_name
+            managerPhone = assignedUser.phone_number
+          } else if (a.account_name?.includes('আনিসুজ্জামান') || a.account_number === 'MGR-CASH-01') {
+            managerName = 'এস এম আনিসুজ্জামান'
+          } else if (
+            a.account_name?.includes('এনামুল') ||
+            a.account_name?.includes('বিথীকা') ||
+            a.account_number === 'MGR-CASH-02'
+          ) {
+            managerName = 'মোঃ এনামুল হক'
+          }
+
+          return {
+            account_id: a.id,
+            account_name: a.account_name,
+            account_number: a.account_number,
+            manager_id: a.assigned_manager_id,
+            manager_name: managerName,
+            manager_phone: managerPhone,
+            balance: liveBalance,
+          }
+        })
+
+        const cashCustody = managerCashBreakdown.reduce((sum, item) => sum + item.balance, 0)
 
         // Filter currently active seated residents strictly respecting seat allocation start_date & admission_date
         // Boarders with future allocation dates (e.g. starting next month) are NOT seated yet and NOT counted in meals!
@@ -951,7 +1050,11 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
             operating_expenses_month: totalExpenses,
             non_rent_incomes_month: totalIncomes,
             cash_in_custody: cashCustody,
-            cash_in_custody_source: 'ম্যানেজার ক্যাশ বক্স (লাইভ ব্যালেন্স)',
+            cash_in_custody_source:
+              managerAccounts.length > 1
+                ? `${managerAccounts.length} জন ম্যানেজারের ক্যাশ ড্রয়ার`
+                : (managerAccounts[0]?.account_name || 'ম্যানেজার ক্যাশ ড্রয়ার'),
+            manager_cash_breakdown: managerCashBreakdown,
             net_operating_income: totalCollected + totalIncomes - totalExpenses,
             active_meals_today: countToday,
             active_meals_tomorrow: countTomorrow,
