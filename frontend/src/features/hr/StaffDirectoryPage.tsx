@@ -13,6 +13,7 @@ import {
   BadgeCheck,
   Sparkles,
   PlusCircle,
+  MinusCircle,
   Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/common/Button'
@@ -63,6 +64,7 @@ export const StaffDirectoryPage: React.FC = () => {
     joining_date: new Date().toISOString().slice(0, 10),
     monthly_salary: 0,
     allowances: [],
+    deductions: [],
     payment_method: 'CASH',
     bank_or_mfs_account: '',
     notes: '',
@@ -90,7 +92,8 @@ export const StaffDirectoryPage: React.FC = () => {
     .reduce((sum, s) => {
       const basic = Number(s.monthly_salary) || 0
       const alw = (s.allowances || []).reduce((aSum, a) => aSum + (Number(a.amount) || 0), 0)
-      return sum + basic + alw
+      const ded = (s.deductions || []).reduce((dSum, d) => dSum + (Number(d.amount) || 0), 0)
+      return sum + basic + alw - ded
     }, 0)
   const kitchenStaff = staffList.filter((s) => s.is_active && s.department === 'KITCHEN').length
 
@@ -110,6 +113,7 @@ export const StaffDirectoryPage: React.FC = () => {
       joining_date: new Date().toISOString().slice(0, 10),
       monthly_salary: 0,
       allowances: [],
+      deductions: [],
       payment_method: 'CASH',
       bank_or_mfs_account: '',
       notes: '',
@@ -133,6 +137,7 @@ export const StaffDirectoryPage: React.FC = () => {
       joining_date: staff.joining_date || new Date().toISOString().slice(0, 10),
       monthly_salary: staff.monthly_salary,
       allowances: staff.allowances ? JSON.parse(JSON.stringify(staff.allowances)) : [],
+      deductions: staff.deductions ? JSON.parse(JSON.stringify(staff.deductions)) : [],
       payment_method: staff.payment_method || 'CASH',
       bank_or_mfs_account: staff.bank_or_mfs_account || '',
       notes: staff.notes || '',
@@ -397,21 +402,39 @@ export const StaffDirectoryPage: React.FC = () => {
                   </span>
                 </div>
 
-                {staff.allowances && staff.allowances.length > 0 && (
+                {((staff.allowances && staff.allowances.length > 0) || (staff.deductions && staff.deductions.length > 0)) && (
                   <>
-                    <div className="flex items-center justify-between text-slate-300">
-                      <span className="text-slate-500 flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-amber-400" /> অন্যান্য ভাতা:
-                      </span>
-                      <span className="font-bold font-mono text-amber-300 text-xs">
-                        +৳{staff.allowances.reduce((sum, a) => sum + (Number(a.amount) || 0), 0).toLocaleString('en-IN')}
-                      </span>
-                    </div>
+                    {staff.allowances && staff.allowances.length > 0 && (
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span className="text-slate-500 flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-blue-400" /> অন্যান্য ভাতা:
+                        </span>
+                        <span className="font-bold font-mono text-blue-300 text-xs">
+                          +৳{staff.allowances.reduce((sum, a) => sum + (Number(a.amount) || 0), 0).toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                    )}
+
+                    {staff.deductions && staff.deductions.length > 0 && (
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span className="text-slate-500 flex items-center gap-1.5">
+                          <MinusCircle className="w-3.5 h-3.5 text-amber-400" /> নিয়মিত কর্তন:
+                        </span>
+                        <span className="font-bold font-mono text-amber-300 text-xs">
+                          -৳{staff.deductions.reduce((sum, d) => sum + (Number(d.amount) || 0), 0).toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                    )}
 
                     <div className="flex items-center justify-between text-slate-300 bg-slate-950/60 p-1.5 rounded-lg border border-slate-800">
-                      <span className="text-slate-400 font-semibold text-[11px]">সর্বমোট প্যাকেজ:</span>
-                      <span className="font-black font-mono text-primary-300 text-sm">
-                        ৳{(Number(staff.monthly_salary) + staff.allowances.reduce((sum, a) => sum + (Number(a.amount) || 0), 0)).toLocaleString('en-IN')}
+                      <span className="text-slate-400 font-semibold text-[11px]">মাসিক প্রদেয় নিট:</span>
+                      <span className="font-black font-mono text-emerald-400 text-sm">
+                        ৳{Math.max(
+                          0,
+                          Number(staff.monthly_salary) +
+                            (staff.allowances || []).reduce((sum, a) => sum + (Number(a.amount) || 0), 0) -
+                            (staff.deductions || []).reduce((sum, d) => sum + (Number(d.amount) || 0), 0)
+                        ).toLocaleString('en-IN')}
                       </span>
                     </div>
                   </>
@@ -705,6 +728,104 @@ export const StaffDirectoryPage: React.FC = () => {
                 ) : (
                   <p className="text-[11px] text-slate-500 italic">
                     কোনো অতিরিক্ত ভাতা নির্ধারিত নেই। প্রয়োজন হলে উপরের &quot;ভাতা যোগ করুন&quot; বাটনে ক্লিক করে খাতের নাম ও টাকার পরিমাণ লিখুন।
+                  </p>
+                )}
+              </div>
+
+              {/* Dynamic Deductions Section (কর্তন যোগ করুন) */}
+              <div className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                      <MinusCircle className="w-3.5 h-3.5 text-amber-400" />
+                      নিয়মিত কর্তনসমূহ (Deductions)
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      খাবার বাবদ, ইউটিলিটি, বাসস্থান, প্রভিডেন্ট ফান্ড বা বিশেষ কর্তন ইত্যাদি
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      const current = formData.deductions || []
+                      setFormData({
+                        ...formData,
+                        deductions: [
+                          ...current,
+                          { id: `ded-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, title: '', amount: 0 },
+                        ],
+                      })
+                    }}
+                    className="text-xs h-7 px-2.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 gap-1 font-semibold"
+                  >
+                    <MinusCircle className="w-3.5 h-3.5" />
+                    কর্তন যোগ করুন
+                  </Button>
+                </div>
+
+                {formData.deductions && formData.deductions.length > 0 ? (
+                  <div className="space-y-2 pt-1">
+                    {formData.deductions.map((ded, index) => (
+                      <div key={ded.id} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder="কর্তনের খাত (যেমন: খাবার বাবদ, ইউটিলিটি, বাসস্থান)"
+                          value={ded.title}
+                          onChange={(e) => {
+                            const updated = [...(formData.deductions || [])]
+                            updated[index] = { ...updated[index], title: e.target.value }
+                            setFormData({ ...formData, deductions: updated })
+                          }}
+                          className="flex-1 bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500"
+                        />
+                        <div className="w-32 relative">
+                          <span className="absolute left-2.5 top-1.5 text-xs text-slate-500">৳</span>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="টাকা"
+                            value={ded.amount || ''}
+                            onChange={(e) => {
+                              const updated = [...(formData.deductions || [])]
+                              updated[index] = { ...updated[index], amount: Number(e.target.value) || 0 }
+                              setFormData({ ...formData, deductions: updated })
+                            }}
+                            className="w-full bg-slate-900 border border-slate-700 text-xs text-amber-400 font-mono font-bold rounded-lg pl-6 pr-2 py-1.5 focus:outline-none focus:border-amber-500 text-right"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = (formData.deductions || []).filter((_, i) => i !== index)
+                            setFormData({ ...formData, deductions: updated })
+                          }}
+                          className="text-rose-400 hover:text-rose-300 p-1.5 rounded-lg hover:bg-rose-500/10"
+                          title="মুছে ফেলুন"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+
+                    <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
+                      <span className="text-amber-400 font-medium">
+                        মোট কর্তন: ৳{(formData.deductions.reduce((s, d) => s + (Number(d.amount) || 0), 0)).toLocaleString('en-IN')}
+                      </span>
+                      <span className="text-emerald-400 font-bold font-mono">
+                        প্রদেয় নিট বেতন: ৳{Math.max(
+                          0,
+                          (Number(formData.monthly_salary) || 0) +
+                            (formData.allowances || []).reduce((s, a) => s + (Number(a.amount) || 0), 0) -
+                            formData.deductions.reduce((s, d) => s + (Number(d.amount) || 0), 0)
+                        ).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-slate-500 italic">
+                    কোনো নিয়মিত কর্তন নির্ধারিত নেই। প্রয়োজন হলে উপরের &quot;কর্তন যোগ করুন&quot; বাটনে ক্লিক করে কি বাবদ কর্তন করা হবে তা লিখে টাকার পরিমাণ লিখুন।
                   </p>
                 )}
               </div>

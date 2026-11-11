@@ -110,16 +110,21 @@ export const PayrollPage: React.FC = () => {
     const itemAlw = i.allowances || i.staff?.allowances || []
     return s + (i.allowances_total !== undefined ? Number(i.allowances_total) : itemAlw.reduce((acc, a) => acc + (Number(a.amount) || 0), 0))
   }, 0)
+  const totalRegularDeductions = items.reduce((s, i) => {
+    const itemDed = i.deductions || i.staff?.deductions || []
+    return s + (i.deductions_total !== undefined ? Number(i.deductions_total) : (i.other_deduction ? Number(i.other_deduction) : itemDed.reduce((acc, d) => acc + (Number(d.amount) || 0), 0)))
+  }, 0)
+  const totalAdvanceDeduction = items.reduce((s, i) => s + (Number(i.advance_deduction) || 0), 0)
   const totalGrossPackage = items.length > 0
     ? totalPureBasic + totalAllowances
     : Number(currentSheet?.total_basic_salary) || 0
   const totalDeductions =
-    currentSheet?.total_deductions || items.reduce((s, i) => s + (Number(i.advance_deduction) || 0), 0)
+    currentSheet?.total_deductions || items.reduce((s, i) => s + (Number(i.advance_deduction) || 0) + (Number(i.other_deduction) || 0), 0)
   const totalNetPayable =
     currentSheet?.total_net_payable || items.reduce((s, i) => s + (Number(i.net_payable) || 0), 0)
   const totalPaid = currentSheet?.total_paid_amount || items.reduce((s, i) => s + (Number(i.paid_amount) || 0), 0)
   const remainingNetPayable = Math.max(0, totalNetPayable - totalPaid)
-  const totalDisbursedCash = totalDeductions + totalPaid
+  const totalDisbursedCash = totalAdvanceDeduction + totalPaid
 
   return (
     <div className="space-y-6">
@@ -209,11 +214,15 @@ export const PayrollPage: React.FC = () => {
 
         <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur flex items-center justify-between">
           <div className="min-w-0">
-            <span className="text-[10px] sm:text-xs font-medium text-amber-400 block truncate">মোট অগ্রিম কর্তন (পেইড)</span>
+            <span className="text-[10px] sm:text-xs font-medium text-amber-400 block truncate">মোট কর্তন (অগ্রিম ও নিয়মিত)</span>
             <span className="text-base sm:text-2xl font-black font-mono text-amber-400 mt-0.5 block">
               ৳{totalDeductions.toLocaleString('en-IN')}
             </span>
-            <span className="text-[9px] sm:text-[11px] text-slate-400 block truncate">কর্মীদের ইতিমধ্যে নগদ পরিশোধিত</span>
+            <span className="text-[9px] sm:text-[11px] text-slate-400 block truncate">
+              {totalRegularDeductions > 0
+                ? `অগ্রিম: ৳${totalAdvanceDeduction.toLocaleString('en-IN')} | নিয়মিত: ৳${totalRegularDeductions.toLocaleString('en-IN')}`
+                : 'কর্মীদের ইতিমধ্যে নগদ পরিশোধিত / কর্তন'}
+            </span>
           </div>
           <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0 ml-2">
             <DollarSign className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -242,7 +251,7 @@ export const PayrollPage: React.FC = () => {
             <span className="text-[9px] sm:text-[11px] text-slate-400 block truncate">
               {remainingNetPayable === 0 && totalGrossPackage > 0
                 ? 'সম্পূর্ণ পরিশোধিত ✓'
-                : `অগ্রিম: ৳${totalDeductions.toLocaleString('en-IN')} | নিট: ৳${totalPaid.toLocaleString('en-IN')}`}
+                : `অগ্রিম: ৳${totalAdvanceDeduction.toLocaleString('en-IN')} | নিট: ৳${totalPaid.toLocaleString('en-IN')}`}
             </span>
           </div>
           <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0 ml-2">
@@ -267,8 +276,8 @@ export const PayrollPage: React.FC = () => {
           {currentSheet && (
             <span
               className={`text-xs px-2.5 py-0.5 rounded-full font-bold self-start sm:self-auto ${currentSheet.status === 'DISBURSED'
-                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                  : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                 }`}
             >
               {currentSheet.status === 'DISBURSED' ? 'সম্পূর্ণ পরিশোধিত' : 'খসড়া / অনুমোদিত'}
@@ -298,6 +307,7 @@ export const PayrollPage: React.FC = () => {
                     <th className="py-3 px-4">কর্মচারী ও পদবী</th>
                     <th className="py-3 px-4 text-right">মূল বেতন</th>
                     <th className="py-3 px-4 text-right">নিয়মিত ভাতা</th>
+                    <th className="py-3 px-4 text-right">নিয়মিত কর্তন</th>
                     <th className="py-3 px-4 text-right">অগ্রিম কর্তন</th>
                     <th className="py-3 px-4 text-right">প্রদেয় নিট বেতন</th>
                     <th className="py-3 px-4 text-center">স্ট্যাটাস</th>
@@ -310,6 +320,10 @@ export const PayrollPage: React.FC = () => {
                     const itemAlwTotal = item.allowances_total !== undefined
                       ? Number(item.allowances_total)
                       : itemAlw.reduce((acc, a) => acc + (Number(a.amount) || 0), 0)
+                    const itemDed = item.deductions || item.staff?.deductions || []
+                    const itemDedTotal = item.deductions_total !== undefined
+                      ? Number(item.deductions_total)
+                      : (item.other_deduction ? Number(item.other_deduction) : itemDed.reduce((acc, d) => acc + (Number(d.amount) || 0), 0))
 
                     return (
                       <tr key={item.id} className="hover:bg-slate-800/30 transition-colors">
@@ -319,11 +333,16 @@ export const PayrollPage: React.FC = () => {
                               <User className="w-4 h-4" />
                             </div>
                             <div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1.5 flex-wrap">
                                 <span>{item.staff?.full_name || 'কর্মচারী'}</span>
                                 {itemAlw.length > 0 && (
                                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary-500/10 text-primary-300 border border-primary-500/20 font-medium">
                                     +{itemAlw.length}টি ভাতা
+                                  </span>
+                                )}
+                                {itemDed.length > 0 && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20 font-medium">
+                                    -{itemDed.length}টি কর্তন
                                   </span>
                                 )}
                               </div>
@@ -345,6 +364,10 @@ export const PayrollPage: React.FC = () => {
                           {itemAlwTotal > 0 ? `+৳${itemAlwTotal.toLocaleString('en-IN')}` : '৳০'}
                         </td>
 
+                        <td className="py-3.5 px-4 text-right font-mono font-medium text-rose-400">
+                          {itemDedTotal > 0 ? `-৳${itemDedTotal.toLocaleString('en-IN')}` : '৳০'}
+                        </td>
+
                         <td className="py-3.5 px-4 text-right font-mono font-semibold text-amber-400">
                           {item.advance_deduction > 0
                             ? `-৳${Number(item.advance_deduction).toLocaleString('en-IN')}`
@@ -358,8 +381,8 @@ export const PayrollPage: React.FC = () => {
                         <td className="py-3.5 px-4 text-center">
                           <span
                             className={`text-[10px] px-2.5 py-1 rounded-full font-bold inline-flex items-center gap-1 ${item.payment_status === 'PAID'
-                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                : 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
+                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                              : 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
                               }`}
                           >
                             {item.payment_status === 'PAID' ? (
@@ -411,6 +434,10 @@ export const PayrollPage: React.FC = () => {
                 const itemAlwTotal = item.allowances_total !== undefined
                   ? Number(item.allowances_total)
                   : itemAlw.reduce((acc, a) => acc + (Number(a.amount) || 0), 0)
+                const itemDed = item.deductions || item.staff?.deductions || []
+                const itemDedTotal = item.deductions_total !== undefined
+                  ? Number(item.deductions_total)
+                  : (item.other_deduction ? Number(item.other_deduction) : itemDed.reduce((acc, d) => acc + (Number(d.amount) || 0), 0))
 
                 return (
                   <div key={item.id} className="p-3.5 space-y-3 bg-slate-900/30 hover:bg-slate-900/60 transition-colors">
@@ -428,6 +455,11 @@ export const PayrollPage: React.FC = () => {
                                 +{itemAlw.length} ভাতা
                               </span>
                             )}
+                            {itemDed.length > 0 && (
+                              <span className="text-[9px] px-1.5 py-0.2 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20 font-medium">
+                                -{itemDed.length} কর্তন
+                              </span>
+                            )}
                           </div>
                           <span className="text-xs text-primary-400 block truncate">{item.staff?.designation || '-'}</span>
                           <span className="text-[10px] text-slate-500 font-mono">{item.staff?.staff_code || ''}</span>
@@ -436,8 +468,8 @@ export const PayrollPage: React.FC = () => {
 
                       <span
                         className={`text-[10px] px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1 shrink-0 ${item.payment_status === 'PAID'
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                            : 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                          : 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
                           }`}
                       >
                         {item.payment_status === 'PAID' ? (
@@ -464,12 +496,17 @@ export const PayrollPage: React.FC = () => {
                         )}
                       </div>
                       <div>
-                        <span className="text-[10px] text-amber-400 block">অগ্রিম কর্তন</span>
+                        <span className="text-[10px] text-amber-400 block">মোট কর্তন</span>
                         <span className="text-xs font-mono font-bold text-amber-400">
-                          {item.advance_deduction > 0
-                            ? `-৳${Number(item.advance_deduction).toLocaleString('en-IN')}`
+                          {(Number(item.advance_deduction || 0) + itemDedTotal) > 0
+                            ? `-৳${(Number(item.advance_deduction || 0) + itemDedTotal).toLocaleString('en-IN')}`
                             : '৳০'}
                         </span>
+                        {itemDedTotal > 0 && item.advance_deduction > 0 ? (
+                          <span className="text-[9px] text-slate-400 block">অগ্রিম + নিয়মিত</span>
+                        ) : itemDedTotal > 0 ? (
+                          <span className="text-[9px] text-rose-400 block">নিয়মিত কর্তন</span>
+                        ) : null}
                       </div>
                       <div>
                         <span className="text-[10px] text-emerald-400 block">প্রদেয় নিট</span>
@@ -559,6 +596,29 @@ export const PayrollPage: React.FC = () => {
                       <div className="flex justify-between text-xs text-primary-300 font-medium pt-0.5">
                         <span>মোট নিয়মিত ভাতা:</span>
                         <span className="font-mono">+৳{modalAlwTotal.toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+                  ) : null
+                })()}
+                {/* Dynamic Deductions in Pay Modal */}
+                {(() => {
+                  const modalDed = payingItem.deductions || payingItem.staff?.deductions || []
+                  const modalDedTotal = payingItem.deductions_total !== undefined
+                    ? Number(payingItem.deductions_total)
+                    : (payingItem.other_deduction ? Number(payingItem.other_deduction) : modalDed.reduce((acc, d) => acc + (Number(d.amount) || 0), 0))
+
+                  return modalDed.length > 0 ? (
+                    <div className="pt-1.5 pb-1 border-t border-slate-800/80 space-y-1">
+                      <span className="text-[11px] font-semibold text-rose-300 block">নিয়মিত কর্তনসমূহ:</span>
+                      {modalDed.map((ded, idx) => (
+                        <div key={idx} className="flex justify-between text-slate-300 text-[11px] pl-2">
+                          <span>• {ded.title}:</span>
+                          <span className="font-mono text-rose-400">-৳{Number(ded.amount).toLocaleString('en-IN')}</span>
+                        </div>
+                      ))}
+                      <div className="flex justify-between text-xs text-rose-300 font-medium pt-0.5">
+                        <span>মোট নিয়মিত কর্তন:</span>
+                        <span className="font-mono">-৳{modalDedTotal.toLocaleString('en-IN')}</span>
                       </div>
                     </div>
                   ) : null
@@ -694,6 +754,10 @@ export const PayrollPage: React.FC = () => {
                   const slipAlwTotal = viewingPayslipItem.allowances_total !== undefined
                     ? Number(viewingPayslipItem.allowances_total)
                     : slipAlw.reduce((acc, a) => acc + (Number(a.amount) || 0), 0)
+                  const slipDed = viewingPayslipItem.deductions || viewingPayslipItem.staff?.deductions || []
+                  const slipDedTotal = viewingPayslipItem.deductions_total !== undefined
+                    ? Number(viewingPayslipItem.deductions_total)
+                    : (viewingPayslipItem.other_deduction ? Number(viewingPayslipItem.other_deduction) : slipDed.reduce((acc, d) => acc + (Number(d.amount) || 0), 0))
                   const gross = Number(viewingPayslipItem.basic_salary) + slipAlwTotal
 
                   return (
@@ -726,6 +790,24 @@ export const PayrollPage: React.FC = () => {
                             <td className="py-2 px-3">সর্বমোট বেতন ও ভাতা (Gross Package)</td>
                             <td className="py-2 px-3 text-right font-mono text-white">
                               ৳{gross.toLocaleString('en-IN')}
+                            </td>
+                          </tr>
+                        )}
+                        {slipDed.map((ded, idx) => (
+                          <tr key={idx} className="text-rose-300">
+                            <td className="py-2 px-3 pl-5 text-[11px]">
+                              - {ded.title} (নিয়মিত কর্তন)
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono font-medium">
+                              -৳{Number(ded.amount).toLocaleString('en-IN')}
+                            </td>
+                          </tr>
+                        ))}
+                        {slipDed.length > 1 && (
+                          <tr className="bg-slate-900/30 text-rose-300/80 font-semibold text-[11px]">
+                            <td className="py-1.5 px-3 pl-5">মোট নিয়মিত কর্তন</td>
+                            <td className="py-1.5 px-3 text-right font-mono">
+                              -৳{slipDedTotal.toLocaleString('en-IN')}
                             </td>
                           </tr>
                         )}

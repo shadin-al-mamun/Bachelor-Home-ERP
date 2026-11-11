@@ -16,6 +16,12 @@ export interface StaffAllowance {
   amount: number
 }
 
+export interface StaffDeduction {
+  id: string
+  title: string
+  amount: number
+}
+
 export interface StaffMember {
   id: string
   staff_code: string
@@ -35,6 +41,7 @@ export interface StaffMember {
   resignation_date?: string | null
   monthly_salary: number // মূল বেতন (Basic Salary)
   allowances?: StaffAllowance[] // অন্যান্য ভাতা ও সুবিধাসমূহ
+  deductions?: StaffDeduction[] // নিয়মিত কর্তনসমূহ (যেমন: খাবার, বাসস্থান, বিশেষ কর্তন)
   is_active: boolean
   payment_method?: string | null
   bank_or_mfs_account?: string | null
@@ -70,6 +77,8 @@ export interface PayrollItem {
   basic_salary: number
   allowances?: StaffAllowance[]
   allowances_total?: number
+  deductions?: StaffDeduction[]
+  deductions_total?: number
   bonus_overtime: number
   advance_deduction: number
   absence_deduction: number
@@ -119,6 +128,7 @@ export interface CreateStaffMemberParams {
   joining_date?: string
   monthly_salary: number
   allowances?: StaffAllowance[]
+  deductions?: StaffDeduction[]
   payment_method?: string
   bank_or_mfs_account?: string
   notes?: string

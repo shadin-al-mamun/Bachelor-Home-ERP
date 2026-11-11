@@ -34,6 +34,7 @@ export const INITIAL_STAFF_BASELINE: StaffMember[] = [
     joining_date: '2026-11-01',
     monthly_salary: 10000,
     allowances: [],
+    deductions: [],
     is_active: true,
     payment_method: 'CASH',
     created_at: '2026-11-10T08:00:00.000Z',
@@ -48,6 +49,7 @@ export const INITIAL_STAFF_BASELINE: StaffMember[] = [
     joining_date: '2026-11-01',
     monthly_salary: 2000,
     allowances: [],
+    deductions: [],
     is_active: true,
     payment_method: 'CASH',
     created_at: '2026-11-10T08:00:00.000Z',
@@ -92,6 +94,8 @@ export const INITIAL_PAYROLL_BASELINE: PayrollSheet[] = [
         basic_salary: 10000,
         allowances: [],
         allowances_total: 0,
+        deductions: [],
+        deductions_total: 0,
         bonus_overtime: 0,
         advance_deduction: 3000,
         absence_deduction: 0,
@@ -109,6 +113,8 @@ export const INITIAL_PAYROLL_BASELINE: PayrollSheet[] = [
         basic_salary: 2000,
         allowances: [],
         allowances_total: 0,
+        deductions: [],
+        deductions_total: 0,
         bonus_overtime: 0,
         advance_deduction: 0,
         absence_deduction: 0,
@@ -373,6 +379,7 @@ export function useStaffMembers() {
                 joining_date: new Date().toISOString().slice(0, 10),
                 monthly_salary: p.full_name.includes('আনিসুজ্জামান') ? 10000 : 2000,
                 allowances: [],
+                deductions: [],
                 is_active: true,
                 payment_method: 'CASH',
                 created_at: new Date().toISOString(),
@@ -426,6 +433,7 @@ export function useCreateStaffMember() {
           joining_date: params.joining_date || new Date().toISOString().slice(0, 10),
           monthly_salary: Number(params.monthly_salary) || 0,
           allowances: params.allowances || [],
+          deductions: params.deductions || [],
           is_active: true,
           payment_method: params.payment_method || 'CASH',
           bank_or_mfs_account: params.bank_or_mfs_account,
@@ -454,6 +462,7 @@ export function useCreateStaffMember() {
           joining_date: params.joining_date || new Date().toISOString().slice(0, 10),
           monthly_salary: Number(params.monthly_salary) || 0,
           allowances: params.allowances || [],
+          deductions: params.deductions || [],
           payment_method: params.payment_method || 'CASH',
           bank_or_mfs_account: params.bank_or_mfs_account,
           notes: params.notes,
@@ -485,6 +494,7 @@ export function useCreateStaffMember() {
             joining_date: params.joining_date || new Date().toISOString().slice(0, 10),
             monthly_salary: Number(params.monthly_salary) || 0,
             allowances: params.allowances || [],
+            deductions: params.deductions || [],
             is_active: true,
             payment_method: params.payment_method || 'CASH',
             bank_or_mfs_account: params.bank_or_mfs_account,
@@ -526,6 +536,7 @@ export function useUpdateStaffMember() {
         if (
           error.message?.includes('schema cache') ||
           error.message?.includes('staff_members') ||
+          error.message?.includes('column') ||
           error.code === '42P01' ||
           error.code === 'PGRST204'
         ) {
@@ -535,6 +546,8 @@ export function useUpdateStaffMember() {
         }
         throw new Error(error.message || 'আপডেট করতে ব্যর্থ হয়েছে।')
       }
+      const staff = getStoredStaff().map((s) => (s.id === id ? { ...s, ...updates } : s))
+      saveStoredStaff(staff)
       return data as StaffMember
     },
     onSuccess: () => {
@@ -886,6 +899,7 @@ export function useGeneratePayrollSheet() {
               joining_date: new Date().toISOString().slice(0, 10),
               monthly_salary: p.full_name.includes('আনিসুজ্জামান') ? 10000 : 2000,
               allowances: [],
+              deductions: [],
               is_active: true,
               payment_method: 'CASH',
               created_at: new Date().toISOString(),
@@ -932,13 +946,15 @@ export function useGeneratePayrollSheet() {
       const items: PayrollItem[] = staffList.map((s) => {
         const basic = Number(s.monthly_salary) || 0
         const alwTotal = (s.allowances || []).reduce((sum, a) => sum + (Number(a.amount) || 0), 0)
+        const dedTotal = (s.deductions || []).reduce((sum, d) => sum + (Number(d.amount) || 0), 0)
         const grossSalary = basic + alwTotal
         const staffAdvances = allAdvances.filter((a) => a.staff_id === s.id)
         const advanceDeduction = staffAdvances.reduce((sum, a) => sum + (Number(a.amount) || 0), 0)
-        const netPayable = Math.max(0, grossSalary - advanceDeduction)
+        const totalStaffDeductions = advanceDeduction + dedTotal
+        const netPayable = Math.max(0, grossSalary - totalStaffDeductions)
 
         totalBasic += grossSalary
-        totalDeductions += advanceDeduction
+        totalDeductions += totalStaffDeductions
         totalNetPayable += netPayable
 
         return {
@@ -949,10 +965,12 @@ export function useGeneratePayrollSheet() {
           basic_salary: basic,
           allowances: s.allowances || [],
           allowances_total: alwTotal,
+          deductions: s.deductions || [],
+          deductions_total: dedTotal,
           bonus_overtime: 0,
           advance_deduction: advanceDeduction,
           absence_deduction: 0,
-          other_deduction: 0,
+          other_deduction: dedTotal,
           net_payable: netPayable,
           paid_amount: 0,
           payment_status: 'UNPAID',

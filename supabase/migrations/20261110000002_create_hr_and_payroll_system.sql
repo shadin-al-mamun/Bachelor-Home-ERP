@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS public.staff_members (
     resignation_date DATE,
     monthly_salary NUMERIC(12,2) NOT NULL DEFAULT 0.00 CHECK (monthly_salary >= 0),
     allowances JSONB DEFAULT '[]'::jsonb,
+    deductions JSONB DEFAULT '[]'::jsonb,
     is_active BOOLEAN NOT NULL DEFAULT true,
     payment_method VARCHAR(50) DEFAULT 'CASH',
     bank_or_mfs_account VARCHAR(100),
@@ -88,6 +89,8 @@ CREATE TABLE IF NOT EXISTS public.payroll_items (
     basic_salary NUMERIC(12,2) NOT NULL DEFAULT 0.00,
     allowances JSONB DEFAULT '[]'::jsonb,
     allowances_total NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+    deductions JSONB DEFAULT '[]'::jsonb,
+    deductions_total NUMERIC(12,2) NOT NULL DEFAULT 0.00,
     bonus_overtime NUMERIC(12,2) NOT NULL DEFAULT 0.00,
     advance_deduction NUMERIC(12,2) NOT NULL DEFAULT 0.00,
     absence_deduction NUMERIC(12,2) NOT NULL DEFAULT 0.00,
@@ -449,4 +452,13 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.fn_disburse_staff_advance(UUID, NUMERIC, UUID, DATE, TEXT) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.fn_disburse_payroll_item(UUID, UUID, TEXT) TO authenticated, service_role;
+
+-- Ensure dynamic allowances and deductions columns exist on existing databases
+ALTER TABLE public.staff_members ADD COLUMN IF NOT EXISTS allowances JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.staff_members ADD COLUMN IF NOT EXISTS deductions JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.payroll_items ADD COLUMN IF NOT EXISTS allowances JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.payroll_items ADD COLUMN IF NOT EXISTS allowances_total NUMERIC(12,2) NOT NULL DEFAULT 0.00;
+ALTER TABLE public.payroll_items ADD COLUMN IF NOT EXISTS deductions JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.payroll_items ADD COLUMN IF NOT EXISTS deductions_total NUMERIC(12,2) NOT NULL DEFAULT 0.00;
+
 

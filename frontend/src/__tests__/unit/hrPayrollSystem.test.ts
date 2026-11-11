@@ -219,5 +219,48 @@ describe('HR & Payroll Management Engine', () => {
     expect(totalCashDisbursed).toBe(12000)
     expect(grossPackage - totalCashDisbursed).toBe(0)
   })
+
+  it('6. Recurring Salary Deductions: correctly deducts regular monthly expenses (meal, utility, accommodation)', () => {
+    const staffWithDeduction: StaffMember = {
+      id: 'stf-mgr-2',
+      staff_code: 'STF-2026-417',
+      full_name: 'এস এম আনিসুজ্জামান',
+      phone_number: '01712345678',
+      designation: 'ম্যানেজার',
+      department: 'MANAGEMENT',
+      joining_date: '2026-10-11',
+      monthly_salary: 10000,
+      allowances: [
+        { id: 'alw-1', title: 'মোবাইল বিল', amount: 500 },
+      ],
+      deductions: [
+        { id: 'ded-1', title: 'খাবার বাবদ কর্তন', amount: 2000 },
+        { id: 'ded-2', title: 'ইউটিলিটি ও বাসস্থান', amount: 1000 },
+      ],
+      is_active: true,
+      created_at: '2026-10-11T00:00:00Z',
+    }
+
+    const totalAlw = (staffWithDeduction.allowances || []).reduce((sum, a) => sum + a.amount, 0)
+    const totalDed = (staffWithDeduction.deductions || []).reduce((sum, d) => sum + d.amount, 0)
+    expect(totalAlw).toBe(500)
+    expect(totalDed).toBe(3000)
+
+    const grossSalary = staffWithDeduction.monthly_salary + totalAlw
+    expect(grossSalary).toBe(10500)
+
+    // With a 1,000 BDT advance in addition to 3,000 BDT recurring deduction:
+    const advanceDeduction = 1000
+    const totalStaffDeductions = advanceDeduction + totalDed
+    expect(totalStaffDeductions).toBe(4000)
+
+    const netPayable = Math.max(0, grossSalary - totalStaffDeductions)
+    // 10500 - 4000 = 6500
+    expect(netPayable).toBe(6500)
+
+    // Total monthly budget for staff directory:
+    const monthlyBudget = grossSalary - totalDed
+    expect(monthlyBudget).toBe(7500)
+  })
 })
 
