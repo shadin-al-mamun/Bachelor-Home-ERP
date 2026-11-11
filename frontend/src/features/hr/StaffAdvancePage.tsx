@@ -146,43 +146,43 @@ export const StaffAdvancePage: React.FC = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur flex items-center justify-between">
-          <div>
-            <span className="text-xs font-medium text-slate-400 block">মোট বিতরণকৃত অগ্রিম</span>
-            <span className="text-2xl font-black font-mono text-white mt-0.5 block">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur flex items-center justify-between">
+          <div className="min-w-0">
+            <span className="text-[10px] sm:text-xs font-medium text-slate-400 block truncate">মোট বিতরণকৃত অগ্রিম</span>
+            <span className="text-sm sm:text-2xl font-black font-mono text-white mt-0.5 block">
               ৳{totalAdvances.toLocaleString('en-IN')}
             </span>
-            <span className="text-[11px] text-slate-400">সর্বমোট অগ্রিম ভাউচার</span>
+            <span className="text-[9px] sm:text-[11px] text-slate-400 block truncate">সর্বমোট অগ্রিম ভাউচার</span>
           </div>
-          <div className="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
-            <HandCoins className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0 ml-1.5">
+            <HandCoins className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur flex items-center justify-between">
-          <div>
-            <span className="text-xs font-medium text-amber-400 block">সমন্বয়ের অপেক্ষায় (Pending)</span>
-            <span className="text-2xl font-black font-mono text-amber-400 mt-0.5 block">
+        <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur flex items-center justify-between">
+          <div className="min-w-0">
+            <span className="text-[10px] sm:text-xs font-medium text-amber-400 block truncate">সমন্বয়ের অপেক্ষায়</span>
+            <span className="text-sm sm:text-2xl font-black font-mono text-amber-400 mt-0.5 block">
               ৳{pendingAdvances.toLocaleString('en-IN')}
             </span>
-            <span className="text-[11px] text-slate-400">পরবর্তী বেতন থেকে কর্তন হবে</span>
+            <span className="text-[9px] sm:text-[11px] text-slate-400 block truncate">বেতন থেকে কর্তন হবে</span>
           </div>
-          <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-            <Clock className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0 ml-1.5">
+            <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur flex items-center justify-between">
-          <div>
-            <span className="text-xs font-medium text-emerald-400 block">ইতিমধ্যে কর্তিত / পরিশোধিত</span>
-            <span className="text-2xl font-black font-mono text-emerald-400 mt-0.5 block">
+        <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur flex items-center justify-between">
+          <div className="min-w-0">
+            <span className="text-[10px] sm:text-xs font-medium text-emerald-400 block truncate">ইতিমধ্যে সমন্বিত</span>
+            <span className="text-sm sm:text-2xl font-black font-mono text-emerald-400 mt-0.5 block">
               ৳{deductedAdvances.toLocaleString('en-IN')}
             </span>
-            <span className="text-[11px] text-slate-400">বেতন শিটে সমন্বিত হয়েছে</span>
+            <span className="text-[9px] sm:text-[11px] text-slate-400 block truncate">বেতন শিটে সমন্বিত</span>
           </div>
-          <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-            <CheckCircle2 className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0 ml-1.5">
+            <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
       </div>
@@ -253,104 +253,178 @@ export const StaffAdvancePage: React.FC = () => {
             <p className="text-xs text-slate-500 mt-1">কর্মচারীকে অগ্রিম টাকা প্রদান করতে উপরের বাটনে ক্লিক করুন।</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-slate-800 bg-slate-950/80 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  <th className="py-3 px-4">ভাউচার নং ও তারিখ</th>
-                  <th className="py-3 px-4">কর্মচারী</th>
-                  <th className="py-3 px-4">পদবী ও বিভাগ</th>
-                  <th className="py-3 px-4 text-right">অগ্রিম পরিমাণ</th>
-                  <th className="py-3 px-4">প্রদানকারী অ্যাকাউন্ট</th>
-                  <th className="py-3 px-4 text-center">স্ট্যাটাস</th>
-                  <th className="py-3 px-4">মন্তব্য</th>
-                  <th className="py-3 px-4 text-center">অ্যাকশন</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60 text-xs">
-                {filteredAdvances.map((adv) => (
-                  <tr key={adv.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-3.5 px-4">
-                      <span className="font-mono font-bold text-amber-400 block">{adv.voucher_no}</span>
-                      <span className="text-[11px] text-slate-500 font-mono flex items-center gap-1 mt-0.5">
-                        <Calendar className="w-3 h-3" />
-                        {adv.advance_date}
-                      </span>
-                    </td>
-
-                    <td className="py-3.5 px-4 font-semibold text-white">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center text-primary-400 font-bold shrink-0">
-                          <User className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <span>{adv.staff?.full_name || 'কর্মচারী'}</span>
-                          <span className="text-[10px] text-slate-500 font-mono block">
-                            {adv.staff?.staff_code || ''}
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="py-3.5 px-4 text-slate-300">
-                      <span className="font-medium block">{adv.staff?.designation || '-'}</span>
-                      <span className="text-[10px] text-slate-500">{adv.staff?.department || '-'}</span>
-                    </td>
-
-                    <td className="py-3.5 px-4 text-right font-black font-mono text-amber-400 text-sm">
-                      ৳{Number(adv.amount).toLocaleString('en-IN')}
-                    </td>
-
-                    <td className="py-3.5 px-4 text-slate-300">
-                      <span className="flex items-center gap-1.5 font-medium">
-                        <Wallet className="w-3.5 h-3.5 text-cyan-400" />
-                        {adv.disbursed_from_account?.account_name || 'ক্যাশ ড্রয়ার'}
-                      </span>
-                    </td>
-
-                    <td className="py-3.5 px-4 text-center">
-                      <span
-                        className={`text-[10px] px-2.5 py-1 rounded-full font-bold inline-flex items-center gap-1 ${
-                          adv.status === 'PENDING'
-                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                            : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                        }`}
-                      >
-                        {adv.status === 'PENDING' ? (
-                          <>
-                            <Clock className="w-3 h-3" /> কর্তনের অপেক্ষায়
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle2 className="w-3 h-3" /> বেতন থেকে কর্তিত
-                          </>
-                        )}
-                      </span>
-                    </td>
-
-                    <td className="py-3.5 px-4 text-slate-400 max-w-[180px] truncate">
-                      {adv.remarks || '-'}
-                    </td>
-
-                    <td className="py-3.5 px-4 text-center">
-                      {adv.status === 'PENDING' ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDirectReconcile(adv.id, adv.staff?.full_name)}
-                          disabled={reconcileMutation.isPending}
-                          className="text-[11px] h-7 px-2.5 rounded-lg font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                        >
-                          সরাসরি সমন্বয়
-                        </Button>
-                      ) : (
-                        <span className="text-[11px] text-emerald-400 font-medium">সমন্বিত ✓</span>
-                      )}
-                    </td>
+          <div>
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-800 bg-slate-950/80 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    <th className="py-3 px-4">ভাউচার নং ও তারিখ</th>
+                    <th className="py-3 px-4">কর্মচারী</th>
+                    <th className="py-3 px-4">পদবী ও বিভাগ</th>
+                    <th className="py-3 px-4 text-right">অগ্রিম পরিমাণ</th>
+                    <th className="py-3 px-4">প্রদানকারী অ্যাকাউন্ট</th>
+                    <th className="py-3 px-4 text-center">স্ট্যাটাস</th>
+                    <th className="py-3 px-4">মন্তব্য</th>
+                    <th className="py-3 px-4 text-center">অ্যাকশন</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 text-xs">
+                  {filteredAdvances.map((adv) => (
+                    <tr key={adv.id} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="py-3.5 px-4">
+                        <span className="font-mono font-bold text-amber-400 block">{adv.voucher_no}</span>
+                        <span className="text-[11px] text-slate-500 font-mono flex items-center gap-1 mt-0.5">
+                          <Calendar className="w-3 h-3" />
+                          {adv.advance_date}
+                        </span>
+                      </td>
+
+                      <td className="py-3.5 px-4 font-semibold text-white">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center text-primary-400 font-bold shrink-0">
+                            <User className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <span>{adv.staff?.full_name || 'কর্মচারী'}</span>
+                            <span className="text-[10px] text-slate-500 font-mono block">
+                              {adv.staff?.staff_code || ''}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="py-3.5 px-4 text-slate-300">
+                        <span className="font-medium block">{adv.staff?.designation || '-'}</span>
+                        <span className="text-[10px] text-slate-500">{adv.staff?.department || '-'}</span>
+                      </td>
+
+                      <td className="py-3.5 px-4 text-right font-black font-mono text-amber-400 text-sm">
+                        ৳{Number(adv.amount).toLocaleString('en-IN')}
+                      </td>
+
+                      <td className="py-3.5 px-4 text-slate-300">
+                        <span className="flex items-center gap-1.5 font-medium">
+                          <Wallet className="w-3.5 h-3.5 text-cyan-400" />
+                          {adv.disbursed_from_account?.account_name || 'ক্যাশ ড্রয়ার'}
+                        </span>
+                      </td>
+
+                      <td className="py-3.5 px-4 text-center">
+                        <span
+                          className={`text-[10px] px-2.5 py-1 rounded-full font-bold inline-flex items-center gap-1 ${
+                            adv.status === 'PENDING'
+                              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                              : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                          }`}
+                        >
+                          {adv.status === 'PENDING' ? (
+                            <>
+                              <Clock className="w-3 h-3" /> কর্তনের অপেক্ষায়
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="w-3 h-3" /> বেতন থেকে কর্তিত
+                            </>
+                          )}
+                        </span>
+                      </td>
+
+                      <td className="py-3.5 px-4 text-slate-400 max-w-[180px] truncate">
+                        {adv.remarks || '-'}
+                      </td>
+
+                      <td className="py-3.5 px-4 text-center">
+                        {adv.status === 'PENDING' ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDirectReconcile(adv.id, adv.staff?.full_name)}
+                            disabled={reconcileMutation.isPending}
+                            className="text-[11px] h-7 px-2.5 rounded-lg font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                          >
+                            সরাসরি সমন্বয়
+                          </Button>
+                        ) : (
+                          <span className="text-[11px] text-emerald-400 font-medium">সমন্বিত ✓</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Cards View */}
+            <div className="block md:hidden divide-y divide-slate-800/80">
+              {filteredAdvances.map((adv) => (
+                <div key={adv.id} className="p-3.5 space-y-3 bg-slate-900/30 hover:bg-slate-900/60 transition-colors">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-primary-400 font-bold shrink-0">
+                        <User className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-sm font-bold text-white block truncate">{adv.staff?.full_name || 'কর্মচারী'}</span>
+                        <span className="text-xs text-primary-400 block truncate">{adv.staff?.designation || '-'}</span>
+                      </div>
+                    </div>
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1 shrink-0 ${
+                        adv.status === 'PENDING'
+                          ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                          : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                      }`}
+                    >
+                      {adv.status === 'PENDING' ? (
+                        <>
+                          <Clock className="w-3 h-3" /> কর্তনের অপেক্ষায়
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-3 h-3" /> সমন্বিত
+                        </>
+                      )}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-slate-950/70 border border-slate-800/80">
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-mono block">{adv.voucher_no}</span>
+                      <span className="text-[10px] text-slate-500 font-mono flex items-center gap-1">
+                        <Calendar className="w-3 h-3" /> {adv.advance_date}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-amber-400 block font-medium">অগ্রিম পরিমাণ</span>
+                      <span className="text-sm font-black font-mono text-amber-400">
+                        ৳{Number(adv.amount).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span className="flex items-center gap-1">
+                      <Wallet className="w-3.5 h-3.5 text-cyan-400" />
+                      {adv.disbursed_from_account?.account_name || 'ক্যাশ ড্রয়ার'}
+                    </span>
+                    {adv.remarks && <span className="text-[11px] text-slate-400 italic truncate max-w-[150px]">{adv.remarks}</span>}
+                  </div>
+
+                  {adv.status === 'PENDING' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDirectReconcile(adv.id, adv.staff?.full_name)}
+                      disabled={reconcileMutation.isPending}
+                      className="w-full text-xs h-8 rounded-lg font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-center gap-1"
+                    >
+                      সরাসরি সমন্বয় করুন
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -358,8 +432,8 @@ export const StaffAdvancePage: React.FC = () => {
       {/* Record Advance Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between shrink-0">
               <h2 className="text-base font-bold text-white flex items-center gap-2">
                 <HandCoins className="w-5 h-5 text-amber-400" />
                 অগ্রিম বেতন প্রদান
@@ -369,7 +443,7 @@ export const StaffAdvancePage: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-5 space-y-4">
+            <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto flex-1">
               <div>
                 <label className="text-xs font-semibold text-slate-300 block mb-1">
                   কর্মচারী নির্বাচন করুন <span className="text-rose-400">*</span>

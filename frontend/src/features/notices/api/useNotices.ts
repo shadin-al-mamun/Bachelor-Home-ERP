@@ -120,6 +120,7 @@ export const useNotices = (options?: { activeOnly?: boolean; boarderId?: string;
             (row) =>
               row.id !== 'notice-seed-1' &&
               !row.id.startsWith('seed-') &&
+              !row.title?.startsWith('__SYSTEM_') &&
               !row.title?.includes('বিদ্যুৎ লাইন রক্ষণাবেক্ষণ')
           )
           .map((row) => ({

@@ -114,13 +114,19 @@ ALTER TABLE public.payroll_sheets ADD COLUMN IF NOT EXISTS total_allowances NUME
 ALTER TABLE public.payroll_items ADD COLUMN IF NOT EXISTS allowances JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE public.payroll_items ADD COLUMN IF NOT EXISTS allowances_total NUMERIC(12,2) NOT NULL DEFAULT 0.00;
 
--- 5. ROW LEVEL SECURITY (RLS) POLICIES
+-- 5. ROW LEVEL SECURITY (RLS) POLICIES & PERMISSIONS
 ALTER TABLE public.staff_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.staff_advances ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payroll_sheets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payroll_items ENABLE ROW LEVEL SECURITY;
 
+GRANT ALL ON public.staff_members TO anon, authenticated, service_role;
+GRANT ALL ON public.staff_advances TO anon, authenticated, service_role;
+GRANT ALL ON public.payroll_sheets TO anon, authenticated, service_role;
+GRANT ALL ON public.payroll_items TO anon, authenticated, service_role;
+
 -- 5.1 Staff Members RLS
+DROP POLICY IF EXISTS "Allow authenticated staff management" ON public.staff_members;
 CREATE POLICY "Allow authenticated staff management"
 ON public.staff_members
 FOR ALL
@@ -135,6 +141,7 @@ WITH CHECK (
 );
 
 -- 5.2 Staff Advances RLS
+DROP POLICY IF EXISTS "Allow authenticated staff advances management" ON public.staff_advances;
 CREATE POLICY "Allow authenticated staff advances management"
 ON public.staff_advances
 FOR ALL
@@ -149,6 +156,7 @@ WITH CHECK (
 );
 
 -- 5.3 Payroll Sheets RLS
+DROP POLICY IF EXISTS "Allow authenticated payroll sheets management" ON public.payroll_sheets;
 CREATE POLICY "Allow authenticated payroll sheets management"
 ON public.payroll_sheets
 FOR ALL
@@ -163,6 +171,7 @@ WITH CHECK (
 );
 
 -- 5.4 Payroll Items RLS
+DROP POLICY IF EXISTS "Allow authenticated payroll items management" ON public.payroll_items;
 CREATE POLICY "Allow authenticated payroll items management"
 ON public.payroll_items
 FOR ALL
@@ -438,5 +447,6 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.fn_disburse_payroll_item(UUID, UUID, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.fn_disburse_staff_advance(UUID, NUMERIC, UUID, DATE, TEXT) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.fn_disburse_payroll_item(UUID, UUID, TEXT) TO authenticated, service_role;
 
