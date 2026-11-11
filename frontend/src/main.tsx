@@ -6,19 +6,24 @@ import './styles/print.css'
 import './i18n'
 import App from './App.tsx'
 
-// Safe Service Worker registration for PWA
-registerSW({
+// Safe Service Worker registration for PWA with automatic activation
+const updateSW = registerSW({
   immediate: true,
   onNeedRefresh() {
-    // New version ready; activates seamlessly without forced page disruption
+    // Auto update service worker immediately when new build arrives
+    updateSW(true)
   },
   onOfflineReady() {
     // App cached and ready for offline use
   },
 })
 
-// Check for service worker updates in background without forcefully interrupting active forms
+// Check for service worker updates immediately and on visibility change
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.ready
+    .then((reg) => reg.update())
+    .catch(() => {})
+
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
       navigator.serviceWorker.ready

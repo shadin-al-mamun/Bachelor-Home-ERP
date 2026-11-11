@@ -23,6 +23,105 @@ const LOCAL_ADVANCES_KEY = 'erp_staff_advances_v1'
 const LOCAL_PAYROLL_KEY = 'erp_payroll_sheets_v1'
 export const HR_CLOUD_NOTICE_TITLE = '__SYSTEM_HR_CLOUD_SYNC__'
 
+export const INITIAL_STAFF_BASELINE: StaffMember[] = [
+  {
+    id: 'stf-2026-416',
+    staff_code: 'STF-2026-416',
+    full_name: 'এস এম আনিসুজ্জামান',
+    phone_number: '01712396857',
+    designation: 'ম্যানেজার',
+    department: 'MANAGEMENT',
+    joining_date: '2026-11-01',
+    monthly_salary: 10000,
+    allowances: [],
+    is_active: true,
+    payment_method: 'CASH',
+    created_at: '2026-11-10T08:00:00.000Z',
+  },
+  {
+    id: 'stf-2026-790',
+    staff_code: 'STF-2026-790',
+    full_name: 'মোঃ এনামুল হক',
+    phone_number: '01722334455',
+    designation: 'ম্যানেজার',
+    department: 'MANAGEMENT',
+    joining_date: '2026-11-01',
+    monthly_salary: 2000,
+    allowances: [],
+    is_active: true,
+    payment_method: 'CASH',
+    created_at: '2026-11-10T08:00:00.000Z',
+  },
+]
+
+export const INITIAL_ADVANCES_BASELINE: StaffAdvance[] = [
+  {
+    id: 'adv-202611-5363',
+    voucher_no: 'ADV-202611-5363',
+    staff_id: 'stf-2026-416',
+    staff: INITIAL_STAFF_BASELINE[0],
+    amount: 3000,
+    advance_date: '2026-11-10',
+    disbursed_from_account_id: 'a0000000-0000-4000-8000-000000000001',
+    status: 'PENDING',
+    deducted_amount: 0,
+    remarks: 'জরুরী প্রয়োজনে অগ্রিম বেতন প্রদান',
+    created_at: '2026-11-10T08:15:00.000Z',
+  },
+]
+
+export const INITIAL_PAYROLL_BASELINE: PayrollSheet[] = [
+  {
+    id: 'pay-2026-11',
+    payroll_month: '2026-11',
+    payroll_batch_no: 'PAY-2026-11',
+    total_basic_salary: 12000,
+    total_bonuses: 0,
+    total_deductions: 3000,
+    total_net_payable: 9000,
+    total_paid_amount: 0,
+    status: 'DRAFT',
+    remarks: '2026-11 মাসের নিয়মিত বেতন শিট',
+    created_at: '2026-11-10T08:30:00.000Z',
+    items: [
+      {
+        id: 'item-stf-2026-416',
+        payroll_sheet_id: 'pay-2026-11',
+        staff_id: 'stf-2026-416',
+        staff: INITIAL_STAFF_BASELINE[0],
+        basic_salary: 10000,
+        allowances: [],
+        allowances_total: 0,
+        bonus_overtime: 0,
+        advance_deduction: 3000,
+        absence_deduction: 0,
+        other_deduction: 0,
+        net_payable: 7000,
+        paid_amount: 0,
+        payment_status: 'UNPAID',
+        created_at: '2026-11-10T08:30:00.000Z',
+      },
+      {
+        id: 'item-stf-2026-790',
+        payroll_sheet_id: 'pay-2026-11',
+        staff_id: 'stf-2026-790',
+        staff: INITIAL_STAFF_BASELINE[1],
+        basic_salary: 2000,
+        allowances: [],
+        allowances_total: 0,
+        bonus_overtime: 0,
+        advance_deduction: 0,
+        absence_deduction: 0,
+        other_deduction: 0,
+        net_payable: 2000,
+        paid_amount: 0,
+        payment_status: 'UNPAID',
+        created_at: '2026-11-10T08:30:00.000Z',
+      },
+    ],
+  },
+]
+
 export interface HRCloudPayload {
   staff: StaffMember[]
   advances: StaffAdvance[]
@@ -143,11 +242,12 @@ export async function pullHRCloudSync(): Promise<HRCloudPayload | null> {
 }
 
 export function getStoredStaff(): StaffMember[] {
-  if (typeof window === 'undefined') return []
+  if (typeof window === 'undefined') return INITIAL_STAFF_BASELINE
   try {
     const raw = localStorage.getItem(LOCAL_STAFF_KEY)
     if (!raw) {
-      return []
+      localStorage.setItem(LOCAL_STAFF_KEY, JSON.stringify(INITIAL_STAFF_BASELINE))
+      return INITIAL_STAFF_BASELINE
     }
     const parsed: StaffMember[] = JSON.parse(raw)
     // Strip away any legacy mock demo employees
@@ -157,12 +257,16 @@ export function getStoredStaff(): StaffMember[] {
         !s.id.startsWith('stf-mock') &&
         !['মো. রফিকুল ইসলাম', 'মো. জাহিদ হোসেন', 'রহিমা বেগম (খালা)', 'মো. আব্দুল জব্বার'].includes(s.full_name)
     )
+    if (filtered.length === 0) {
+      localStorage.setItem(LOCAL_STAFF_KEY, JSON.stringify(INITIAL_STAFF_BASELINE))
+      return INITIAL_STAFF_BASELINE
+    }
     if (filtered.length !== parsed.length) {
       localStorage.setItem(LOCAL_STAFF_KEY, JSON.stringify(filtered))
     }
     return filtered
   } catch {
-    return []
+    return INITIAL_STAFF_BASELINE
   }
 }
 
@@ -173,12 +277,21 @@ export function saveStoredStaff(staff: StaffMember[]) {
 }
 
 export function getStoredAdvances(): StaffAdvance[] {
-  if (typeof window === 'undefined') return []
+  if (typeof window === 'undefined') return INITIAL_ADVANCES_BASELINE
   try {
     const raw = localStorage.getItem(LOCAL_ADVANCES_KEY)
-    return raw ? JSON.parse(raw) : []
+    if (!raw) {
+      localStorage.setItem(LOCAL_ADVANCES_KEY, JSON.stringify(INITIAL_ADVANCES_BASELINE))
+      return INITIAL_ADVANCES_BASELINE
+    }
+    const parsed: StaffAdvance[] = JSON.parse(raw)
+    if (!parsed || parsed.length === 0) {
+      localStorage.setItem(LOCAL_ADVANCES_KEY, JSON.stringify(INITIAL_ADVANCES_BASELINE))
+      return INITIAL_ADVANCES_BASELINE
+    }
+    return parsed
   } catch {
-    return []
+    return INITIAL_ADVANCES_BASELINE
   }
 }
 
@@ -189,12 +302,21 @@ export function saveStoredAdvances(advances: StaffAdvance[]) {
 }
 
 export function getStoredPayroll(): PayrollSheet[] {
-  if (typeof window === 'undefined') return []
+  if (typeof window === 'undefined') return INITIAL_PAYROLL_BASELINE
   try {
     const raw = localStorage.getItem(LOCAL_PAYROLL_KEY)
-    return raw ? JSON.parse(raw) : []
+    if (!raw) {
+      localStorage.setItem(LOCAL_PAYROLL_KEY, JSON.stringify(INITIAL_PAYROLL_BASELINE))
+      return INITIAL_PAYROLL_BASELINE
+    }
+    const parsed: PayrollSheet[] = JSON.parse(raw)
+    if (!parsed || parsed.length === 0) {
+      localStorage.setItem(LOCAL_PAYROLL_KEY, JSON.stringify(INITIAL_PAYROLL_BASELINE))
+      return INITIAL_PAYROLL_BASELINE
+    }
+    return parsed
   } catch {
-    return []
+    return INITIAL_PAYROLL_BASELINE
   }
 }
 

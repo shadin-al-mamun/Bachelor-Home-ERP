@@ -11,6 +11,7 @@ import {
   X,
   CreditCard,
   User,
+  RefreshCw,
 } from 'lucide-react'
 import { Button } from '@/components/common/Button'
 import { usePayrollSheets, useGeneratePayrollSheet, useDisbursePayrollItem } from './api/useHR'
@@ -109,8 +110,8 @@ export const PayrollPage: React.FC = () => {
     const itemAlw = i.allowances || i.staff?.allowances || []
     return s + (i.allowances_total !== undefined ? Number(i.allowances_total) : itemAlw.reduce((acc, a) => acc + (Number(a.amount) || 0), 0))
   }, 0)
-  const totalGrossPackage = items.length > 0 
-    ? totalPureBasic + totalAllowances 
+  const totalGrossPackage = items.length > 0
+    ? totalPureBasic + totalAllowances
     : Number(currentSheet?.total_basic_salary) || 0
   const totalDeductions =
     currentSheet?.total_deductions || items.reduce((s, i) => s + (Number(i.advance_deduction) || 0), 0)
@@ -159,18 +160,33 @@ export const PayrollPage: React.FC = () => {
             </select>
           </div>
 
-          <Button
-            onClick={handleGenerateSheet}
-            disabled={generateMutation.isPending}
-            className="w-full sm:w-auto bg-primary-600 hover:bg-primary-500 text-white font-bold text-xs gap-2 px-4 py-2.5 rounded-xl shadow-lg shadow-primary-500/20 justify-center"
-          >
-            <Zap className={`w-4 h-4 ${generateMutation.isPending ? 'animate-spin' : ''}`} />
-            {generateMutation.isPending
-              ? 'বেতন শিট তৈরি হচ্ছে...'
-              : currentSheet
-              ? 'বেতন শিট পুনর্গণনা করুন'
-              : 'বেতন শিট তৈরি করুন'}
-          </Button>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Button
+              onClick={handleGenerateSheet}
+              disabled={generateMutation.isPending}
+              className="flex-1 sm:flex-initial bg-primary-600 hover:bg-primary-500 text-white font-bold text-xs gap-2 px-4 py-2.5 rounded-xl shadow-lg shadow-primary-500/20 justify-center"
+            >
+              <Zap className={`w-4 h-4 ${generateMutation.isPending ? 'animate-spin' : ''}`} />
+              {generateMutation.isPending
+                ? 'বেতন শিট তৈরি হচ্ছে...'
+                : currentSheet
+                  ? 'বেতন শিট পুনর্গণনা করুন'
+                  : 'বেতন শিট তৈরি করুন'}
+            </Button>
+
+            <Button
+              variant="ghost"
+              onClick={() => {
+                refetch()
+                window.location.reload()
+              }}
+              className="text-xs h-10 px-3 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white flex items-center justify-center gap-1.5 shrink-0 shadow-md"
+              title="লাইভ ডাটা রিফ্রেশ"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-primary-400" />
+              <span className="hidden sm:inline">রিফ্রেশ</span>
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -250,11 +266,10 @@ export const PayrollPage: React.FC = () => {
 
           {currentSheet && (
             <span
-              className={`text-xs px-2.5 py-0.5 rounded-full font-bold self-start sm:self-auto ${
-                currentSheet.status === 'DISBURSED'
+              className={`text-xs px-2.5 py-0.5 rounded-full font-bold self-start sm:self-auto ${currentSheet.status === 'DISBURSED'
                   ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                   : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-              }`}
+                }`}
             >
               {currentSheet.status === 'DISBURSED' ? 'সম্পূর্ণ পরিশোধিত' : 'খসড়া / অনুমোদিত'}
             </span>
@@ -292,8 +307,8 @@ export const PayrollPage: React.FC = () => {
                 <tbody className="divide-y divide-slate-800/60 text-xs">
                   {items.map((item) => {
                     const itemAlw = item.allowances || item.staff?.allowances || []
-                    const itemAlwTotal = item.allowances_total !== undefined 
-                      ? Number(item.allowances_total) 
+                    const itemAlwTotal = item.allowances_total !== undefined
+                      ? Number(item.allowances_total)
                       : itemAlw.reduce((acc, a) => acc + (Number(a.amount) || 0), 0)
 
                     return (
@@ -342,11 +357,10 @@ export const PayrollPage: React.FC = () => {
 
                         <td className="py-3.5 px-4 text-center">
                           <span
-                            className={`text-[10px] px-2.5 py-1 rounded-full font-bold inline-flex items-center gap-1 ${
-                              item.payment_status === 'PAID'
+                            className={`text-[10px] px-2.5 py-1 rounded-full font-bold inline-flex items-center gap-1 ${item.payment_status === 'PAID'
                                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                                 : 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
-                            }`}
+                              }`}
                           >
                             {item.payment_status === 'PAID' ? (
                               <>
@@ -394,8 +408,8 @@ export const PayrollPage: React.FC = () => {
             <div className="block md:hidden divide-y divide-slate-800/80">
               {items.map((item) => {
                 const itemAlw = item.allowances || item.staff?.allowances || []
-                const itemAlwTotal = item.allowances_total !== undefined 
-                  ? Number(item.allowances_total) 
+                const itemAlwTotal = item.allowances_total !== undefined
+                  ? Number(item.allowances_total)
                   : itemAlw.reduce((acc, a) => acc + (Number(a.amount) || 0), 0)
 
                 return (
@@ -421,11 +435,10 @@ export const PayrollPage: React.FC = () => {
                       </div>
 
                       <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1 shrink-0 ${
-                          item.payment_status === 'PAID'
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1 shrink-0 ${item.payment_status === 'PAID'
                             ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                             : 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
-                        }`}
+                          }`}
                       >
                         {item.payment_status === 'PAID' ? (
                           <>
@@ -533,7 +546,7 @@ export const PayrollPage: React.FC = () => {
                   const modalAlwTotal = payingItem.allowances_total !== undefined
                     ? Number(payingItem.allowances_total)
                     : modalAlw.reduce((acc, a) => acc + (Number(a.amount) || 0), 0)
-                  
+
                   return modalAlw.length > 0 ? (
                     <div className="pt-1.5 pb-1 border-t border-slate-800/80 space-y-1">
                       <span className="text-[11px] font-semibold text-primary-300 block">নিয়মিত সুবিধাসমূহ / ভাতা:</span>
