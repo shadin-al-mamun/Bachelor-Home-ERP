@@ -121,6 +121,11 @@ export const StaffDirectoryPage: React.FC = () => {
     setIsAddModalOpen(true)
   }
 
+  const handleCloseModal = () => {
+    setIsAddModalOpen(false)
+    setEditingStaff(null)
+  }
+
   const handleOpenEdit = (staff: StaffMember) => {
     setEditingStaff(staff)
     setFormData({
@@ -167,7 +172,7 @@ export const StaffDirectoryPage: React.FC = () => {
           monthly_salary: Number(formData.monthly_salary) || 0,
         })
       }
-      setIsAddModalOpen(false)
+      handleCloseModal()
       refetch()
     } catch (err: any) {
       alert(err.message || 'কর্মচারী সংরক্ষণ করতে ব্যর্থ হয়েছে।')
@@ -487,7 +492,7 @@ export const StaffDirectoryPage: React.FC = () => {
                 {editingStaff ? 'কর্মচারী তথ্য সম্পাদনা' : 'নতুন কর্মচারী সংযোজন'}
               </h2>
               <button
-                onClick={() => setIsAddModalOpen(false)}
+                onClick={handleCloseModal}
                 className="text-slate-400 hover:text-white p-1 rounded-lg"
               >
                 <X className="w-5 h-5" />
@@ -912,7 +917,7 @@ export const StaffDirectoryPage: React.FC = () => {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => setIsAddModalOpen(false)}
+                  onClick={handleCloseModal}
                   className="text-slate-400 hover:text-white"
                 >
                   বাতিল

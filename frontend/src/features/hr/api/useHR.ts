@@ -28,7 +28,7 @@ export const INITIAL_STAFF_BASELINE: StaffMember[] = [
     id: 'stf-2026-416',
     staff_code: 'STF-2026-416',
     full_name: 'এস এম আনিসুজ্জামান',
-    phone_number: '01712396857',
+    phone_number: '01794963009',
     designation: 'ম্যানেজার',
     department: 'MANAGEMENT',
     joining_date: '2026-11-01',
@@ -38,12 +38,13 @@ export const INITIAL_STAFF_BASELINE: StaffMember[] = [
     is_active: true,
     payment_method: 'CASH',
     created_at: '2026-11-10T08:00:00.000Z',
+    updated_at: '2026-11-10T08:00:00.000Z',
   },
   {
     id: 'stf-2026-790',
     staff_code: 'STF-2026-790',
     full_name: 'মোঃ এনামুল হক',
-    phone_number: '01722334455',
+    phone_number: '01755995974',
     designation: 'ম্যানেজার',
     department: 'MANAGEMENT',
     joining_date: '2026-11-01',
@@ -53,6 +54,7 @@ export const INITIAL_STAFF_BASELINE: StaffMember[] = [
     is_active: true,
     payment_method: 'CASH',
     created_at: '2026-11-10T08:00:00.000Z',
+    updated_at: '2026-11-10T08:00:00.000Z',
   },
 ]
 
@@ -137,46 +139,52 @@ export interface HRCloudPayload {
 
 let syncTimer: any = null
 
+export async function pushHRCloudSyncImmediate() {
+  if (!isSupabaseConfigured || typeof window === 'undefined') return
+  if (syncTimer) clearTimeout(syncTimer)
+  try {
+    const payload: HRCloudPayload = {
+      staff: getStoredStaff(),
+      advances: getStoredAdvances(),
+      payroll: getStoredPayroll(),
+      updated_at: new Date().toISOString(),
+    }
+    const jsonStr = JSON.stringify(payload)
+
+    const { data: existing } = await supabase
+      .from('hostel_notices')
+      .select('id')
+      .eq('title', HR_CLOUD_NOTICE_TITLE)
+      .limit(1)
+
+    if (existing && existing.length > 0) {
+      await supabase
+        .from('hostel_notices')
+        .update({
+          message: jsonStr,
+          is_active: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existing[0].id)
+    } else {
+      await supabase.from('hostel_notices').insert({
+        title: HR_CLOUD_NOTICE_TITLE,
+        message: jsonStr,
+        type: 'ALERT',
+        target_audience: 'SPECIFIC',
+        is_active: false,
+      })
+    }
+  } catch (e) {
+    console.warn('HR cloud sync push immediate failed:', e)
+  }
+}
+
 export function pushHRCloudSyncDebounced() {
   if (!isSupabaseConfigured || typeof window === 'undefined') return
   if (syncTimer) clearTimeout(syncTimer)
   syncTimer = setTimeout(async () => {
-    try {
-      const payload: HRCloudPayload = {
-        staff: getStoredStaff(),
-        advances: getStoredAdvances(),
-        payroll: getStoredPayroll(),
-        updated_at: new Date().toISOString(),
-      }
-      const jsonStr = JSON.stringify(payload)
-
-      const { data: existing } = await supabase
-        .from('hostel_notices')
-        .select('id')
-        .eq('title', HR_CLOUD_NOTICE_TITLE)
-        .limit(1)
-
-      if (existing && existing.length > 0) {
-        await supabase
-          .from('hostel_notices')
-          .update({
-            message: jsonStr,
-            is_active: false,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', existing[0].id)
-      } else {
-        await supabase.from('hostel_notices').insert({
-          title: HR_CLOUD_NOTICE_TITLE,
-          message: jsonStr,
-          type: 'ALERT',
-          target_audience: 'SPECIFIC',
-          is_active: false,
-        })
-      }
-    } catch (e) {
-      console.warn('HR cloud sync push failed:', e)
-    }
+    await pushHRCloudSyncImmediate()
   }, 300)
 }
 
@@ -197,15 +205,48 @@ export async function pullHRCloudSync(): Promise<HRCloudPayload | null> {
     const payload: HRCloudPayload = JSON.parse(data[0].message)
     if (!payload) return null
 
-    // Merge or update local caches across devices
+    // Merge or update local caches across devices safely
     if (Array.isArray(payload.staff) && payload.staff.length > 0) {
       const local = getStoredStaff()
-      const mergedStaff = [...payload.staff]
+      const map = new Map<string, StaffMember>()
+
+      // 1. Remote payload staff
+      payload.staff.forEach((ps) => {
+        if (ps && ps.id) map.set(ps.id, ps)
+        if (ps && ps.staff_code) map.set(ps.staff_code, ps)
+      })
+
+      // 2. Overlay local staff (prefer local if newer or equal timestamp)
       local.forEach((ls) => {
-        if (!mergedStaff.some((s) => s.id === ls.id || s.staff_code === ls.staff_code)) {
-          mergedStaff.push(ls)
+        const remote = map.get(ls.id) || (ls.staff_code ? map.get(ls.staff_code) : undefined)
+        if (!remote) {
+          map.set(ls.id, ls)
+        } else {
+          const localTime = ls.updated_at ? new Date(ls.updated_at).getTime() : 0
+          const remoteTime = remote.updated_at ? new Date(remote.updated_at).getTime() : 0
+          if (localTime >= remoteTime) {
+            map.set(ls.id, ls)
+            if (ls.staff_code) map.set(ls.staff_code, ls)
+          } else {
+            map.set(remote.id, remote)
+            if (remote.staff_code) map.set(remote.staff_code, remote)
+          }
         }
       })
+
+      // Dedup by ID / staff_code
+      const seen = new Set<string>()
+      const mergedStaff: StaffMember[] = []
+      Array.from(map.values()).forEach((item) => {
+        const key = item.id || item.staff_code
+        if (!seen.has(key)) {
+          seen.add(key)
+          if (item.id) seen.add(item.id)
+          if (item.staff_code) seen.add(item.staff_code)
+          mergedStaff.push(item)
+        }
+      })
+
       if (typeof window !== 'undefined') {
         localStorage.setItem(LOCAL_STAFF_KEY, JSON.stringify(mergedStaff))
       }
@@ -340,8 +381,14 @@ export function useStaffMembers() {
   return useQuery({
     queryKey: ['staff-members'],
     queryFn: async (): Promise<StaffMember[]> => {
+      // 1. Pull latest cloud sync notice if online
+      if (isSupabaseConfigured) {
+        await pullHRCloudSync()
+      }
+      const localStaff = getStoredStaff()
+
       if (!isSupabaseConfigured) {
-        return getStoredStaff()
+        return localStaff
       }
 
       try {
@@ -354,56 +401,37 @@ export function useStaffMembers() {
           `)
           .order('created_at', { ascending: false })
 
-        if (error) {
-          console.warn('staff_members query failed, pulling from cloud sync bridge:', error.message)
-          await pullHRCloudSync()
-          const staff = getStoredStaff()
-          if (staff.length > 0) return staff
-
-          // Fallback: Check if manager profiles exist in database to seed them
-          try {
-            const { data: mgrProfiles } = await supabase
-              .from('profiles')
-              .select('id, full_name, phone_number, role')
-              .in('role', ['MANAGER', 'ADMIN'])
-
-            if (mgrProfiles && mgrProfiles.length > 0) {
-              const defaultStaff: StaffMember[] = mgrProfiles.map((p, idx) => ({
-                id: `stf-${p.id.slice(0, 8)}`,
-                staff_code: `STF-2026-${400 + idx * 390}`,
-                profile_id: p.id,
-                full_name: p.full_name,
-                phone_number: p.phone_number || '01700000000',
-                designation: 'ম্যানেজার',
-                department: 'MANAGEMENT',
-                joining_date: new Date().toISOString().slice(0, 10),
-                monthly_salary: p.full_name.includes('আনিসুজ্জামান') ? 10000 : 2000,
-                allowances: [],
-                deductions: [],
-                is_active: true,
-                payment_method: 'CASH',
-                created_at: new Date().toISOString(),
-              }))
-              saveStoredStaff(defaultStaff)
-              return defaultStaff
-            }
-          } catch {
-            // Ignore
-          }
+        if (error || !data) {
+          console.warn('staff_members query failed, relying on local & cloud sync:', error?.message)
           return getStoredStaff()
         }
 
         const supabaseStaff = (data || []) as StaffMember[]
         if (supabaseStaff.length === 0) {
-          await pullHRCloudSync()
+          return getStoredStaff()
         }
-        const localOnlyStaff = getStoredStaff().filter(
-          (local) => !supabaseStaff.some((remote) => remote.id === local.id || remote.staff_code === local.staff_code)
-        )
-        return [...supabaseStaff, ...localOnlyStaff]
+
+        // Merge Supabase remote staff and local staff safely
+        const currentLocal = getStoredStaff()
+        const merged: StaffMember[] = [...supabaseStaff]
+
+        currentLocal.forEach((ls) => {
+          const remoteIdx = merged.findIndex((ms) => ms.id === ls.id || (ls.staff_code && ms.staff_code === ls.staff_code))
+          if (remoteIdx === -1) {
+            merged.push(ls)
+          } else {
+            // If local has newer timestamp or local allowances/deductions were edited, prefer local edits
+            const localTime = ls.updated_at ? new Date(ls.updated_at).getTime() : 0
+            const remoteTime = merged[remoteIdx].updated_at ? new Date(merged[remoteIdx].updated_at).getTime() : 0
+            if (localTime >= remoteTime) {
+              merged[remoteIdx] = { ...merged[remoteIdx], ...ls }
+            }
+          }
+        })
+
+        return merged
       } catch (err) {
         console.warn('staff_members network exception, falling back:', err)
-        await pullHRCloudSync()
         return getStoredStaff()
       }
     },
@@ -415,71 +443,40 @@ export function useCreateStaffMember() {
   return useMutation({
     mutationFn: async (params: CreateStaffMemberParams) => {
       const code = `STF-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`
-
-      if (!isSupabaseConfigured) {
-        const newStaff: StaffMember = {
-          id: `stf-${Date.now()}`,
-          staff_code: code,
-          profile_id: params.profile_id || null,
-          full_name: params.full_name,
-          phone_number: params.phone_number,
-          emergency_contact: params.emergency_contact,
-          designation: params.designation,
-          department: params.department,
-          nid_number: params.nid_number,
-          avatar_url: params.avatar_url,
-          assigned_building_id: params.assigned_building_id,
-          assigned_flat_id: params.assigned_flat_id,
-          joining_date: params.joining_date || new Date().toISOString().slice(0, 10),
-          monthly_salary: Number(params.monthly_salary) || 0,
-          allowances: params.allowances || [],
-          deductions: params.deductions || [],
-          is_active: true,
-          payment_method: params.payment_method || 'CASH',
-          bank_or_mfs_account: params.bank_or_mfs_account,
-          notes: params.notes,
-          created_at: new Date().toISOString(),
-        }
-        const updated = [newStaff, ...getStoredStaff()]
-        saveStoredStaff(updated)
-        return newStaff
+      const timestamp = new Date().toISOString()
+      const newStaff: StaffMember = {
+        id: `stf-${Date.now()}`,
+        staff_code: code,
+        profile_id: params.profile_id || null,
+        full_name: params.full_name,
+        phone_number: params.phone_number,
+        emergency_contact: params.emergency_contact,
+        designation: params.designation,
+        department: params.department,
+        nid_number: params.nid_number,
+        avatar_url: params.avatar_url,
+        assigned_building_id: params.assigned_building_id || undefined,
+        assigned_flat_id: params.assigned_flat_id || undefined,
+        joining_date: params.joining_date || new Date().toISOString().slice(0, 10),
+        monthly_salary: Number(params.monthly_salary) || 0,
+        allowances: params.allowances || [],
+        deductions: params.deductions || [],
+        is_active: true,
+        payment_method: params.payment_method || 'CASH',
+        bank_or_mfs_account: params.bank_or_mfs_account,
+        notes: params.notes,
+        created_at: timestamp,
+        updated_at: timestamp,
       }
 
-      const { data, error } = await supabase
-        .from('staff_members')
-        .insert({
-          staff_code: code,
-          profile_id: params.profile_id || null,
-          full_name: params.full_name,
-          phone_number: params.phone_number,
-          emergency_contact: params.emergency_contact,
-          designation: params.designation,
-          department: params.department,
-          nid_number: params.nid_number,
-          avatar_url: params.avatar_url,
-          assigned_building_id: params.assigned_building_id || null,
-          assigned_flat_id: params.assigned_flat_id || null,
-          joining_date: params.joining_date || new Date().toISOString().slice(0, 10),
-          monthly_salary: Number(params.monthly_salary) || 0,
-          allowances: params.allowances || [],
-          deductions: params.deductions || [],
-          payment_method: params.payment_method || 'CASH',
-          bank_or_mfs_account: params.bank_or_mfs_account,
-          notes: params.notes,
-        })
-        .select()
-        .single()
+      // Always save to local cache first
+      const updated = [newStaff, ...getStoredStaff().filter((s) => s.id !== newStaff.id && s.staff_code !== newStaff.staff_code)]
+      saveStoredStaff(updated)
+      await pushHRCloudSyncImmediate()
 
-      if (error) {
-        if (
-          error.message?.includes('schema cache') ||
-          error.message?.includes('staff_members') ||
-          error.code === '42P01' ||
-          error.code === 'PGRST204'
-        ) {
-          console.warn('staff_members table not in Supabase yet, falling back to local storage:', error.message)
-          const fallbackStaff: StaffMember = {
-            id: `stf-local-${Date.now()}`,
+      if (isSupabaseConfigured) {
+        try {
+          const insertPayload: any = {
             staff_code: code,
             profile_id: params.profile_id || null,
             full_name: params.full_name,
@@ -489,28 +486,44 @@ export function useCreateStaffMember() {
             department: params.department,
             nid_number: params.nid_number,
             avatar_url: params.avatar_url,
-            assigned_building_id: params.assigned_building_id || undefined,
-            assigned_flat_id: params.assigned_flat_id || undefined,
+            assigned_building_id: params.assigned_building_id || null,
+            assigned_flat_id: params.assigned_flat_id || null,
             joining_date: params.joining_date || new Date().toISOString().slice(0, 10),
             monthly_salary: Number(params.monthly_salary) || 0,
             allowances: params.allowances || [],
             deductions: params.deductions || [],
-            is_active: true,
             payment_method: params.payment_method || 'CASH',
             bank_or_mfs_account: params.bank_or_mfs_account,
             notes: params.notes,
-            created_at: new Date().toISOString(),
           }
-          const updated = [fallbackStaff, ...getStoredStaff()]
-          saveStoredStaff(updated)
-          return fallbackStaff
+
+          const { data, error } = await supabase
+            .from('staff_members')
+            .insert(insertPayload)
+            .select()
+            .single()
+
+          if (!error && data) {
+            const synced = getStoredStaff().map((s) => (s.id === newStaff.id ? (data as StaffMember) : s))
+            saveStoredStaff(synced)
+            await pushHRCloudSyncImmediate()
+            return data as StaffMember
+          }
+          console.warn('Supabase staff_members insert fallback:', error?.message)
+        } catch (supabaseErr) {
+          console.warn('Supabase staff insert exception:', supabaseErr)
         }
-        throw new Error(error.message || 'কর্মচারী তথ্য সংরক্ষণে ব্যর্থ হয়েছে।')
       }
-      return data as StaffMember
+
+      return newStaff
     },
-    onSuccess: () => {
+    onSuccess: (newStaff) => {
+      queryClient.setQueryData(['staff-members'], (old: StaffMember[] | undefined) => {
+        if (!old) return [newStaff]
+        return [newStaff, ...old.filter((s) => s.id !== newStaff.id && s.staff_code !== newStaff.staff_code)]
+      })
       queryClient.invalidateQueries({ queryKey: ['staff-members'] })
+      queryClient.invalidateQueries({ queryKey: ['payroll-sheets'] })
     },
   })
 }
@@ -519,39 +532,81 @@ export function useUpdateStaffMember() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<StaffMember> }) => {
-      if (!isSupabaseConfigured) {
-        const staff = getStoredStaff().map((s) => (s.id === id ? { ...s, ...updates } : s))
-        saveStoredStaff(staff)
-        return staff.find((s) => s.id === id)
+      const timestamp = new Date().toISOString()
+      const sanitizedUpdates: any = {
+        ...updates,
+        updated_at: timestamp,
       }
 
-      const { data, error } = await supabase
-        .from('staff_members')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single()
+      // Nullify empty string UUID foreign keys
+      if (!sanitizedUpdates.assigned_building_id || sanitizedUpdates.assigned_building_id === '') {
+        delete sanitizedUpdates.assigned_building_id
+      }
+      if (!sanitizedUpdates.assigned_flat_id || sanitizedUpdates.assigned_flat_id === '') {
+        delete sanitizedUpdates.assigned_flat_id
+      }
+      if (!sanitizedUpdates.profile_id || sanitizedUpdates.profile_id === '') {
+        delete sanitizedUpdates.profile_id
+      }
 
-      if (error) {
-        if (
-          error.message?.includes('schema cache') ||
-          error.message?.includes('staff_members') ||
-          error.message?.includes('column') ||
-          error.code === '42P01' ||
-          error.code === 'PGRST204'
-        ) {
-          const staff = getStoredStaff().map((s) => (s.id === id ? { ...s, ...updates } : s))
-          saveStoredStaff(staff)
-          return staff.find((s) => s.id === id) as StaffMember
+      // 1. Immediately update and save to localStorage
+      const currentList = getStoredStaff()
+      let found = false
+      const updatedList = currentList.map((s) => {
+        if (s.id === id || (updates.staff_code && s.staff_code === updates.staff_code)) {
+          found = true
+          return { ...s, ...sanitizedUpdates, updated_at: timestamp }
         }
-        throw new Error(error.message || 'আপডেট করতে ব্যর্থ হয়েছে।')
+        return s
+      })
+
+      if (!found) {
+        // If not found in current local list, append
+        updatedList.push({ ...sanitizedUpdates, id } as StaffMember)
       }
-      const staff = getStoredStaff().map((s) => (s.id === id ? { ...s, ...updates } : s))
-      saveStoredStaff(staff)
-      return data as StaffMember
+      saveStoredStaff(updatedList)
+
+      // 2. Immediately push to cloud sync so that any subsequent refetch() will see the updated data
+      await pushHRCloudSyncImmediate()
+
+      // 3. If Supabase is configured, attempt remote update
+      if (isSupabaseConfigured) {
+        try {
+          const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+          let query = supabase.from('staff_members').update(sanitizedUpdates)
+          if (isUUID) {
+            query = query.eq('id', id)
+          } else if (updates.staff_code) {
+            query = query.eq('staff_code', updates.staff_code)
+          } else {
+            query = query.eq('full_name', updates.full_name || '')
+          }
+
+          const { data, error } = await query.select().single()
+          if (!error && data) {
+            const remoteStaff = data as StaffMember
+            const reUpdated = getStoredStaff().map((s) => (s.id === id || s.staff_code === remoteStaff.staff_code ? { ...s, ...remoteStaff } : s))
+            saveStoredStaff(reUpdated)
+            await pushHRCloudSyncImmediate()
+            return remoteStaff
+          }
+          console.warn('Supabase staff_members update fallback:', error?.message)
+        } catch (supabaseErr) {
+          console.warn('Supabase staff_members update exception:', supabaseErr)
+        }
+      }
+
+      const finalSaved = getStoredStaff().find((s) => s.id === id || (updates.staff_code && s.staff_code === updates.staff_code)) || ({ ...updates, id } as StaffMember)
+      return finalSaved
     },
-    onSuccess: () => {
+    onSuccess: (savedStaff) => {
+      queryClient.setQueryData(['staff-members'], (old: StaffMember[] | undefined) => {
+        if (!old) return [savedStaff]
+        return old.map((s) => (s.id === savedStaff.id || (savedStaff.staff_code && s.staff_code === savedStaff.staff_code) ? { ...s, ...savedStaff } : s))
+      })
       queryClient.invalidateQueries({ queryKey: ['staff-members'] })
+      queryClient.invalidateQueries({ queryKey: ['payroll-sheets'] })
+      queryClient.invalidateQueries({ queryKey: ['staff-advances'] })
     },
   })
 }

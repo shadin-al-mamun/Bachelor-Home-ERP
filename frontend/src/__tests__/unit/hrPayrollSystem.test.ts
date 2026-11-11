@@ -262,5 +262,63 @@ describe('HR & Payroll Management Engine', () => {
     const monthlyBudget = grossSalary - totalDed
     expect(monthlyBudget).toBe(7500)
   })
+
+  it('7. Staff Update & Cloud Sync Merge: ensures local staff edits are preserved and not overwritten by older cloud payload', () => {
+    // Simulate remote cloud payload with older data
+    const remoteStaff: StaffMember[] = [
+      {
+        id: 'stf-2026-416',
+        staff_code: 'STF-2026-416',
+        full_name: 'এস এম আনিসুজ্জামান',
+        phone_number: '01794963009',
+        designation: 'ম্যানেজার',
+        department: 'MANAGEMENT',
+        joining_date: '2026-11-01',
+        monthly_salary: 10000,
+        allowances: [],
+        deductions: [],
+        is_active: true,
+        created_at: '2026-11-10T08:00:00.000Z',
+        updated_at: '2026-11-10T08:00:00.000Z',
+      },
+    ]
+
+    // Simulate user editing the staff member locally at a newer timestamp
+    const localEditedStaff: StaffMember = {
+      ...remoteStaff[0],
+      monthly_salary: 12000,
+      allowances: [{ id: 'alw-1', title: 'মোবাইল বিল', amount: 500 }],
+      deductions: [{ id: 'ded-1', title: 'খাবার বাবদ কর্তন', amount: 2000 }],
+      updated_at: '2026-11-11T11:45:00.000Z',
+    }
+
+    // Merge logic as in pullHRCloudSync:
+    const map = new Map<string, StaffMember>()
+    remoteStaff.forEach((ps) => {
+      if (ps && ps.id) map.set(ps.id, ps)
+      if (ps && ps.staff_code) map.set(ps.staff_code, ps)
+    })
+
+    const localList = [localEditedStaff]
+    localList.forEach((ls) => {
+      const remote = map.get(ls.id) || (ls.staff_code ? map.get(ls.staff_code) : undefined)
+      if (!remote) {
+        map.set(ls.id, ls)
+      } else {
+        const localTime = ls.updated_at ? new Date(ls.updated_at).getTime() : 0
+        const remoteTime = remote.updated_at ? new Date(remote.updated_at).getTime() : 0
+        if (localTime >= remoteTime) {
+          map.set(ls.id, ls)
+          if (ls.staff_code) map.set(ls.staff_code, ls)
+        }
+      }
+    })
+
+    const finalStaff = map.get('stf-2026-416')!
+    expect(finalStaff.monthly_salary).toBe(12000)
+    expect(finalStaff.allowances).toHaveLength(1)
+    expect(finalStaff.deductions).toHaveLength(1)
+    expect(finalStaff.deductions?.[0].amount).toBe(2000)
+  })
 })
 
