@@ -28,6 +28,14 @@ import { useBoarders, type BoarderWithRelations } from '@/features/boarders/api/
 import ApplicantReviewModal from '@/features/boarders/components/ApplicantReviewModal'
 import { formatDateBn } from '@/utils/date'
 import { formatFloorBn } from '@/utils/floor'
+import {
+  useFinancialAccounts,
+  useReceipts,
+  getVisibleFinancialAccounts,
+} from '@/features/billing/api/useReceipts'
+import { useExpenses } from '@/features/expenses/api/useExpenses'
+import { useIncomes, useAccountTransfers } from '@/features/finance/api/useFinance'
+import { useUsersList } from '@/features/governance/api/useUserManagement'
 
 export const OwnerDashboardPage: React.FC = () => {
   const { profile } = useAuthStore()
@@ -50,6 +58,150 @@ export const OwnerDashboardPage: React.FC = () => {
   const [selectedFinanceMonth, setSelectedFinanceMonth] = useState<string>(currentDhakaMonthStr)
   const { data: dashboard, isLoading, refetch, isRefetching } = useOwnerDashboard(selectedFinanceMonth)
   const { data: pendingBoarders = [], refetch: refetchPendingBoarders } = useBoarders({ status: 'PENDING' })
+
+  // Authoritative Running Ledger Balance (Single Source of Truth matching /finance/accounts)
+  const { data: accounts = [], refetch: refetchAccounts } = useFinancialAccounts()
+  const { data: receipts = [] } = useReceipts({ status: 'VALID' })
+  const { data: expenses = [] } = useExpenses({ status: 'APPROVED' })
+  const { data: incomes = [] } = useIncomes()
+  const { data: transfers = [] } = useAccountTransfers()
+  const { data: usersList = [] } = useUsersList()
+
+  const managerUsers = useMemo(() => {
+    return usersList.filter((u) => u.role === 'MANAGER' || u.role === 'ADMIN')
+  }, [usersList])
+
+  const visibleAccounts = useMemo(() => {
+    return getVisibleFinancialAccounts(accounts, profile)
+  }, [accounts, profile])
+
+  const visibleAccountIds = useMemo(() => {
+    return new Set(visibleAccounts.map((a) => a.id))
+  }, [visibleAccounts])
+
+  const rawLedgerEntries = useMemo(() => {
+    const list: Array<{ accountId: string; credit: number; debit: number }> = []
+
+    // 0. Opening Balance entries for visible accounts
+    visibleAccounts.forEach((acc: any) => {
+      const openBal = Number(acc.opening_balance) || 0
+      if (openBal <= 0) return
+      list.push({
+        accountId: acc.id,
+        credit: openBal,
+        debit: 0,
+      })
+    })
+
+    // 1. Receipts (Bill Collection Credit)
+    receipts.forEach((r: any) => {
+      if (r.is_void) return
+      if (!visibleAccountIds.has(r.destination_account_id)) return
+      list.push({
+        accountId: r.destination_account_id,
+        credit: Number(r.amount) || 0,
+        debit: 0,
+      })
+    })
+
+    // 2. Non-rent Incomes
+    incomes.forEach((inc: any) => {
+      if (!visibleAccountIds.has(inc.destination_account_id)) return
+      list.push({
+        accountId: inc.destination_account_id,
+        credit: Number(inc.amount) || 0,
+        debit: 0,
+      })
+    })
+
+    // 3. Approved Expenses (Debit)
+    expenses.forEach((exp: any) => {
+      if (exp.approval_status === 'REJECTED') return
+      if (!visibleAccountIds.has(exp.source_account_id)) return
+      list.push({
+        accountId: exp.source_account_id,
+        credit: 0,
+        debit: Number(exp.amount) || 0,
+      })
+    })
+
+    // 4. Internal Transfers
+    transfers.forEach((trf: any) => {
+      if (visibleAccountIds.has(trf.from_account_id)) {
+        list.push({
+          accountId: trf.from_account_id,
+          credit: 0,
+          debit: Number(trf.amount) || 0,
+        })
+      }
+      if (visibleAccountIds.has(trf.to_account_id)) {
+        list.push({
+          accountId: trf.to_account_id,
+          credit: Number(trf.amount) || 0,
+          debit: 0,
+        })
+      }
+    })
+
+    return list
+  }, [visibleAccounts, visibleAccountIds, receipts, incomes, expenses, transfers])
+
+  const getAccountEffectiveBalance = useMemo(() => {
+    return (acc: any) => {
+      const accEntries = rawLedgerEntries.filter((e) => e.accountId === acc.id)
+      if (accEntries.length > 0) {
+        const net = accEntries.reduce((sum, e) => sum + e.credit - e.debit, 0)
+        return Math.max(0, net)
+      }
+      const cur = Number(acc.current_balance) || 0
+      const open = Number(acc.opening_balance) || 0
+      return cur > 0 ? cur : open
+    }
+  }, [rawLedgerEntries])
+
+  const managerCashAccounts = useMemo(() => {
+    return visibleAccounts.filter((a: any) =>
+      a.account_type === 'CASH_MANAGER' ||
+      a.account_number === 'MGR-CASH-01' ||
+      a.account_number === 'MGR-CASH-02' ||
+      (a.account_type !== 'CASH_OWNER' && a.account_type !== 'BANK' && (
+        a.account_name?.toLowerCase().includes('manager cash') ||
+        a.account_name?.includes('ম্যানেজার ক্যাশ') ||
+        a.account_name?.includes('ক্যাশ ড্রয়ার') ||
+        a.account_name?.includes('ক্যাশ ড্রয়ার')
+      ))
+    )
+  }, [visibleAccounts])
+
+  const liveManagerBreakdown = useMemo(() => {
+    return managerCashAccounts.map((a: any) => {
+      const balance = getAccountEffectiveBalance(a)
+      const assignedManager = managerUsers.find((u) => u.id === a.assigned_manager_id)
+      let managerName = assignedManager?.full_name || 'ম্যানেজার'
+      if (!assignedManager) {
+        if (a.account_name?.includes('আনিসুজ্জামান') || a.account_number === 'MGR-CASH-01') {
+          managerName = 'এস এম আনিসুজ্জামান'
+        } else if (a.account_name?.includes('এনামুল') || a.account_name?.includes('বিথীকা') || a.account_number === 'MGR-CASH-02') {
+          managerName = 'মোঃ এনামুল হক'
+        }
+      }
+
+      return {
+        account_id: a.id,
+        account_name: a.account_name,
+        account_number: a.account_number,
+        manager_name: managerName,
+        balance,
+      }
+    })
+  }, [managerCashAccounts, getAccountEffectiveBalance, managerUsers])
+
+  const liveTotalCashCustody = useMemo(() => {
+    if (liveManagerBreakdown.length > 0) {
+      return liveManagerBreakdown.reduce((sum, item) => sum + item.balance, 0)
+    }
+    return dashboard?.kpis?.cash_in_custody || 0
+  }, [liveManagerBreakdown, dashboard?.kpis?.cash_in_custody])
 
   const [reviewApplicant, setReviewApplicant] = useState<BoarderWithRelations | null>(null)
   const [trendMetric, setTrendMetric] = useState<'SURPLUS' | 'ALL'>('ALL')
@@ -134,7 +286,11 @@ export const OwnerDashboardPage: React.FC = () => {
               })}
             </div>
             <button
-              onClick={() => refetch()}
+              onClick={() => {
+                refetch()
+                refetchAccounts()
+                refetchPendingBoarders()
+              }}
               disabled={isRefetching}
               className="p-2.5 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition-colors"
               title="রিফ্রেশ করুন"
@@ -520,22 +676,22 @@ export const OwnerDashboardPage: React.FC = () => {
                 </div>
 
                 <div className="text-2xl sm:text-3xl font-extrabold font-mono text-amber-400 mt-2">
-                  ৳{kpis.cash_in_custody.toLocaleString('en-IN')}
+                  ৳{liveTotalCashCustody.toLocaleString('en-IN')}
                 </div>
 
                 <p className="text-[10px] text-amber-200/80 mt-0.5">
-                  ড্রয়ারে থাকা মোট নগদ টাকা {kpis.manager_cash_breakdown && kpis.manager_cash_breakdown.length > 0 ? `(${kpis.manager_cash_breakdown.length} জন ম্যানেজার)` : ''}
+                  ড্রয়ারে থাকা মোট নগদ টাকা {liveManagerBreakdown.length > 0 ? `(${liveManagerBreakdown.length} জন ম্যানেজার)` : ''}
                 </p>
 
                 {/* Per-Manager Live Cash Breakdown */}
-                {kpis.manager_cash_breakdown && kpis.manager_cash_breakdown.length > 0 ? (
+                {liveManagerBreakdown.length > 0 ? (
                   <div className="mt-3 pt-2.5 border-t border-slate-800/80 space-y-1.5">
                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
                       <span>ম্যানেজারভিত্তিক ড্রয়ার ক্যাশ:</span>
                       <span>ব্যালেন্স</span>
                     </div>
                     <div className="space-y-1.5 max-h-40 overflow-y-auto pr-0.5">
-                      {kpis.manager_cash_breakdown.map((item) => (
+                      {liveManagerBreakdown.map((item) => (
                         <div
                           key={item.account_id}
                           className="p-2 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-center justify-between gap-2"
