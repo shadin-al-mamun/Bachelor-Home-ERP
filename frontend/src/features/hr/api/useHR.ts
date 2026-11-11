@@ -572,8 +572,13 @@ export function useUpdateStaffMember() {
       // 3. If Supabase is configured, attempt remote update
       if (isSupabaseConfigured) {
         try {
+          const dbPayload = { ...sanitizedUpdates }
+          delete dbPayload.assigned_building
+          delete dbPayload.assigned_flat
+          delete dbPayload.staff
+
           const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
-          let query = supabase.from('staff_members').update(sanitizedUpdates)
+          let query = supabase.from('staff_members').update(dbPayload)
           if (isUUID) {
             query = query.eq('id', id)
           } else if (updates.staff_code) {
@@ -582,7 +587,14 @@ export function useUpdateStaffMember() {
             query = query.eq('full_name', updates.full_name || '')
           }
 
-          const { data, error } = await query.select().single()
+          const { data, error } = await query
+            .select(`
+              *,
+              assigned_building:buildings(id, name),
+              assigned_flat:flats(id, name, flat_code)
+            `)
+            .single()
+
           if (!error && data) {
             const remoteStaff = data as StaffMember
             const reUpdated = getStoredStaff().map((s) => (s.id === id || s.staff_code === remoteStaff.staff_code ? { ...s, ...remoteStaff } : s))
@@ -890,8 +902,16 @@ export function usePayrollSheets() {
           const existingIdx = merged.findIndex((ms) => ms.payroll_month === ls.payroll_month)
           if (existingIdx === -1) {
             merged.push(ls)
-          } else if ((!merged[existingIdx].items || merged[existingIdx].items.length === 0) && ls.items && ls.items.length > 0) {
-            merged[existingIdx].items = ls.items
+          } else {
+            // Check if local sheet has allowances/deductions or is newer
+            const localHasAlwOrDed = (ls.items || []).some(
+              (i) => (i.allowances_total && i.allowances_total > 0) || (i.deductions_total && i.deductions_total > 0)
+            )
+            const localTime = ls.created_at ? new Date(ls.created_at).getTime() : 0
+            const remoteTime = merged[existingIdx].created_at ? new Date(merged[existingIdx].created_at).getTime() : 0
+            if (localHasAlwOrDed || localTime >= remoteTime) {
+              merged[existingIdx] = ls
+            }
           }
         })
         return merged
@@ -913,59 +933,58 @@ export function useGeneratePayrollSheet() {
       const month = params.payroll_month // 'YYYY-MM'
       const batchNo = `PAY-${month}`
 
-      // 1. Fetch active staff members (combine Supabase + local + cloud sync)
-      let staffList: StaffMember[] = []
+      // 1. Fetch active staff members: always pull cloud sync and start with localStaff (which has user's newest allowances and deductions!)
+      await pullHRCloudSync()
+      const localStaff = getStoredStaff().filter((s) => s.is_active)
+      let remoteStaff: StaffMember[] = []
       if (isSupabaseConfigured) {
         try {
           const { data, error } = await supabase.from('staff_members').select('*').eq('is_active', true)
           if (!error && data) {
-            staffList = data as StaffMember[]
+            remoteStaff = data as StaffMember[]
           }
         } catch (err) {
           console.warn('staff_members fetch in generate payroll failed:', err)
         }
       }
-      if (staffList.length === 0) {
-        await pullHRCloudSync()
-      }
-      const localStaff = getStoredStaff().filter((s) => s.is_active)
+
+      // Merge: localStaff takes precedence whenever it has allowances/deductions or newer timestamp
+      const staffMap = new Map<string, StaffMember>()
+      remoteStaff.forEach((rs) => {
+        if (rs.id) staffMap.set(rs.id, rs)
+        if (rs.staff_code) staffMap.set(rs.staff_code, rs)
+      })
+
       localStaff.forEach((ls) => {
-        if (!staffList.some((s) => s.id === ls.id || s.staff_code === ls.staff_code)) {
-          staffList.push(ls)
+        const remote = staffMap.get(ls.id) || (ls.staff_code ? staffMap.get(ls.staff_code) : undefined)
+        if (!remote) {
+          staffMap.set(ls.id, ls)
+          if (ls.staff_code) staffMap.set(ls.staff_code, ls)
+        } else {
+          const localHasAllowances = Array.isArray(ls.allowances) && ls.allowances.length > 0
+          const localHasDeductions = Array.isArray(ls.deductions) && ls.deductions.length > 0
+          const localTime = ls.updated_at ? new Date(ls.updated_at).getTime() : 0
+          const remoteTime = remote.updated_at ? new Date(remote.updated_at).getTime() : 0
+
+          if (localHasAllowances || localHasDeductions || localTime >= remoteTime) {
+            const mergedItem = { ...remote, ...ls }
+            staffMap.set(ls.id, mergedItem)
+            if (ls.staff_code) staffMap.set(ls.staff_code, mergedItem)
+          }
         }
       })
 
-      if (staffList.length === 0 && isSupabaseConfigured) {
-        try {
-          const { data: mgrProfiles } = await supabase
-            .from('profiles')
-            .select('id, full_name, phone_number, role')
-            .in('role', ['MANAGER', 'ADMIN'])
-
-          if (mgrProfiles && mgrProfiles.length > 0) {
-            const defaultStaff: StaffMember[] = mgrProfiles.map((p, idx) => ({
-              id: `stf-${p.id.slice(0, 8)}`,
-              staff_code: `STF-2026-${400 + idx * 390}`,
-              profile_id: p.id,
-              full_name: p.full_name,
-              phone_number: p.phone_number || '01700000000',
-              designation: 'ম্যানেজার',
-              department: 'MANAGEMENT',
-              joining_date: new Date().toISOString().slice(0, 10),
-              monthly_salary: p.full_name.includes('আনিসুজ্জামান') ? 10000 : 2000,
-              allowances: [],
-              deductions: [],
-              is_active: true,
-              payment_method: 'CASH',
-              created_at: new Date().toISOString(),
-            }))
-            saveStoredStaff(defaultStaff)
-            staffList = defaultStaff
-          }
-        } catch {
-          // Ignore
+      const seenStaff = new Set<string>()
+      const staffList: StaffMember[] = []
+      Array.from(staffMap.values()).forEach((s) => {
+        const key = s.id || s.staff_code
+        if (!seenStaff.has(key)) {
+          seenStaff.add(key)
+          if (s.id) seenStaff.add(s.id)
+          if (s.staff_code) seenStaff.add(s.staff_code)
+          staffList.push(s)
         }
-      }
+      })
 
       if (staffList.length === 0) {
         throw new Error('কোনো সক্রিয় কর্মচারী বা কর্মকর্তা পাওয়া যায়নি। আগে কর্মচারী তালিকায় কর্মী যুক্ত করুন।')
@@ -1003,7 +1022,9 @@ export function useGeneratePayrollSheet() {
         const alwTotal = (s.allowances || []).reduce((sum, a) => sum + (Number(a.amount) || 0), 0)
         const dedTotal = (s.deductions || []).reduce((sum, d) => sum + (Number(d.amount) || 0), 0)
         const grossSalary = basic + alwTotal
-        const staffAdvances = allAdvances.filter((a) => a.staff_id === s.id)
+        const staffAdvances = allAdvances.filter(
+          (a) => a.staff_id === s.id || (s.staff_code && a.staff?.staff_code === s.staff_code)
+        )
         const advanceDeduction = staffAdvances.reduce((sum, a) => sum + (Number(a.amount) || 0), 0)
         const totalStaffDeductions = advanceDeduction + dedTotal
         const netPayable = Math.max(0, grossSalary - totalStaffDeductions)
@@ -1095,7 +1116,7 @@ export function useGeneratePayrollSheet() {
         }
       }
 
-      // Always save to localStorage
+      // Always save to localStorage and push immediately to cloud sync
       const existing = getStoredPayroll()
       const existingIdx = existing.findIndex((p) => p.payroll_month === month)
       let updated: PayrollSheet[]
@@ -1106,9 +1127,20 @@ export function useGeneratePayrollSheet() {
         updated = [completeSheet, ...existing]
       }
       saveStoredPayroll(updated)
+      await pushHRCloudSyncImmediate()
       return completeSheet
     },
-    onSuccess: () => {
+    onSuccess: (newSheet) => {
+      queryClient.setQueryData(['payroll-sheets'], (old: PayrollSheet[] | undefined) => {
+        if (!old) return [newSheet]
+        const idx = old.findIndex((p) => p.payroll_month === newSheet.payroll_month)
+        if (idx >= 0) {
+          const copy = [...old]
+          copy[idx] = newSheet
+          return copy
+        }
+        return [newSheet, ...old]
+      })
       queryClient.invalidateQueries({ queryKey: ['payroll-sheets'] })
     },
   })

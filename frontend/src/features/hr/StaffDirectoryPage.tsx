@@ -157,6 +157,11 @@ export const StaffDirectoryPage: React.FC = () => {
       return
     }
 
+    const selectedBuilding = buildings.find((b: any) => b.id === formData.assigned_building_id)
+    const assignedBuildingObj = selectedBuilding
+      ? { id: selectedBuilding.id, name: selectedBuilding.name }
+      : null
+
     try {
       if (editingStaff) {
         await updateMutation.mutateAsync({
@@ -164,12 +169,14 @@ export const StaffDirectoryPage: React.FC = () => {
           updates: {
             ...formData,
             monthly_salary: Number(formData.monthly_salary) || 0,
+            assigned_building: assignedBuildingObj,
           },
         })
       } else {
         await createMutation.mutateAsync({
           ...formData,
           monthly_salary: Number(formData.monthly_salary) || 0,
+          assigned_building: assignedBuildingObj,
         })
       }
       handleCloseModal()
@@ -445,14 +452,19 @@ export const StaffDirectoryPage: React.FC = () => {
                   </>
                 )}
 
-                {staff.assigned_building && (
-                  <div className="flex items-center justify-between text-slate-300">
-                    <span className="text-slate-500 flex items-center gap-1.5">
-                      <Building className="w-3.5 h-3.5" /> ডিউটি ভবন:
-                    </span>
-                    <span className="text-slate-300 truncate max-w-[150px]">{staff.assigned_building.name}</span>
-                  </div>
-                )}
+                {(() => {
+                  const bld =
+                    buildings.find((b: any) => b.id === staff.assigned_building_id) ||
+                    staff.assigned_building
+                  return bld?.name ? (
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span className="text-slate-500 flex items-center gap-1.5">
+                        <Building className="w-3.5 h-3.5" /> ডিউটি ভবন:
+                      </span>
+                      <span className="text-slate-300 truncate max-w-[150px]">{bld.name}</span>
+                    </div>
+                  ) : null
+                })()}
               </div>
 
               {/* Action Buttons */}

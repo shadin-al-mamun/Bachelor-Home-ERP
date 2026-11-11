@@ -124,7 +124,9 @@ export interface CreateStaffMemberParams {
   nid_number?: string
   avatar_url?: string
   assigned_building_id?: string
+  assigned_building?: { id: string; name: string } | null
   assigned_flat_id?: string
+  assigned_flat?: { id: string; name: string; flat_code: string } | null
   joining_date?: string
   monthly_salary: number
   allowances?: StaffAllowance[]

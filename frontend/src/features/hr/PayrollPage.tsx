@@ -14,7 +14,7 @@ import {
   RefreshCw,
 } from 'lucide-react'
 import { Button } from '@/components/common/Button'
-import { usePayrollSheets, useGeneratePayrollSheet, useDisbursePayrollItem } from './api/useHR'
+import { useStaffMembers, usePayrollSheets, useGeneratePayrollSheet, useDisbursePayrollItem } from './api/useHR'
 import { useFinancialAccounts } from '@/features/billing/api/useReceipts'
 import type { PayrollItem } from '@/types/hr'
 
@@ -22,6 +22,7 @@ export const PayrollPage: React.FC = () => {
   const currentMonthStr = new Date().toISOString().slice(0, 7)
   const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthStr)
   const { data: payrollSheets = [], isLoading, refetch } = usePayrollSheets()
+  const { data: staffList = [] } = useStaffMembers()
   const { data: accounts = [] } = useFinancialAccounts()
   const generateMutation = useGeneratePayrollSheet()
   const disburseMutation = useDisbursePayrollItem()
@@ -105,24 +106,56 @@ export const PayrollPage: React.FC = () => {
   }
 
   const items = currentSheet?.items || []
-  const totalPureBasic = items.reduce((s, i) => s + (Number(i.basic_salary) || 0), 0)
-  const totalAllowances = items.reduce((s, i) => {
-    const itemAlw = i.allowances || i.staff?.allowances || []
-    return s + (i.allowances_total !== undefined ? Number(i.allowances_total) : itemAlw.reduce((acc, a) => acc + (Number(a.amount) || 0), 0))
-  }, 0)
-  const totalRegularDeductions = items.reduce((s, i) => {
-    const itemDed = i.deductions || i.staff?.deductions || []
-    return s + (i.deductions_total !== undefined ? Number(i.deductions_total) : (i.other_deduction ? Number(i.other_deduction) : itemDed.reduce((acc, d) => acc + (Number(d.amount) || 0), 0)))
-  }, 0)
-  const totalAdvanceDeduction = items.reduce((s, i) => s + (Number(i.advance_deduction) || 0), 0)
-  const totalGrossPackage = items.length > 0
+  const enrichedItems = useMemo(() => {
+    return items.map((item) => {
+      const liveStaff =
+        staffList.find(
+          (s) => s.id === item.staff_id || (item.staff?.staff_code && s.staff_code === item.staff.staff_code)
+        ) || item.staff
+
+      const itemAlw =
+        item.allowances && item.allowances.length > 0 ? item.allowances : liveStaff?.allowances || []
+      const itemAlwTotal =
+        item.allowances_total !== undefined && item.allowances_total > 0
+          ? Number(item.allowances_total)
+          : itemAlw.reduce((acc, a) => acc + (Number(a.amount) || 0), 0)
+
+      const itemDed =
+        item.deductions && item.deductions.length > 0 ? item.deductions : liveStaff?.deductions || []
+      const itemDedTotal =
+        item.deductions_total !== undefined && item.deductions_total > 0
+          ? Number(item.deductions_total)
+          : item.other_deduction
+          ? Number(item.other_deduction)
+          : itemDed.reduce((acc, d) => acc + (Number(d.amount) || 0), 0)
+
+      const pureBasic = Number(item.basic_salary) || 0
+      const advanceDed = Number(item.advance_deduction) || 0
+      const computedNet = Math.max(0, pureBasic + itemAlwTotal - (advanceDed + itemDedTotal))
+      const netPayable = item.payment_status === 'PAID' ? Number(item.paid_amount) : computedNet
+
+      return {
+        ...item,
+        staff: liveStaff,
+        allowances: itemAlw,
+        allowances_total: itemAlwTotal,
+        deductions: itemDed,
+        deductions_total: itemDedTotal,
+        net_payable: netPayable,
+      }
+    })
+  }, [items, staffList])
+
+  const totalPureBasic = enrichedItems.reduce((s, i) => s + (Number(i.basic_salary) || 0), 0)
+  const totalAllowances = enrichedItems.reduce((s, i) => s + Number(i.allowances_total || 0), 0)
+  const totalRegularDeductions = enrichedItems.reduce((s, i) => s + Number(i.deductions_total || 0), 0)
+  const totalAdvanceDeduction = enrichedItems.reduce((s, i) => s + (Number(i.advance_deduction) || 0), 0)
+  const totalGrossPackage = enrichedItems.length > 0
     ? totalPureBasic + totalAllowances
     : Number(currentSheet?.total_basic_salary) || 0
-  const totalDeductions =
-    currentSheet?.total_deductions || items.reduce((s, i) => s + (Number(i.advance_deduction) || 0) + (Number(i.other_deduction) || 0), 0)
-  const totalNetPayable =
-    currentSheet?.total_net_payable || items.reduce((s, i) => s + (Number(i.net_payable) || 0), 0)
-  const totalPaid = currentSheet?.total_paid_amount || items.reduce((s, i) => s + (Number(i.paid_amount) || 0), 0)
+  const totalDeductions = totalAdvanceDeduction + totalRegularDeductions
+  const totalNetPayable = enrichedItems.reduce((s, i) => s + Number(i.net_payable || 0), 0)
+  const totalPaid = currentSheet?.total_paid_amount || enrichedItems.reduce((s, i) => s + (Number(i.paid_amount) || 0), 0)
   const remainingNetPayable = Math.max(0, totalNetPayable - totalPaid)
   const totalDisbursedCash = totalAdvanceDeduction + totalPaid
 
@@ -287,7 +320,7 @@ export const PayrollPage: React.FC = () => {
 
         {isLoading ? (
           <div className="p-12 text-center text-slate-400 text-sm">বেতন শিট লোড হচ্ছে...</div>
-        ) : !currentSheet || items.length === 0 ? (
+        ) : !currentSheet || enrichedItems.length === 0 ? (
           <div className="p-12 text-center">
             <FileText className="w-10 h-10 text-slate-600 mx-auto mb-2" />
             <p className="text-sm font-semibold text-slate-300">
@@ -315,15 +348,11 @@ export const PayrollPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 text-xs">
-                  {items.map((item) => {
-                    const itemAlw = item.allowances || item.staff?.allowances || []
-                    const itemAlwTotal = item.allowances_total !== undefined
-                      ? Number(item.allowances_total)
-                      : itemAlw.reduce((acc, a) => acc + (Number(a.amount) || 0), 0)
-                    const itemDed = item.deductions || item.staff?.deductions || []
-                    const itemDedTotal = item.deductions_total !== undefined
-                      ? Number(item.deductions_total)
-                      : (item.other_deduction ? Number(item.other_deduction) : itemDed.reduce((acc, d) => acc + (Number(d.amount) || 0), 0))
+                  {enrichedItems.map((item) => {
+                    const itemAlw = item.allowances || []
+                    const itemAlwTotal = Number(item.allowances_total) || 0
+                    const itemDed = item.deductions || []
+                    const itemDedTotal = Number(item.deductions_total) || 0
 
                     return (
                       <tr key={item.id} className="hover:bg-slate-800/30 transition-colors">
@@ -429,15 +458,11 @@ export const PayrollPage: React.FC = () => {
 
             {/* Mobile Cards View (Optimized for phones: Zero horizontal scroll, touch-friendly) */}
             <div className="block md:hidden divide-y divide-slate-800/80">
-              {items.map((item) => {
-                const itemAlw = item.allowances || item.staff?.allowances || []
-                const itemAlwTotal = item.allowances_total !== undefined
-                  ? Number(item.allowances_total)
-                  : itemAlw.reduce((acc, a) => acc + (Number(a.amount) || 0), 0)
-                const itemDed = item.deductions || item.staff?.deductions || []
-                const itemDedTotal = item.deductions_total !== undefined
-                  ? Number(item.deductions_total)
-                  : (item.other_deduction ? Number(item.other_deduction) : itemDed.reduce((acc, d) => acc + (Number(d.amount) || 0), 0))
+              {enrichedItems.map((item) => {
+                const itemAlw = item.allowances || []
+                const itemAlwTotal = Number(item.allowances_total) || 0
+                const itemDed = item.deductions || []
+                const itemDedTotal = Number(item.deductions_total) || 0
 
                 return (
                   <div key={item.id} className="p-3.5 space-y-3 bg-slate-900/30 hover:bg-slate-900/60 transition-colors">
