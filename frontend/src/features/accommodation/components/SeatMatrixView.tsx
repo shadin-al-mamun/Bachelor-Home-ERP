@@ -1013,7 +1013,11 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
                       setSearchQuery('')
                       setStatusFilter('ALL')
                     }}
-                    className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800/90 hover:border-primary-500/60 hover:shadow-xl hover:shadow-primary-500/10 transition-all duration-300 cursor-pointer space-y-4 group relative overflow-hidden flex flex-col justify-between"
+                    className={`p-5 rounded-2xl transition-all duration-300 cursor-pointer space-y-4 group relative overflow-hidden flex flex-col justify-between ${
+                      flat.status === 'INACTIVE'
+                        ? 'bg-slate-950/80 border border-rose-900/40 opacity-80'
+                        : 'bg-slate-900/70 border border-slate-800/90 hover:border-primary-500/60 hover:shadow-xl hover:shadow-primary-500/10'
+                    }`}
                   >
                     {/* Top Glow Accent on Hover */}
                     <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary-500 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -1022,7 +1026,11 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
                       {/* Flat Name & Badges */}
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-2xl bg-primary-600/15 border border-primary-500/30 text-primary-400 flex items-center justify-center font-bold group-hover:scale-105 transition-transform">
+                          <div className={`w-10 h-10 rounded-2xl border flex items-center justify-center font-bold group-hover:scale-105 transition-transform ${
+                            flat.status === 'INACTIVE'
+                              ? 'bg-rose-600/15 border-rose-500/30 text-rose-400'
+                              : 'bg-primary-600/15 border-primary-500/30 text-primary-400'
+                          }`}>
                             <DoorOpen className="w-5 h-5" />
                           </div>
                           <div>
@@ -1042,9 +1050,16 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
                           </div>
                         </div>
 
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-800/80 text-slate-300 border border-slate-700/60 shrink-0">
-                          {flat.flat_code}
-                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {flat.status === 'INACTIVE' && (
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                              নিষ্ক্রিয়
+                            </span>
+                          )}
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-800/80 text-slate-300 border border-slate-700/60">
+                            {flat.flat_code}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Seat Count Badges Grid */}

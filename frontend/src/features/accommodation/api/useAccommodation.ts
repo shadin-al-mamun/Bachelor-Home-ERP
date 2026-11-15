@@ -273,6 +273,38 @@ export function useCreateBuilding() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['buildings'] })
+      queryClient.invalidateQueries({ queryKey: ['accommodation'] })
+    },
+  })
+}
+
+export function useUpdateBuilding() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<Building> & { id: string }) => {
+      if (!isSupabaseConfigured) {
+        mockBuildings = mockBuildings.map((b) =>
+          b.id === id ? { ...b, ...updates, updated_at: new Date().toISOString() } : b
+        )
+        const updated = mockBuildings.find((b) => b.id === id)
+        return updated as Building
+      }
+
+      const { data, error } = await supabase
+        .from('buildings')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (error) throw error
+      return data as Building
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['buildings'] })
+      queryClient.invalidateQueries({ queryKey: ['flats'] })
+      queryClient.invalidateQueries({ queryKey: ['accommodation'] })
+      queryClient.invalidateQueries({ queryKey: ['seats'] })
     },
   })
 }
@@ -341,6 +373,38 @@ export function useCreateFlat() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['flats'] })
+      queryClient.invalidateQueries({ queryKey: ['accommodation'] })
+    },
+  })
+}
+
+export function useUpdateFlat() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<Flat> & { id: string }) => {
+      if (!isSupabaseConfigured) {
+        mockFlats = mockFlats.map((f) =>
+          f.id === id ? { ...f, ...updates, updated_at: new Date().toISOString() } : f
+        )
+        const updated = mockFlats.find((f) => f.id === id)
+        return updated as Flat
+      }
+
+      const { data, error } = await supabase
+        .from('flats')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (error) throw error
+      return data as Flat
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['flats'] })
+      queryClient.invalidateQueries({ queryKey: ['rooms'] })
+      queryClient.invalidateQueries({ queryKey: ['seats'] })
+      queryClient.invalidateQueries({ queryKey: ['accommodation'] })
     },
   })
 }

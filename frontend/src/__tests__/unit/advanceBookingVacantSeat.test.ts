@@ -3,6 +3,7 @@ import { enrichSeatAllocations } from '@/features/accommodation/api/useAccommoda
 
 describe('Seat Allocation Enrichment - Vacant Advance Booking vs Handover', () => {
   it('correctly enriches a previously vacant seat with future booking (Seat C-1, Abu Bakar from 11 Nov 2026)', () => {
+    const futureDate = new Date(Date.now() + 86400000 * 10).toISOString().slice(0, 10)
     const seatC1 = {
       id: 'seat-c-1',
       seat_code: 'Seat C-1',
@@ -17,7 +18,7 @@ describe('Seat Allocation Enrichment - Vacant Advance Booking vs Handover', () =
           seat_id: 'seat-c-1',
           status: 'ACTIVE',
           monthly_rent: 2900,
-          start_date: '2026-11-11', // starts in the future (today is before 11 Nov)
+          start_date: futureDate, // starts in the future
           end_date: null,
           boarder: {
             id: 'bdr-abu-bakar',
@@ -44,7 +45,7 @@ describe('Seat Allocation Enrichment - Vacant Advance Booking vs Handover', () =
     expect(enriched.has_upcoming_allocation).toBe(true)
     expect(enriched.upcoming_occupant_name).toBe('আবু বকর')
     expect(enriched.upcoming_occupant_code).toBe('BDR-2026-5784')
-    expect(enriched.upcoming_start_date).toBe('2026-11-11')
+    expect(enriched.upcoming_start_date).toBe(futureDate)
   })
 
   it('correctly handles handover when a seat has both a current resident leaving and upcoming booking (Seat B-1)', () => {

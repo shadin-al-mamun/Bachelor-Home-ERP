@@ -48,21 +48,26 @@ export const TransferSeatModal: React.FC<TransferSeatModalProps> = ({
 
   // Build available seats excluding the current one
   const availableSeats: AvailableSeat[] = useMemo(() => {
-    const fromHierarchy = (seatMatrix as BuildingWithFlats[]).flatMap(
-      (b: BuildingWithFlats) =>
-        (b.flats || []).flatMap((f: FlatWithRooms) =>
-          (f.rooms || []).flatMap((r: RoomWithSeats) =>
-            (r.seats || [])
-              .filter((s) => s.status === 'AVAILABLE' && s.id !== currentAllocation?.currentSeatId)
-              .map((s) => ({
-                ...s,
-                buildingName: b.name,
-                flatCode: f.flat_code,
-                roomName: r.name,
-              }))
+    const fromHierarchy = (seatMatrix as BuildingWithFlats[])
+      .filter((b: BuildingWithFlats) => b.status !== 'INACTIVE')
+      .flatMap((b: BuildingWithFlats) =>
+        (b.flats || [])
+          .filter((f: FlatWithRooms) => f.status !== 'INACTIVE')
+          .flatMap((f: FlatWithRooms) =>
+            (f.rooms || [])
+              .filter((r: RoomWithSeats) => r.status !== 'INACTIVE')
+              .flatMap((r: RoomWithSeats) =>
+                (r.seats || [])
+                  .filter((s) => s.status === 'AVAILABLE' && s.id !== currentAllocation?.currentSeatId)
+                  .map((s) => ({
+                    ...s,
+                    buildingName: b.name,
+                    flatCode: f.flat_code,
+                    roomName: r.name,
+                  }))
+              )
           )
-        )
-    )
+      )
 
     if (fromHierarchy.length > 0) return fromHierarchy
 
