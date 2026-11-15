@@ -55,32 +55,29 @@ export const BuildingList: React.FC = () => {
           <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-900/80 border border-slate-800 text-xs">
             <button
               onClick={() => setStatusFilter('ALL')}
-              className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
-                statusFilter === 'ALL'
-                  ? 'bg-primary-600 text-white'
-                  : 'text-slate-400 hover:text-white'
-              }`}
+              className={`px-2.5 py-1 rounded-lg font-medium transition-all ${statusFilter === 'ALL'
+                ? 'bg-primary-600 text-white'
+                : 'text-slate-400 hover:text-white'
+                }`}
             >
               সকল ({buildings.length})
             </button>
             <button
               onClick={() => setStatusFilter('ACTIVE')}
-              className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
-                statusFilter === 'ACTIVE'
-                  ? 'bg-emerald-600 text-white'
-                  : 'text-slate-400 hover:text-white'
-              }`}
+              className={`px-2.5 py-1 rounded-lg font-medium transition-all ${statusFilter === 'ACTIVE'
+                ? 'bg-emerald-600 text-white'
+                : 'text-slate-400 hover:text-white'
+                }`}
             >
               সক্রিয় ({activeCount})
             </button>
             {inactiveCount > 0 && (
               <button
                 onClick={() => setStatusFilter('INACTIVE')}
-                className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
-                  statusFilter === 'INACTIVE'
-                    ? 'bg-rose-600 text-white'
-                    : 'text-slate-400 hover:text-white'
-                }`}
+                className={`px-2.5 py-1 rounded-lg font-medium transition-all ${statusFilter === 'INACTIVE'
+                  ? 'bg-rose-600 text-white'
+                  : 'text-slate-400 hover:text-white'
+                  }`}
               >
                 নিষ্ক্রিয় ({inactiveCount})
               </button>
@@ -113,11 +110,10 @@ export const BuildingList: React.FC = () => {
               <Card
                 key={b.id}
                 variant="glass"
-                className={`p-5 transition-colors ${
-                  isInactive
-                    ? 'border-rose-900/40 bg-slate-950/70 opacity-80'
-                    : 'border-slate-800 hover:border-slate-700 bg-slate-900/60'
-                }`}
+                className={`p-5 transition-colors ${isInactive
+                  ? 'border-rose-900/40 bg-slate-950/70 opacity-80'
+                  : 'border-slate-800 hover:border-slate-700 bg-slate-900/60'
+                  }`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="space-y-1">

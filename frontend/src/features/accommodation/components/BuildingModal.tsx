@@ -146,16 +146,14 @@ export const BuildingModal: React.FC<BuildingModalProps> = ({
             <button
               type="button"
               onClick={() => setStatus('ACTIVE')}
-              className={`p-3 rounded-xl border text-left transition-all flex items-start gap-2.5 ${
-                status === 'ACTIVE'
-                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-200'
-                  : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'
-              }`}
+              className={`p-3 rounded-xl border text-left transition-all flex items-start gap-2.5 ${status === 'ACTIVE'
+                ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-200'
+                : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                }`}
             >
               <CheckCircle2
-                className={`w-4 h-4 mt-0.5 shrink-0 ${
-                  status === 'ACTIVE' ? 'text-emerald-400' : 'text-slate-500'
-                }`}
+                className={`w-4 h-4 mt-0.5 shrink-0 ${status === 'ACTIVE' ? 'text-emerald-400' : 'text-slate-500'
+                  }`}
               />
               <div>
                 <span className="text-xs font-bold block text-white">সক্রিয় (Active)</span>
@@ -168,16 +166,14 @@ export const BuildingModal: React.FC<BuildingModalProps> = ({
             <button
               type="button"
               onClick={() => setStatus('INACTIVE')}
-              className={`p-3 rounded-xl border text-left transition-all flex items-start gap-2.5 ${
-                status === 'INACTIVE'
-                  ? 'bg-rose-500/15 border-rose-500/40 text-rose-200'
-                  : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'
-              }`}
+              className={`p-3 rounded-xl border text-left transition-all flex items-start gap-2.5 ${status === 'INACTIVE'
+                ? 'bg-rose-500/15 border-rose-500/40 text-rose-200'
+                : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                }`}
             >
               <AlertTriangle
-                className={`w-4 h-4 mt-0.5 shrink-0 ${
-                  status === 'INACTIVE' ? 'text-rose-400' : 'text-slate-500'
-                }`}
+                className={`w-4 h-4 mt-0.5 shrink-0 ${status === 'INACTIVE' ? 'text-rose-400' : 'text-slate-500'
+                  }`}
               />
               <div>
                 <span className="text-xs font-bold block text-white">নিষ্ক্রিয় (Inactive)</span>
