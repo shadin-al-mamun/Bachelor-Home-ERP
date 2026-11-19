@@ -3,10 +3,12 @@ import { Modal } from '@/components/common/Modal'
 import { Button } from '@/components/common/Button'
 import { Input } from '@/components/common/Input'
 import { useCancelAllocationMutation } from '../api/useSeatAllocations'
-import { AlertTriangle, LogOut, CheckCircle2, Loader2, AlertCircle } from 'lucide-react'
+import { AlertTriangle, LogOut, CheckCircle2, Loader2, AlertCircle, Banknote, ShieldCheck } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
 import { formatCurrencyBn, formatDateBn } from '@/utils/date'
+import { useFinancialAccounts } from '@/features/billing/api/useReceipts'
+import { useRecordExpenseMutation, EXPENSE_CATEGORY_UUIDS } from '@/features/expenses/api/useExpenses'
 
 export interface AllocationCancelInfo {
   allocationId: string
@@ -33,26 +35,44 @@ export const CancelAllocationModal: React.FC<CancelAllocationModalProps> = ({
   const [reason, setReason] = useState('')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [isSuccess, setIsSuccess] = useState(false)
+  const [shouldRefundDeposit, setShouldRefundDeposit] = useState(false)
+  const [refundAmount, setRefundAmount] = useState<number>(0)
+  const [refundAccountId, setRefundAccountId] = useState('')
 
   const cancelMutation = useCancelAllocationMutation()
+  const recordExpenseMutation = useRecordExpenseMutation()
+  const { data: accounts = [] } = useFinancialAccounts()
+  const activeAccounts = accounts.filter((a) => a.is_active)
 
-  // Live Query: Fetch outstanding dues for this boarder before vacating/cancelling
+  // Live Query: Fetch outstanding dues and security deposit for this boarder
   const { data: duesData, isLoading: isLoadingDues } = useQuery({
     queryKey: ['boarder-dues-for-cancellation', allocation?.boarderId, allocation?.allocationId, allocation?.boarderCode],
     enabled: Boolean(isOpen && (allocation?.boarderId || allocation?.allocationId || allocation?.boarderCode)),
     queryFn: async () => {
-      if (!isSupabaseConfigured) return null
+      if (!isSupabaseConfigured) {
+        return {
+          boarderId: allocation?.boarderId || '',
+          outstandingDue: 0,
+          totalBilled: 0,
+          totalPaid: 0,
+          securityDeposit: 3000,
+        }
+      }
 
       let targetBoarderId = allocation?.boarderId
+      let securityDeposit = 0
 
       // If boarderId was not provided, look it up from allocationId
-      if (!targetBoarderId && allocation?.allocationId) {
+      if (allocation?.allocationId) {
         const { data: alloc } = await supabase
           .from('allocations')
-          .select('boarder_id')
+          .select('boarder_id, security_deposit')
           .eq('id', allocation.allocationId)
           .maybeSingle()
-        targetBoarderId = alloc?.boarder_id
+        if (alloc) {
+          if (!targetBoarderId) targetBoarderId = alloc.boarder_id
+          securityDeposit = Number(alloc.security_deposit) || 0
+        }
       }
 
       // Or look it up from boarderCode
@@ -81,6 +101,7 @@ export const CancelAllocationModal: React.FC<CancelAllocationModalProps> = ({
             outstandingDue: Number(summary.outstanding_due || 0),
             totalBilled: Number(summary.total_billed || 0),
             totalPaid: Number(summary.total_paid || 0),
+            securityDeposit,
           }
         }
       } catch {
@@ -112,6 +133,7 @@ export const CancelAllocationModal: React.FC<CancelAllocationModalProps> = ({
         outstandingDue,
         totalBilled,
         totalPaid,
+        securityDeposit,
       }
     },
   })
@@ -125,6 +147,20 @@ export const CancelAllocationModal: React.FC<CancelAllocationModalProps> = ({
       setEndDate(new Date().toISOString().slice(0, 10))
     }
   }, [isOpen])
+
+  useEffect(() => {
+    if (duesData) {
+      const deposit = duesData.securityDeposit || 0
+      const net = Math.max(0, deposit - duesData.outstandingDue)
+      setRefundAmount(net)
+      if (net > 0) {
+        setShouldRefundDeposit(true)
+      }
+      if (activeAccounts[0]?.id && !refundAccountId) {
+        setRefundAccountId(activeAccounts[0].id)
+      }
+    }
+  }, [duesData, activeAccounts, refundAccountId])
 
   if (!allocation) return null
 
@@ -145,6 +181,17 @@ export const CancelAllocationModal: React.FC<CancelAllocationModalProps> = ({
         reason: reason.trim(),
         status: actionType,
       })
+
+      // If deposit refund is selected, record an approved expense voucher to debit cash drawer/account
+      if (shouldRefundDeposit && refundAmount > 0 && refundAccountId) {
+        await recordExpenseMutation.mutateAsync({
+          categoryId: EXPENSE_CATEGORY_UUIDS.MISCELLANEOUS,
+          amount: refundAmount,
+          sourceAccountId: refundAccountId,
+          expenseDate: endDate,
+          description: `বর্ডার ${allocation.boarderName} (${allocation.boarderCode}) এর সিট ছাড়পত্র বাবদ জামানত ফেরত (Security Deposit Refund)`,
+        })
+      }
 
       setIsSuccess(true)
       setTimeout(() => {
@@ -226,6 +273,87 @@ export const CancelAllocationModal: React.FC<CancelAllocationModalProps> = ({
               বর্ডারের কোনো বকেয়া নেই (সম্পূর্ণ পরিশোধিত)
             </span>
             <span className="font-bold font-mono">৳০.০০</span>
+          </div>
+        )}
+
+        {/* SECURITY DEPOSIT & REFUND SECTION */}
+        {duesData && duesData.securityDeposit > 0 && (
+          <div className="p-4 rounded-2xl border border-indigo-500/30 bg-slate-900/80 space-y-3">
+            <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800">
+              <span className="text-slate-300 font-bold flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-indigo-400" />
+                জামানত ও রিফান্ড হিসাব (Security Deposit)
+              </span>
+              <span className="text-indigo-400 font-mono font-bold">
+                জমা: {formatCurrencyBn(duesData.securityDeposit)}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <span className="text-slate-400 text-[11px] block">বকেয়া সমন্বয়:</span>
+                <span className="text-rose-400 font-mono font-bold">
+                  −{formatCurrencyBn(Math.min(duesData.securityDeposit, duesData.outstandingDue))}
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="text-slate-400 text-[11px] block">নিট ফেরতযোগ্য জামানত:</span>
+                <span className="text-emerald-400 font-mono font-bold text-sm">
+                  {formatCurrencyBn(Math.max(0, duesData.securityDeposit - duesData.outstandingDue))}
+                </span>
+              </div>
+            </div>
+
+            {/* Checkbox to trigger auto-refund expense voucher */}
+            <div className="pt-2 border-t border-slate-800 space-y-2.5">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={shouldRefundDeposit}
+                  onChange={(e) => setShouldRefundDeposit(e.target.checked)}
+                  className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span className="text-xs font-semibold text-slate-200 flex items-center gap-1">
+                  <Banknote className="w-3.5 h-3.5 text-emerald-400" />
+                  বর্ডারকে অবশিষ্ট জামানত ফেরত ও ক্যাশ লেজার এন্ট্রি সম্পন্ন করুন
+                </span>
+              </label>
+
+              {shouldRefundDeposit && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 pl-5">
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-400 block mb-1">
+                      টাকা প্রদানের মাধ্যম (ড্রয়ার / একাউন্ট)
+                    </label>
+                    <select
+                      value={refundAccountId}
+                      onChange={(e) => setRefundAccountId(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 text-xs text-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-indigo-500"
+                    >
+                      {activeAccounts.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.account_name} ({a.account_type})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-400 block mb-1">
+                      ফেরত টাকার পরিমাণ (৳)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max={duesData.securityDeposit}
+                      value={refundAmount}
+                      onChange={(e) => setRefundAmount(Math.max(0, Number(e.target.value) || 0))}
+                      className="w-full bg-slate-950 border border-slate-800 text-xs font-mono font-bold text-emerald-400 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 text-right"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

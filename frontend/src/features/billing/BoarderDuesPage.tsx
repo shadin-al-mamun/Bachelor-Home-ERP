@@ -26,6 +26,7 @@ import {
   RefreshCw,
   ExternalLink,
   Calendar,
+  MessageCircle,
 } from 'lucide-react'
 
 export const BoarderDuesPage: React.FC = () => {
@@ -556,18 +557,34 @@ export const BoarderDuesPage: React.FC = () => {
                           </Link>
 
                           {hasDue && (
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              onClick={() => {
-                                setCollectBoarderId(row.boarder_id)
-                                setIsCollectModalOpen(true)
-                              }}
-                              className="h-8 px-2.5 text-xs shadow-sm bg-emerald-600 hover:bg-emerald-500 border-none font-bold text-white flex items-center gap-1"
-                            >
-                              <Receipt className="w-3.5 h-3.5 mr-1" />
-                              ভাড়া আদায়
-                            </Button>
+                            <>
+                              {row.phone_number && (
+                                <a
+                                  href={`https://wa.me/88${row.phone_number.replace(/^(\+?88)?0?/, '0')}?text=${encodeURIComponent(
+                                    `আসসালামু আলাইকুম ${row.full_name},\nব্যাচেলর হোম হোস্টেল থেকে আপনার বকেয়া ভাড়ার পরিমাণ: ৳${Number(row.outstanding_due || 0).toLocaleString('en-IN')}/-।\nঅনুগ্রহ করে নির্ধারিত সময়ের মধ্যে বকেয়া পরিশোধ করে আপনার মানি রিসিট গ্রহণ করুন।\nধন্যবাদান্তে,\nব্যাচেলর হোম প্রশাসন`
+                                  )}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="h-8 px-2 rounded-lg inline-flex items-center gap-1 text-xs font-semibold bg-emerald-950/60 text-emerald-400 hover:bg-emerald-900/60 border border-emerald-800/60 transition-colors"
+                                  title="বর্ডারের হোয়াটসঅ্যাপে বকেয়া তাগাদা বার্তা পাঠান"
+                                >
+                                  <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+                                  <span className="hidden sm:inline">WhatsApp</span>
+                                </a>
+                              )}
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={() => {
+                                  setCollectBoarderId(row.boarder_id)
+                                  setIsCollectModalOpen(true)
+                                }}
+                                className="h-8 px-2.5 text-xs shadow-sm bg-emerald-600 hover:bg-emerald-500 border-none font-bold text-white flex items-center gap-1"
+                              >
+                                <Receipt className="w-3.5 h-3.5 mr-1" />
+                                ভাড়া আদায়
+                              </Button>
+                            </>
                           )}
                         </div>
                       </td>

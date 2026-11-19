@@ -20,6 +20,8 @@ import { Button } from '@/components/common/Button'
 import { useStaffMembers, useCreateStaffMember, useUpdateStaffMember } from './api/useHR'
 import { useBuildings } from '@/features/accommodation/api/useAccommodation'
 import { useUsersList } from '@/features/governance/api/useUserManagement'
+import { useAuthStore } from '@/app/store/useAuthStore'
+import { useAccessControlStore } from '@/app/store/useAccessControlStore'
 import type { StaffMember, StaffDepartment, CreateStaffMemberParams } from '@/types/hr'
 
 const DEPARTMENTS: { value: StaffDepartment; label: string }[] = [
@@ -37,6 +39,9 @@ export const StaffDirectoryPage: React.FC = () => {
   const { data: rawUsers = [] } = useUsersList()
   const createMutation = useCreateStaffMember()
   const updateMutation = useUpdateStaffMember()
+  const { profile } = useAuthStore()
+  const { hasOptionAccess } = useAccessControlStore()
+  const canManageStaff = hasOptionAccess(profile?.role || '', 'hr', 'manage_staff', profile?.id)
 
   const systemOfficers = useMemo(() => {
     return rawUsers.filter((u) =>
@@ -236,13 +241,15 @@ export const StaffDirectoryPage: React.FC = () => {
           </p>
         </div>
 
-        <Button
-          onClick={handleOpenAdd}
-          className="bg-primary-600 hover:bg-primary-500 text-white font-bold text-xs gap-2 px-4 py-2.5 rounded-xl shadow-lg shadow-primary-500/20"
-        >
-          <UserPlus className="w-4 h-4" />
-          নতুন কর্মী যুক্ত করুন
-        </Button>
+        {canManageStaff && (
+          <Button
+            onClick={handleOpenAdd}
+            className="bg-primary-600 hover:bg-primary-500 text-white font-bold text-xs gap-2 px-4 py-2.5 rounded-xl shadow-lg shadow-primary-500/20"
+          >
+            <UserPlus className="w-4 h-4" />
+            নতুন কর্মী যুক্ত করুন
+          </Button>
+        )}
       </div>
 
       {/* KPI Cards */}
@@ -468,27 +475,29 @@ export const StaffDirectoryPage: React.FC = () => {
               </div>
 
               {/* Action Buttons */}
-              <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleToggleActive(staff)}
-                  className={`text-[11px] h-8 px-2.5 rounded-lg font-semibold ${
-                    staff.is_active ? 'text-rose-400 hover:text-rose-300' : 'text-emerald-400 hover:text-emerald-300'
-                  }`}
-                >
-                  {staff.is_active ? 'নিষ্ক্রিয় করুন' : 'সক্রিয় করুন'}
-                </Button>
+              {canManageStaff && (
+                <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleToggleActive(staff)}
+                    className={`text-[11px] h-8 px-2.5 rounded-lg font-semibold ${
+                      staff.is_active ? 'text-rose-400 hover:text-rose-300' : 'text-emerald-400 hover:text-emerald-300'
+                    }`}
+                  >
+                    {staff.is_active ? 'নিষ্ক্রিয় করুন' : 'সক্রিয় করুন'}
+                  </Button>
 
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleOpenEdit(staff)}
-                  className="text-[11px] h-8 px-3 rounded-lg font-semibold bg-slate-800/60 hover:bg-slate-800 text-slate-200"
-                >
-                  সম্পাদনা করুন
-                </Button>
-              </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleOpenEdit(staff)}
+                    className="text-[11px] h-8 px-3 rounded-lg font-semibold bg-slate-800/60 hover:bg-slate-800 text-slate-200"
+                  >
+                    সম্পাদনা করুন
+                  </Button>
+                </div>
+              )}
             </div>
           ))}
         </div>

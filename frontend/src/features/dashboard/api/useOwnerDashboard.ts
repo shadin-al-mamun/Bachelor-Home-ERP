@@ -496,11 +496,13 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
           mealsTomorrowRes,
           transfersRes,
           profilesRes,
+          advancesRes,
+          payrollRes,
         ] = await Promise.all([
           supabase.from('seats').select('id, status, room:rooms(flat_id)'),
           supabase.from('boarder_charges').select('amount, paid_amount, status, due_date, billing_month, boarder_id'),
           supabase.from('receipts').select('id, receipt_number, amount, is_void, receipt_date, received_by, destination_account_id, boarder_id').eq('is_void', false),
-          supabase.from('expenses').select('id, amount, approval_status, expense_date, paid_by, flat_id, building_id, source_account_id').eq('approval_status', 'APPROVED'),
+          supabase.from('expenses').select('id, amount, approval_status, expense_date, paid_by, flat_id, building_id, source_account_id, expense_voucher_no, description').eq('approval_status', 'APPROVED'),
           supabase.from('incomes').select('id, amount, income_date, destination_account_id'),
           supabase
             .from('financial_accounts')
@@ -523,25 +525,64 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
           supabase.from('meal_selections').select('boarder_id, breakfast, lunch, dinner').eq('meal_date', tomorrowStr),
           supabase.from('account_transfers').select('id, from_account_id, to_account_id, amount, transfer_date'),
           supabase.from('profiles').select('id, full_name, phone_number, role'),
+          supabase.from('staff_advances').select('id, amount, disbursed_from_account_id, status, voucher_no, expense_id, advance_date, disbursed_by'),
+          supabase.from('payroll_items').select('id, paid_amount, payment_status, disbursed_from_account_id'),
         ])
 
         let seats = seatsRes.data || []
         let rawAllocations = (allocationsRes.data || []) as any[]
         let allCharges = chargesRes.data || []
         let allReceipts = receiptsRes.data || []
-        let allExpenses = expensesRes.data || []
+        let allExpenses = (expensesRes.data || []) as any[]
         let allIncomes = incomesRes.data || []
         let allGuestBookings = (guestBookingsRes.data || []) as any[]
         let mealsToday = mealsTodayRes.data || []
         let mealsTomorrow = mealsTomorrowRes.data || []
+        const rawAdvances = (advancesRes?.data || []) as any[]
+        const rawPayroll = (payrollRes?.data || []) as any[]
+
+        // Merge staff advances seamlessly into expenses for authoritative cash ledger accounting
+        rawAdvances.forEach((adv: any) => {
+          if (!adv.disbursed_from_account_id) return
+          const alreadyLinked = allExpenses.some((e: any) =>
+            (adv.expense_id && e.id === adv.expense_id) ||
+            e.expense_voucher_no === adv.voucher_no ||
+            (e.description && e.description.includes(adv.voucher_no))
+          )
+          if (!alreadyLinked) {
+            allExpenses.push({
+              id: `adv-${adv.id}`,
+              amount: Number(adv.amount) || 0,
+              approval_status: 'APPROVED',
+              source_account_id: adv.disbursed_from_account_id,
+              expense_date: adv.advance_date,
+              paid_by: adv.disbursed_by,
+            })
+          }
+        })
+
+        // Merge paid payroll items into expenses
+        rawPayroll.forEach((item: any) => {
+          if (item.payment_status === 'PAID' && item.paid_amount > 0 && item.disbursed_from_account_id) {
+            allExpenses.push({
+              id: `pay-${item.id}`,
+              amount: Number(item.paid_amount) || 0,
+              approval_status: 'APPROVED',
+              source_account_id: item.disbursed_from_account_id,
+            })
+          }
+        })
+
         let managerAccounts = (managerAccountsRes.data || []).filter((a: any) =>
           a.account_type === 'CASH_MANAGER' ||
           a.id === '11111111-0000-0000-0000-000000000002' ||
           a.account_number === 'MGR-CASH-01' ||
+          a.account_number === 'MGR-CASH-02' ||
           (a.account_type !== 'CASH_OWNER' && a.account_type !== 'BANK' && (
             a.account_name?.toLowerCase().includes('manager cash') ||
             a.account_name?.includes('ম্যানেজার ক্যাশ') ||
-            a.account_name?.includes('ক্যাশ ড্রয়ার')
+            a.account_name?.includes('ক্যাশ ড্রয়ার') ||
+            a.account_name?.includes('ক্যাশ ড্রয়ার')
           ))
         )
 

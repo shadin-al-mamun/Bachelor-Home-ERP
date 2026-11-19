@@ -15,6 +15,7 @@ import {
   ShoppingCart,
   Layers,
   Store,
+  Lock,
 } from 'lucide-react'
 import { ManageCategoriesModal } from '@/features/finance/components/ManageCategoriesModal'
 import {
@@ -25,6 +26,7 @@ import {
   type RecordExpenseInput,
 } from '../api/useExpenses'
 import { useAuthStore } from '@/app/store/useAuthStore'
+import { useFinancialAuditStore } from '@/app/store/useFinancialAuditStore'
 import { getVisibleFinancialAccounts } from '@/features/billing/api/useReceipts'
 import type { ExpenseScope } from '@/types/database'
 import { compressVoucherImage } from '@/utils/imageCompression'
@@ -83,6 +85,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   const { data: accounts = [] } = useExpenseAccounts()
   const { data: flats = [] } = useExpenseFlats()
   const recordMutation = useRecordExpenseMutation()
+  const { isMonthLocked } = useFinancialAuditStore()
 
   const savedDraft = useMemo(() => getSavedDraft(), [])
 
@@ -387,6 +390,11 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       return
     }
 
+    if (isMonthLocked(expenseDate)) {
+      setErrorMsg(`এই মাসের (${expenseDate.slice(0, 7)}) আর্থিক হিসাব অডিট ও লক করা রয়েছে। কোনো নতুন ভাউচার যোগ করা যাবে না।`)
+      return
+    }
+
     if (!description.trim()) {
       setErrorMsg('খরচের সুনির্দিষ্ট বিবরণ উল্লেখ করুন।')
       return
@@ -545,16 +553,27 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
             {/* Expense Date */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-indigo-400" />
-                খরচের তারিখ <span className="text-rose-400">*</span>
+              <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+                  খরচের তারিখ <span className="text-rose-400">*</span>
+                </span>
+                {isMonthLocked(expenseDate) && (
+                  <span className="text-[10px] text-rose-400 font-bold flex items-center gap-1 bg-rose-950/60 border border-rose-800/60 px-1.5 py-0.5 rounded">
+                    <Lock className="w-3 h-3 text-rose-400" /> অডিট লক
+                  </span>
+                )}
               </label>
               <input
                 type="date"
                 value={expenseDate}
                 onChange={(e) => setExpenseDate(e.target.value)}
                 required
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700/80 text-white text-xs focus:outline-none focus:border-indigo-500 transition-all font-mono"
+                className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950/90 border text-white text-xs focus:outline-none transition-all font-mono ${
+                  isMonthLocked(expenseDate)
+                    ? 'border-rose-500/80 ring-1 ring-rose-500/40'
+                    : 'border-slate-700/80 focus:border-indigo-500'
+                }`}
               />
             </div>
           </div>
@@ -857,7 +876,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={recordMutation.isPending || !!successInfo}
+              disabled={recordMutation.isPending || !!successInfo || isMonthLocked(expenseDate)}
               className="px-6 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/30 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {recordMutation.isPending ? (

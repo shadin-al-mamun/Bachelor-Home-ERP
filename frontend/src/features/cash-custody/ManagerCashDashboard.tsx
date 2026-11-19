@@ -475,7 +475,10 @@ export const ManagerCashDashboard: React.FC = () => {
                 </span>
               </div>
               <div className="text-2xl sm:text-3xl font-extrabold font-mono text-amber-400 mt-1.5">
-                ৳{(session.account_current_balance ?? calculatedExpected).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                ৳{((session?.status === 'APPROVED' || session?.status === 'SUBMITTED') && session?.actual_counted_cash !== null && session?.actual_counted_cash !== undefined
+                  ? session.actual_counted_cash
+                  : calculatedExpected
+                ).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </div>
               <p className="text-[10px] text-amber-200/80 mt-1 font-medium">
                 ম্যানেজার ক্যাশ বক্সের বর্তমান মোট ব্যালেন্স

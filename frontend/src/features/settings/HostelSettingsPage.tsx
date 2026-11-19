@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 import {
   Building2,
   Sparkles,
@@ -25,9 +25,12 @@ import {
   Eye,
   Copy,
   AlertTriangle,
+  Lock,
+  Unlock,
 } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
+import { useFinancialAuditStore } from '@/app/store/useFinancialAuditStore'
 import {
   useBrandingStore,
   DEFAULT_BRANDING,
@@ -72,7 +75,7 @@ export const HostelSettingsPage: React.FC = () => {
 
   // Section switcher state
   const [activeSection, setActiveSection] = useState<
-    'all' | 'menu' | 'general' | 'receipt' | 'rules' | 'logo'
+    'all' | 'menu' | 'general' | 'receipt' | 'rules' | 'logo' | 'audit_lock'
   >(
     tabParam === 'menu'
       ? 'menu'
@@ -84,6 +87,8 @@ export const HostelSettingsPage: React.FC = () => {
       ? 'rules'
       : tabParam === 'logo'
       ? 'logo'
+      : tabParam === 'audit_lock'
+      ? 'audit_lock'
       : 'all'
   )
 
@@ -167,11 +172,34 @@ export const HostelSettingsPage: React.FC = () => {
     } else if (tabParam === 'logo') {
       setActiveSection('logo')
       setRightPanelTab('receipt')
+    } else if (tabParam === 'audit_lock') {
+      setActiveSection('audit_lock')
+      setRightPanelTab('receipt')
     }
   }, [tabParam])
 
+  const { lockMonth, unlockMonth, isMonthLocked } = useFinancialAuditStore()
+
+  const auditMonthsList = useMemo<{ value: string; label: string }[]>(() => {
+    const list: { value: string; label: string }[] = []
+    const now = new Date()
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const year = d.getFullYear()
+      const monthNum = String(d.getMonth() + 1).padStart(2, '0')
+      const value = `${year}-${monthNum}`
+      const monthNamesBn = [
+        'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+        'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
+      ]
+      const label = `${monthNamesBn[d.getMonth()]} ${year}${i === 0 ? ' (চলতি মাস)' : ''}`
+      list.push({ value, label })
+    }
+    return list
+  }, [])
+
   const handleSectionTabClick = (
-    section: 'all' | 'menu' | 'general' | 'receipt' | 'rules' | 'logo'
+    section: 'all' | 'menu' | 'general' | 'receipt' | 'rules' | 'logo' | 'audit_lock'
   ) => {
     setActiveSection(section)
     if (section === 'menu') {
@@ -508,6 +536,19 @@ export const HostelSettingsPage: React.FC = () => {
         >
           <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
           <span>লোগো ও অ্যাপ আইকন</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleSectionTabClick('audit_lock')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+            activeSection === 'audit_lock'
+              ? 'bg-rose-600 text-white shadow'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+          }`}
+        >
+          <Lock className="w-3.5 h-3.5 text-rose-400" />
+          <span>আর্থিক মাস অডিট ও লক</span>
         </button>
 
         <button
@@ -1133,6 +1174,119 @@ export const HostelSettingsPage: React.FC = () => {
           <p className="text-xs text-slate-500 mt-1">
             PNG, JPG, SVG, WebP (বর্গাকার ছবি সবচেয়ে ভালো দেখায়)
           </p>
+        </div>
+      </div>
+    )}
+
+    {/* Section 6: Financial Month Locking & Audit Controls */}
+    {(activeSection === 'all' || activeSection === 'audit_lock') && (
+      <div
+        className={`glass-card p-6 rounded-2xl border border-slate-800 space-y-6 ${
+          activeSection === 'all' ? 'pt-6 border-t border-slate-800' : ''
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+              <Lock className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <span>আর্থিক মাস অডিট ও লক (Financial Month Locking)</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                  অডিট প্রটেকশন
+                </span>
+              </h3>
+              <p className="text-xs text-slate-400">
+                আর্থিক মাস অডিট সম্পন্ন হলে লক করুন, যাতে পেছনের তারিখে অননুমোদিত খরচ বা পরিবর্তন প্রবেশ না করতে পারে
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/25 text-xs text-rose-300 flex items-start gap-2.5">
+          <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+          <p>
+            কোনো মাস লক করা থাকলে সেই নির্দিষ্ট মাসের খরচের ভাউচার তৈরি বা পরিবর্তন স্বয়ংক্রিয়ভাবে ব্লক থাকবে। কেবল সুপার এডমিন প্রয়োজনে যেকোনো সময় যেকোনো মাস আনলক করে পুনরায় কাজ করতে পারবেন।
+          </p>
+        </div>
+
+        <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+          {auditMonthsList.map((m) => {
+            const locked = isMonthLocked(m.value)
+            return (
+              <div
+                key={m.value}
+                className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 transition-colors ${
+                  locked
+                    ? 'bg-rose-950/20 border-rose-900/40 text-rose-200'
+                    : 'bg-slate-950/40 border-slate-800/80 text-slate-300'
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                      locked
+                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                        : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    }`}
+                  >
+                    {locked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                  </div>
+                  <div>
+                    <span className="text-sm font-bold text-white block">
+                      {m.label}
+                    </span>
+                    <span className="text-[11px] font-mono text-slate-400">
+                      মাস কোড: {m.value}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2.5 shrink-0">
+                  <span
+                    className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+                      locked
+                        ? 'bg-rose-950/80 text-rose-300 border-rose-800/60'
+                        : 'bg-emerald-950/80 text-emerald-300 border-emerald-800/60'
+                    }`}
+                  >
+                    {locked ? 'লকড (হিসাব ক্লোজড)' : 'উন্মুক্ত (সক্রিয় লেনদেন)'}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (locked) {
+                        unlockMonth(m.value)
+                      } else {
+                        if (confirm(`${m.label} এর হিসাব লক করতে চান? এর ফলে এই মাসে পেছনের তারিখে নতুন কোনো খরচ এন্ট্রি করা যাবে না।`)) {
+                          lockMonth(m.value)
+                        }
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      locked
+                        ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                        : 'bg-rose-600/90 hover:bg-rose-500 text-white shadow-sm'
+                    }`}
+                  >
+                    {locked ? (
+                      <>
+                        <Unlock className="w-3 h-3 text-emerald-400" />
+                        <span>আনলক করুন</span>
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="w-3 h-3" />
+                        <span>মাস লক করুন</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
     )}

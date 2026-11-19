@@ -22,6 +22,7 @@ import { FlatAssignmentModal } from './components/FlatAssignmentModal'
 import { CreateStaffModal } from './components/CreateStaffModal'
 import { ProfileModal } from '../../components/profile/ProfileModal'
 import { useAuthStore } from '../../app/store/useAuthStore'
+import { useAccessControlStore } from '../../app/store/useAccessControlStore'
 import { Navigate, Link } from 'react-router-dom'
 import type { UserRole } from '../../types/database'
 
@@ -40,6 +41,11 @@ const STAFF_ROLE_KEYS: UserRole[] = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNT
 
 export const UserManagementPage: React.FC = () => {
   const { profile: currentUser } = useAuthStore()
+  const { hasOptionAccess } = useAccessControlStore()
+  const canCreateStaff = hasOptionAccess(currentUser?.role || '', 'governance', 'create_staff', currentUser?.id)
+  const canChangeRole = hasOptionAccess(currentUser?.role || '', 'governance', 'change_role', currentUser?.id)
+  const canToggleStatus = hasOptionAccess(currentUser?.role || '', 'governance', 'toggle_status', currentUser?.id)
+  const canAssignFlats = hasOptionAccess(currentUser?.role || '', 'governance', 'assign_flats', currentUser?.id)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState('ALL')
@@ -116,14 +122,16 @@ export const UserManagementPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3 self-start sm:self-auto">
-          <button
-            type="button"
-            onClick={() => setIsCreateModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 flex items-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
-          >
-            <UserPlus className="w-4 h-4" />
-            <span>নতুন কর্মকর্তা আইডি তৈরি করুন</span>
-          </button>
+          {canCreateStaff && (
+            <button
+              type="button"
+              onClick={() => setIsCreateModalOpen(true)}
+              className="px-4 py-2.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 flex items-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>নতুন কর্মকর্তা আইডি তৈরি করুন</span>
+            </button>
+          )}
 
           <div className="px-4 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-right">
             <span className="text-[10px] uppercase font-semibold text-slate-500 block">
@@ -320,7 +328,7 @@ export const UserManagementPage: React.FC = () => {
               ) : (
                 users!.map((u, i) => {
                   const roleConfig = SYSTEM_ROLES.find((r) => r.role === u.role)
-                  const canAssignFlats = ['MANAGER', 'MEAL_OPERATOR', 'ADMIN'].includes(u.role)
+                  const isFlatRoleEligible = ['MANAGER', 'MEAL_OPERATOR', 'ADMIN'].includes(u.role)
                   const assignedCount = u.assigned_flats?.length || 0
 
                   return (
@@ -352,11 +360,11 @@ export const UserManagementPage: React.FC = () => {
                       <td className="py-3 px-4">
                         <select
                           value={u.role}
-                          disabled={updateRoleMutation.isPending || u.id === currentUser?.id}
+                          disabled={updateRoleMutation.isPending || u.id === currentUser?.id || !canChangeRole}
                           onChange={(e) => handleRoleChange(u, e.target.value as UserRole)}
                           className={`px-2.5 py-1 text-xs font-semibold rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500/50 bg-slate-900 ${
                             roleConfig?.badgeColor || 'border-slate-700 text-slate-300'
-                          }`}
+                          } ${!canChangeRole ? 'opacity-70 cursor-not-allowed' : ''}`}
                         >
                           {SYSTEM_ROLES.map((r) => (
                             <option key={r.role} value={r.role} className="bg-slate-900 text-slate-200">
@@ -368,18 +376,20 @@ export const UserManagementPage: React.FC = () => {
 
                       {/* Assigned Flats */}
                       <td className="py-3 px-4">
-                        {canAssignFlats ? (
+                        {isFlatRoleEligible ? (
                           <div className="flex items-center gap-2">
                             <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">
                               {assignedCount} টি ফ্ল্যাট
                             </span>
-                            <button
-                              type="button"
-                              onClick={() => setSelectedUserForFlats(u)}
-                              className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 underline"
-                            >
-                              পরিবর্তন করুন
-                            </button>
+                            {canAssignFlats && (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedUserForFlats(u)}
+                                className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 underline cursor-pointer"
+                              >
+                                পরিবর্তন করুন
+                              </button>
+                            )}
                           </div>
                         ) : (
                           <span className="text-[11px] text-slate-500 italic">প্রযোজ্য নয় (Global / Resident)</span>
@@ -391,8 +401,10 @@ export const UserManagementPage: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => handleStatusToggle(u)}
-                          disabled={u.id === currentUser?.id}
+                          disabled={u.id === currentUser?.id || !canToggleStatus}
                           className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition-colors ${
+                            !canToggleStatus ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+                          } ${
                             u.is_active
                               ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800 hover:bg-rose-950/80 hover:text-rose-300 hover:border-rose-800'
                               : 'bg-rose-950/80 text-rose-300 border border-rose-800 hover:bg-emerald-950/80 hover:text-emerald-300 hover:border-emerald-800'
@@ -428,7 +440,7 @@ export const UserManagementPage: React.FC = () => {
                             <span>ছবি</span>
                           </button>
 
-                          {canAssignFlats && (
+                          {canAssignFlats && isFlatRoleEligible && (
                             <button
                               type="button"
                               onClick={() => setSelectedUserForFlats(u)}

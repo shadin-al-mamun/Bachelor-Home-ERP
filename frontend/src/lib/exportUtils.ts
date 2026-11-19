@@ -604,3 +604,20 @@ export function exportToPDF(
 export function triggerBrowserPrint(): void {
   window.print()
 }
+
+/**
+ * Download Structured System Backup File (JSON)
+ */
+export function downloadSystemJsonBackup(payload: any, filename?: string): void {
+  const dateStr = new Date().toISOString().slice(0, 10)
+  const defaultFilename = `Bachelor_Home_ERP_Backup_${dateStr}.json`
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename || defaultFilename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}

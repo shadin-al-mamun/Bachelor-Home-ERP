@@ -11,6 +11,7 @@ import { VoidReceiptModal } from './components/VoidReceiptModal'
 import { Button } from '@/components/common/Button'
 import { Badge } from '@/components/common/Badge'
 import { useAuthStore } from '@/app/store/useAuthStore'
+import { useAccessControlStore } from '@/app/store/useAccessControlStore'
 import { formatCurrencyBn, formatDateBn } from '@/utils/date'
 import type { PaymentMethod } from '@/types/database'
 import {
@@ -26,6 +27,7 @@ import {
   Calendar,
   Zap,
   X,
+  MessageCircle,
 } from 'lucide-react'
 
 
@@ -34,10 +36,10 @@ export const ReceiptListPage: React.FC = () => {
   const initialBoarderId = searchParams.get('boarderId') || undefined
 
   const { profile } = useAuthStore()
-  const canVoidReceipt =
-    profile?.role === 'SUPER_ADMIN' ||
-    profile?.role === 'ADMIN' ||
-    profile?.role === 'ACCOUNTANT'
+  const { hasOptionAccess } = useAccessControlStore()
+  const canCollectRent = hasOptionAccess(profile?.role || '', 'collections', 'collect_rent', profile?.id)
+  const canPrintReceipt = hasOptionAccess(profile?.role || '', 'collections', 'print_receipt', profile?.id)
+  const canVoidReceipt = hasOptionAccess(profile?.role || '', 'collections', 'void_receipt', profile?.id)
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'VALID' | 'VOID'>('ALL')
@@ -121,17 +123,19 @@ export const ReceiptListPage: React.FC = () => {
             রিফ্রেশ
           </Button>
 
-          <Button
-            variant="primary"
-            size="sm"
-            id="btn-collect-receipt"
-            data-testid="btn-collect-receipt"
-            onClick={() => setIsCollectModalOpen(true)}
-            className="text-xs bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-600/20"
-          >
-            <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
-            টাকা গ্রহণ / রিসিপ্ট কাটুন
-          </Button>
+          {canCollectRent && (
+            <Button
+              variant="primary"
+              size="sm"
+              id="btn-collect-receipt"
+              data-testid="btn-collect-receipt"
+              onClick={() => setIsCollectModalOpen(true)}
+              className="text-xs bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-600/20"
+            >
+              <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
+              টাকা গ্রহণ / রিসিপ্ট কাটুন
+            </Button>
+          )}
         </div>
       </div>
 
@@ -404,16 +408,34 @@ export const ReceiptListPage: React.FC = () => {
                     {/* Actions */}
                     <td className="py-3.5 px-4 text-center">
                       <div className="flex items-center justify-center gap-1.5">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setPrintReceipt(rc)}
-                          className="h-8 px-2.5 text-xs text-slate-300 hover:text-white"
-                          title="ভাউচার প্রিন্ট করুন"
-                        >
-                          <Printer className="w-3.5 h-3.5 mr-1 text-primary-400" />
-                          প্রিন্ট
-                        </Button>
+                        {canPrintReceipt && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setPrintReceipt(rc)}
+                            className="h-8 px-2.5 text-xs text-slate-300 hover:text-white"
+                            title="ভাউচার প্রিন্ট করুন"
+                          >
+                            <Printer className="w-3.5 h-3.5 mr-1 text-primary-400" />
+                            প্রিন্ট
+                          </Button>
+                        )}
+
+                        {/* WhatsApp Share Button */}
+                        {rc.boarder_phone && !rc.is_void && (
+                          <a
+                            href={`https://wa.me/88${rc.boarder_phone.replace(/^(\+?88)?0?/, '0')}?text=${encodeURIComponent(
+                              `আসসালামু আলাইকুম ${rc.boarder_name},\nব্যাচেলর হোম হোস্টেল থেকে আপনার মানি রিসিট প্রস্তুত হয়েছে:\n• রশিদ নং: ${rc.receipt_number}\n• তারিখ: ${rc.receipt_date}\n• আদায়কৃত টাকা: ৳${Number(rc.amount || 0).toLocaleString('en-IN')}/-\n• মাধ্যম: ${rc.payment_method}\nধন্যবাদান্তে,\nব্যাচেলর হোম প্রশাসন`
+                            )}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="h-8 px-2 rounded-lg inline-flex items-center gap-1 text-xs font-semibold bg-emerald-950/60 text-emerald-400 hover:bg-emerald-900/60 border border-emerald-800/60 transition-colors"
+                            title="বর্ডারের হোয়াটসঅ্যাপে মানি রিসিট পাঠান"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+                            <span className="hidden sm:inline">WhatsApp</span>
+                          </a>
+                        )}
 
                         {!rc.is_void && canVoidReceipt && (
                           <Button

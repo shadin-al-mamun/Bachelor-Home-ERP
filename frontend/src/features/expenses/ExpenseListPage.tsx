@@ -18,6 +18,7 @@ import {
   FolderPlus,
 } from 'lucide-react'
 import { useAuthStore } from '@/app/store/useAuthStore'
+import { useAccessControlStore } from '@/app/store/useAccessControlStore'
 import {
   useExpenses,
   useExpenseCategories,
@@ -35,7 +36,10 @@ import type { ExpenseScope } from '@/types/database'
 
 export const ExpenseListPage: React.FC = () => {
   const { profile } = useAuthStore()
-  const isAdmin = profile?.role === 'SUPER_ADMIN' || profile?.role === 'ADMIN'
+  const { hasOptionAccess } = useAccessControlStore()
+  const canCreateExpense = hasOptionAccess(profile?.role || '', 'expenses', 'create_expense', profile?.id)
+  const canApproveExpense = hasOptionAccess(profile?.role || '', 'expenses', 'approve_expense', profile?.id)
+  const canManageCategories = hasOptionAccess(profile?.role || '', 'expenses', 'manage_categories', profile?.id)
 
   // Main Page View Mode
   const [activeTab, setActiveTab] = useState<'LIST' | 'FLAT_DISTRIBUTION'>('LIST')
@@ -190,23 +194,27 @@ export const ExpenseListPage: React.FC = () => {
             <RotateCw className={`w-4 h-4 ${isRefetching ? 'animate-spin text-indigo-400' : ''}`} />
           </button>
 
-          <button
-            onClick={() => setIsCategoryModalOpen(true)}
-            className="px-3.5 py-2.5 rounded-xl bg-slate-900 border border-indigo-500/30 hover:bg-slate-800 text-indigo-300 font-semibold text-xs flex items-center gap-2 transition-all shadow-sm active:scale-[0.98]"
-            title="ব্যয়ের খাত ব্যবস্থাপনা ও নতুন ক্যাটাগরি তৈরি"
-          >
-            <FolderPlus className="w-4 h-4 text-indigo-400" />
-            <span className="hidden sm:inline">খাত / ক্যাটাগরি তৈরি</span>
-            <span className="sm:hidden">খাত তৈরি</span>
-          </button>
+          {canManageCategories && (
+            <button
+              onClick={() => setIsCategoryModalOpen(true)}
+              className="px-3.5 py-2.5 rounded-xl bg-slate-900 border border-indigo-500/30 hover:bg-slate-800 text-indigo-300 font-semibold text-xs flex items-center gap-2 transition-all shadow-sm active:scale-[0.98]"
+              title="ব্যয়ের খাত ব্যবস্থাপনা ও নতুন ক্যাটাগরি তৈরি"
+            >
+              <FolderPlus className="w-4 h-4 text-indigo-400" />
+              <span className="hidden sm:inline">খাত / ক্যাটাগরি তৈরি</span>
+              <span className="sm:hidden">খাত তৈরি</span>
+            </button>
+          )}
 
-          <button
-            onClick={handleOpenAddModal}
-            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-semibold text-xs shadow-lg shadow-indigo-600/30 flex items-center gap-2 transition-all active:scale-[0.98]"
-          >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>নতুন খরচ এন্ট্রি</span>
-          </button>
+          {canCreateExpense && (
+            <button
+              onClick={handleOpenAddModal}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-semibold text-xs shadow-lg shadow-indigo-600/30 flex items-center gap-2 transition-all active:scale-[0.98]"
+            >
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <span>নতুন খরচ এন্ট্রি</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -572,8 +580,8 @@ export const ExpenseListPage: React.FC = () => {
                       {/* Actions */}
                       <td className="px-5 py-3.5 whitespace-nowrap text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* Admin Review Action Buttons for Pending */}
-                          {isAdmin && isPending && (
+                          {/* Review Action Buttons for Pending */}
+                          {canApproveExpense && isPending && (
                             <>
                               <button
                                 onClick={() => handleQuickApprove(expense)}

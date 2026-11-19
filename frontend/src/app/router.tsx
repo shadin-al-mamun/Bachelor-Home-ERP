@@ -1,18 +1,45 @@
 import React from 'react'
 import { createBrowserRouter, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuthStore } from './store/useAuthStore'
+import { useAccessControlStore } from './store/useAccessControlStore'
 import type { UserRole } from '@/types/database'
 import UnauthorizedView from '@/views/auth/UnauthorizedView'
 
 import AppLayout from '@/components/layout/AppLayout'
 
+// Helper to map route path to ERP Menu ID for dynamic access control enforcement
+export function resolveMenuIdFromPath(pathname: string): string | null {
+  const cleanPath = pathname.replace(/^\/+/, '').split('?')[0].split('#')[0]
+
+  if (cleanPath.startsWith('accommodation')) return 'accommodations'
+  if (cleanPath.startsWith('boarders')) return 'boarders'
+  if (cleanPath === 'billing/receipts') return 'collections'
+  if (cleanPath.startsWith('billing')) return 'billing'
+  if (cleanPath.startsWith('expenses')) return 'expenses'
+  if (cleanPath.startsWith('finance/income') || cleanPath === 'incomes') return 'incomes'
+  if (cleanPath.startsWith('finance/transfers') || cleanPath === 'transfers') return 'transfers'
+  if (cleanPath.startsWith('finance/accounts') || cleanPath === 'accounts' || cleanPath.startsWith('cash-custody')) return 'cashbook'
+  if (cleanPath === 'meals/settings' || cleanPath === 'meals/audit') return 'meals'
+  if (cleanPath.startsWith('meals')) return 'kitchen'
+  if (cleanPath.startsWith('hr')) return 'hr'
+  if (cleanPath.startsWith('reports')) return 'reports'
+  if (cleanPath === 'settings/users' || cleanPath === 'settings') return 'governance'
+  if (cleanPath === 'settings/branding') return 'branding'
+  if (cleanPath === 'settings/hostel' || cleanPath === 'settings/tenant-form') return 'hostel_settings'
+  if (cleanPath === 'settings/notices' || cleanPath === 'notices') return 'notices'
+  if (cleanPath === 'settings/audit-logs' || cleanPath === 'audit-logs') return 'audit_logs'
+
+  return null
+}
+
 // Lazy-loaded or placeholder route component helper
 export interface ProtectedRouteProps {
   allowedRoles?: UserRole[]
+  menuId?: string
   children?: React.ReactNode
 }
 
-export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, children }) => {
+export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, menuId, children }) => {
   const { isAuthenticated, profile, isLoading } = useAuthStore()
   const location = useLocation()
 
@@ -40,6 +67,17 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, ch
       return <Navigate to="/portal/dashboard" replace />
     }
     return <Navigate to="/unauthorized" replace />
+  }
+
+  // Dynamic Menu Permission Check (Access Control)
+  if (profile && profile.role !== 'SUPER_ADMIN' && profile.role !== 'BOARDER' && profile.role !== 'APPLICANT') {
+    const targetMenuId = menuId || resolveMenuIdFromPath(location.pathname)
+    if (targetMenuId) {
+      const hasAccess = useAccessControlStore.getState().hasMenuAccess(profile.role, targetMenuId, profile.id)
+      if (!hasAccess) {
+        return <Navigate to="/unauthorized" replace />
+      }
+    }
   }
 
   return children ? <>{children}</> : <Outlet />

@@ -967,9 +967,9 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
                           type="button"
                           onClick={() => handleQuickStatusChange(seat.id, seat.status)}
                           className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 text-xs transition-colors"
-                          title="স্ট্যাটাস পরিবর্তন"
+                          title={isAvailable ? "সংস্কার বা রক্ষণাবেক্ষণ মোডে নিন (Set Maintenance)" : "সিট উন্মুক্ত ও সক্রিয় করুন (Mark Available)"}
                         >
-                          {isAvailable ? <Wrench className="w-4 h-4 text-amber-400" /> : <Ban className="w-4 h-4" />}
+                          {isAvailable ? <Wrench className="w-4 h-4 text-amber-400" /> : <Ban className="w-4 h-4 text-emerald-400" />}
                         </button>
                       )}
                     </div>

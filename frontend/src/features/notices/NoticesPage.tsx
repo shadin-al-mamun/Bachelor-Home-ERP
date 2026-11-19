@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '@/app/store/useAuthStore'
+import { useAccessControlStore } from '@/app/store/useAccessControlStore'
 import Button from '@/components/common/Button'
 import { useNotices, useDeleteNotice } from './api/useNotices'
 import type { NoticeType } from './api/useNotices'
@@ -27,6 +28,9 @@ import { formatDhakaDate } from '@/utils/date'
 
 export const NoticesPage: React.FC = () => {
   const { profile } = useAuthStore()
+  const { hasOptionAccess } = useAccessControlStore()
+  const canCreateNotice = hasOptionAccess(profile?.role || '', 'notices', 'create_notice', profile?.id)
+  const canDeleteNotice = hasOptionAccess(profile?.role || '', 'notices', 'delete_notice', profile?.id)
   const { data: notices = [], isLoading } = useNotices()
   const deleteNoticeMutation = useDeleteNotice()
 
@@ -114,13 +118,15 @@ export const NoticesPage: React.FC = () => {
           </p>
         </div>
 
-        <Button
-          onClick={() => setIsSendModalOpen(true)}
-          className="bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white shadow-lg shadow-indigo-600/25 px-5"
-        >
-          <Plus className="w-4 h-4 mr-1.5" />
-          নতুন নোটিশ তৈরি ও প্রকাশ করুন
-        </Button>
+        {canCreateNotice && (
+          <Button
+            onClick={() => setIsSendModalOpen(true)}
+            className="bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white shadow-lg shadow-indigo-600/25 px-5"
+          >
+            <Plus className="w-4 h-4 mr-1.5" />
+            নতুন নোটিশ তৈরি ও প্রকাশ করুন
+          </Button>
+        )}
       </div>
 
       {/* Governance & Settings Navigation Tabs */}
@@ -350,15 +356,17 @@ export const NoticesPage: React.FC = () => {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2 self-end sm:self-auto">
-                    <button
-                      onClick={() => handleDelete(notice.id, notice.title)}
-                      className="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-rose-500/10 transition-colors"
-                      title="নোটিশ মুছে ফেলুন"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                  {canDeleteNotice && (
+                    <div className="flex items-center gap-2 self-end sm:self-auto">
+                      <button
+                        onClick={() => handleDelete(notice.id, notice.title)}
+                        className="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-rose-500/10 transition-colors"
+                        title="নোটিশ মুছে ফেলুন"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Title & Body */}

@@ -19,8 +19,11 @@ import {
   Search,
   FileSpreadsheet,
   UtensilsCrossed,
+  Download,
 } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
+import { useAuthStore } from '@/app/store/useAuthStore'
+import { useSystemBackup } from './api/useSystemBackup'
 import type { ReportId, ReportFilterState, CustomReportExportHandlers } from './types'
 import { ALL_REPORTS, REPORT_CATEGORIES } from './reportDefinitions'
 import { useReportsData } from './api/useReportsData'
@@ -67,6 +70,8 @@ export const ReportsHubPage: React.FC = () => {
   const lastDay = `${lastDayDate.getFullYear()}-${String(lastDayDate.getMonth() + 1).padStart(2, '0')}-${String(lastDayDate.getDate()).padStart(2, '0')}`
 
   const [searchParams, setSearchParams] = useSearchParams()
+  const { profile } = useAuthStore()
+  const { generateFullBackup, isExporting: isBackupExporting } = useSystemBackup()
   const [activeReportId, setActiveReportId] = useState<ReportId>('DAILY_INCOME_EXPENSE')
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL')
   const [searchQuery, setSearchQuery] = useState('')
@@ -260,12 +265,27 @@ export const ReportsHubPage: React.FC = () => {
         </div>
 
         {/* Export Toolbar */}
-        <ExportActions
-          onPrint={handlePrint}
-          onExportPDF={handleExportPDF}
-          onExportExcel={handleExportExcel}
-          isExporting={isExporting}
-        />
+        <div className="flex flex-wrap items-center gap-2.5">
+          {profile?.role === 'SUPER_ADMIN' && (
+            <button
+              type="button"
+              onClick={generateFullBackup}
+              disabled={isBackupExporting}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg shadow-emerald-600/25 flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+              title="পুরো সফটওয়্যারের সকল টেবিল ও ডেটা এক ক্লিকে ব্যাকআপ ফাইল হিসেবে ডাউনলোড করুন"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>{isBackupExporting ? 'ব্যাকআপ হচ্ছে...' : 'সম্পূর্ণ ডেটাবেজ ব্যাকআপ (.json)'}</span>
+            </button>
+          )}
+
+          <ExportActions
+            onPrint={handlePrint}
+            onExportPDF={handleExportPDF}
+            onExportExcel={handleExportExcel}
+            isExporting={isExporting}
+          />
+        </div>
       </div>
 
       {/* 2. Category Tabs & Search Bar */}
