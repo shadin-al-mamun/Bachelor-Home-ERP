@@ -395,7 +395,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
 
     if (child.permissionKey) {
-      return hasMenuAccess(userRole, child.permissionKey)
+      return hasMenuAccess(userRole, child.permissionKey, profile?.id)
     }
 
     return child.roles.includes(userRole)

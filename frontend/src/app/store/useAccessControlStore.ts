@@ -408,33 +408,65 @@ function buildDefaultPermissions(): AllRolesPermissions {
 export const DEFAULT_ROLE_PERMISSIONS: AllRolesPermissions = buildDefaultPermissions()
 
 const STORAGE_KEY = 'bachelor_erp_role_permissions'
+const USER_STORAGE_KEY = 'bachelor_erp_user_permissions'
+
+export type AccessControlMode = 'ROLE' | 'USER'
 
 interface AccessControlState {
   rolePermissions: AllRolesPermissions
+  userPermissions: Record<string, RolePermissionsMap>
   activeRole: ConfigurableRole
+  accessMode: AccessControlMode
+  activeUserId: string | null
   isLoading: boolean
   isSaved: boolean
 
+  setAccessMode: (mode: AccessControlMode) => void
   setActiveRole: (role: ConfigurableRole) => void
+  setActiveUserId: (userId: string | null) => void
+  getUserEffectivePermissions: (userId: string, roleFallback: ConfigurableRole) => RolePermissionsMap
   toggleMenu: (role: ConfigurableRole, menuId: string, enabled?: boolean) => void
   toggleOption: (role: ConfigurableRole, menuId: string, optionId: string, enabled?: boolean) => void
   toggleAllForMenu: (role: ConfigurableRole, menuId: string, enabled: boolean) => void
   toggleAllForRole: (role: ConfigurableRole, enabled: boolean) => void
+  toggleMenuForUser: (userId: string, menuId: string, roleFallback: ConfigurableRole, enabled?: boolean) => void
+  toggleOptionForUser: (userId: string, menuId: string, optionId: string, roleFallback: ConfigurableRole, enabled?: boolean) => void
+  toggleAllForMenuForUser: (userId: string, menuId: string, enabled: boolean, roleFallback: ConfigurableRole) => void
+  toggleAllForUser: (userId: string, enabled: boolean) => void
+  resetUserToRoleDefault: (userId: string) => void
+  hasUserCustomPermissions: (userId: string) => boolean
   resetRoleToDefault: (role: ConfigurableRole) => void
   resetAllToDefault: () => void
   savePermissions: () => Promise<void>
   initializePermissions: () => Promise<void>
-  hasMenuAccess: (role: string, menuId: string) => boolean
-  hasOptionAccess: (role: string, menuId: string, optionId: string) => boolean
+  hasMenuAccess: (role: string, menuId: string, userId?: string) => boolean
+  hasOptionAccess: (role: string, menuId: string, optionId: string, userId?: string) => boolean
 }
 
 export const useAccessControlStore = create<AccessControlState>((set, get) => ({
   rolePermissions: DEFAULT_ROLE_PERMISSIONS,
+  userPermissions: {},
   activeRole: 'ADMIN',
+  accessMode: 'ROLE',
+  activeUserId: null,
   isLoading: false,
   isSaved: false,
 
+  setAccessMode: (mode) => set({ accessMode: mode, isSaved: false }),
   setActiveRole: (role) => set({ activeRole: role, isSaved: false }),
+  setActiveUserId: (userId) => set({ activeUserId: userId, isSaved: false }),
+
+  getUserEffectivePermissions: (userId, roleFallback) => {
+    const state = get()
+    if (state.userPermissions[userId]) {
+      return state.userPermissions[userId]
+    }
+    return state.rolePermissions[roleFallback] || DEFAULT_ROLE_PERMISSIONS[roleFallback] || {}
+  },
+
+  hasUserCustomPermissions: (userId) => {
+    return Boolean(get().userPermissions[userId])
+  },
 
   toggleMenu: (role, menuId, explicitValue) => {
     set((state) => {
@@ -554,6 +586,138 @@ export const useAccessControlStore = create<AccessControlState>((set, get) => ({
     })
   },
 
+  toggleMenuForUser: (userId, menuId, roleFallback, explicitValue) => {
+    set((state) => {
+      const currentMap: RolePermissionsMap = state.userPermissions[userId]
+        ? { ...state.userPermissions[userId] }
+        : JSON.parse(JSON.stringify(state.rolePermissions[roleFallback] || DEFAULT_ROLE_PERMISSIONS[roleFallback] || {}))
+
+      const currentMenu = currentMap[menuId] || { enabled: false, options: {} }
+      const newEnabled = explicitValue !== undefined ? explicitValue : !currentMenu.enabled
+      const updatedOptions = { ...(currentMenu.options || {}) }
+
+      if (newEnabled) {
+        const allOff = Object.values(updatedOptions).every((v) => !v)
+        if (allOff) {
+          const menuDef = ERP_MENU_DEFINITIONS.find((m) => m.id === menuId)
+          menuDef?.options.forEach((opt) => {
+            updatedOptions[opt.id] = true
+          })
+        }
+      }
+
+      currentMap[menuId] = {
+        enabled: newEnabled,
+        options: updatedOptions,
+      }
+
+      return {
+        userPermissions: {
+          ...state.userPermissions,
+          [userId]: currentMap,
+        },
+        isSaved: false,
+      }
+    })
+  },
+
+  toggleOptionForUser: (userId, menuId, optionId, roleFallback, explicitValue) => {
+    set((state) => {
+      const currentMap: RolePermissionsMap = state.userPermissions[userId]
+        ? { ...state.userPermissions[userId] }
+        : JSON.parse(JSON.stringify(state.rolePermissions[roleFallback] || DEFAULT_ROLE_PERMISSIONS[roleFallback] || {}))
+
+      const currentMenu = currentMap[menuId] || { enabled: false, options: {} }
+      const currentOptions = currentMenu.options || {}
+      const newOptionVal = explicitValue !== undefined ? explicitValue : !currentOptions[optionId]
+
+      const updatedOptions = {
+        ...currentOptions,
+        [optionId]: newOptionVal,
+      }
+
+      const hasAnyEnabled = Object.values(updatedOptions).some((v) => v === true)
+      const menuEnabled = hasAnyEnabled ? true : currentMenu.enabled
+
+      currentMap[menuId] = {
+        enabled: menuEnabled,
+        options: updatedOptions,
+      }
+
+      return {
+        userPermissions: {
+          ...state.userPermissions,
+          [userId]: currentMap,
+        },
+        isSaved: false,
+      }
+    })
+  },
+
+  toggleAllForMenuForUser: (userId, menuId, enabled, roleFallback) => {
+    set((state) => {
+      const currentMap: RolePermissionsMap = state.userPermissions[userId]
+        ? { ...state.userPermissions[userId] }
+        : JSON.parse(JSON.stringify(state.rolePermissions[roleFallback] || DEFAULT_ROLE_PERMISSIONS[roleFallback] || {}))
+
+      const menuDef = ERP_MENU_DEFINITIONS.find((m) => m.id === menuId)
+      const options: Record<string, boolean> = {}
+      if (menuDef) {
+        menuDef.options.forEach((opt) => {
+          options[opt.id] = enabled
+        })
+      }
+
+      currentMap[menuId] = {
+        enabled,
+        options,
+      }
+
+      return {
+        userPermissions: {
+          ...state.userPermissions,
+          [userId]: currentMap,
+        },
+        isSaved: false,
+      }
+    })
+  },
+
+  toggleAllForUser: (userId, enabled) => {
+    set((state) => {
+      const updatedMenus: RolePermissionsMap = {}
+      ERP_MENU_DEFINITIONS.forEach((menuDef) => {
+        const options: Record<string, boolean> = {}
+        menuDef.options.forEach((opt) => {
+          options[opt.id] = enabled
+        })
+        updatedMenus[menuDef.id] = {
+          enabled,
+          options,
+        }
+      })
+
+      return {
+        userPermissions: {
+          ...state.userPermissions,
+          [userId]: updatedMenus,
+        },
+        isSaved: false,
+      }
+    })
+  },
+
+  resetUserToRoleDefault: (userId) => {
+    set((state) => {
+      const nextUserPerms = { ...state.userPermissions }
+      delete nextUserPerms[userId]
+      return {
+        userPermissions: nextUserPerms,
+        isSaved: false,
+      }
+    })
+  },
+
   resetRoleToDefault: (role) => {
     set((state) => ({
       rolePermissions: {
@@ -567,16 +731,18 @@ export const useAccessControlStore = create<AccessControlState>((set, get) => ({
   resetAllToDefault: () => {
     set({
       rolePermissions: JSON.parse(JSON.stringify(DEFAULT_ROLE_PERMISSIONS)),
+      userPermissions: {},
       isSaved: false,
     })
   },
 
   savePermissions: async () => {
     set({ isLoading: true })
-    const { rolePermissions } = get()
+    const { rolePermissions, userPermissions } = get()
 
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(rolePermissions))
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userPermissions))
     } catch (e) {
       console.warn('Failed to save permissions to localStorage:', e)
     }
@@ -585,7 +751,10 @@ export const useAccessControlStore = create<AccessControlState>((set, get) => ({
       try {
         await supabase.from('organization_settings').upsert({
           org_name: 'Bachelor Home',
-          access_control_permissions: rolePermissions,
+          access_control_permissions: {
+            ...rolePermissions,
+            __user_overrides__: userPermissions,
+          },
           updated_at: new Date().toISOString(),
         })
       } catch {
@@ -599,11 +768,11 @@ export const useAccessControlStore = create<AccessControlState>((set, get) => ({
   initializePermissions: async () => {
     const mergePermissions = (base: AllRolesPermissions, override: Partial<AllRolesPermissions>): AllRolesPermissions => {
       const result: AllRolesPermissions = { ...base }
-        ; (Object.keys(base) as ConfigurableRole[]).forEach((role) => {
-          if (override[role]) {
-            result[role] = { ...base[role], ...override[role] }
-          }
-        })
+      ;(Object.keys(base) as ConfigurableRole[]).forEach((role) => {
+        if (override[role]) {
+          result[role] = { ...base[role], ...override[role] }
+        }
+      })
       return result
     }
 
@@ -612,6 +781,12 @@ export const useAccessControlStore = create<AccessControlState>((set, get) => ({
       if (stored) {
         const parsed = JSON.parse(stored)
         set((state) => ({ rolePermissions: mergePermissions(state.rolePermissions, parsed) }))
+      }
+
+      const storedUsers = localStorage.getItem(USER_STORAGE_KEY)
+      if (storedUsers) {
+        const parsedUsers = JSON.parse(storedUsers)
+        set({ userPermissions: parsedUsers })
       }
     } catch (e) {
       console.warn('Failed to parse local permissions:', e)
@@ -625,9 +800,14 @@ export const useAccessControlStore = create<AccessControlState>((set, get) => ({
           .maybeSingle()
 
         if (!error && data?.access_control_permissions) {
-          const remotePerms = data.access_control_permissions as AllRolesPermissions
+          const remotePerms = data.access_control_permissions as any
           set((state) => ({ rolePermissions: mergePermissions(state.rolePermissions, remotePerms) }))
           localStorage.setItem(STORAGE_KEY, JSON.stringify(remotePerms))
+
+          if (remotePerms.__user_overrides__) {
+            set({ userPermissions: remotePerms.__user_overrides__ })
+            localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(remotePerms.__user_overrides__))
+          }
         }
       } catch {
         // Fallback gracefully
@@ -635,12 +815,31 @@ export const useAccessControlStore = create<AccessControlState>((set, get) => ({
     }
   },
 
-  hasMenuAccess: (role, menuId) => {
+  hasMenuAccess: (role, menuId, userId) => {
     if (role === 'SUPER_ADMIN') return true
     if (!['ADMIN', 'MANAGER', 'ACCOUNTANT', 'MEAL_OPERATOR', 'AUDITOR'].includes(role)) {
       return false
     }
+
     const state = get()
+
+    // 1. User-specific custom override takes precedence
+    if (userId && state.userPermissions[userId]) {
+      const userMap = state.userPermissions[userId]
+      let userTargetKey = menuId
+      if (!userMap[userTargetKey]) {
+        if (menuId === 'branding' && userMap['hostel_settings']) {
+          userTargetKey = 'hostel_settings'
+        } else if (menuId === 'hostel_settings' && userMap['branding']) {
+          userTargetKey = 'branding'
+        }
+      }
+      if (userMap[userTargetKey] !== undefined) {
+        return Boolean(userMap[userTargetKey].enabled)
+      }
+    }
+
+    // 2. Role permissions fallback
     const roleMap = state.rolePermissions[role as ConfigurableRole]
     let targetKey = menuId
     if (!roleMap?.[targetKey]) {
@@ -657,12 +856,35 @@ export const useAccessControlStore = create<AccessControlState>((set, get) => ({
     return Boolean(roleMap[targetKey].enabled)
   },
 
-  hasOptionAccess: (role, menuId, optionId) => {
+  hasOptionAccess: (role, menuId, optionId, userId) => {
     if (role === 'SUPER_ADMIN') return true
     if (!['ADMIN', 'MANAGER', 'ACCOUNTANT', 'MEAL_OPERATOR', 'AUDITOR'].includes(role)) {
       return false
     }
+
     const state = get()
+
+    // 1. User-specific custom override takes precedence
+    if (userId && state.userPermissions[userId]) {
+      const userMap = state.userPermissions[userId]
+      let userTargetKey = menuId
+      if (!userMap[userTargetKey]) {
+        if (menuId === 'branding' && userMap['hostel_settings']) {
+          userTargetKey = 'hostel_settings'
+        } else if (menuId === 'hostel_settings' && userMap['branding']) {
+          userTargetKey = 'branding'
+        }
+      }
+      const userMenuState = userMap[userTargetKey]
+      if (userMenuState !== undefined) {
+        if (!userMenuState.enabled) return false
+        if (userMenuState.options && userMenuState.options[optionId] !== undefined) {
+          return Boolean(userMenuState.options[optionId])
+        }
+      }
+    }
+
+    // 2. Role permissions fallback
     const roleMap = state.rolePermissions[role as ConfigurableRole]
     let targetKey = menuId
     if (!roleMap?.[targetKey]) {

@@ -137,4 +137,55 @@ describe('Access Control Store & Role Permissions Matrix', () => {
     resetRoleToDefault('ADMIN')
     expect(useAccessControlStore.getState().hasMenuAccess('ADMIN', 'branding')).toBe(true)
   })
+
+  it('supports individual user custom permissions (allows different managers to have different access)', () => {
+    const { toggleMenuForUser, hasUserCustomPermissions, resetUserToRoleDefault } =
+      useAccessControlStore.getState()
+
+    const managerAnisId = 'mgr-anisuzzaman'
+    const managerEnamulId = 'mgr-enamul-haque'
+    const managerOtherId = 'mgr-standard'
+
+    // Manager Anisuzzaman gets Cashbook enabled (default is true), but let's toggle off 'meals' for him
+    toggleMenuForUser(managerAnisId, 'meals', 'MANAGER', false)
+    expect(hasUserCustomPermissions(managerAnisId)).toBe(true)
+
+    // Manager Enamul gets Cashbook turned OFF (e.g. not allowed to manage cash box)
+    toggleMenuForUser(managerEnamulId, 'cashbook', 'MANAGER', false)
+    expect(hasUserCustomPermissions(managerEnamulId)).toBe(true)
+
+    // Standard manager has no custom overrides
+    expect(hasUserCustomPermissions(managerOtherId)).toBe(false)
+
+    // 1. Verify Manager Anisuzzaman's access
+    expect(useAccessControlStore.getState().hasMenuAccess('MANAGER', 'cashbook', managerAnisId)).toBe(true)
+    expect(useAccessControlStore.getState().hasMenuAccess('MANAGER', 'meals', managerAnisId)).toBe(false)
+
+    // 2. Verify Manager Enamul's access (Cashbook disabled for him, but meals is still active)
+    expect(useAccessControlStore.getState().hasMenuAccess('MANAGER', 'cashbook', managerEnamulId)).toBe(false)
+    expect(useAccessControlStore.getState().hasMenuAccess('MANAGER', 'meals', managerEnamulId)).toBe(true)
+
+    // 3. Standard manager without override still gets role default (both cashbook and meals active)
+    expect(useAccessControlStore.getState().hasMenuAccess('MANAGER', 'cashbook', managerOtherId)).toBe(true)
+    expect(useAccessControlStore.getState().hasMenuAccess('MANAGER', 'meals', managerOtherId)).toBe(true)
+
+    // 4. Resetting Enamul reverts him back to standard manager access
+    resetUserToRoleDefault(managerEnamulId)
+    expect(useAccessControlStore.getState().hasUserCustomPermissions(managerEnamulId)).toBe(false)
+    expect(useAccessControlStore.getState().hasMenuAccess('MANAGER', 'cashbook', managerEnamulId)).toBe(true)
+  })
+
+  it('supports user-specific granular option permissions', () => {
+    const { toggleOptionForUser } = useAccessControlStore.getState()
+    const officerId = 'officer-special'
+
+    // Disable 'create_expense' for this specific manager while keeping view_expenses enabled
+    toggleOptionForUser(officerId, 'expenses', 'create_expense', 'MANAGER', false)
+
+    expect(useAccessControlStore.getState().hasOptionAccess('MANAGER', 'expenses', 'create_expense', officerId)).toBe(false)
+    expect(useAccessControlStore.getState().hasOptionAccess('MANAGER', 'expenses', 'view_expenses', officerId)).toBe(true)
+
+    // Other manager still has create_expense enabled by default
+    expect(useAccessControlStore.getState().hasOptionAccess('MANAGER', 'expenses', 'create_expense', 'other-mgr')).toBe(true)
+  })
 })
