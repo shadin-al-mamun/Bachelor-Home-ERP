@@ -36,6 +36,7 @@ import {
   useAccessControlStore,
   CONFIGURABLE_ROLES,
   ERP_MENU_DEFINITIONS,
+  DEFAULT_ROLE_PERMISSIONS,
   type ConfigurableRole,
   type RolePermissionsMap,
 } from '@/app/store/useAccessControlStore'
@@ -72,13 +73,13 @@ export const AccessControlPage: React.FC = () => {
   const { profile: currentUser } = useAuthStore()
   const {
     rolePermissions,
+    userPermissions,
     activeRole,
     setActiveRole,
     accessMode,
     setAccessMode,
     activeUserId,
     setActiveUserId,
-    getUserEffectivePermissions,
     toggleMenu,
     toggleOption,
     toggleAllForMenu,
@@ -124,16 +125,20 @@ export const AccessControlPage: React.FC = () => {
 
   const currentOfficerRole = (currentOfficer?.role as ConfigurableRole) || 'MANAGER'
   const isCurrentOfficerCustomized = currentOfficer ? hasUserCustomPermissions(currentOfficer.id) : false
-
   const currentRoleConfig = CONFIGURABLE_ROLES.find((r) => r.role === activeRole)!
 
-  // Active effective permissions map depending on whether configuring ROLE or individual USER
+  // Active effective permissions map with reactive subscription to userPermissions & rolePermissions
   const effectivePerms: RolePermissionsMap = useMemo(() => {
     if (accessMode === 'USER' && currentOfficer) {
-      return getUserEffectivePermissions(currentOfficer.id, currentOfficerRole)
+      return (
+        userPermissions[currentOfficer.id] ||
+        rolePermissions[currentOfficerRole] ||
+        DEFAULT_ROLE_PERMISSIONS[currentOfficerRole] ||
+        {}
+      )
     }
     return rolePermissions[activeRole] || {}
-  }, [accessMode, currentOfficer, currentOfficerRole, getUserEffectivePermissions, rolePermissions, activeRole])
+  }, [accessMode, currentOfficer, currentOfficerRole, userPermissions, rolePermissions, activeRole])
 
   // Filtered menus
   const filteredMenus = ERP_MENU_DEFINITIONS.filter((menu) => {
@@ -264,7 +269,7 @@ export const AccessControlPage: React.FC = () => {
           <button
             type="button"
             onClick={handleReset}
-            className="px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-slate-900 border border-slate-700 hover:border-slate-600 text-slate-300 hover:text-white flex items-center gap-2 transition-all shadow-sm"
+            className="px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-slate-900 border border-slate-700 hover:border-slate-600 text-slate-300 hover:text-white flex items-center gap-2 transition-all shadow-sm cursor-pointer"
             title={accessMode === 'USER' ? 'পদবীর ডিফল্টে রিস্টোর করুন' : 'এই পদবীর ডিফল্ট পারমিশনে ফিরুন'}
           >
             <RotateCcw className="w-4 h-4 text-slate-400" />
@@ -277,7 +282,7 @@ export const AccessControlPage: React.FC = () => {
             type="button"
             onClick={handleSave}
             disabled={isLoading}
-            className="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-lg shadow-cyan-500/25 flex items-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+            className="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-lg shadow-cyan-500/25 flex items-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 cursor-pointer"
           >
             {isLoading ? (
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -361,7 +366,7 @@ export const AccessControlPage: React.FC = () => {
         <button
           type="button"
           onClick={() => setAccessMode('ROLE')}
-          className={`flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+          className={`flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
             accessMode === 'ROLE'
               ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/30 ring-1 ring-primary-400/40'
               : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
@@ -379,7 +384,7 @@ export const AccessControlPage: React.FC = () => {
               setActiveUserId(officers[0].id)
             }
           }}
-          className={`flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+          className={`flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
             accessMode === 'USER'
               ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/30 ring-1 ring-cyan-400/40'
               : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
@@ -417,7 +422,7 @@ export const AccessControlPage: React.FC = () => {
                   key={r.role}
                   type="button"
                   onClick={() => setActiveRole(r.role)}
-                  className={`p-3 rounded-xl text-left transition-all border flex flex-col justify-between gap-2 ${
+                  className={`p-3 rounded-xl text-left transition-all border flex flex-col justify-between gap-2 cursor-pointer ${
                     isSelected
                       ? 'bg-cyan-950/50 border-cyan-500/60 shadow-lg shadow-cyan-500/10 ring-1 ring-cyan-500/50'
                       : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-800/60'
@@ -479,7 +484,12 @@ export const AccessControlPage: React.FC = () => {
             {filteredOfficers.map((officer) => {
               const isSelected = (currentOfficer?.id === officer.id)
               const hasCustom = hasUserCustomPermissions(officer.id)
-              const officerPerms = getUserEffectivePermissions(officer.id, officer.role as ConfigurableRole)
+              const officerPerms = (
+                userPermissions[officer.id] ||
+                rolePermissions[officer.role as ConfigurableRole] ||
+                DEFAULT_ROLE_PERMISSIONS[officer.role as ConfigurableRole] ||
+                {}
+              )
               const activeCount = Object.values(officerPerms).filter((m) => m?.enabled).length
 
               return (
@@ -487,7 +497,7 @@ export const AccessControlPage: React.FC = () => {
                   key={officer.id}
                   type="button"
                   onClick={() => setActiveUserId(officer.id)}
-                  className={`p-3 rounded-xl text-left transition-all border flex items-start gap-3 relative overflow-hidden ${
+                  className={`p-3 rounded-xl text-left transition-all border flex items-start gap-3 relative overflow-hidden cursor-pointer ${
                     isSelected
                       ? 'bg-cyan-950/60 border-cyan-500/70 shadow-lg shadow-cyan-500/20 ring-1 ring-cyan-400'
                       : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-800/60'
@@ -552,7 +562,7 @@ export const AccessControlPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-rose-950/60 hover:bg-rose-900/60 text-rose-300 border border-rose-800/60 shrink-0 flex items-center gap-1 transition-colors"
+                  className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-rose-950/60 hover:bg-rose-900/60 text-rose-300 border border-rose-800/60 shrink-0 flex items-center gap-1 transition-colors cursor-pointer"
                 >
                   <RotateCcw className="w-3 h-3" />
                   <span>কাস্টম মুছে ডিফল্টে ফিরুন</span>
@@ -600,7 +610,7 @@ export const AccessControlPage: React.FC = () => {
           <button
             type="button"
             onClick={() => handleToggleAll(true)}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-800/60 flex items-center gap-1.5 transition-colors"
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-800/60 flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <CheckSquare className="w-3.5 h-3.5" />
             <span>সকল অপশন টিক দিন</span>
@@ -608,7 +618,7 @@ export const AccessControlPage: React.FC = () => {
           <button
             type="button"
             onClick={() => handleToggleAll(false)}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-950/60 hover:bg-rose-900/60 text-rose-300 border border-rose-800/60 flex items-center gap-1.5 transition-colors"
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-950/60 hover:bg-rose-900/60 text-rose-300 border border-rose-800/60 flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <Square className="w-3.5 h-3.5" />
             <span>সব আনচেক করুন</span>
@@ -627,7 +637,7 @@ export const AccessControlPage: React.FC = () => {
                 key={key}
                 type="button"
                 onClick={() => setCategoryFilter(key)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                   isActive
                     ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/20'
                     : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
@@ -728,16 +738,24 @@ export const AccessControlPage: React.FC = () => {
                     <div className="flex items-center gap-1 border-r border-slate-700 pr-3">
                       <button
                         type="button"
-                        onClick={() => handleToggleAllForMenu(menu.id, true)}
-                        className="px-2 py-1 text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/50 rounded-lg transition-colors"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          handleToggleAllForMenu(menu.id, true)
+                        }}
+                        className="px-2 py-1 text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/50 rounded-lg transition-colors cursor-pointer"
                         title="এই মেনুর সব অপশন টিক দিন"
                       >
                         সব সিলেক্ট
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleToggleAllForMenu(menu.id, false)}
-                        className="px-2 py-1 text-[11px] font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          handleToggleAllForMenu(menu.id, false)
+                        }}
+                        className="px-2 py-1 text-[11px] font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
                         title="এই মেনুর সব অপশন আনচেক করুন"
                       >
                         সব আনচেক
@@ -745,61 +763,72 @@ export const AccessControlPage: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Main Menu Checkbox / Toggle */}
-                  <label className="cursor-pointer flex items-center gap-2 select-none">
+                  {/* Main Menu Checkbox / Toggle (Single clickable button without label synthetic bubbling) */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      handleToggleMenu(menu.id)
+                    }}
+                    className="cursor-pointer flex items-center gap-2 select-none focus:outline-none group/toggle py-1 px-2 rounded-xl hover:bg-slate-800/40 transition-colors"
+                  >
                     <div
-                      onClick={() => handleToggleMenu(menu.id)}
-                      className={`w-6 h-6 rounded-lg flex items-center justify-center border transition-all ${
+                      className={`w-6 h-6 rounded-lg flex items-center justify-center border transition-all pointer-events-none ${
                         isMenuEnabled
                           ? 'bg-cyan-600 border-cyan-400 text-white shadow-md shadow-cyan-600/30 ring-1 ring-cyan-400'
-                          : 'bg-slate-800 border-slate-700 text-transparent hover:border-slate-500'
+                          : 'bg-slate-800 border-slate-700 text-transparent group-hover/toggle:border-slate-500'
                       }`}
                     >
                       <Check className="w-4 h-4 stroke-[3]" />
                     </div>
                     <span
-                      onClick={() => handleToggleMenu(menu.id)}
-                      className={`text-xs font-bold ${
-                        isMenuEnabled ? 'text-cyan-300' : 'text-slate-400'
+                      className={`text-xs font-bold pointer-events-none transition-colors ${
+                        isMenuEnabled ? 'text-cyan-300' : 'text-slate-400 group-hover/toggle:text-slate-300'
                       }`}
                     >
                       {isMenuEnabled ? 'মেনু সক্রিয়' : 'মেনু বন্ধ'}
                     </span>
-                  </label>
+                  </button>
                 </div>
               </div>
 
               {/* Card Body: Granular Feature Options Checkboxes */}
               {options.length > 0 && (
-                <div className={`p-4 ${!isMenuEnabled && 'pointer-events-none opacity-40'}`}>
+                <div className={`p-4 transition-opacity ${!isMenuEnabled ? 'opacity-50' : 'opacity-100'}`}>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {options.map((opt) => {
                       const isOptionChecked = Boolean(isMenuEnabled && menuState.options?.[opt.id])
 
                       return (
-                        <div
+                        <button
+                          type="button"
                           key={opt.id}
-                          onClick={() => handleToggleOption(menu.id, opt.id)}
-                          className={`p-3 rounded-xl border transition-all cursor-pointer flex items-start gap-2.5 ${
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleToggleOption(menu.id, opt.id)
+                          }}
+                          className={`p-3 rounded-xl border transition-all cursor-pointer flex items-start gap-2.5 text-left w-full select-none focus:outline-none group/opt ${
                             isOptionChecked
-                              ? 'bg-cyan-950/30 border-cyan-500/40 hover:border-cyan-400'
-                              : 'bg-slate-950/40 border-slate-800/80 hover:border-slate-700'
+                              ? 'bg-cyan-950/30 border-cyan-500/40 hover:border-cyan-400 shadow-sm'
+                              : 'bg-slate-950/40 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/60'
                           }`}
                         >
                           <div
-                            className={`w-5 h-5 rounded-md flex items-center justify-center border shrink-0 mt-0.5 transition-colors ${
+                            className={`w-5 h-5 rounded-md flex items-center justify-center border shrink-0 mt-0.5 transition-colors pointer-events-none ${
                               isOptionChecked
                                 ? 'bg-cyan-600 border-cyan-400 text-white shadow-sm'
-                                : 'bg-slate-800 border-slate-700 text-transparent'
+                                : 'bg-slate-800 border-slate-700 text-transparent group-hover/opt:border-slate-500'
                             }`}
                           >
                             <Check className="w-3.5 h-3.5 stroke-[3]" />
                           </div>
 
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex-1 pointer-events-none">
                             <span
                               className={`text-xs font-semibold block leading-tight ${
-                                isOptionChecked ? 'text-white' : 'text-slate-400'
+                                isOptionChecked ? 'text-white' : 'text-slate-400 group-hover/opt:text-slate-300'
                               }`}
                             >
                               {opt.label}
@@ -808,7 +837,7 @@ export const AccessControlPage: React.FC = () => {
                               {opt.desc}
                             </span>
                           </div>
-                        </div>
+                        </button>
                       )
                     })}
                   </div>
