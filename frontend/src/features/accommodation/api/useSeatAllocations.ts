@@ -428,8 +428,13 @@ export function useCancelAllocationMutation() {
           }
         }
 
-        // Set seat status to AVAILABLE only if departure is today or in the past
-        if (!isFuture) {
+        // Set seat status: OCCUPIED if future departure notice, AVAILABLE if today or past
+        if (isFuture) {
+          await supabase
+            .from('seats')
+            .update({ status: 'OCCUPIED', updated_at: new Date().toISOString() })
+            .eq('id', params.seatId)
+        } else {
           const { error: seatUpdateErr } = await supabase
             .from('seats')
             .update({ status: 'AVAILABLE', updated_at: new Date().toISOString() })

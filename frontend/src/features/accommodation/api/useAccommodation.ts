@@ -686,7 +686,11 @@ export function useSeats(params?: SeatFilterParams) {
           results = results.filter((s) => s.room_id === params.roomId)
         }
         if (params?.status && params.status !== 'ALL') {
-          results = results.filter((s) => s.status === params.status)
+          if (params.status === 'NOTICE') {
+            results = results.filter((s: any) => s.has_notice_to_vacate)
+          } else {
+            results = results.filter((s) => s.status === params.status)
+          }
         }
       } else {
         let query = supabase
@@ -709,7 +713,7 @@ export function useSeats(params?: SeatFilterParams) {
         if (params?.roomId) {
           query = query.eq('room_id', params.roomId)
         }
-        if (params?.status && params.status !== 'ALL') {
+        if (params?.status && params.status !== 'ALL' && params.status !== 'NOTICE') {
           query = query.eq('status', params.status)
         }
 
@@ -719,6 +723,9 @@ export function useSeats(params?: SeatFilterParams) {
           results = []
         } else {
           results = (data || []).map((s: any) => enrichSeatAllocations(s))
+          if (params?.status === 'NOTICE') {
+            results = results.filter((s: any) => s.has_notice_to_vacate)
+          }
         }
       }
 

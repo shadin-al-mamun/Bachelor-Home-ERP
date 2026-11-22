@@ -12,6 +12,7 @@ export interface ExecutiveKPIs {
   occupied_seats: number
   vacant_seats: number
   maintenance_seats: number
+  upcoming_vacant_seats?: number
   occupancy_rate: number // %
 
   // 2. Financial Health (Current Month or Selected Month)
@@ -104,6 +105,7 @@ const MOCK_DASHBOARD_DATA: OwnerDashboardData = {
     occupied_seats: 98,
     vacant_seats: 18,
     maintenance_seats: 4,
+    upcoming_vacant_seats: 2,
     occupancy_rate: 81.7,
 
     total_billed_month: 524000,
@@ -652,13 +654,37 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
           })
         }
 
+        // Identify all seats with departure notice (upcoming vacant seats):
+        // Boarders who have given notice to vacate in future (>= todayStr) are actively staying today and paying rent!
+        const noticeSeatIds = new Set<string>()
+        rawAllocations.forEach((a: any) => {
+          const seatId = a.seat?.id || a.seat_id
+          if (!seatId) return
+          const isCurrentResident =
+            (!a.start_date || a.start_date <= todayStr) &&
+            (!a.end_date || a.end_date >= todayStr) &&
+            (a.boarder?.status === 'ACTIVE' || (a.boarder?.leaving_date && a.boarder.leaving_date >= todayStr))
+          const hasNotice = Boolean(
+            (a.end_date && a.end_date >= todayStr) ||
+            (a.boarder?.leaving_date && a.boarder.leaving_date >= todayStr) ||
+            a.cancellation_reason
+          )
+          if (isCurrentResident && hasNotice) {
+            noticeSeatIds.add(seatId)
+          }
+        })
+
+        const upcomingVacantSeats = isManager
+          ? seats.filter((s: any) => noticeSeatIds.has(s.id)).length
+          : (Number(rpcKpis?.upcoming_vacant_seats) || noticeSeatIds.size)
+
         const totalSeats = isManager ? seats.length : (Number(rpcKpis?.total_seats) || seats.length)
         const occupiedSeats = isManager
-          ? seats.filter((s: any) => s.status === 'OCCUPIED').length
-          : (Number(rpcKpis?.occupied_seats) || seats.filter((s) => s.status === 'OCCUPIED').length)
+          ? seats.filter((s: any) => s.status === 'OCCUPIED' || noticeSeatIds.has(s.id)).length
+          : (Number(rpcKpis?.occupied_seats) || seats.filter((s) => s.status === 'OCCUPIED' || noticeSeatIds.has(s.id)).length)
         const vacantSeats = isManager
-          ? seats.filter((s: any) => s.status === 'AVAILABLE').length
-          : (Number(rpcKpis?.vacant_seats) || seats.filter((s) => s.status === 'AVAILABLE').length)
+          ? seats.filter((s: any) => s.status === 'AVAILABLE' && !noticeSeatIds.has(s.id)).length
+          : (Number(rpcKpis?.vacant_seats) || seats.filter((s) => s.status === 'AVAILABLE' && !noticeSeatIds.has(s.id)).length)
         const maintenanceSeats = isManager
           ? seats.filter((s: any) => s.status === 'MAINTENANCE').length
           : (Number(rpcKpis?.maintenance_seats) || seats.filter((s) => s.status === 'MAINTENANCE').length)
@@ -981,8 +1007,8 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
 
         const flatOccupancy: FlatOccupancyPoint[] = realFlats.map((f: any) => {
           const flatSeats = (f.rooms || []).flatMap((r: any) => r.seats || [])
-          const occ = flatSeats.filter((s: any) => s.status === 'OCCUPIED').length
-          const vac = flatSeats.filter((s: any) => s.status === 'AVAILABLE').length
+          const occ = flatSeats.filter((s: any) => s.status === 'OCCUPIED' || noticeSeatIds.has(s.id)).length
+          const vac = flatSeats.filter((s: any) => s.status === 'AVAILABLE' && !noticeSeatIds.has(s.id)).length
           const tot = flatSeats.length
           return {
             flat_id: f.id,
@@ -1081,6 +1107,7 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
             occupied_seats: occupiedSeats,
             vacant_seats: vacantSeats,
             maintenance_seats: maintenanceSeats,
+            upcoming_vacant_seats: upcomingVacantSeats,
             occupancy_rate: Math.round(occupancyRate * 10) / 10,
             total_billed_month: totalBilled,
             total_collected_month: totalCollected,
@@ -1115,6 +1142,7 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
             occupied_seats: 0,
             vacant_seats: 0,
             maintenance_seats: 0,
+            upcoming_vacant_seats: 0,
             occupancy_rate: 0,
             total_billed_month: 0,
             total_collected_month: 0,

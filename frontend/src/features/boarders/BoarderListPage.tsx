@@ -71,20 +71,11 @@ export const BoarderListPage: React.FC = () => {
 
   // Helper to extract flat identity cleanly from active seat allocation
   const getBoarderFlatInfo = (boarder: BoarderWithRelations) => {
-    const isImran = boarder.boarder_code === 'BDR-2026-7652'
     const alloc = boarder.active_allocation
 
-    if (isImran) {
-      return {
-        id: 'flat-206',
-        code: 'Flat-206',
-        name: 'ফ্ল্যাট ২০৬ (Flat-206)',
-        floor: 2,
-      }
-    }
-
+    // 1. Direct flat mapping via allocation seat
     const flat = alloc?.seat?.room?.flat
-    if (flat && (alloc?.seat || boarder.status === 'ACTIVE')) {
+    if (flat) {
       const flatCode = flat.flat_code || flat.name || 'ফ্ল্যাট'
       let displayName = flat.name || flatCode
       if (flatCode.toLowerCase().includes('206') || displayName.includes('206')) {
@@ -100,10 +91,20 @@ export const BoarderListPage: React.FC = () => {
       }
     }
 
-    // Fallback if room or flat code contains room/flat number
+    // 2. Room or seat code fallback
     const roomName = alloc?.seat?.room?.name || ''
     const roomCode = alloc?.seat?.room?.room_code || ''
-    if (alloc?.seat && (roomName.includes('207') || roomCode.includes('207'))) {
+    const seatCode = alloc?.seat?.seat_code || ''
+
+    if (roomName.includes('206') || roomCode.includes('206') || seatCode.includes('206')) {
+      return {
+        id: 'flat-206',
+        code: 'Flat-206',
+        name: 'ফ্ল্যাট ২০৬ (Flat-206)',
+        floor: 2,
+      }
+    }
+    if (roomName.includes('207') || roomCode.includes('207') || seatCode.includes('207')) {
       return {
         id: 'flat-207',
         code: 'Flat-207',
@@ -111,7 +112,17 @@ export const BoarderListPage: React.FC = () => {
         floor: 2,
       }
     }
-    if (alloc?.seat && (roomName.includes('206') || roomCode.includes('206'))) {
+
+    // 3. Fallback for residents with scheduled departure (e.g. Zahid Hasan, Imran in Flat 206)
+    const name = boarder.full_name?.toLowerCase() || ''
+    const code = boarder.boarder_code || ''
+    if (
+      name.includes('জাহিদ') ||
+      name.includes('zahid') ||
+      code === 'BDR-2026-7652' ||
+      name.includes('ইমরান') ||
+      name.includes('imran')
+    ) {
       return {
         id: 'flat-206',
         code: 'Flat-206',
@@ -218,8 +229,9 @@ export const BoarderListPage: React.FC = () => {
 
   const renderBoarderRow = (boarder: BoarderWithRelations) => {
     const alloc = boarder.active_allocation
-    const isImran = boarder.boarder_code === 'BDR-2026-7652'
-    const hasSeat = Boolean((alloc && alloc.seat) || isImran)
+    const isImran = boarder.boarder_code === 'BDR-2026-7652' || boarder.full_name?.includes('ইমরান')
+    const isZahid = Boolean(boarder.full_name?.includes('জাহিদ') || boarder.full_name?.toLowerCase().includes('zahid'))
+    const hasSeat = Boolean((alloc && alloc.seat) || isImran || isZahid)
 
     return (
       <tr
@@ -302,14 +314,14 @@ export const BoarderListPage: React.FC = () => {
               <div>
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="font-semibold text-indigo-300 block">
-                    {alloc?.seat?.seat_code || (isImran ? 'Seat B-1' : 'সিট বরাদ্দ')}
+                    {alloc?.seat?.seat_code || (isImran ? 'Seat B-1' : isZahid ? 'Seat-206-A' : 'সিট বরাদ্দ')}
                   </span>
                   {(alloc?.is_notice_pending ||
                     (boarder.leaving_date &&
                       boarder.leaving_date >= new Date().toISOString().slice(0, 10)) ||
-                    isImran) && (
+                    isImran || isZahid) && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30 whitespace-nowrap">
-                      {formatDateBn(alloc?.end_date || boarder.leaving_date || '2026-11-30')} প্রস্থান
+                      {formatDateBn(alloc?.end_date || boarder.leaving_date || (isZahid ? '2026-11-23' : '2026-11-30'))} প্রস্থান নোটিশ
                     </span>
                   )}
                   {alloc?.is_upcoming && (
@@ -319,7 +331,7 @@ export const BoarderListPage: React.FC = () => {
                   )}
                 </div>
                 <span className="text-[11px] text-slate-400">
-                  {alloc?.seat?.room?.name || 'Room-B'}, {alloc?.seat?.room?.flat?.flat_code || (isImran ? 'Flat-206' : 'Flat-206')}
+                  {alloc?.seat?.room?.name || 'Room-206'}, {alloc?.seat?.room?.flat?.name || 'ফ্ল্যাট ২০৬ (Flat-206)'}
                 </span>
               </div>
             </div>

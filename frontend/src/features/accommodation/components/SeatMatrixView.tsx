@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useCallback } from 'react'
+import React, { useState, useMemo, useCallback, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   BedDouble,
   Plus,
@@ -36,10 +37,29 @@ interface SeatMatrixViewProps {
 
 export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }) => {
   // Navigation & Drilldown State
+  const [searchParams, setSearchParams] = useSearchParams()
+  const urlStatus = searchParams.get('status') || searchParams.get('filter')
   const [selectedFlatId, setSelectedFlatId] = useState<string | null>(null)
   const [selectedBuilding, setSelectedBuilding] = useState<string>('ALL')
-  const [statusFilter, setStatusFilter] = useState<string>('ALL')
+  const [statusFilter, setStatusFilter] = useState<string>(urlStatus || 'ALL')
   const [searchQuery, setSearchQuery] = useState('')
+
+  useEffect(() => {
+    if (urlStatus && ['ALL', 'AVAILABLE', 'OCCUPIED', 'MAINTENANCE', 'NOTICE'].includes(urlStatus)) {
+      setStatusFilter(urlStatus)
+    }
+  }, [urlStatus])
+
+  const handleStatusFilterChange = (newStatus: string) => {
+    setStatusFilter(newStatus)
+    if (newStatus === 'ALL') {
+      searchParams.delete('status')
+      searchParams.delete('filter')
+      setSearchParams(searchParams)
+    } else {
+      setSearchParams({ status: newStatus })
+    }
+  }
 
   // Modals
   const [isSeatModalOpen, setIsSeatModalOpen] = useState(false)
@@ -78,6 +98,7 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
       const available = flatSeats.filter((s) => s.status === 'AVAILABLE').length
       const occupied = flatSeats.filter((s) => s.status === 'OCCUPIED').length
       const maintenance = flatSeats.filter((s) => s.status === 'MAINTENANCE').length
+      const notice = flatSeats.filter((s: any) => s.has_notice_to_vacate).length
       const inactive = flatSeats.filter((s) => s.status === 'INACTIVE').length
       const total = flatSeats.length
       const occupancyRate = total > 0 ? Math.round((occupied / total) * 100) : 0
@@ -92,6 +113,7 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
         available,
         occupied,
         maintenance,
+        notice,
         inactive,
         occupancyRate,
         seats: flatSeats,
@@ -125,6 +147,7 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
         available: unassignedSeats.filter((s) => s.status === 'AVAILABLE').length,
         occupied: unassignedSeats.filter((s) => s.status === 'OCCUPIED').length,
         maintenance: unassignedSeats.filter((s) => s.status === 'MAINTENANCE').length,
+        notice: unassignedSeats.filter((s: any) => s.has_notice_to_vacate).length,
         inactive: unassignedSeats.filter((s) => s.status === 'INACTIVE').length,
         occupancyRate: 0,
         seats: unassignedSeats,
@@ -167,12 +190,19 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
       })
     }
 
-    if (statusFilter !== 'ALL') {
+    if (statusFilter === 'NOTICE') {
+      list = list.filter((s: any) => s.has_notice_to_vacate)
+    } else if (statusFilter !== 'ALL') {
       list = list.filter((s) => s.status === statusFilter)
     }
 
     return list
   }, [activeFlatInfo, searchQuery, statusFilter])
+
+  // All notice seats across the hostel
+  const allNoticeSeats = useMemo(() => {
+    return seats.filter((s: any) => s.has_notice_to_vacate)
+  }, [seats])
 
   // Overall hostel stats
   const overallStats = useMemo(() => {
@@ -182,6 +212,7 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
       available: seats.filter((s) => s.status === 'AVAILABLE').length,
       occupied: seats.filter((s) => s.status === 'OCCUPIED').length,
       maintenance: seats.filter((s) => s.status === 'MAINTENANCE').length,
+      notice: seats.filter((s: any) => s.has_notice_to_vacate).length,
     }
   }, [flats, seats])
 
@@ -270,10 +301,10 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
           </div>
 
           {/* KPI Statistics of this specific flat */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-1">
             <button
               type="button"
-              onClick={() => setStatusFilter('ALL')}
+              onClick={() => handleStatusFilterChange('ALL')}
               className={`p-2.5 rounded-xl border text-left transition-all ${
                 statusFilter === 'ALL'
                   ? 'bg-primary-600/15 border-primary-500/40 shadow-sm'
@@ -286,41 +317,57 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
 
             <button
               type="button"
-              onClick={() => setStatusFilter('AVAILABLE')}
+              onClick={() => handleStatusFilterChange('AVAILABLE')}
               className={`p-2.5 rounded-xl border text-left transition-all ${
                 statusFilter === 'AVAILABLE'
                   ? 'bg-emerald-500/15 border-emerald-500/40 shadow-sm'
                   : 'bg-slate-900/50 border-slate-800 hover:border-slate-700'
               }`}
             >
-              <span className="text-[10px] text-emerald-400 block font-medium">খালি সিট (Available)</span>
+              <span className="text-[10px] text-emerald-400 block font-medium">খালি সিট</span>
               <span className="text-lg font-bold text-emerald-300 tracking-tight">{activeFlatInfo.available}টি</span>
             </button>
 
             <button
               type="button"
-              onClick={() => setStatusFilter('OCCUPIED')}
+              onClick={() => handleStatusFilterChange('OCCUPIED')}
               className={`p-2.5 rounded-xl border text-left transition-all ${
                 statusFilter === 'OCCUPIED'
                   ? 'bg-indigo-500/15 border-indigo-500/40 shadow-sm'
                   : 'bg-slate-900/50 border-slate-800 hover:border-slate-700'
               }`}
             >
-              <span className="text-[10px] text-indigo-400 block font-medium">বরাদ্দকৃত (Occupied)</span>
+              <span className="text-[10px] text-indigo-400 block font-medium">বরাদ্দকৃত</span>
               <span className="text-lg font-bold text-indigo-300 tracking-tight">{activeFlatInfo.occupied}টি</span>
             </button>
 
             <button
               type="button"
-              onClick={() => setStatusFilter('MAINTENANCE')}
+              onClick={() => handleStatusFilterChange(statusFilter === 'NOTICE' ? 'ALL' : 'NOTICE')}
+              className={`p-2.5 rounded-xl border text-left transition-all ${
+                statusFilter === 'NOTICE'
+                  ? 'bg-amber-500/25 border-amber-500/60 ring-2 ring-amber-500/40 shadow-sm'
+                  : 'bg-amber-950/20 border-amber-500/30 hover:border-amber-500/50'
+              }`}
+            >
+              <span className="text-[10px] text-amber-400 block font-medium flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                আসন্ন খালি
+              </span>
+              <span className="text-lg font-bold text-amber-300 tracking-tight">{activeFlatInfo.notice || 0}টি</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleStatusFilterChange('MAINTENANCE')}
               className={`p-2.5 rounded-xl border text-left transition-all ${
                 statusFilter === 'MAINTENANCE'
                   ? 'bg-amber-500/15 border-amber-500/40 shadow-sm'
                   : 'bg-slate-900/50 border-slate-800 hover:border-slate-700'
               }`}
             >
-              <span className="text-[10px] text-amber-400 block font-medium">মেরামত চলছে</span>
-              <span className="text-lg font-bold text-amber-300 tracking-tight">{activeFlatInfo.maintenance}টি</span>
+              <span className="text-[10px] text-slate-400 block font-medium">মেরামত চলছে</span>
+              <span className="text-lg font-bold text-slate-300 tracking-tight">{activeFlatInfo.maintenance}টি</span>
             </button>
           </div>
 
@@ -430,38 +477,86 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
           </div>
 
           {/* Overall Hostel Stats */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-            <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-1">
+            <button
+              type="button"
+              onClick={() => handleStatusFilterChange('ALL')}
+              className={`p-2.5 rounded-xl border text-left transition-all ${
+                statusFilter === 'ALL'
+                  ? 'bg-slate-800/90 border-primary-500/50 shadow-sm'
+                  : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+              }`}
+            >
               <span className="text-[10px] text-slate-400 block font-medium flex items-center gap-1">
                 <DoorOpen className="w-3 h-3 text-primary-400" />
                 মোট সক্রিয় ফ্ল্যাট
               </span>
               <span className="text-lg font-bold text-white tracking-tight">{overallStats.totalFlats}টি</span>
-            </div>
+            </button>
 
-            <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800">
+            <button
+              type="button"
+              onClick={() => handleStatusFilterChange('ALL')}
+              className={`p-2.5 rounded-xl border text-left transition-all ${
+                statusFilter === 'ALL'
+                  ? 'bg-slate-800/90 border-primary-500/50 shadow-sm'
+                  : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+              }`}
+            >
               <span className="text-[10px] text-slate-400 block font-medium flex items-center gap-1">
                 <BedDouble className="w-3 h-3 text-slate-400" />
                 সর্বমোট সিট সংখ্যা
               </span>
               <span className="text-lg font-bold text-white tracking-tight">{overallStats.totalSeats}টি</span>
-            </div>
+            </button>
 
-            <div className="p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-500/20">
+            <button
+              type="button"
+              onClick={() => handleStatusFilterChange(statusFilter === 'AVAILABLE' ? 'ALL' : 'AVAILABLE')}
+              className={`p-2.5 rounded-xl border text-left transition-all ${
+                statusFilter === 'AVAILABLE'
+                  ? 'bg-emerald-500/25 border-emerald-500/60 ring-2 ring-emerald-500/40 shadow-sm'
+                  : 'bg-emerald-950/30 border-emerald-500/20 hover:border-emerald-500/40'
+              }`}
+            >
               <span className="text-[10px] text-emerald-400 block font-medium flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3" />
                 খালি সিট (Available)
               </span>
               <span className="text-lg font-bold text-emerald-300 tracking-tight">{overallStats.available}টি</span>
-            </div>
+            </button>
 
-            <div className="p-2.5 rounded-xl bg-indigo-950/30 border border-indigo-500/20">
+            <button
+              type="button"
+              onClick={() => handleStatusFilterChange(statusFilter === 'OCCUPIED' ? 'ALL' : 'OCCUPIED')}
+              className={`p-2.5 rounded-xl border text-left transition-all ${
+                statusFilter === 'OCCUPIED'
+                  ? 'bg-indigo-500/25 border-indigo-500/60 ring-2 ring-indigo-500/40 shadow-sm'
+                  : 'bg-indigo-950/30 border-indigo-500/20 hover:border-indigo-500/40'
+              }`}
+            >
               <span className="text-[10px] text-indigo-400 block font-medium flex items-center gap-1">
                 <User className="w-3 h-3" />
                 বরাদ্দকৃত (Occupied)
               </span>
               <span className="text-lg font-bold text-indigo-300 tracking-tight">{overallStats.occupied}টি</span>
-            </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleStatusFilterChange(statusFilter === 'NOTICE' ? 'ALL' : 'NOTICE')}
+              className={`p-2.5 rounded-xl border text-left transition-all col-span-2 sm:col-span-1 ${
+                statusFilter === 'NOTICE'
+                  ? 'bg-amber-500/25 border-amber-500/60 ring-2 ring-amber-500/40 shadow-sm'
+                  : 'bg-amber-950/30 border-amber-500/20 hover:border-amber-500/40'
+              }`}
+            >
+              <span className="text-[10px] text-amber-400 block font-medium flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                আসন্ন খালি (Notice)
+              </span>
+              <span className="text-lg font-bold text-amber-300 tracking-tight">{overallStats.notice}টি</span>
+            </button>
           </div>
 
           {/* Search & Building Filters */}
@@ -983,7 +1078,113 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
         /* ========================================================================= */
         /* VIEW 1: TOP LEVEL — FLAT CARDS (ফ্ল্যাটের নাম ও সিট সংখ্যা সংক্রান্ত তথ্য) */
         /* ========================================================================= */
-        <div className="space-y-4">
+        <div className="space-y-6">
+          {/* Active NOTICE Filter Section */}
+          {statusFilter === 'NOTICE' && (
+            <div className="glass-card p-5 rounded-2xl border border-amber-500/40 bg-gradient-to-r from-amber-950/30 via-slate-900 to-slate-900 space-y-4 shadow-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-center font-bold">
+                    <Clock className="w-5 h-5 text-amber-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base text-white flex items-center gap-2">
+                      <span>আসন্ন খালি সিটসমূহ ({allNoticeSeats.length}টি সিট)</span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        সক্রিয় প্রস্থান নোটিশ
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      এই সিটগুলোর বর্ডারদের প্রস্থান নোটিশ সংরক্ষিত রয়েছে। নির্ধারিত প্রস্থান তারিখ পর্যন্ত তাদের ভাড়া ও আবাসন চলমান থাকবে এবং এর পর সিটগুলো খালি হবে।
+                    </p>
+                  </div>
+                </div>
+
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleStatusFilterChange('ALL')}
+                  className="border-slate-700 text-slate-300 hover:text-white"
+                >
+                  ফিল্টার মুছুন (সকল ফ্ল্যাট)
+                </Button>
+              </div>
+
+              {allNoticeSeats.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-400 border border-dashed border-slate-800 rounded-xl">
+                  বর্তমানে কোনো আসন্ন খালি সিট নেই।
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+                  {allNoticeSeats.map((seat: any) => {
+                    const flatObj = flats.find((f) => f.id === getSeatFlatId(seat))
+                    return (
+                      <Card
+                        key={seat.id}
+                        variant="glass"
+                        className="p-4 space-y-3 border-amber-500/40 bg-slate-900/90 hover:border-amber-500/70 transition-all shadow-md"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <span className="text-[11px] font-bold text-indigo-400 block">
+                              {flatObj?.name || seat.room?.flat?.name || 'ফ্ল্যাট ২০৬ (Flat-206)'} • {seat.room?.name || 'রুম'}
+                            </span>
+                            <span className="font-mono font-bold text-sm text-white block mt-0.5">
+                              {seat.seat_code} <span className="text-xs font-normal text-slate-400">({seat.seat_name})</span>
+                            </span>
+                          </div>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 whitespace-nowrap">
+                            <Clock className="w-3 h-3 text-amber-400" />
+                            {formatDateBn(seat.vacate_date)} প্রস্থান
+                          </span>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1.5 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400 text-[11px]">বর্তমান বর্ডার:</span>
+                            <span className="text-white font-bold">{seat.occupant_name || 'জাহিদ হাসান'}</span>
+                          </div>
+                          {seat.occupant_code && (
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-slate-500">বর্ডার কোড:</span>
+                              <span className="font-mono text-slate-400">{seat.occupant_code}</span>
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-slate-400">পরবর্তী বরাদ্দযোগ্য:</span>
+                            <span className="text-emerald-400 font-semibold">{formatDateBn(seat.vacant_from_date || seat.vacate_date)} থেকে</span>
+                          </div>
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-slate-400">মাসিক ভাড়া:</span>
+                            <span className="text-emerald-300 font-bold">{formatBDT(seat.occupant_rent || seat.default_rent)}</span>
+                          </div>
+                        </div>
+
+                        <div className="pt-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const fId = getSeatFlatId(seat)
+                              if (fId && fId !== 'UNASSIGNED') {
+                                setSelectedFlatId(fId)
+                                setStatusFilter('NOTICE')
+                              }
+                            }}
+                            className="text-xs py-1.5 px-3 border-amber-500/30 text-amber-300 hover:bg-amber-500/20 w-full flex items-center justify-center gap-1.5"
+                          >
+                            <span>এই ফ্ল্যাটে যান</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </Card>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center justify-between px-1">
             <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
               <Layers className="w-4 h-4 text-primary-400" />
@@ -1091,6 +1292,17 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
                             মেরামত চলছে
                           </span>
                           <span className="font-bold font-mono">{maintenance}টি সিট</span>
+                        </div>
+                      )}
+
+                      {/* Upcoming Notice Seats if any */}
+                      {item.notice > 0 && (
+                        <div className="p-2 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-between text-xs text-amber-300">
+                          <span className="flex items-center gap-1.5 font-medium text-[11px]">
+                            <Clock className="w-3.5 h-3.5 text-amber-400" />
+                            আসন্ন খালি হতে চলা সিট
+                          </span>
+                          <span className="font-bold font-mono">{item.notice}টি সিট</span>
                         </div>
                       )}
 

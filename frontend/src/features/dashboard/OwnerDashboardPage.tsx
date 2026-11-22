@@ -471,8 +471,20 @@ export const OwnerDashboardPage: React.FC = () => {
                 />
               </div>
 
-              <div className="flex items-center justify-between text-[10px] text-slate-400 mt-2">
+              <div className="flex items-center justify-between text-[10px] text-slate-400 mt-2.5 pt-2 border-t border-slate-800/60">
                 <span className="text-emerald-400 font-semibold">{kpis.vacant_seats}টি সিট খালি</span>
+
+                {/* Upcoming Vacant Badge & Drill-down Link */}
+                <Link
+                  to="/accommodation?status=NOTICE"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 font-semibold text-[10px] transition-colors group/link"
+                  title="আসন্ন খালি সিটগুলোর তালিকা দেখতে ক্লিক করুন"
+                >
+                  <Clock className="w-3 h-3 text-amber-400" />
+                  <span>{kpis.upcoming_vacant_seats || 0}টি আসন্ন খালি</span>
+                  <ArrowRight className="w-2.5 h-2.5 text-amber-400/80 group-hover/link:translate-x-0.5 transition-transform" />
+                </Link>
+
                 <span>{kpis.maintenance_seats}টি মেরামত</span>
               </div>
             </div>
