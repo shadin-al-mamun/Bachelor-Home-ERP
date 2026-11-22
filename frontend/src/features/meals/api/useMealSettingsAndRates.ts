@@ -387,7 +387,7 @@ export async function calculateClientOptOutBillingPreview(
       })
       .eq('charge_type', 'MEAL')
       .eq('amount', 1664.00)
-      .then(() => {})
+      .then(() => { })
   }
 
   // Rates
@@ -404,21 +404,21 @@ export async function calculateClientOptOutBillingPreview(
 
   // Fast lookup maps
   const selMap = new Map<string, any>()
-  ;(selectionsRes.data || []).forEach((s: any) => {
-    selMap.set(`${s.boarder_id}_${s.meal_date}`, s)
-  })
+    ; (selectionsRes.data || []).forEach((s: any) => {
+      selMap.set(`${s.boarder_id}_${s.meal_date}`, s)
+    })
 
   const guestMap = new Map<string, any[]>()
-  ;(guestMealsRes.data || []).forEach((g: any) => {
-    const list = guestMap.get(g.boarder_id) || []
-    list.push(g)
-    guestMap.set(g.boarder_id, list)
-  })
+    ; (guestMealsRes.data || []).forEach((g: any) => {
+      const list = guestMap.get(g.boarder_id) || []
+      list.push(g)
+      guestMap.set(g.boarder_id, list)
+    })
 
   const chargeMap = new Map<string, any>()
-  ;(chargesRes.data || []).forEach((c: any) => {
-    chargeMap.set(c.boarder_id, c)
-  })
+    ; (chargesRes.data || []).forEach((c: any) => {
+      chargeMap.set(c.boarder_id, c)
+    })
 
   const previewItems: MealBillingPreviewItem[] = []
 
