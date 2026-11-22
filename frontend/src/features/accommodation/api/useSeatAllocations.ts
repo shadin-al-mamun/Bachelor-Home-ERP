@@ -77,10 +77,13 @@ export function useAllocateSeatMutation() {
 
             if (!insErr && createdBdr) {
               effectiveBoarderId = createdBdr.id
-              await supabase
-                .from('profiles')
-                .update({ role: 'BOARDER', updated_at: new Date().toISOString() })
-                .eq('id', profileRow.id)
+              // Only update profile role to BOARDER if not already staff/admin
+              if (!['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF', 'COOK', 'CLEANER'].includes(profileRow.role)) {
+                await supabase
+                  .from('profiles')
+                  .update({ role: 'BOARDER', updated_at: new Date().toISOString() })
+                  .eq('id', profileRow.id)
+              }
 
               // Ensure auth account is confirmed
               try {
@@ -105,10 +108,18 @@ export function useAllocateSeatMutation() {
             .eq('id', effectiveBoarderId)
 
           if (existingBoarder.user_id) {
-            await supabase
+            const { data: userProf } = await supabase
               .from('profiles')
-              .update({ role: 'BOARDER', updated_at: new Date().toISOString() })
+              .select('role')
               .eq('id', existingBoarder.user_id)
+              .maybeSingle()
+
+            if (!userProf || !['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF', 'COOK', 'CLEANER'].includes(userProf.role)) {
+              await supabase
+                .from('profiles')
+                .update({ role: 'BOARDER', updated_at: new Date().toISOString() })
+                .eq('id', existingBoarder.user_id)
+            }
 
             // Auto-confirm auth user account
             try {
@@ -229,7 +240,7 @@ export function useTransferSeatMutation() {
       // 3. Fallback: Direct table operations if RPC failed or no prior allocation record
       if (params.currentSeatId && params.newSeatId) {
         let boarderId = params.boarderId && isValidUuid(params.boarderId) ? params.boarderId : null
-        let rent = params.currentRent || 0
+        let rent = params.currentRent !== undefined && params.currentRent !== null ? Number(params.currentRent) : 0
         let deposit = 0
 
         if (isValidUuid(allocId)) {
@@ -241,7 +252,7 @@ export function useTransferSeatMutation() {
 
           if (oldAlloc) {
             boarderId = boarderId || oldAlloc.boarder_id
-            rent = oldAlloc.monthly_rent || rent
+            rent = oldAlloc.monthly_rent !== undefined && oldAlloc.monthly_rent !== null ? Number(oldAlloc.monthly_rent) : rent
             deposit = oldAlloc.security_deposit || 0
 
             await supabase
@@ -268,7 +279,7 @@ export function useTransferSeatMutation() {
 
           if (closedAlloc) {
             boarderId = boarderId || closedAlloc.boarder_id
-            rent = closedAlloc.monthly_rent || rent
+            rent = closedAlloc.monthly_rent !== undefined && closedAlloc.monthly_rent !== null ? Number(closedAlloc.monthly_rent) : rent
             deposit = closedAlloc.security_deposit || 0
             allocId = closedAlloc.id
           }

@@ -46,7 +46,7 @@ export const GenerateMonthlyChargesModal: React.FC<GenerateMonthlyChargesModalPr
       setSuccessMsg(
         `সফলভাবে সম্পন্ন! ${result?.generated || 'সকল'} জন সক্রিয় বর্ডারের মাসিক ভাড়া চার্জ জেনারেট হয়েছে। ${
           result?.skipped ? `${result.skipped} জন ইতিমধ্যে জেনারেটকৃত (স্কিপ)।` : ''
-        }`
+        } ${result?.exempt_staff ? `(${result.exempt_staff} জন কর্মচারী ফ্রি আবাসন বাবদ স্কিপ)` : ''}`
       )
       setTimeout(() => onClose(), 2500)
     } catch (err: unknown) {

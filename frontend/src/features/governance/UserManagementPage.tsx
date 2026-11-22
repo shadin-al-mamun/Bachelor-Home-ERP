@@ -196,64 +196,56 @@ export const UserManagementPage: React.FC = () => {
         <button
           type="button"
           onClick={() => setRoleFilter('ALL')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
-            roleFilter === 'ALL'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-              : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
-          }`}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${roleFilter === 'ALL'
+            ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+            : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
+            }`}
         >
           <span>সকল পদবী (All Users)</span>
-          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-            roleFilter === 'ALL' ? 'bg-indigo-800 text-indigo-100' : 'bg-slate-800 text-slate-400'
-          }`}>
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${roleFilter === 'ALL' ? 'bg-indigo-800 text-indigo-100' : 'bg-slate-800 text-slate-400'
+            }`}>
             {totalCount}
           </span>
         </button>
         <button
           type="button"
           onClick={() => setRoleFilter('STAFF')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
-            roleFilter === 'STAFF'
-              ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
-              : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
-          }`}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${roleFilter === 'STAFF'
+            ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
+            : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
+            }`}
         >
           <span>🛡️ কর্মকর্তা ও কর্মচারী (Staff Only)</span>
-          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-            roleFilter === 'STAFF' ? 'bg-purple-800 text-purple-100' : 'bg-slate-800 text-slate-400'
-          }`}>
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${roleFilter === 'STAFF' ? 'bg-purple-800 text-purple-100' : 'bg-slate-800 text-slate-400'
+            }`}>
             {staffCount}
           </span>
         </button>
         <button
           type="button"
           onClick={() => setRoleFilter('BOARDER')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
-            roleFilter === 'BOARDER'
-              ? 'bg-teal-600 text-white shadow-md shadow-teal-600/20'
-              : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
-          }`}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${roleFilter === 'BOARDER'
+            ? 'bg-teal-600 text-white shadow-md shadow-teal-600/20'
+            : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
+            }`}
         >
           <span>🎓 আবাসিক বোর্ডার (Boarders)</span>
-          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-            roleFilter === 'BOARDER' ? 'bg-teal-800 text-teal-100' : 'bg-slate-800 text-slate-400'
-          }`}>
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${roleFilter === 'BOARDER' ? 'bg-teal-800 text-teal-100' : 'bg-slate-800 text-slate-400'
+            }`}>
             {boarderCount}
           </span>
         </button>
         <button
           type="button"
           onClick={() => setRoleFilter('APPLICANT')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
-            roleFilter === 'APPLICANT'
-              ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20'
-              : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
-          }`}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${roleFilter === 'APPLICANT'
+            ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20'
+            : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
+            }`}
         >
           <span>📋 আবেদনকারী (Applicants)</span>
-          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-            roleFilter === 'APPLICANT' ? 'bg-amber-800 text-amber-100' : 'bg-slate-800 text-slate-400'
-          }`}>
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${roleFilter === 'APPLICANT' ? 'bg-amber-800 text-amber-100' : 'bg-slate-800 text-slate-400'
+            }`}>
             {applicantCount}
           </span>
         </button>
@@ -362,9 +354,8 @@ export const UserManagementPage: React.FC = () => {
                           value={u.role}
                           disabled={updateRoleMutation.isPending || u.id === currentUser?.id || !canChangeRole}
                           onChange={(e) => handleRoleChange(u, e.target.value as UserRole)}
-                          className={`px-2.5 py-1 text-xs font-semibold rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500/50 bg-slate-900 ${
-                            roleConfig?.badgeColor || 'border-slate-700 text-slate-300'
-                          } ${!canChangeRole ? 'opacity-70 cursor-not-allowed' : ''}`}
+                          className={`px-2.5 py-1 text-xs font-semibold rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500/50 bg-slate-900 ${roleConfig?.badgeColor || 'border-slate-700 text-slate-300'
+                            } ${!canChangeRole ? 'opacity-70 cursor-not-allowed' : ''}`}
                         >
                           {SYSTEM_ROLES.map((r) => (
                             <option key={r.role} value={r.role} className="bg-slate-900 text-slate-200">
@@ -402,13 +393,11 @@ export const UserManagementPage: React.FC = () => {
                           type="button"
                           onClick={() => handleStatusToggle(u)}
                           disabled={u.id === currentUser?.id || !canToggleStatus}
-                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition-colors ${
-                            !canToggleStatus ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
-                          } ${
-                            u.is_active
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition-colors ${!canToggleStatus ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+                            } ${u.is_active
                               ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800 hover:bg-rose-950/80 hover:text-rose-300 hover:border-rose-800'
                               : 'bg-rose-950/80 text-rose-300 border border-rose-800 hover:bg-emerald-950/80 hover:text-emerald-300 hover:border-emerald-800'
-                          }`}
+                            }`}
                           title="Click to toggle active/inactive"
                         >
                           {u.is_active ? (

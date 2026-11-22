@@ -195,7 +195,7 @@ export function useGenerateMonthlyCharges() {
           updated_at: new Date().toISOString(),
         }
         MOCK_CHARGES.push(newCharge)
-        return { generated: 2, skipped: 0 }
+        return { generated: 2, skipped: 0, exempt_staff: 1 }
       }
 
       // Call RPC to batch generate (or manual INSERT logic)
@@ -210,6 +210,8 @@ export function useGenerateMonthlyCharges() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['boarder-dues'] })
       queryClient.invalidateQueries({ queryKey: ['boarder-charges'] })
+      queryClient.invalidateQueries({ queryKey: ['executive-kpis'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-kpis'] })
     },
   })
 }

@@ -231,6 +231,14 @@ export const BoarderListPage: React.FC = () => {
     const alloc = boarder.active_allocation
     const isImran = boarder.boarder_code === 'BDR-2026-7652' || boarder.full_name?.includes('ইমরান')
     const isZahid = Boolean(boarder.full_name?.includes('জাহিদ') || boarder.full_name?.toLowerCase().includes('zahid'))
+    const isStaff = Boolean(
+      boarder.institution?.includes('কর্মচারী') ||
+      boarder.institution?.includes('স্টাফ') ||
+      boarder.boarder_code?.startsWith('STF-') ||
+      alloc?.monthly_rent === 0 ||
+      (alloc as any)?.remarks?.includes('স্টাফ') ||
+      (alloc as any)?.remarks?.includes('কর্মচারী')
+    )
     const hasSeat = Boolean((alloc && alloc.seat) || isImran || isZahid)
 
     return (
@@ -316,6 +324,11 @@ export const BoarderListPage: React.FC = () => {
                   <span className="font-semibold text-indigo-300 block">
                     {alloc?.seat?.seat_code || (isImran ? 'Seat B-1' : isZahid ? 'Seat-206-A' : 'সিট বরাদ্দ')}
                   </span>
+                  {isStaff && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-purple-500/20 text-purple-300 border border-purple-500/30 whitespace-nowrap">
+                      ৳০ (স্টাফ ফ্রি)
+                    </span>
+                  )}
                   {(alloc?.is_notice_pending ||
                     (boarder.leaving_date &&
                       boarder.leaving_date >= new Date().toISOString().slice(0, 10)) ||

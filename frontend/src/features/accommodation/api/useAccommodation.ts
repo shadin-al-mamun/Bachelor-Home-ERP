@@ -632,6 +632,25 @@ export function enrichSeatAllocations(s: any) {
     s.upcoming_start_date ||
     null
 
+  // Check if occupied by hostel staff (0 rent or staff designation)
+  const isStaffOccupant = Boolean(
+    (primaryAlloc && (
+      Number(primaryAlloc.monthly_rent) === 0 ||
+      primaryAlloc.remarks?.includes('স্টাফ') ||
+      primaryAlloc.remarks?.includes('কর্মচারী') ||
+      primaryAlloc.remarks?.toLowerCase().includes('staff') ||
+      primaryAlloc.boarder?.institution?.includes('স্টাফ') ||
+      primaryAlloc.boarder?.institution?.includes('কর্মচারী')
+    )) ||
+    (s.occupant_code && s.occupant_code.startsWith('STF-')) ||
+    s.occupant_rent === 0 ||
+    (s.description && (s.description.includes('স্টাফ') || s.description.includes('কর্মচারী')))
+  )
+
+  const resolvedRent = primaryAlloc !== null && primaryAlloc !== undefined
+    ? Number(primaryAlloc.monthly_rent)
+    : (s.occupant_rent !== undefined && s.occupant_rent !== null ? Number(s.occupant_rent) : s.default_rent)
+
   return {
     ...s,
     status: effectiveStatus,
@@ -640,8 +659,9 @@ export function enrichSeatAllocations(s: any) {
     occupant_name: occupantName,
     occupant_code: occupantCode,
     occupant_id: primaryAlloc?.boarder?.id || primaryAlloc?.boarder_id || s.occupant_id || null,
-    occupant_rent: primaryAlloc?.monthly_rent ?? s.default_rent,
+    occupant_rent: resolvedRent,
     occupant_start_date: primaryAlloc?.start_date || null,
+    is_staff: isStaffOccupant,
 
     // Notice to vacate details
     has_notice_to_vacate: hasNotice,

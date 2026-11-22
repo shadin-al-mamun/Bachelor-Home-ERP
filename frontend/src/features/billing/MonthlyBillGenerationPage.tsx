@@ -137,8 +137,9 @@ export const MonthlyBillGenerationPage: React.FC = () => {
       })
       setRentStatus({
         type: 'success',
-        message: `সফলভাবে সম্পন্ন! ${result?.generated ?? activeBoarders.length} জন সক্রিয় বর্ডারের মাসিক সিট ভাড়া তৈরি হয়েছে। ${result?.skipped ? `(${result.skipped} জন ইতিমধ্যে জেনারেট থাকায় স্কিপ করা হয়েছে)` : ''
-          }`,
+        message: `সফলভাবে সম্পন্ন! ${result?.generated ?? activeBoarders.length} জন সক্রিয় বর্ডারের মাসিক সিট ভাড়া তৈরি হয়েছে। ${
+          result?.skipped ? `(${result.skipped} জন ইতিমধ্যে জেনারেট থাকায় স্কিপ করা হয়েছে)` : ''
+        } ${result?.exempt_staff ? `(${result.exempt_staff} জন কর্মচারী ফ্রি আবাসন বাবদ স্কিপ)` : ''}`,
       })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'মাসিক ভাড়া চার্জ তৈরি করতে ব্যর্থ।'
@@ -685,8 +686,16 @@ export const MonthlyBillGenerationPage: React.FC = () => {
                               {boarder.active_allocation?.seat?.room?.flat?.name || boarder.active_allocation?.seat?.room?.flat?.flat_code || 'ফ্ল্যাট নেই'} • {boarder.active_allocation?.seat?.room?.room_code || 'রুম'}-{boarder.active_allocation?.seat?.seat_code || 'সিট'}
                             </span>
                           </td>
-                          <td className="py-2.5 px-3.5 text-right font-mono font-bold text-amber-300">
-                            ৳{Number(boarder.active_allocation?.monthly_rent || 0).toLocaleString('en-IN')}
+                          <td className="py-2.5 px-3.5 text-right font-mono font-bold">
+                            {Number(boarder.active_allocation?.monthly_rent || 0) <= 0 ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                                ৳০ (স্টাফ ফ্রি)
+                              </span>
+                            ) : (
+                              <span className="text-amber-300">
+                                ৳{Number(boarder.active_allocation?.monthly_rent || 0).toLocaleString('en-IN')}
+                              </span>
+                            )}
                           </td>
                           <td className="py-2.5 px-3.5 text-center">
                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">

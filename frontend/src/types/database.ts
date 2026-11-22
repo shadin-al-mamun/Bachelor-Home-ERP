@@ -118,6 +118,8 @@ export interface Seat {
   occupant_code?: string | null
   occupant_id?: string | null
   occupant_rent?: number | null
+  is_staff?: boolean
+  staff_department?: string | null
 }
 
 export interface Boarder {
@@ -174,6 +176,7 @@ export interface Allocation {
   status: AllocationStatus
   cancellation_reason?: string | null
   remarks?: string | null
+  is_staff?: boolean
   created_by?: string | null
   created_at: string
   updated_at: string

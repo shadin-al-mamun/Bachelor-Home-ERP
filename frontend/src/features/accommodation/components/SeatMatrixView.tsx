@@ -100,6 +100,16 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
       const maintenance = flatSeats.filter((s) => s.status === 'MAINTENANCE').length
       const notice = flatSeats.filter((s: any) => s.has_notice_to_vacate).length
       const inactive = flatSeats.filter((s) => s.status === 'INACTIVE').length
+      const staff = flatSeats.filter((s: any) =>
+        Boolean(
+          s.is_staff ||
+          s.occupant_rent === 0 ||
+          s.active_allocation?.monthly_rent === 0 ||
+          s.active_allocation?.remarks?.includes('স্টাফ') ||
+          s.active_allocation?.remarks?.includes('কর্মচারী') ||
+          s.occupant_code?.startsWith('STF-')
+        )
+      ).length
       const total = flatSeats.length
       const occupancyRate = total > 0 ? Math.round((occupied / total) * 100) : 0
 
@@ -115,6 +125,7 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
         maintenance,
         notice,
         inactive,
+        staff,
         occupancyRate,
         seats: flatSeats,
       }
@@ -628,6 +639,14 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
               const hasUpcoming = Boolean(seat.has_upcoming_allocation && seat.upcoming_occupant_name)
               const isHandover = Boolean(hasCurrentOccupant && hasUpcoming)
               const isAdvanceBookedVacant = Boolean(!hasCurrentOccupant && hasUpcoming)
+              const isStaffSeat = Boolean(
+                (seat as any).is_staff ||
+                seat.occupant_rent === 0 ||
+                seat.active_allocation?.monthly_rent === 0 ||
+                seat.active_allocation?.remarks?.includes('স্টাফ') ||
+                seat.active_allocation?.remarks?.includes('কর্মচারী') ||
+                seat.occupant_code?.startsWith('STF-')
+              )
 
               return (
                 <Card
@@ -639,7 +658,9 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
                       : isAdvanceBookedVacant
                       ? 'hover:border-emerald-500/50 hover:shadow-glow-emerald border-emerald-500/30 bg-slate-900/70'
                       : isOccupied
-                      ? hasNotice && !hasUpcoming
+                      ? isStaffSeat
+                        ? 'hover:border-purple-500/50 hover:shadow-glow-purple border-purple-500/30 bg-slate-900/70'
+                        : hasNotice && !hasUpcoming
                         ? 'hover:border-amber-500/50 hover:shadow-glow-amber border-amber-500/30 bg-slate-900/70'
                         : isHandover
                         ? 'hover:border-indigo-500/50 hover:shadow-glow-primary border-indigo-500/30 bg-slate-900/70'
@@ -657,6 +678,8 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
                           className={`w-8 h-8 rounded-xl flex items-center justify-center ${
                             isAvailable || isAdvanceBookedVacant
                               ? 'bg-emerald-500/15 text-emerald-400'
+                              : isStaffSeat
+                              ? 'bg-purple-500/15 text-purple-400'
                               : isOccupied
                               ? hasNotice && !hasUpcoming
                                 ? 'bg-amber-500/15 text-amber-400'
@@ -688,7 +711,12 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
-                        {isHandover ? (
+                        {isStaffSeat ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                            <span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+                            কর্মচারী আবাসন (ফ্রি)
+                          </span>
+                        ) : isHandover ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                             <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
                             হস্তান্তর প্রক্রিয়াধীন
@@ -720,10 +748,23 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
                     {/* Rent and Room Info */}
                     <div className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80 flex items-center justify-between text-xs">
                       <div>
-                        <span className="text-[10px] text-slate-400 block">মাসিক ডিফল্ট ভাড়া:</span>
-                        <span className="font-semibold text-emerald-400 flex items-center gap-0.5">
-                          <DollarSign className="w-3 h-3" />
-                          {formatBDT(seat.default_rent)}
+                        <span className="text-[10px] text-slate-400 block">
+                          {isStaffSeat ? 'কর্মচারী সিট ভাড়া:' : 'মাসিক ডিফল্ট ভাড়া:'}
+                        </span>
+                        <span className={`font-semibold flex items-center gap-0.5 ${isStaffSeat ? 'text-purple-300' : 'text-emerald-400'}`}>
+                          {isStaffSeat ? (
+                            <>
+                              <span>৳০ (ফ্রি সুবিধা)</span>
+                              <span className="text-[10px] text-slate-500 font-normal ml-1">
+                                (ডিফল্ট: {formatBDT(seat.default_rent)})
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <DollarSign className="w-3 h-3" />
+                              {formatBDT(seat.default_rent)}
+                            </>
+                          )}
                         </span>
                       </div>
 
@@ -742,7 +783,9 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
                         {hasCurrentOccupant ? (
                           <div
                             className={`p-2.5 rounded-xl border text-xs space-y-1.5 ${
-                              hasNotice || isHandover
+                              isStaffSeat
+                                ? 'bg-purple-500/10 border-purple-500/25 text-purple-200'
+                                : hasNotice || isHandover
                                 ? 'bg-amber-500/10 border-amber-500/25 text-amber-200'
                                 : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-200'
                             }`}
@@ -751,19 +794,32 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
                               <div className="flex items-center gap-2 min-w-0">
                                 <User
                                   className={`w-3.5 h-3.5 shrink-0 ${
-                                    hasNotice || isHandover ? 'text-amber-400' : 'text-indigo-400'
+                                    isStaffSeat
+                                      ? 'text-purple-400'
+                                      : hasNotice || isHandover
+                                      ? 'text-amber-400'
+                                      : 'text-indigo-400'
                                   }`}
                                 />
                                 <span className="font-semibold truncate">
                                   {seat.occupant_name}
+                                  {isStaffSeat && (
+                                    <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9.5px] bg-purple-500/25 text-purple-300 font-normal">
+                                      হোস্টেল কর্মী
+                                    </span>
+                                  )}
                                 </span>
                               </div>
                               <span
                                 className={`text-[10px] font-mono shrink-0 ${
-                                  hasNotice || isHandover ? 'text-amber-300' : 'text-indigo-300'
+                                  isStaffSeat
+                                    ? 'text-purple-300'
+                                    : hasNotice || isHandover
+                                    ? 'text-amber-300'
+                                    : 'text-indigo-300'
                                 }`}
                               >
-                                {seat.occupant_code || 'BDR-ACTIVE'}
+                                {seat.occupant_code || (isStaffSeat ? 'STF-ACTIVE' : 'BDR-ACTIVE')}
                               </span>
                             </div>
 
@@ -1283,6 +1339,17 @@ export const SeatMatrixView: React.FC<SeatMatrixViewProps> = ({ onAllocateSeat }
                           <span className="text-base font-bold text-indigo-300 font-mono">{occupied}টি</span>
                         </div>
                       </div>
+
+                      {/* Staff Accommodation Notice if any */}
+                      {item.staff > 0 && (
+                        <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-between text-xs text-purple-300">
+                          <span className="flex items-center gap-1.5 font-medium text-[11px]">
+                            <User className="w-3.5 h-3.5 text-purple-400" />
+                            কর্মচারী আবাসন
+                          </span>
+                          <span className="font-bold font-mono">{item.staff}টি সিট (ফ্রি)</span>
+                        </div>
+                      )}
 
                       {/* Maintenance Notice if any */}
                       {maintenance > 0 && (

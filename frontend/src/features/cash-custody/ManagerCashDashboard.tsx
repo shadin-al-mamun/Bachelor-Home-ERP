@@ -82,11 +82,11 @@ export const ManagerCashDashboard: React.FC = () => {
   // Expected = Opening + Receipts + HandoverIn - Expenses - DepositedToOwner - HandoverOut
   const calculatedExpected = session
     ? session.opening_cash +
-      session.cash_receipts +
-      session.cash_handed_over_in -
-      session.cash_expenses -
-      session.cash_deposited_to_owner -
-      session.cash_handed_over_out
+    session.cash_receipts +
+    session.cash_handed_over_in -
+    session.cash_expenses -
+    session.cash_deposited_to_owner -
+    session.cash_handed_over_out
     : 0
 
   // Filtered movements
@@ -164,11 +164,10 @@ export const ManagerCashDashboard: React.FC = () => {
           <div className="flex items-center rounded-xl bg-slate-900 border border-slate-800 p-1 text-xs font-semibold">
             <button
               onClick={() => setSelectedDate(new Date().toISOString().slice(0, 10))}
-              className={`px-3 py-1 rounded-lg transition-all ${
-                isToday
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
+              className={`px-3 py-1 rounded-lg transition-all ${isToday
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-white'
+                }`}
             >
               আজকের সেশন
             </button>
@@ -178,11 +177,10 @@ export const ManagerCashDashboard: React.FC = () => {
                   new Date(Date.now() - 86400000).toISOString().slice(0, 10)
                 )
               }
-              className={`px-3 py-1 rounded-lg transition-all ${
-                !isToday
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
+              className={`px-3 py-1 rounded-lg transition-all ${!isToday
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-white'
+                }`}
             >
               গতকালকের
             </button>
@@ -489,13 +487,12 @@ export const ManagerCashDashboard: React.FC = () => {
           {/* Submitted / Approved Reconciliation Audit Card */}
           {session.status !== 'OPEN' && session.actual_counted_cash !== null && (
             <div
-              className={`p-5 rounded-3xl border shadow-xl ${
-                session.cash_variance === 0
-                  ? 'bg-emerald-950/20 border-emerald-500/40'
-                  : (session.cash_variance || 0) < 0
+              className={`p-5 rounded-3xl border shadow-xl ${session.cash_variance === 0
+                ? 'bg-emerald-950/20 border-emerald-500/40'
+                : (session.cash_variance || 0) < 0
                   ? 'bg-rose-950/20 border-rose-500/40'
                   : 'bg-amber-950/20 border-amber-500/40'
-              } space-y-4 animate-fade-in`}
+                } space-y-4 animate-fade-in`}
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
                 <div className="flex items-center gap-2.5">
@@ -521,9 +518,9 @@ export const ManagerCashDashboard: React.FC = () => {
                   <span className="text-xs font-mono text-slate-300">
                     {session.submitted_at
                       ? new Date(session.submitted_at).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
                       : 'অপেক্ষমাণ'}
                   </span>
                 </div>
@@ -545,20 +542,19 @@ export const ManagerCashDashboard: React.FC = () => {
                 </div>
 
                 <div
-                  className={`p-3.5 rounded-2xl border ${
-                    session.cash_variance === 0
-                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                      : (session.cash_variance || 0) < 0
+                  className={`p-3.5 rounded-2xl border ${session.cash_variance === 0
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                    : (session.cash_variance || 0) < 0
                       ? 'bg-rose-500/10 border-rose-500/30 text-rose-300'
                       : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-                  }`}
+                    }`}
                 >
                   <div className="text-[11px] font-medium">
                     {session.cash_variance === 0
                       ? 'পার্থক্য (Variance)'
                       : (session.cash_variance || 0) < 0
-                      ? 'ক্যাশ ঘাটতি (Deficit)'
-                      : 'ক্যাশ উদ্বৃত্ত (Surplus)'}
+                        ? 'ক্যাশ ঘাটতি (Deficit)'
+                        : 'ক্যাশ উদ্বৃত্ত (Surplus)'}
                   </div>
                   <div className="text-lg font-extrabold font-mono mt-1">
                     {session.cash_variance === 0
@@ -801,11 +797,10 @@ export const ManagerCashDashboard: React.FC = () => {
                   <button
                     key={tab.id}
                     onClick={() => setMovementFilter(tab.id as any)}
-                    className={`px-3 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
-                      movementFilter === tab.id
-                        ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
+                    className={`px-3 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${movementFilter === tab.id
+                      ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                      }`}
                   >
                     {tab.label}
                   </button>
@@ -830,11 +825,10 @@ export const ManagerCashDashboard: React.FC = () => {
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div
-                          className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                            isPositive
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                              : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                          }`}
+                          className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isPositive
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                            : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                            }`}
                         >
                           {isPositive ? (
                             <ArrowDownLeft className="w-4 h-4" />
@@ -860,9 +854,8 @@ export const ManagerCashDashboard: React.FC = () => {
 
                       <div className="text-right whitespace-nowrap shrink-0">
                         <div
-                          className={`font-mono font-bold text-xs ${
-                            isPositive ? 'text-emerald-400' : 'text-rose-400'
-                          }`}
+                          className={`font-mono font-bold text-xs ${isPositive ? 'text-emerald-400' : 'text-rose-400'
+                            }`}
                         >
                           {isPositive ? '+' : '−'}৳
                           {item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
