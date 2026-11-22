@@ -922,6 +922,11 @@ export const MonthlyBillGenerationPage: React.FC = () => {
                               <span>{item.boarder_name}</span>
                               <ExternalLink className="w-3 h-3 text-slate-500 group-hover:text-emerald-400 opacity-60 group-hover:opacity-100 transition-opacity" />
                             </Link>
+                            {item.is_staff_free_meal && (
+                              <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 inline-flex items-center gap-0.5">
+                                🛠️ স্টাফ (ফ্রি মিল)
+                              </span>
+                            )}
                             <div className="text-[10px] text-slate-400 font-mono">
                               {item.boarder_code}
                             </div>
@@ -967,10 +972,21 @@ export const MonthlyBillGenerationPage: React.FC = () => {
                             )}
                           </td>
                           <td className="py-2.5 px-3 text-right font-mono font-extrabold text-emerald-300">
-                            ৳{item.total_amount.toLocaleString('en-IN')}
+                            {item.is_staff_free_meal ? (
+                              <div>
+                                <span className="text-purple-300">৳০</span>
+                                <span className="block text-[9px] text-purple-400 font-normal">স্টাফ ফ্রি মিল</span>
+                              </div>
+                            ) : (
+                              `৳${item.total_amount.toLocaleString('en-IN')}`
+                            )}
                           </td>
                           <td className="py-2.5 px-3 text-center">
-                            {item.already_billed ? (
+                            {item.is_staff_free_meal ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                                ফ্রি (অব্যাহতিপ্রাপ্ত)
+                              </span>
+                            ) : item.already_billed ? (
                               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
                                 বিল তৈরি সম্পন্ন
                               </span>

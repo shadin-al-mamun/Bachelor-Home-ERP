@@ -43,6 +43,7 @@ export interface MealBillingPreviewItem {
   dinner_cost: number
   total_amount: number
   already_billed: boolean
+  is_staff_free_meal?: boolean
 }
 
 export interface MealBillingPreviewResponse {
@@ -321,12 +322,14 @@ export async function calculateClientOptOutBillingPreview(
         boarder_code,
         phone_number,
         admission_date,
+        institution,
         status,
         active_allocation:allocations(
           id,
           start_date,
           end_date,
           status,
+          remarks,
           seat:seats(
             id,
             seat_name,
@@ -498,6 +501,18 @@ export async function calculateClientOptOutBillingPreview(
     // Do not add guestAmount again to prevent double counting.
     const totalAmount = Math.round((bCost + lCost + dCost + shortfallCost) * 100) / 100
 
+    // Staff members receiving free accommodation and free meals are exempt from meal bills
+    const isStaffFree =
+      Boolean((activeAlloc as any)?.remarks?.includes('কর্মচারী')) ||
+      Boolean((activeAlloc as any)?.remarks?.includes('স্টাফ')) ||
+      Boolean((activeAlloc as any)?.remarks?.includes('ফ্রি মিল')) ||
+      Boolean((b as any).institution?.includes('কর্মচারী')) ||
+      Boolean((b as any).institution?.includes('স্টাফ')) ||
+      Boolean((b as any).institution?.includes('ফ্রি মিল'))
+
+    const effectiveTotalAmount = isStaffFree ? 0 : totalAmount
+    const effectiveShortfallCost = isStaffFree ? 0 : shortfallCost
+
     const existingCharge = chargeMap.get(b.id)
 
     previewItems.push({
@@ -515,12 +530,13 @@ export async function calculateClientOptOutBillingPreview(
       min_meals: minMeals,
       shortfall_meals: shortfallMeals,
       billable_meals: billableMeals,
-      shortfall_cost: shortfallCost,
+      shortfall_cost: effectiveShortfallCost,
       breakfast_cost: bCost,
       lunch_cost: lCost,
       dinner_cost: dCost,
-      total_amount: totalAmount,
+      total_amount: effectiveTotalAmount,
       already_billed: Boolean(existingCharge),
+      is_staff_free_meal: isStaffFree,
     })
   }
 
@@ -851,7 +867,7 @@ export function useGenerateMonthlyMealChargesMutation() {
       const existingMap = new Map((existingCharges || []).map((c: any) => [c.boarder_id, c]))
 
       for (const item of preview.preview_items) {
-        if (item.total_amount <= 0) continue
+        if (item.is_staff_free_meal || item.total_amount <= 0) continue
 
         const existing: any = existingMap.get(item.boarder_id)
         const shortfallText = item.shortfall_meals > 0 ? `, শর্টফল: ${item.shortfall_meals}টি` : ''

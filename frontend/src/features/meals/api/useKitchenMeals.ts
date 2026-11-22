@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import {
@@ -52,6 +52,9 @@ export interface FlatBoarderMealItem {
   dinner: boolean
   is_override: boolean
   override_reason?: string | null
+  is_staff?: boolean
+  staff_role?: string
+  has_free_meal?: boolean
 }
 
 // ==============================================================================
@@ -591,14 +594,18 @@ export function useFlatBoarderMeals(flatId?: string, mealDate?: string) {
           status,
           start_date,
           end_date,
+          remarks,
           boarder:boarders (
             id,
             full_name,
             boarder_code,
             phone_number,
             status,
+            institution,
+            department,
             admission_date,
-            leaving_date
+            leaving_date,
+            remarks
           ),
           seat:seats (
             id,
@@ -736,6 +743,17 @@ export function useFlatBoarderMeals(flatId?: string, mealDate?: string) {
         const room = Array.isArray(seat?.room) ? seat.room[0] : seat?.room
         const sel = selectionsMap.get(b?.id)
 
+        const isStaff =
+          Boolean(row.remarks?.includes('কর্মচারী') || row.remarks?.includes('স্টাফ')) ||
+          Boolean(b?.institution?.includes('কর্মচারী') || b?.institution?.includes('স্টাফ'))
+        const hasFreeMeal =
+          Boolean(row.remarks?.includes('ফ্রি মিল')) ||
+          Boolean(b?.institution?.includes('ফ্রি মিল')) ||
+          isStaff
+        const staffRole =
+          b?.department ||
+          (row.remarks?.includes('বাবুর্চি') ? 'বাবুর্চি' : row.remarks?.includes('ক্লিনার') ? 'ক্লিনার' : 'স্টাফ')
+
         return {
           boarder_id: b?.id,
           boarder_name: b?.full_name || 'বর্ডার',
@@ -748,6 +766,9 @@ export function useFlatBoarderMeals(flatId?: string, mealDate?: string) {
           dinner: sel ? sel.dinner : true,       // Opt-Out: active by default
           is_override: sel?.is_override ?? false,
           override_reason: sel?.override_reason || null,
+          is_staff: isStaff,
+          staff_role: isStaff ? staffRole : undefined,
+          has_free_meal: hasFreeMeal,
         }
       })
     },
@@ -776,5 +797,272 @@ export function updateMockFlatBoarderMeal(
         item.override_reason = reason || 'ম্যানেজার কর্তৃক পরিবর্তন'
       }
     }
+  })
+}
+
+// In-memory staff leave override tracking for mock mode
+const MOCK_STAFF_LEAVES = new Map<string, { startDate: string; endDate: string; reason: string }>()
+
+export function setMockStaffMealLeave(
+  boarderId: string,
+  startDate: string,
+  endDate: string,
+  isOnLeave: boolean,
+  reason?: string
+) {
+  if (isOnLeave) {
+    MOCK_STAFF_LEAVES.set(boarderId, {
+      startDate,
+      endDate,
+      reason: reason || 'কর্মচারী ছুটিতে (Staff on Leave)',
+    })
+    // Turn off meals in mock flat detail
+    updateMockFlatBoarderMeal(boarderId, 'BREAKFAST', false, true, reason || 'কর্মচারী ছুটিতে')
+    updateMockFlatBoarderMeal(boarderId, 'LUNCH', false, true, reason || 'কর্মচারী ছুটিতে')
+    updateMockFlatBoarderMeal(boarderId, 'DINNER', false, true, reason || 'কর্মচারী ছুটিতে')
+  } else {
+    MOCK_STAFF_LEAVES.delete(boarderId)
+    updateMockFlatBoarderMeal(boarderId, 'BREAKFAST', true, false, null)
+    updateMockFlatBoarderMeal(boarderId, 'LUNCH', true, false, null)
+    updateMockFlatBoarderMeal(boarderId, 'DINNER', true, false, null)
+  }
+}
+
+// ==============================================================================
+// 4. Resident Staff Free Meals & Leave Tracking Hook
+// ==============================================================================
+
+export interface ResidentStaffMealInfo {
+  boarder_id: string
+  allocation_id: string
+  name: string
+  code: string
+  phone: string
+  role: string
+  flat_id: string
+  flat_name: string
+  room_name: string
+  seat_name: string
+  has_free_meal: boolean
+  is_on_leave: boolean
+  leave_reason?: string | null
+  breakfast: boolean
+  lunch: boolean
+  dinner: boolean
+}
+
+export function useResidentStaffMeals(targetDate?: string) {
+  const queryDate = targetDate || formatDhakaDate(getDhakaNow())
+
+  return useQuery({
+    queryKey: ['resident-staff-meals', queryDate],
+    queryFn: async (): Promise<ResidentStaffMealInfo[]> => {
+      if (!isSupabaseConfigured) {
+        const mockStaff: ResidentStaffMealInfo[] = [
+          {
+            boarder_id: 'bdr-staff-cook',
+            allocation_id: 'alloc-staff-1',
+            name: 'মোঃ রফিক মিয়া',
+            code: 'STF-2026-101',
+            phone: '01711002233',
+            role: 'প্রধান বাবুর্চি / কিচেন স্টাফ',
+            flat_id: 'flat-2a',
+            flat_name: 'ফ্ল্যাট ২-এ',
+            room_name: 'রুম ২০২',
+            seat_name: 'সিট B-1',
+            has_free_meal: true,
+            is_on_leave: MOCK_STAFF_LEAVES.has('bdr-staff-cook'),
+            leave_reason: MOCK_STAFF_LEAVES.get('bdr-staff-cook')?.reason || null,
+            breakfast: !MOCK_STAFF_LEAVES.has('bdr-staff-cook'),
+            lunch: !MOCK_STAFF_LEAVES.has('bdr-staff-cook'),
+            dinner: !MOCK_STAFF_LEAVES.has('bdr-staff-cook'),
+          },
+        ]
+        return mockStaff
+      }
+
+      // Fetch active allocations for resident staff members
+      const { data: rawAllocs, error } = await supabase
+        .from('allocations')
+        .select(`
+          id,
+          status,
+          start_date,
+          end_date,
+          remarks,
+          boarder:boarders (
+            id,
+            full_name,
+            boarder_code,
+            phone_number,
+            status,
+            institution,
+            department,
+            admission_date,
+            remarks
+          ),
+          seat:seats (
+            id,
+            seat_name,
+            seat_code,
+            room:rooms (
+              id,
+              name,
+              flat_id,
+              flat:flats (
+                id,
+                name,
+                flat_code
+              )
+            )
+          )
+        `)
+        .or('status.eq.ACTIVE,end_date.gte.' + queryDate)
+
+      if (error) throw new Error(error.message)
+
+      // Filter to genuine resident staff
+      const staffAllocs = (rawAllocs || []).filter((row: any) => {
+        const b = Array.isArray(row.boarder) ? row.boarder[0] : row.boarder
+        if (!b) return false
+        if (row.start_date && row.start_date > queryDate) return false
+        if (row.end_date && row.end_date < queryDate) return false
+
+        const isStaff =
+          Boolean(row.remarks?.includes('কর্মচারী') || row.remarks?.includes('স্টাফ')) ||
+          Boolean(b?.institution?.includes('কর্মচারী') || b?.institution?.includes('স্টাফ'))
+        return isStaff
+      })
+
+      if (staffAllocs.length === 0) return []
+
+      const staffBoarderIds = staffAllocs.map((a: any) => (Array.isArray(a.boarder) ? a.boarder[0].id : a.boarder.id))
+
+      // Query meal selections for today
+      const { data: selectionsData } = await supabase
+        .from('meal_selections')
+        .select('*')
+        .in('boarder_id', staffBoarderIds)
+        .eq('meal_date', queryDate)
+
+      const selMap = new Map((selectionsData || []).map((s: any) => [s.boarder_id, s]))
+
+      return staffAllocs.map((row: any) => {
+        const b = Array.isArray(row.boarder) ? row.boarder[0] : row.boarder
+        const seat = Array.isArray(row.seat) ? row.seat[0] : row.seat
+        const room = Array.isArray(seat?.room) ? seat.room[0] : seat?.room
+        const flat = Array.isArray(room?.flat) ? room?.flat[0] : room?.flat
+        const sel = selMap.get(b.id)
+
+        const hasFreeMeal =
+          Boolean(row.remarks?.includes('ফ্রি মিল')) ||
+          Boolean(b?.institution?.includes('ফ্রি মিল')) ||
+          true
+
+        const isOnLeave = Boolean(
+          sel &&
+          sel.breakfast === false &&
+          sel.lunch === false &&
+          sel.dinner === false &&
+          (sel.override_reason?.includes('ছুটি') || sel.is_override)
+        )
+
+        return {
+          boarder_id: b.id,
+          allocation_id: row.id,
+          name: b.full_name,
+          code: b.boarder_code,
+          phone: b.phone_number || '',
+          role: b.department || (row.remarks?.includes('বাবুর্চি') ? 'বাবুর্চি' : 'হোস্টেল স্টাফ'),
+          flat_id: flat?.id || room?.flat_id || '',
+          flat_name: flat?.name || flat?.flat_code || 'ফ্ল্যাট',
+          room_name: room?.name || 'রুম',
+          seat_name: seat?.seat_name || seat?.seat_code || 'সিট',
+          has_free_meal: hasFreeMeal,
+          is_on_leave: isOnLeave,
+          leave_reason: sel?.override_reason || null,
+          breakfast: sel ? sel.breakfast : true,
+          lunch: sel ? sel.lunch : true,
+          dinner: sel ? sel.dinner : true,
+        }
+      })
+    },
+  })
+}
+
+// ==============================================================================
+// 5. Staff Meal Leave & Override Mutation
+// ==============================================================================
+
+export interface StaffMealLeaveInput {
+  boarderId: string
+  flatId?: string
+  startDate: string
+  endDate: string
+  isOnLeave: boolean
+  reason?: string
+}
+
+export function useStaffMealLeaveMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: StaffMealLeaveInput) => {
+      const { boarderId, flatId, startDate, endDate, isOnLeave, reason } = input
+
+      // Sync mock state
+      setMockStaffMealLeave(boarderId, startDate, endDate, isOnLeave, reason)
+
+      if (!isSupabaseConfigured) {
+        return {
+          success: true,
+          message: isOnLeave
+            ? 'কর্মচারীর ছুটির কারণে খাবার বন্ধ রাখা হয়েছে।'
+            : 'কর্মচারীর খাবার পুনরায় চালু করা হয়েছে।',
+        }
+      }
+
+      // Generate all dates in range
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+      const dates: string[] = []
+
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        dates.push(d.toISOString().slice(0, 10))
+      }
+
+      const rows = dates.map((meal_date) => ({
+        boarder_id: boarderId,
+        flat_id: flatId || null,
+        meal_date,
+        breakfast: !isOnLeave,
+        lunch: !isOnLeave,
+        dinner: !isOnLeave,
+        is_override: isOnLeave,
+        override_reason: isOnLeave ? (reason || 'কর্মচারী ছুটিতে (Staff on Leave)') : null,
+        updated_at: new Date().toISOString(),
+      }))
+
+      const { error } = await supabase
+        .from('meal_selections')
+        .upsert(rows, { onConflict: 'boarder_id,meal_date' })
+
+      if (error) {
+        throw new Error(error.message || 'ছুটি আপডেট করতে সমস্যা হয়েছে।')
+      }
+
+      return {
+        success: true,
+        message: isOnLeave
+          ? `কর্মচারীর ${dates.length} দিনের ছুটির কারণে মিল অফ করা হয়েছে।`
+          : `কর্মচারীর ${dates.length} দিনের মিল পুনরায় চালু করা হয়েছে।`,
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['kitchen-meals-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['flat-boarder-meals'] })
+      queryClient.invalidateQueries({ queryKey: ['resident-staff-meals'] })
+      queryClient.invalidateQueries({ queryKey: ['boarder-meal-selections'] })
+    },
   })
 }

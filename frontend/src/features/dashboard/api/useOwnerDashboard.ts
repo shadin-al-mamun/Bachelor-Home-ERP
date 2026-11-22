@@ -13,6 +13,7 @@ export interface ExecutiveKPIs {
   vacant_seats: number
   maintenance_seats: number
   upcoming_vacant_seats?: number
+  staff_seats?: number
   occupancy_rate: number // %
 
   // 2. Financial Health (Current Month or Selected Month)
@@ -674,6 +675,24 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
           }
         })
 
+        // Identify staff occupied seats (free staff accommodation)
+        const staffSeatIds = new Set<string>()
+        rawAllocations.forEach((a: any) => {
+          const seatId = a.seat?.id || a.seat_id
+          if (!seatId) return
+          const isCurrentResident =
+            (!a.start_date || a.start_date <= todayStr) &&
+            (!a.end_date || a.end_date >= todayStr) &&
+            (a.boarder?.status === 'ACTIVE' || (a.boarder?.leaving_date && a.boarder.leaving_date >= todayStr))
+          const isStaff =
+            Boolean(a.remarks?.includes('কর্মচারী') || a.remarks?.includes('স্টাফ')) ||
+            Boolean(a.boarder?.institution?.includes('কর্মচারী') || a.boarder?.institution?.includes('স্টাফ'))
+          if (isCurrentResident && isStaff) {
+            staffSeatIds.add(seatId)
+          }
+        })
+        const staffSeatsCount = staffSeatIds.size
+
         const upcomingVacantSeats = isManager
           ? seats.filter((s: any) => noticeSeatIds.has(s.id)).length
           : (Number(rpcKpis?.upcoming_vacant_seats) || noticeSeatIds.size)
@@ -1108,6 +1127,7 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
             vacant_seats: vacantSeats,
             maintenance_seats: maintenanceSeats,
             upcoming_vacant_seats: upcomingVacantSeats,
+            staff_seats: staffSeatsCount,
             occupancy_rate: Math.round(occupancyRate * 10) / 10,
             total_billed_month: totalBilled,
             total_collected_month: totalCollected,
@@ -1143,6 +1163,7 @@ export function useOwnerDashboard(selectedFinanceMonth?: string) {
             vacant_seats: 0,
             maintenance_seats: 0,
             upcoming_vacant_seats: 0,
+            staff_seats: 0,
             occupancy_rate: 0,
             total_billed_month: 0,
             total_collected_month: 0,

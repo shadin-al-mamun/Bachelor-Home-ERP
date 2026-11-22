@@ -7,17 +7,19 @@ import {
   Banknote,
   Layers,
   ChefHat,
+  Palmtree,
 } from 'lucide-react'
 import {
   formatDhakaDate,
   getDhakaNow,
 } from './api/useMeals'
-import { useKitchenMealSummary } from './api/useKitchenMeals'
+import { useKitchenMealSummary, useResidentStaffMeals } from './api/useKitchenMeals'
 import type { KitchenFlatSummary } from './api/useKitchenMeals'
 import { useRealtimeMeals } from './hooks/useRealtimeMeals'
 import { MealEngineTabs } from './components/MealEngineTabs'
 import { FlatBoarderBreakdownModal } from './components/FlatBoarderBreakdownModal'
 import { StaffMealControlModal } from './components/StaffMealControlModal'
+import { StaffMealLeaveModal } from './components/StaffMealLeaveModal'
 import { formatFloorBn } from '@/utils/floor'
 
 export const KitchenMealSummaryPage: React.FC = () => {
@@ -31,6 +33,7 @@ export const KitchenMealSummaryPage: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<string>(tomorrowStr)
   const [selectedFlat, setSelectedFlat] = useState<KitchenFlatSummary | null>(null)
   const [isStaffMealControlOpen, setIsStaffMealControlOpen] = useState<boolean>(false)
+  const [isStaffLeaveModalOpen, setIsStaffLeaveModalOpen] = useState<boolean>(false)
 
   // Realtime WebSocket Subscription
   const { isLive, lastEventTime, changeCount } = useRealtimeMeals()
@@ -42,6 +45,8 @@ export const KitchenMealSummaryPage: React.FC = () => {
     refetch,
     isRefetching,
   } = useKitchenMealSummary(selectedDate)
+
+  const { data: residentStaffList = [], refetch: refetchStaff } = useResidentStaffMeals(selectedDate)
 
   const flats = summaryData?.flats || []
   const totals = summaryData?.grand_totals || {
@@ -224,6 +229,48 @@ export const KitchenMealSummaryPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Staff Free Meals & Leave Tracking Strip (Only visible on screen, hidden on print) */}
+      <div className="p-4 rounded-3xl bg-gradient-to-r from-purple-950/40 via-slate-900/60 to-purple-950/30 border border-purple-500/30 flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0">
+            <ChefHat className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-white">
+                🛠️ হোস্টেল কর্মচারী ফ্রি মিল ও ছুটি ট্র্যাকিং
+              </h3>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 font-mono">
+                {residentStaffList.length} জন কর্মী আবাসিক
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              কর্মচারী হোস্টেলে উপস্থিত থাকলে রান্না তালিকায় গণনা হবে, ছুটিতে থাকলে স্বয়ংক্রিয়ভাবে মিল অফ থাকবে ও কোনো চার্জ ধার্য হবে না।
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2 text-[11px] font-mono">
+            <span className="px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-bold">
+              ✅ {residentStaffList.filter((s) => !s.is_on_leave).length} জন খাবার চলমান
+            </span>
+            <span className="px-2.5 py-1 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 font-bold">
+              🏖️ {residentStaffList.filter((s) => s.is_on_leave).length} জন ছুটিতে (অফ)
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsStaffLeaveModalOpen(true)}
+            className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md shadow-purple-600/30 transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            <Palmtree className="w-3.5 h-3.5" />
+            <span>ছুটি ও মিল নিয়ন্ত্রণ</span>
+          </button>
+        </div>
+      </div>
+
       {/* Flat-wise Preparation Breakdown Table */}
       <div className="glass-card rounded-3xl border border-slate-800/80 overflow-hidden shadow-2xl p-5 space-y-4 print:border-none print:shadow-none print:p-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800 print:border-black">
@@ -389,6 +436,19 @@ export const KitchenMealSummaryPage: React.FC = () => {
             refetch()
           }}
           initialDate={selectedDate}
+        />
+      )}
+
+      {/* Staff Free Meal Leave & Override Modal */}
+      {isStaffLeaveModalOpen && (
+        <StaffMealLeaveModal
+          isOpen={isStaffLeaveModalOpen}
+          onClose={() => {
+            setIsStaffLeaveModalOpen(false)
+            refetch()
+            refetchStaff()
+          }}
+          selectedDate={selectedDate}
         />
       )}
     </div>

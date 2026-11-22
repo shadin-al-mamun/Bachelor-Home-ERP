@@ -65,6 +65,7 @@ export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
   const [securityDeposit, setSecurityDeposit] = useState<number>(5000)
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
   const [remarks, setRemarks] = useState('')
+  const [includeFreeMeal, setIncludeFreeMeal] = useState(true)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [isSuccess, setIsSuccess] = useState(false)
 
@@ -167,7 +168,7 @@ export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
       setStaffName('')
       setStaffRole('বাবুর্চি / কুক')
       setStaffPhone('')
-      setRemarks('হোস্টেল কর্মচারী আবাসন (ফ্রি সুবিধা) - বাবুর্চি')
+      setRemarks(includeFreeMeal ? 'হোস্টেল কর্মচারী আবাসন (ফ্রি সুবিধা ও ফ্রি মিল) - বাবুর্চি [ফ্রি মিল সুবিধা অন্তর্ভুক্ত]' : 'হোস্টেল কর্মচারী আবাসন (ফ্রি সুবিধা) - বাবুর্চি')
       return
     }
     setIsNewStaffMode(false)
@@ -186,7 +187,7 @@ export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
           : 'হোস্টেল স্টাফ'
       setStaffRole(deptLabel)
       setStaffPhone(st.phone_number || '')
-      setRemarks(`হোস্টেল কর্মচারী আবাসন (ফ্রি সুবিধা) - ${deptLabel}`)
+      setRemarks(includeFreeMeal ? `হোস্টেল কর্মচারী আবাসন (ফ্রি সুবিধা ও ফ্রি মিল) - ${deptLabel} [ফ্রি মিল সুবিধা অন্তর্ভুক্ত]` : `হোস্টেল কর্মচারী আবাসন (ফ্রি সুবিধা) - ${deptLabel}`)
     }
   }
 
@@ -196,7 +197,8 @@ export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
     if (type === 'STAFF') {
       setMonthlyRent(0)
       setSecurityDeposit(0)
-      setRemarks('হোস্টেল কর্মচারী আবাসন (ফ্রি সুবিধা)')
+      setIncludeFreeMeal(true)
+      setRemarks('হোস্টেল কর্মচারী আবাসন (ফ্রি সুবিধা ও ফ্রি মিল) [ফ্রি মিল সুবিধা অন্তর্ভুক্ত]')
       if (staffMembers.length > 0 && !selectedStaffId) {
         handleStaffSelect(staffMembers[0].id)
       } else if (staffMembers.length === 0) {
@@ -263,11 +265,14 @@ export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
 
           if (existingBdr) {
             targetBoarderId = existingBdr.id
+            const staffInstitution = includeFreeMeal
+              ? `হোস্টেল কর্মচারী (${staffRole}) [ফ্রি মিল]`
+              : `হোস্টেল কর্মচারী (${staffRole})`
             await supabase
               .from('boarders')
               .update({
                 status: 'ACTIVE',
-                institution: `হোস্টেল কর্মচারী (${staffRole})`,
+                institution: staffInstitution,
                 department: staffRole,
                 updated_at: new Date().toISOString(),
               })
@@ -275,20 +280,26 @@ export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
           } else {
             // Create a dedicated staff resident record
             const staffCode = `STF-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`
+            const staffInstitution = includeFreeMeal
+              ? `হোস্টেল কর্মচারী (${staffRole}) [ফ্রি মিল]`
+              : `হোস্টেল কর্মচারী (${staffRole})`
+            const defaultStaffRemarks = includeFreeMeal
+              ? `হোস্টেল কর্মচারী আবাসন (ফ্রি সুবিধা ও ফ্রি মিল) - ${staffRole} [ফ্রি মিল সুবিধা অন্তর্ভুক্ত]`
+              : `হোস্টেল কর্মচারী আবাসন (ফ্রি সুবিধা) - ${staffRole}`
             const { data: newBdr, error: bdrErr } = await supabase
               .from('boarders')
               .insert({
                 full_name: finalStaffName,
                 phone_number: effectivePhone,
                 boarder_code: staffCode,
-                institution: `হোস্টেল কর্মচারী (${staffRole})`,
+                institution: staffInstitution,
                 department: staffRole,
                 guardian_name: 'হোস্টেল কর্তৃপক্ষ',
                 guardian_phone: effectivePhone,
                 permanent_address: 'হোস্টেল স্টাফ আবাসন',
                 status: 'ACTIVE',
                 admission_date: startDate || new Date().toISOString().slice(0, 10),
-                remarks: remarks.trim() || `হোস্টেল কর্মচারী আবাসন (ফ্রি সুবিধা) - ${staffRole}`,
+                remarks: remarks.trim() || defaultStaffRemarks,
               })
               .select('id')
               .single()
@@ -303,6 +314,12 @@ export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
           targetBoarderId = selectedStaffId && selectedStaffId !== 'NEW' ? selectedStaffId : `stf-${Date.now()}`
         }
 
+        const effectiveStaffRemarks = remarks.trim() || (
+          includeFreeMeal
+            ? `হোস্টেল কর্মচারী আবাসন (ফ্রি সুবিধা ও ফ্রি মিল) - ${staffRole} [ফ্রি মিল সুবিধা অন্তর্ভুক্ত]`
+            : `হোস্টেল কর্মচারী আবাসন (ফ্রি সুবিধা) - ${staffRole}`
+        )
+
         // Allocate seat with 0 rent and 0 deposit
         await allocateMutation.mutateAsync({
           boarderId: targetBoarderId,
@@ -310,7 +327,7 @@ export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
           monthlyRent: 0,
           securityDeposit: 0,
           startDate,
-          remarks: remarks.trim() || `হোস্টেল কর্মচারী আবাসন (ফ্রি সুবিধা) - ${staffRole}`,
+          remarks: effectiveStaffRemarks,
         })
       }
 
@@ -578,25 +595,59 @@ export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
             />
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3.5 rounded-xl bg-purple-950/20 border border-purple-500/20">
-            <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">
-                মাসিক সিট ভাড়া (৳)
-              </label>
-              <div className="flex items-center justify-between px-3 py-2 bg-slate-900 border border-purple-500/30 rounded-xl text-purple-300 text-xs font-mono font-bold">
-                <span>৳০ (কর্মচারী ফ্রি আবাসন সুবিধা)</span>
-                <span className="text-[10px] text-slate-400 font-normal">
-                  (ডিফল্ট: {selectedSeat ? formatCurrencyBn(selectedSeat.default_rent) : '৳০'})
-                </span>
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3.5 rounded-xl bg-purple-950/20 border border-purple-500/20">
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1">
+                  মাসিক সিট ভাড়া (৳)
+                </label>
+                <div className="flex items-center justify-between px-3 py-2 bg-slate-900 border border-purple-500/30 rounded-xl text-purple-300 text-xs font-mono font-bold">
+                  <span>৳০ (কর্মচারী ফ্রি আবাসন সুবিধা)</span>
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    (ডিফল্ট: {selectedSeat ? formatCurrencyBn(selectedSeat.default_rent) : '৳০'})
+                  </span>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1">
+                  নিরাপত্তা জামানত / সিকিউরিটি (৳)
+                </label>
+                <div className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-400 text-xs font-mono">
+                  ৳০ (কর্মচারীদের প্রযোজ্য নয়)
+                </div>
               </div>
             </div>
-            <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">
-                নিরাপত্তা জামানত / সিকিউরিটি (৳)
+
+            {/* Free Meal Benefit Option */}
+            <div className="p-3.5 rounded-xl bg-purple-950/25 border border-purple-500/30 flex items-center justify-between">
+              <label className="flex items-center gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={includeFreeMeal}
+                  onChange={(e) => {
+                    const next = e.target.checked
+                    setIncludeFreeMeal(next)
+                    if (next) {
+                      setRemarks(`হোস্টেল কর্মচারী আবাসন (ফ্রি সুবিধা ও ফ্রি মিল) - ${staffRole || 'স্টাফ'} [ফ্রি মিল সুবিধা অন্তর্ভুক্ত]`)
+                    } else {
+                      setRemarks(`হোস্টেল কর্মচারী আবাসন (ফ্রি সুবিধা) - ${staffRole || 'স্টাফ'}`)
+                    }
+                  }}
+                  className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                />
+                <span className="text-xs font-semibold text-white">
+                  🍽️ ফ্রি মিল সুবিধা অন্তর্ভুক্ত (Free Daily Mess Meals)
+                </span>
               </label>
-              <div className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-400 text-xs font-mono">
-                ৳০ (কর্মচারীদের প্রযোজ্য নয়)
-              </div>
+              <span
+                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+                  includeFreeMeal
+                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                    : 'bg-slate-800 border-slate-700 text-slate-400'
+                }`}
+              >
+                {includeFreeMeal ? 'ফ্রি খাবার বরাদ্দ' : 'নিজস্ব খাবার'}
+              </span>
             </div>
           </div>
         )}

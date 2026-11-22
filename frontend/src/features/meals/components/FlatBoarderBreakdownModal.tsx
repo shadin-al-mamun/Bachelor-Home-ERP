@@ -175,9 +175,22 @@ export const FlatBoarderBreakdownModal: React.FC<FlatBoarderBreakdownModalProps>
                   return (
                     <tr key={b.boarder_id} className="hover:bg-slate-900/40 transition-colors">
                       <td className="py-2.5 px-3">
-                        <div className="font-bold text-white">{b.boarder_name}</div>
+                        <div className="font-bold text-white flex items-center gap-1.5 flex-wrap">
+                          <span>{b.boarder_name}</span>
+                          {b.is_staff && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                              🛠️ স্টাফ {b.has_free_meal ? '(ফ্রি মিল)' : ''}
+                            </span>
+                          )}
+                          {(b.override_reason?.includes('ছুটি') || (!b.breakfast && !b.lunch && !b.dinner && b.is_override)) && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                              🏖️ ছুটিতে (মিল অফ)
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[10px] text-slate-400 font-mono">
                           {b.room_name} ({b.seat_name}) • {b.boarder_code}
+                          {b.staff_role && ` • ${b.staff_role}`}
                         </div>
                       </td>
 

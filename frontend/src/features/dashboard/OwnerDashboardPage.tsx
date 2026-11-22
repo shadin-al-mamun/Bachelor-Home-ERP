@@ -471,7 +471,7 @@ export const OwnerDashboardPage: React.FC = () => {
                 />
               </div>
 
-              <div className="flex items-center justify-between text-[10px] text-slate-400 mt-2.5 pt-2 border-t border-slate-800/60">
+              <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] text-slate-400 mt-2.5 pt-2 border-t border-slate-800/60">
                 <span className="text-emerald-400 font-semibold">{kpis.vacant_seats}টি সিট খালি</span>
 
                 {/* Upcoming Vacant Badge & Drill-down Link */}
@@ -484,6 +484,15 @@ export const OwnerDashboardPage: React.FC = () => {
                   <span>{kpis.upcoming_vacant_seats || 0}টি আসন্ন খালি</span>
                   <ArrowRight className="w-2.5 h-2.5 text-amber-400/80 group-hover/link:translate-x-0.5 transition-transform" />
                 </Link>
+
+                {Boolean(kpis.staff_seats && kpis.staff_seats > 0) && (
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-300 font-semibold text-[10px]"
+                    title="হোস্টেল কর্মচারীদের ফ্রি আবাসন আসন"
+                  >
+                    🛠️ {kpis.staff_seats}টি স্টাফ
+                  </span>
+                )}
 
                 <span>{kpis.maintenance_seats}টি মেরামত</span>
               </div>
