@@ -91,16 +91,22 @@ export const CancelAllocationModal: React.FC<CancelAllocationModalProps> = ({
       try {
         const { data: summary, error } = await supabase
           .from('vw_boarder_dues_summary')
-          .select('outstanding_due, total_billed, total_paid')
+          .select('outstanding_due, total_billed, total_paid, advance_balance')
           .eq('boarder_id', targetBoarderId)
           .maybeSingle()
 
         if (!error && summary) {
+          const totalBilled = Number(summary.total_billed || 0)
+          const totalPaid = Number(summary.total_paid || 0)
+          const outstandingDue = Number(summary.outstanding_due || 0)
+          const advanceBalance = Number(summary.advance_balance ?? Math.max(0, totalPaid - totalBilled))
+
           return {
             boarderId: targetBoarderId,
-            outstandingDue: Number(summary.outstanding_due || 0),
-            totalBilled: Number(summary.total_billed || 0),
-            totalPaid: Number(summary.total_paid || 0),
+            outstandingDue,
+            totalBilled,
+            totalPaid,
+            advanceBalance,
             securityDeposit,
           }
         }
@@ -127,12 +133,14 @@ export const CancelAllocationModal: React.FC<CancelAllocationModalProps> = ({
       const totalRecs = (recs || []).reduce((acc: number, r: any) => acc + Number(r.amount || 0), 0)
       const totalPaid = Math.max(totalRecs, totalPaidCharges)
       const outstandingDue = Math.max(0, totalBilled - totalPaid)
+      const advanceBalance = Math.max(0, totalPaid - totalBilled)
 
       return {
         boarderId: targetBoarderId,
         outstandingDue,
         totalBilled,
         totalPaid,
+        advanceBalance,
         securityDeposit,
       }
     },
@@ -148,19 +156,27 @@ export const CancelAllocationModal: React.FC<CancelAllocationModalProps> = ({
     }
   }, [isOpen])
 
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const isFutureDeparture = Boolean(endDate && endDate > todayStr)
+
   useEffect(() => {
     if (duesData) {
       const deposit = duesData.securityDeposit || 0
-      const net = Math.max(0, deposit - duesData.outstandingDue)
+      const advance = duesData.advanceBalance || 0
+      const totalGrossRefundable = deposit + advance
+      const net = Math.max(0, totalGrossRefundable - duesData.outstandingDue)
       setRefundAmount(net)
-      if (net > 0) {
+      // Only default refund to true if it is NOT a future advance notice
+      if (net > 0 && !isFutureDeparture) {
         setShouldRefundDeposit(true)
+      } else {
+        setShouldRefundDeposit(false)
       }
       if (activeAccounts[0]?.id && !refundAccountId) {
         setRefundAccountId(activeAccounts[0].id)
       }
     }
-  }, [duesData, activeAccounts, refundAccountId])
+  }, [duesData, activeAccounts, refundAccountId, isFutureDeparture])
 
   if (!allocation) return null
 
@@ -182,14 +198,22 @@ export const CancelAllocationModal: React.FC<CancelAllocationModalProps> = ({
         status: actionType,
       })
 
-      // If deposit refund is selected, record an approved expense voucher to debit cash drawer/account
-      if (shouldRefundDeposit && refundAmount > 0 && refundAccountId) {
+      // If deposit refund is selected (only on actual/today departure, never on future advance notice)
+      if (!isFutureDeparture && shouldRefundDeposit && refundAmount > 0 && refundAccountId) {
+        const today = new Date().toISOString().slice(0, 10)
+        const deposit = duesData?.securityDeposit || 0
+        const advance = duesData?.advanceBalance || 0
+        const due = duesData?.outstandingDue || 0
+        const gross = deposit + advance
+        const adj = Math.min(gross, due)
+
         await recordExpenseMutation.mutateAsync({
           categoryId: EXPENSE_CATEGORY_UUIDS.MISCELLANEOUS,
           amount: refundAmount,
           sourceAccountId: refundAccountId,
-          expenseDate: endDate,
-          description: `বর্ডার ${allocation.boarderName} (${allocation.boarderCode}) এর সিট ছাড়পত্র বাবদ জামানত ফেরত (Security Deposit Refund)`,
+          expenseDate: today,
+          approvalStatus: 'APPROVED',
+          description: `বর্ডার ${allocation.boarderName} (${allocation.boarderCode}) এর সিট ছাড়পত্র বাবদ রিফান্ড [জামানত: ৳${deposit}, অতিরিক্ত জমা: ৳${advance}, বকেয়া সমন্বয়: ৳${adj}] [APPROVED]`,
         })
       }
 
@@ -276,84 +300,105 @@ export const CancelAllocationModal: React.FC<CancelAllocationModalProps> = ({
           </div>
         )}
 
-        {/* SECURITY DEPOSIT & REFUND SECTION */}
-        {duesData && duesData.securityDeposit > 0 && (
+        {/* SECURITY DEPOSIT & ADVANCE REFUND SECTION */}
+        {duesData && ((duesData.securityDeposit || 0) > 0 || (duesData.advanceBalance || 0) > 0) && (
           <div className="p-4 rounded-2xl border border-indigo-500/30 bg-slate-900/80 space-y-3">
             <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800">
               <span className="text-slate-300 font-bold flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-indigo-400" />
-                জামানত ও রিফান্ড হিসাব (Security Deposit)
+                জামানত ও অতিরিক্ত জমা হিসাব (Deposit & Advance Settlement)
               </span>
               <span className="text-indigo-400 font-mono font-bold">
-                জমা: {formatCurrencyBn(duesData.securityDeposit)}
+                মোট প্রাপ্য: {formatCurrencyBn((duesData.securityDeposit || 0) + (duesData.advanceBalance || 0))}
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <span className="text-slate-400 text-[11px] block">বকেয়া সমন্বয়:</span>
-                <span className="text-rose-400 font-mono font-bold">
-                  −{formatCurrencyBn(Math.min(duesData.securityDeposit, duesData.outstandingDue))}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+              <div className="p-2 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                <span className="text-slate-400 text-[10px] block mb-0.5">সিকিউরিটি জামানত</span>
+                <span className="text-indigo-300 font-mono font-bold text-xs">
+                  {formatCurrencyBn(duesData.securityDeposit || 0)}
                 </span>
               </div>
-              <div className="text-right">
-                <span className="text-slate-400 text-[11px] block">নিট ফেরতযোগ্য জামানত:</span>
-                <span className="text-emerald-400 font-mono font-bold text-sm">
-                  {formatCurrencyBn(Math.max(0, duesData.securityDeposit - duesData.outstandingDue))}
+              <div className="p-2 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                <span className="text-slate-400 text-[10px] block mb-0.5">অতিরিক্ত জমা (অগ্রিম)</span>
+                <span className="text-emerald-300 font-mono font-bold text-xs">
+                  {formatCurrencyBn(duesData.advanceBalance || 0)}
+                </span>
+              </div>
+              <div className="p-2 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                <span className="text-slate-400 text-[10px] block mb-0.5">বকেয়া বিল সমন্বয়</span>
+                <span className="text-rose-400 font-mono font-bold text-xs">
+                  −{formatCurrencyBn(Math.min((duesData.securityDeposit || 0) + (duesData.advanceBalance || 0), duesData.outstandingDue || 0))}
+                </span>
+              </div>
+              <div className="p-2 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                <span className="text-slate-400 text-[10px] block mb-0.5">নিট ফেরতযোগ্য অর্থ</span>
+                <span className="text-emerald-400 font-mono font-bold text-xs">
+                  {formatCurrencyBn(Math.max(0, (duesData.securityDeposit || 0) + (duesData.advanceBalance || 0) - (duesData.outstandingDue || 0)))}
                 </span>
               </div>
             </div>
 
-            {/* Checkbox to trigger auto-refund expense voucher */}
-            <div className="pt-2 border-t border-slate-800 space-y-2.5">
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={shouldRefundDeposit}
-                  onChange={(e) => setShouldRefundDeposit(e.target.checked)}
-                  className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500"
-                />
-                <span className="text-xs font-semibold text-slate-200 flex items-center gap-1">
-                  <Banknote className="w-3.5 h-3.5 text-emerald-400" />
-                  বর্ডারকে অবশিষ্ট জামানত ফেরত ও ক্যাশ লেজার এন্ট্রি সম্পন্ন করুন
+            {isFutureDeparture ? (
+              <div className="p-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-400" />
+                <span className="text-[11px] leading-relaxed">
+                  <strong>অগ্রিম নোটিশ:</strong> যেহেতু এটি অগ্রিম প্রস্থান নোটিশ (ভবিষ্যতের তারিখ), তাই জামানত বা অতিরিক্ত জমার ক্যাশ ভাউচার আজ তৈরি হবে না। চূড়ান্ত প্রস্থানের দিন (রিলিজের সময়) ক্যাশ ড্রয়ার থেকে রিফান্ড ভাউচার তৈরি হবে।
                 </span>
-              </label>
+              </div>
+            ) : (
+              /* Checkbox to trigger auto-refund expense voucher */
+              <div className="pt-2 border-t border-slate-800 space-y-2.5">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={shouldRefundDeposit}
+                    onChange={(e) => setShouldRefundDeposit(e.target.checked)}
+                    className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-xs font-semibold text-slate-200 flex items-center gap-1">
+                    <Banknote className="w-3.5 h-3.5 text-emerald-400" />
+                    বর্ডারকে অবশিষ্ট জামানত ও অতিরিক্ত জমা ফেরত এবং ক্যাশ লেজার এন্ট্রি সম্পন্ন করুন
+                  </span>
+                </label>
 
-              {shouldRefundDeposit && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 pl-5">
-                  <div>
-                    <label className="text-[11px] font-semibold text-slate-400 block mb-1">
-                      টাকা প্রদানের মাধ্যম (ড্রয়ার / একাউন্ট)
-                    </label>
-                    <select
-                      value={refundAccountId}
-                      onChange={(e) => setRefundAccountId(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 text-xs text-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-indigo-500"
-                    >
-                      {activeAccounts.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.account_name} ({a.account_type})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                {shouldRefundDeposit && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 pl-5">
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-400 block mb-1">
+                        টাকা প্রদানের মাধ্যম (ড্রয়ার / একাউন্ট)
+                      </label>
+                      <select
+                        value={refundAccountId}
+                        onChange={(e) => setRefundAccountId(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 text-xs text-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-indigo-500"
+                      >
+                        {activeAccounts.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.account_name} ({a.account_type})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-                  <div>
-                    <label className="text-[11px] font-semibold text-slate-400 block mb-1">
-                      ফেরত টাকার পরিমাণ (৳)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      max={duesData.securityDeposit}
-                      value={refundAmount}
-                      onChange={(e) => setRefundAmount(Math.max(0, Number(e.target.value) || 0))}
-                      className="w-full bg-slate-950 border border-slate-800 text-xs font-mono font-bold text-emerald-400 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 text-right"
-                    />
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-400 block mb-1">
+                        ফেরত টাকার পরিমাণ (৳)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max={(duesData.securityDeposit || 0) + (duesData.advanceBalance || 0)}
+                        value={refundAmount}
+                        onChange={(e) => setRefundAmount(Math.max(0, Number(e.target.value) || 0))}
+                        className="w-full bg-slate-950 border border-slate-800 text-xs font-mono font-bold text-emerald-400 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 text-right"
+                      />
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

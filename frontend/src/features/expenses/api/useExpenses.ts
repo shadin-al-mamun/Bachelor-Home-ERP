@@ -53,6 +53,7 @@ export interface RecordExpenseInput {
   description: string
   voucherFile?: File | null
   voucherAttachmentUrl?: string | null
+  approvalStatus?: ApprovalStatus
 }
 
 export interface ReviewExpenseInput {
@@ -830,6 +831,7 @@ export function useExpenseFlats() {
 
 export function useRecordExpenseMutation() {
   const queryClient = useQueryClient()
+  const { profile } = useAuthStore()
 
   return useMutation({
     mutationFn: async (input: RecordExpenseInput) => {
@@ -839,6 +841,10 @@ export function useRecordExpenseMutation() {
       if (input.voucherFile) {
         attachmentUrl = await uploadVoucherFile(input.voucherFile)
       }
+
+      const effectiveApproval: ApprovalStatus =
+        input.approvalStatus ||
+        (profile?.role === 'SUPER_ADMIN' || profile?.role === 'ADMIN' ? 'APPROVED' : 'PENDING')
 
       if (!isSupabaseConfigured) {
         const voucherNo = `EXP-${Math.floor(5000 + MOCK_EXPENSES.length + 1).toString().padStart(6, '0')}`
@@ -863,11 +869,11 @@ export function useRecordExpenseMutation() {
           expense_date: input.expenseDate,
           description: input.description,
           voucher_attachment_url: attachmentUrl,
-          paid_by: 'usr-mgr1',
-          payer_name: 'দায়িত্বপ্রাপ্ত ম্যানেজার',
-          approval_status: 'PENDING',
-          approved_by: null,
-          approved_at: null,
+          paid_by: profile?.id || 'usr-mgr1',
+          payer_name: profile?.full_name || 'দায়িত্বপ্রাপ্ত ম্যানেজার',
+          approval_status: effectiveApproval,
+          approved_by: effectiveApproval === 'APPROVED' ? (profile?.id || 'usr-admin1') : null,
+          approved_at: effectiveApproval === 'APPROVED' ? new Date().toISOString() : null,
           rejection_reason: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -935,6 +941,8 @@ export function useRecordExpenseMutation() {
           console.warn('Category reconciliation error, proceeding with resolved UUID:', e)
         }
 
+        let result: any = null
+
         // Try simplified expense RPC first
         try {
           const { data, error } = await supabase.rpc('fn_record_simplified_expense', {
@@ -951,34 +959,62 @@ export function useRecordExpenseMutation() {
             p_voucher_attachment_url: attachmentUrl,
           })
 
-          if (!error && data) return data
+          if (!error && data) {
+            result = data
+          }
         } catch (err) {
           console.warn('fn_record_simplified_expense not yet present, falling back:', err)
         }
 
-        // Fallback to fn_record_expense
-        const { data, error } = await supabase.rpc('fn_record_expense', {
-          p_category_id: resolvedCategoryId,
-          p_amount: input.amount,
-          p_source_account_id: input.sourceAccountId,
-          p_building_id: input.buildingId || null,
-          p_flat_id: input.flatId || null,
-          p_expense_date: input.expenseDate,
-          p_description: input.description,
-          p_voucher_attachment_url: attachmentUrl,
-        })
+        if (!result) {
+          // Fallback to fn_record_expense
+          const { data, error } = await supabase.rpc('fn_record_expense', {
+            p_category_id: resolvedCategoryId,
+            p_amount: input.amount,
+            p_source_account_id: input.sourceAccountId,
+            p_building_id: input.buildingId || null,
+            p_flat_id: input.flatId || null,
+            p_expense_date: input.expenseDate,
+            p_description: input.description,
+            p_voucher_attachment_url: attachmentUrl,
+          })
 
-        if (error) {
-          throw new Error(error.message || 'খরচ এন্ট্রি সম্পন্ন করতে ব্যর্থ হয়েছে।')
+          if (error) {
+            throw new Error(error.message || 'খরচ এন্ট্রি সম্পন্ন করতে ব্যর্থ হয়েছে।')
+          }
+
+          result = data
         }
 
-        return data
+        // Auto-approve if requested or if recorded by Super Admin/Admin
+        const expId = result?.expense_id || result?.id
+        if (expId && effectiveApproval === 'APPROVED') {
+          try {
+            await supabase
+              .from('expenses')
+              .update({
+                approval_status: 'APPROVED',
+                approved_by: profile?.id || null,
+                approved_at: new Date().toISOString(),
+              })
+              .eq('id', expId)
+          } catch (appErr) {
+            console.warn('Auto-approval update failed silently:', appErr)
+          }
+        }
+
+        return result
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] })
       queryClient.invalidateQueries({ queryKey: ['financial-accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['expense-accounts'] })
       queryClient.invalidateQueries({ queryKey: ['cash-sessions'] })
+      queryClient.invalidateQueries({ queryKey: ['manager-cash-session'] })
+      queryClient.invalidateQueries({ queryKey: ['pending-handovers'] })
+      queryClient.invalidateQueries({ queryKey: ['boarder-dues-for-cancellation'] })
+      queryClient.invalidateQueries({ queryKey: ['boarders'] })
     },
   })
 }

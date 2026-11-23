@@ -44,12 +44,6 @@ export const ManagerCashDashboard: React.FC = () => {
   const [selectedManagerId, setSelectedManagerId] = useState<string>(
     profile?.role === 'MANAGER' ? (profile?.id || 'p-manager-1') : 'p-manager-1'
   )
-
-  React.useEffect(() => {
-    if (profile?.role === 'MANAGER' && profile?.id) {
-      setSelectedManagerId(profile.id)
-    }
-  }, [profile?.id, profile?.role])
   const [movementFilter, setMovementFilter] = useState<'ALL' | 'RECEIPT' | 'EXPENSE' | 'TRANSFERS'>('ALL')
 
   // Modals state
@@ -59,6 +53,19 @@ export const ManagerCashDashboard: React.FC = () => {
 
   // API Queries
   const { data: managers = [] } = useCashManagers()
+
+  React.useEffect(() => {
+    if (profile?.role === 'MANAGER' && profile?.id) {
+      setSelectedManagerId(profile.id)
+    } else if (isAdmin && managers.length > 0) {
+      // If current selectedManagerId is not in active managers list, pick the first valid manager
+      if (!selectedManagerId || !managers.some((m) => m.id === selectedManagerId)) {
+        if (managers[0]?.id) {
+          setSelectedManagerId(managers[0].id)
+        }
+      }
+    }
+  }, [profile?.id, profile?.role, isAdmin, managers, selectedManagerId])
   const {
     data: sessionDetails,
     isLoading,
