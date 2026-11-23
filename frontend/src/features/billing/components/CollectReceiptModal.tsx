@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
 import { Modal } from '@/components/common/Modal'
 import { Button } from '@/components/common/Button'
 import { Input } from '@/components/common/Input'
@@ -225,186 +224,27 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
     }
   }, [visibleAccounts, destinationAccountId, paymentMethod])
 
-  // Self-heal database charges to ensure Supabase live tables also match 8949 billed and 449 due
-  useEffect(() => {
-    if (!isSupabaseConfigured || !boarderId || allBoarderCharges.length === 0) return
-    const healDb = async () => {
-      for (const c of allBoarderCharges) {
-        const amt = Number(c.amount) || 0
-        if (c.charge_type === 'UTILITY' && (amt === 844 || amt === 1100 || amt === 948)) {
-          await supabase
-            .from('boarder_charges')
-            .update({
-              amount: 989,
-              paid_amount: 989,
-              due_amount: 0,
-              description: 'October 2026 — Flat-206 বিবিধ বিল (ইউটিলিটি: ৳৩৮৯.০০, বাবুর্চি: ৳৬০০.০০)',
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', c.id)
-        }
-      }
-    }
-    healDb().catch((err) => console.warn('CollectModal heal error:', err))
-  }, [boarderId, allBoarderCharges])
-
   // Calculate live total amount
   const totalAmount = useMemo(() => {
     return items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
   }, [items])
 
   const duesBreakdown = useMemo(() => {
-    if (allBoarderCharges.length > 0) {
-      // 1. Sanitize legacy test charges (e.g. utility bill for Flat-206 = 989, meal = 1560)
-      const sanitized = allBoarderCharges.map((c) => {
-        const amt = Number(c.amount) || 0
-        const paid = Number(c.paid_amount) || 0
-        if (c.charge_type === 'MEAL' && (amt === 1664 || (amt > 1560 && amt <= 1664))) {
-          return {
-            ...c,
-            amount: 1560,
-            paid_amount: paid >= amt ? 1560 : paid,
-            due_amount: Math.max(0, 1560 - paid),
-          }
-        }
-        if (
-          c.charge_type === 'UTILITY' &&
-          (amt === 844 || amt === 1100 || amt === 948 || (amt > 0 && amt < 1100 && (c.description?.includes('২৪৪') || c.description?.includes('৫০০'))))
-        ) {
-          return {
-            ...c,
-            amount: 989,
-            paid_amount: paid >= amt ? 989 : paid,
-            due_amount: Math.max(0, 989 - paid),
-          }
-        }
-        return c
-      })
-
-      // 2. Classify receipts into operational cash vs deposit cash
-      let totalRegularReceipts = 0
-      let totalAdjustments = 0
-      let totalDepositReceipts = 0
-
-      boarderReceipts.forEach((r) => {
-        if (r.is_void) return
-        const isAdj =
-          r.payment_method === 'ADJUSTMENT' ||
-          r.remarks?.includes('[DEPOSIT_ADJUSTMENT]') ||
-          r.transaction_reference?.includes('[DEPOSIT_ADJUSTMENT]') ||
-          r.remarks?.includes('জামানত থেকে সমন্বয়') ||
-          r.transaction_reference?.includes('জামানত থেকে সমন্বয়')
-
-        if (isAdj) {
-          totalAdjustments += Number(r.amount) || 0
-        } else if (r.items && r.items.length > 0) {
-          r.items.forEach((it) => {
-            const itemVal = Number(it.amount) || 0
-            if (
-              it.head_code === 'SECURITY_DEPOSIT' ||
-              it.head_name?.includes('জামানত') ||
-              it.description?.includes('জামানত')
-            ) {
-              totalDepositReceipts += itemVal
-            } else {
-              totalRegularReceipts += itemVal
-            }
-          })
-        } else {
-          const isDep =
-            r.remarks?.includes('জামানত সংগ্রহ') ||
-            r.remarks?.includes('সিকিউরিটি জামানত') ||
-            r.remarks?.includes('[SECURITY_DEPOSIT]') ||
-            r.transaction_reference?.includes('জামানত সংগ্রহ') ||
-            r.transaction_reference?.includes('সিকিউরিটি জামানত') ||
-            r.transaction_reference?.includes('[SECURITY_DEPOSIT]')
-          if (isDep) {
-            totalDepositReceipts += Number(r.amount) || 0
-          } else {
-            totalRegularReceipts += Number(r.amount) || 0
-          }
-        }
-      })
-
-      let availableCash = totalRegularReceipts + totalAdjustments
-
-      // 3. Separate regular charges from deposit charges
-      const regularCharges = sanitized.filter(
-        (c) =>
-          c.charge_type !== 'SECURITY_DEPOSIT' &&
-          !c.description?.includes('[SECURITY_DEPOSIT]') &&
-          !c.description?.includes('জামানত সংগ্রহ')
-      )
-      const sortedRegular = [...regularCharges].sort((a, b) => {
-        const mA = a.billing_month || ''
-        const mB = b.billing_month || ''
-        if (mA !== mB) return mA.localeCompare(mB)
-        const dA = a.due_date || a.created_at || ''
-        const dB = b.due_date || b.created_at || ''
-        return dA.localeCompare(dB)
-      })
-
-      let rentDue = 0
-      let mealDue = 0
-      let utilityDue = 0
-      let otherDue = 0
-
-      for (const c of sortedRegular) {
-        const amt = Number(c.amount) || 0
-        const allocated = Math.min(availableCash, amt)
-        availableCash = Math.max(0, availableCash - allocated)
-        const due = Math.max(0, amt - allocated)
-        if (due <= 0) continue
-
-        if (c.charge_type === 'RENT') {
-          rentDue += due
-        } else if (c.charge_type === 'MEAL') {
-          mealDue += due
-        } else if (c.charge_type === 'UTILITY') {
-          utilityDue += due
-        } else {
-          otherDue += due
-        }
-      }
-
-      // 4. Calculate any unpaid deposit charges if billed
-      let remainingDepositFund = totalDepositReceipts
-      const depositCharges = sanitized.filter(
-        (c) =>
-          c.charge_type === 'SECURITY_DEPOSIT' ||
-          c.description?.includes('[SECURITY_DEPOSIT]') ||
-          c.description?.includes('জামানত সংগ্রহ')
-      )
-      for (const c of depositCharges) {
-        const amt = Number(c.amount) || 0
-        const allocated = Math.min(remainingDepositFund, amt)
-        remainingDepositFund = Math.max(0, remainingDepositFund - allocated)
-        const due = Math.max(0, amt - allocated)
-        otherDue += due
-      }
-
-      const totalDue = rentDue + mealDue + utilityDue + otherDue
-      return {
-        rentDue,
-        mealDue,
-        utilityDue,
-        otherDue,
-        totalDue,
-        advanceBalance: availableCash,
-        hasDues: totalDue > 0,
-      }
-    }
+    const targetCharges = allBoarderCharges.length > 0 ? allBoarderCharges : unpaidCharges
 
     let rentDue = 0
     let mealDue = 0
     let utilityDue = 0
     let otherDue = 0
 
-    unpaidCharges.forEach((c) => {
+    targetCharges.forEach((c) => {
+      if (c.status === 'VOID' || c.status === 'PAID') return
+
       const due =
-        c.due_amount !== undefined
+        c.due_amount !== undefined && c.due_amount !== null
           ? Number(c.due_amount)
           : Math.max(0, Number(c.amount) - (Number(c.paid_amount) || 0))
+
       if (due <= 0) return
 
       if (c.charge_type === 'RENT') {
@@ -421,6 +261,7 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
     const chargesTotal = rentDue + mealDue + utilityDue + otherDue
     const summaryDue = Number(boarderDueSummary?.outstanding_due || 0)
     const effectiveTotalDue = chargesTotal > 0 ? chargesTotal : summaryDue
+    const advanceBalance = Number(boarderDueSummary?.advance_balance || 0)
 
     return {
       rentDue,
@@ -428,10 +269,10 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
       utilityDue,
       otherDue,
       totalDue: effectiveTotalDue,
-      advanceBalance: Number(boarderDueSummary?.advance_balance || 0),
+      advanceBalance,
       hasDues: effectiveTotalDue > 0,
     }
-  }, [allBoarderCharges, boarderReceipts, unpaidCharges, boarderDueSummary])
+  }, [allBoarderCharges, unpaidCharges, boarderDueSummary])
 
   const handleAutoFillFromDues = () => {
     if (!duesBreakdown.hasDues) return
