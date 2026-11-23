@@ -4,7 +4,7 @@ import { Button } from '@/components/common/Button'
 import { Input } from '@/components/common/Input'
 import { useCancelAllocationMutation } from '../api/useSeatAllocations'
 import { AlertTriangle, LogOut, CheckCircle2, Loader2, AlertCircle, Banknote, ShieldCheck } from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient'
 import { formatCurrencyBn, formatDateBn } from '@/utils/date'
 import { useFinancialAccounts } from '@/features/billing/api/useReceipts'
@@ -39,6 +39,7 @@ export const CancelAllocationModal: React.FC<CancelAllocationModalProps> = ({
   const [refundAmount, setRefundAmount] = useState<number>(0)
   const [refundAccountId, setRefundAccountId] = useState('')
 
+  const queryClient = useQueryClient()
   const cancelMutation = useCancelAllocationMutation()
   const recordExpenseMutation = useRecordExpenseMutation()
   const { data: accounts = [] } = useFinancialAccounts()
@@ -60,14 +61,15 @@ export const CancelAllocationModal: React.FC<CancelAllocationModalProps> = ({
       }
 
       let targetBoarderId = allocation?.boarderId
+      let targetAllocationId = allocation?.allocationId
       let securityDeposit = 0
 
       // If boarderId was not provided, look it up from allocationId
-      if (allocation?.allocationId) {
+      if (targetAllocationId) {
         const { data: alloc } = await supabase
           .from('allocations')
-          .select('boarder_id, security_deposit')
-          .eq('id', allocation.allocationId)
+          .select('id, boarder_id, security_deposit')
+          .eq('id', targetAllocationId)
           .maybeSingle()
         if (alloc) {
           if (!targetBoarderId) targetBoarderId = alloc.boarder_id
@@ -87,6 +89,72 @@ export const CancelAllocationModal: React.FC<CancelAllocationModalProps> = ({
 
       if (!targetBoarderId) return null
 
+      // Check if security deposit or checkout refund has ALREADY been disbursed via expense vouchers
+      let alreadyRefundedDeposit = 0
+      let alreadyRefundedAdvance = 0
+      try {
+        const bCode = allocation?.boarderCode
+        const bName = allocation?.boarderName
+
+        let query = supabase
+          .from('expenses')
+          .select('id, amount, description, approval_status')
+          .neq('approval_status', 'REJECTED')
+
+        if (bCode && targetBoarderId && bName) {
+          query = query.or(`description.ilike.%${bCode}%,description.ilike.%${targetBoarderId}%,description.ilike.%${bName}%`)
+        } else if (bCode && targetBoarderId) {
+          query = query.or(`description.ilike.%${bCode}%,description.ilike.%${targetBoarderId}%`)
+        } else if (bCode) {
+          query = query.ilike('description', `%${bCode}%`)
+        } else if (targetBoarderId) {
+          query = query.ilike('description', `%${targetBoarderId}%`)
+        }
+
+        const { data: refExpenses } = await query
+
+        if (refExpenses && refExpenses.length > 0) {
+          const relevantExpenses = refExpenses.filter((e) => {
+            const desc = (e.description || '').toLowerCase()
+            return (
+              desc.includes('জামানত') ||
+              desc.includes('security deposit') ||
+              desc.includes('রিফান্ড') ||
+              desc.includes('ছাড়পত্র')
+            )
+          })
+
+          const totalDepositVouchers = relevantExpenses
+            .filter((e) => {
+              const desc = (e.description || '').toLowerCase()
+              return desc.includes('জামানত') || desc.includes('security deposit')
+            })
+            .reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0)
+
+          const totalAdvanceVouchers = relevantExpenses
+            .filter((e) => {
+              const desc = (e.description || '').toLowerCase()
+              return desc.includes('অগ্রিম') || desc.includes('অতিরিক্ত জমা')
+            })
+            .reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0)
+
+          const totalGeneralRefunds = relevantExpenses
+            .filter((e) => {
+              const desc = (e.description || '').toLowerCase()
+              return !desc.includes('জামানত') && !desc.includes('security deposit') && !desc.includes('অগ্রিম')
+            })
+            .reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0)
+
+          // Attribute deposit vouchers first
+          alreadyRefundedDeposit = Math.min(securityDeposit, totalDepositVouchers + totalGeneralRefunds)
+          alreadyRefundedAdvance = totalAdvanceVouchers
+        }
+      } catch (err) {
+        console.warn('Failed to query existing refund expenses:', err)
+      }
+
+      const effectiveSecurityDeposit = Math.max(0, securityDeposit - alreadyRefundedDeposit)
+
       // Strategy 1: Query vw_boarder_dues_summary
       try {
         const { data: summary, error } = await supabase
@@ -99,15 +167,19 @@ export const CancelAllocationModal: React.FC<CancelAllocationModalProps> = ({
           const totalBilled = Number(summary.total_billed || 0)
           const totalPaid = Number(summary.total_paid || 0)
           const outstandingDue = Number(summary.outstanding_due || 0)
-          const advanceBalance = Number(summary.advance_balance ?? Math.max(0, totalPaid - totalBilled))
+          const rawAdvance = Number(summary.advance_balance ?? Math.max(0, totalPaid - totalBilled))
+          const effectiveAdvanceBalance = Math.max(0, rawAdvance - alreadyRefundedAdvance)
 
           return {
             boarderId: targetBoarderId,
             outstandingDue,
             totalBilled,
             totalPaid,
-            advanceBalance,
-            securityDeposit,
+            advanceBalance: effectiveAdvanceBalance,
+            securityDeposit: effectiveSecurityDeposit,
+            originalSecurityDeposit: securityDeposit,
+            alreadyRefundedDeposit,
+            alreadyRefundedAdvance,
           }
         }
       } catch {
@@ -133,15 +205,19 @@ export const CancelAllocationModal: React.FC<CancelAllocationModalProps> = ({
       const totalRecs = (recs || []).reduce((acc: number, r: any) => acc + Number(r.amount || 0), 0)
       const totalPaid = Math.max(totalRecs, totalPaidCharges)
       const outstandingDue = Math.max(0, totalBilled - totalPaid)
-      const advanceBalance = Math.max(0, totalPaid - totalBilled)
+      const rawAdvance = Math.max(0, totalPaid - totalBilled)
+      const effectiveAdvanceBalance = Math.max(0, rawAdvance - alreadyRefundedAdvance)
 
       return {
         boarderId: targetBoarderId,
         outstandingDue,
         totalBilled,
         totalPaid,
-        advanceBalance,
-        securityDeposit,
+        advanceBalance: effectiveAdvanceBalance,
+        securityDeposit: effectiveSecurityDeposit,
+        originalSecurityDeposit: securityDeposit,
+        alreadyRefundedDeposit,
+        alreadyRefundedAdvance,
       }
     },
   })
@@ -215,7 +291,27 @@ export const CancelAllocationModal: React.FC<CancelAllocationModalProps> = ({
           approvalStatus: 'APPROVED',
           description: `বর্ডার ${allocation.boarderName} (${allocation.boarderCode}) এর সিট ছাড়পত্র বাবদ রিফান্ড [জামানত: ৳${deposit}, অতিরিক্ত জমা: ৳${advance}, বকেয়া সমন্বয়: ৳${adj}] [APPROVED]`,
         })
+
+        // Also ensure allocations table reflects that security deposit is 0 so it never re-appears
+        if (allocation.allocationId) {
+          try {
+            await supabase
+              .from('allocations')
+              .update({
+                security_deposit: 0,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', allocation.allocationId)
+          } catch (e) {
+            console.warn('Failed to update allocation security_deposit:', e)
+          }
+        }
       }
+
+      queryClient.invalidateQueries({ queryKey: ['boarder-dues-for-cancellation'] })
+      queryClient.invalidateQueries({ queryKey: ['allocations'] })
+      queryClient.invalidateQueries({ queryKey: ['seat-allocations'] })
+      queryClient.invalidateQueries({ queryKey: ['expenses'] })
 
       setIsSuccess(true)
       setTimeout(() => {
@@ -301,7 +397,7 @@ export const CancelAllocationModal: React.FC<CancelAllocationModalProps> = ({
         )}
 
         {/* SECURITY DEPOSIT & ADVANCE REFUND SECTION */}
-        {duesData && ((duesData.securityDeposit || 0) > 0 || (duesData.advanceBalance || 0) > 0) && (
+        {duesData && ((duesData.securityDeposit || 0) > 0 || (duesData.advanceBalance || 0) > 0 || (duesData.alreadyRefundedDeposit || 0) > 0) && (
           <div className="p-4 rounded-2xl border border-indigo-500/30 bg-slate-900/80 space-y-3">
             <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800">
               <span className="text-slate-300 font-bold flex items-center gap-1.5">
@@ -309,7 +405,7 @@ export const CancelAllocationModal: React.FC<CancelAllocationModalProps> = ({
                 জামানত ও অতিরিক্ত জমা হিসাব (Deposit & Advance Settlement)
               </span>
               <span className="text-indigo-400 font-mono font-bold">
-                মোট প্রাপ্য: {formatCurrencyBn((duesData.securityDeposit || 0) + (duesData.advanceBalance || 0))}
+                অবশিষ্ট প্রাপ্য: {formatCurrencyBn((duesData.securityDeposit || 0) + (duesData.advanceBalance || 0))}
               </span>
             </div>
 
@@ -319,6 +415,11 @@ export const CancelAllocationModal: React.FC<CancelAllocationModalProps> = ({
                 <span className="text-indigo-300 font-mono font-bold text-xs">
                   {formatCurrencyBn(duesData.securityDeposit || 0)}
                 </span>
+                {(duesData.alreadyRefundedDeposit || 0) > 0 && (
+                  <span className="text-[9px] text-amber-400 font-medium block mt-0.5 leading-tight">
+                    (পূর্বে ৳{(duesData.alreadyRefundedDeposit || 0).toLocaleString('en-IN')} কর্তন সম্পন্ন)
+                  </span>
+                )}
               </div>
               <div className="p-2 rounded-xl bg-slate-950/60 border border-slate-800/80">
                 <span className="text-slate-400 text-[10px] block mb-0.5">অতিরিক্ত জমা (অগ্রিম)</span>
@@ -347,6 +448,13 @@ export const CancelAllocationModal: React.FC<CancelAllocationModalProps> = ({
                   <strong>অগ্রিম নোটিশ:</strong> যেহেতু এটি অগ্রিম প্রস্থান নোটিশ (ভবিষ্যতের তারিখ), তাই জামানত বা অতিরিক্ত জমার ক্যাশ ভাউচার আজ তৈরি হবে না। চূড়ান্ত প্রস্থানের দিন (রিলিজের সময়) ক্যাশ ড্রয়ার থেকে রিফান্ড ভাউচার তৈরি হবে।
                 </span>
               </div>
+            ) : (duesData.securityDeposit || 0) + (duesData.advanceBalance || 0) <= 0 ? (
+              <div className="p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                <span>
+                  এই বর্ডারের জামানত ইতিপূর্বে সম্পূর্ণ কর্তন ও ভাউচার সংরক্ষণ সম্পন্ন হয়েছে। বর্তমানে নতুন কোনো রিফান্ড অবশিষ্ট নেই।
+                </span>
+              </div>
             ) : (
               /* Checkbox to trigger auto-refund expense voucher */
               <div className="pt-2 border-t border-slate-800 space-y-2.5">
@@ -359,7 +467,9 @@ export const CancelAllocationModal: React.FC<CancelAllocationModalProps> = ({
                   />
                   <span className="text-xs font-semibold text-slate-200 flex items-center gap-1">
                     <Banknote className="w-3.5 h-3.5 text-emerald-400" />
-                    বর্ডারকে অবশিষ্ট জামানত ও অতিরিক্ত জমা ফেরত এবং ক্যাশ লেজার এন্ট্রি সম্পন্ন করুন
+                    {(duesData.securityDeposit || 0) > 0
+                      ? 'বর্ডারকে অবশিষ্ট জামানত ও অতিরিক্ত জমা ফেরত এবং ক্যাশ লেজার এন্ট্রি সম্পন্ন করুন'
+                      : 'বর্ডারকে খরচের অতিরিক্ত জমাকৃত অর্থ (অগ্রিম ব্যালেন্স) ফেরত এবং ক্যাশ লেজার এন্ট্রি সম্পন্ন করুন'}
                   </span>
                 </label>
 
