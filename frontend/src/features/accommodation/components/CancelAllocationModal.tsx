@@ -153,7 +153,53 @@ export const CancelAllocationModal: React.FC<CancelAllocationModalProps> = ({
         console.warn('Failed to query existing refund expenses:', err)
       }
 
-      const effectiveSecurityDeposit = Math.max(0, securityDeposit - alreadyRefundedDeposit)
+      // Check actual collected deposit from receipts (including offline opening migration receipts)
+      let receiptPaidDeposit = 0
+      let receiptAdjustedDeposit = 0
+      try {
+        const { data: bdrRecs } = await supabase
+          .from('receipts')
+          .select('id, amount, payment_method, remarks, transaction_reference')
+          .eq('boarder_id', targetBoarderId)
+          .eq('is_void', false)
+
+        if (bdrRecs && bdrRecs.length > 0) {
+          bdrRecs.forEach((r: any) => {
+            const isAdj =
+              (r.payment_method === 'ADJUSTMENT' &&
+                !r.remarks?.includes('[OPENING_DEPOSIT]') &&
+                !r.transaction_reference?.includes('[OPENING_DEPOSIT]')) ||
+              r.remarks?.includes('[DEPOSIT_ADJUSTMENT]') ||
+              r.transaction_reference?.includes('[DEPOSIT_ADJUSTMENT]') ||
+              r.remarks?.includes('জামানত থেকে সমন্বয়')
+
+            const isDep =
+              r.remarks?.includes('[SECURITY_DEPOSIT]') ||
+              r.transaction_reference?.includes('[SECURITY_DEPOSIT]') ||
+              r.remarks?.includes('[OPENING_DEPOSIT]') ||
+              r.transaction_reference?.includes('[OPENING_DEPOSIT]') ||
+              r.remarks?.includes('প্রারম্ভিক জামানত') ||
+              r.remarks?.includes('জামানত সংগ্রহ') ||
+              r.transaction_reference?.includes('জামানত সংগ্রহ') ||
+              r.remarks?.includes('সিকিউরিটি জামানত')
+
+            if (isAdj) {
+              receiptAdjustedDeposit += Number(r.amount) || 0
+            } else if (isDep) {
+              receiptPaidDeposit += Number(r.amount) || 0
+            }
+          })
+        }
+      } catch (depErr) {
+        console.warn('Failed to calculate boarder paid deposit from receipts:', depErr)
+      }
+
+      const baseHeldDeposit =
+        receiptPaidDeposit > 0
+          ? Math.max(0, receiptPaidDeposit - receiptAdjustedDeposit)
+          : securityDeposit
+
+      const effectiveSecurityDeposit = Math.max(0, baseHeldDeposit - alreadyRefundedDeposit)
 
       // Strategy 1: Query vw_boarder_dues_summary
       try {

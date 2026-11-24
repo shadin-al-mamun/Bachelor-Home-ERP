@@ -106,7 +106,9 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
 
     boarderReceipts.forEach((r) => {
       const isAdjustment =
-        r.payment_method === 'ADJUSTMENT' ||
+        (r.payment_method === 'ADJUSTMENT' &&
+          !r.remarks?.includes('[OPENING_DEPOSIT]') &&
+          !r.transaction_reference?.includes('[OPENING_DEPOSIT]')) ||
         r.remarks?.includes('[DEPOSIT_ADJUSTMENT]') ||
         r.transaction_reference?.includes('[DEPOSIT_ADJUSTMENT]') ||
         r.remarks?.includes('জামানত থেকে সমন্বয়') ||
@@ -120,7 +122,8 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
           if (
             it.head_code === 'SECURITY_DEPOSIT' ||
             it.head_name?.includes('জামানত') ||
-            it.description?.includes('জামানত')
+            it.description?.includes('জামানত') ||
+            it.description?.includes('OPENING_DEPOSIT')
           ) {
             dep += Number(it.amount) || 0
           }
@@ -131,9 +134,13 @@ export const CollectReceiptModal: React.FC<CollectReceiptModalProps> = ({
           r.remarks?.includes('জামানত সংগ্রহ') ||
           r.remarks?.includes('সিকিউরিটি জামানত') ||
           r.remarks?.includes('[SECURITY_DEPOSIT]') ||
+          r.remarks?.includes('[OPENING_DEPOSIT]') ||
+          r.remarks?.includes('প্রারম্ভিক জামানত') ||
           r.transaction_reference?.includes('জামানত সংগ্রহ') ||
           r.transaction_reference?.includes('সিকিউরিটি জামানত') ||
-          r.transaction_reference?.includes('[SECURITY_DEPOSIT]')
+          r.transaction_reference?.includes('[SECURITY_DEPOSIT]') ||
+          r.transaction_reference?.includes('[OPENING_DEPOSIT]') ||
+          r.transaction_reference?.includes('প্রারম্ভিক জামানত')
         if (isDep) {
           receiptDeposit += Number(r.amount) || 0
         }

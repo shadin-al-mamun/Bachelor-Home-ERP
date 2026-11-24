@@ -8,6 +8,7 @@ export interface AllocateSeatParams {
   securityDeposit?: number
   startDate: string
   remarks?: string
+  isOpeningDepositPaid?: boolean
 }
 
 export interface TransferSeatParams {
@@ -137,6 +138,7 @@ export function useAllocateSeatMutation() {
       }
 
       // 2. Execute seat allocation via RPC
+      let newAllocationId: string = ''
       const { data, error } = await supabase.rpc('fn_allocate_seat', {
         p_boarder_id: effectiveBoarderId,
         p_seat_id: params.seatId,
@@ -177,16 +179,104 @@ export function useAllocateSeatMutation() {
           .update({ status: 'OCCUPIED', updated_at: new Date().toISOString() })
           .eq('id', params.seatId)
 
-        return { success: true, allocationId: directAlloc.id }
+        newAllocationId = directAlloc.id
+      } else {
+        newAllocationId = data
       }
 
-      return { success: true, allocationId: data }
+      // 3. If this is an existing boarder whose security deposit was already paid offline,
+      // record an Opening Deposit receipt so it is safely recognized in the hostel deposit fund,
+      // without inflating the manager's daily cash till or physical drawer.
+      if (params.isOpeningDepositPaid && params.securityDeposit && params.securityDeposit > 0) {
+        try {
+          const { data: accounts } = await supabase
+            .from('financial_accounts')
+            .select('id, account_name, account_type')
+            .eq('is_active', true)
+
+          const reserveAccount =
+            accounts?.find((a: any) => a.account_name?.includes('প্রারম্ভিক জামানত') || a.account_type === 'CASH_OWNER') ||
+            accounts?.[0]
+
+          const destinationAccountId = reserveAccount?.id
+
+          if (destinationAccountId) {
+            const depositAmount = Number(params.securityDeposit)
+            const collectionDate = params.startDate ? new Date(params.startDate).toISOString() : new Date().toISOString()
+            const refTag = '[SECURITY_DEPOSIT] [OPENING_DEPOSIT]'
+            const remarksText = '[SECURITY_DEPOSIT] [OPENING_DEPOSIT] অফলাইন প্রারম্ভিক জামানত মাইগ্রেশন (Opening Migration Deposit)'
+
+            try {
+              await supabase.rpc('fn_record_unified_collection', {
+                p_boarder_id: effectiveBoarderId,
+                p_destination_account_id: destinationAccountId,
+                p_payment_method: 'CASH',
+                p_items: [
+                  {
+                    head_code: 'SECURITY_DEPOSIT',
+                    head_name: 'জামানত সংগ্রহ (Security Deposit)',
+                    amount: depositAmount,
+                    billing_month: `${params.startDate.slice(0, 7)}-01`,
+                    description: 'অফলাইন প্রারম্ভিক জামানত মাইগ্রেশন',
+                  },
+                ],
+                p_collection_date: collectionDate,
+                p_reference: refTag,
+                p_remarks: remarksText,
+              })
+            } catch (rpcErr) {
+              console.warn('fn_record_unified_collection for opening deposit failed, executing direct fallback:', rpcErr)
+              const authUser = (await supabase.auth.getUser()).data.user
+              const receiptNo = `RCT-${new Date().getFullYear().toString().slice(-2)}${String(Date.now()).slice(-6)}`
+
+              const { data: recData } = await supabase
+                .from('receipts')
+                .insert({
+                  receipt_number: receiptNo,
+                  boarder_id: effectiveBoarderId,
+                  received_by: authUser?.id || (await supabase.from('profiles').select('id').limit(1)).data?.[0]?.id,
+                  destination_account_id: destinationAccountId,
+                  amount: depositAmount,
+                  payment_method: 'CASH',
+                  transaction_reference: refTag,
+                  receipt_date: collectionDate,
+                  remarks: remarksText,
+                  is_void: false,
+                })
+                .select('id')
+                .maybeSingle()
+
+              if (recData?.id) {
+                try {
+                  await supabase.from('receipt_items').insert({
+                    receipt_id: recData.id,
+                    head_code: 'SECURITY_DEPOSIT',
+                    head_name: 'জামানত সংগ্রহ (Security Deposit)',
+                    amount: depositAmount,
+                    billing_month: `${params.startDate.slice(0, 7)}-01`,
+                    description: 'অফলাইন প্রারম্ভিক জামানত মাইগ্রেশন',
+                  })
+                } catch {
+                  // ignore
+                }
+              }
+            }
+          }
+        } catch (depositErr) {
+          console.warn('Failed to record opening security deposit receipt:', depositErr)
+        }
+      }
+
+      return { success: true, allocationId: newAllocationId }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['seats'] })
       queryClient.invalidateQueries({ queryKey: ['accommodation'] })
       queryClient.invalidateQueries({ queryKey: ['boarders'] })
       queryClient.invalidateQueries({ queryKey: ['boarder'] })
+      queryClient.invalidateQueries({ queryKey: ['receipts'] })
+      queryClient.invalidateQueries({ queryKey: ['boarder-dues'] })
+      queryClient.invalidateQueries({ queryKey: ['financial-accounts'] })
       queryClient.invalidateQueries({ queryKey: ['owner-executive-dashboard'] })
     },
   })

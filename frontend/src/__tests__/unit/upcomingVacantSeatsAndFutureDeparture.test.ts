@@ -228,4 +228,121 @@ describe('Future Departure & Upcoming Vacant Seat (আসন্ন খালি 
     const flatInfo = getBoarderFlatInfoMock(departedBoarder)
     expect(flatInfo).toBeNull()
   })
+
+  it('8. Al-Imran with departure notice for 30/11/2026 retains active allocation and flat grouping', () => {
+    const rawAlloc = {
+      id: 'alloc-imran-7652',
+      boarder_id: 'b-imran',
+      seat_id: 'seat-206-b1',
+      monthly_rent: 4200,
+      security_deposit: 3600,
+      start_date: '2026-10-20',
+      end_date: '2026-11-30', // Scheduled future departure
+      status: 'ACTIVE',
+      cancellation_reason: 'প্রস্থান নোটিশ ৩০/১১/২০২৬',
+      seat: [
+        {
+          id: 'seat-206-b1',
+          seat_code: 'S-1',
+          seat_name: 'Seat 1',
+          room: [
+            {
+              id: 'room-b',
+              room_code: 'R-B',
+              name: 'Room-B',
+              flat: [
+                {
+                  id: 'flat-206',
+                  flat_code: 'Flat-206',
+                  name: 'ফ্ল্যাট ২০৬ (Flat-206)',
+                  floor_number: 2,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }
+
+    const CURRENT_DATE = '2026-11-24'
+    const resolved = resolveBoarderActiveAllocation(rawAlloc, CURRENT_DATE)
+    expect(resolved).not.toBeNull()
+    expect(resolved?.id).toBe('alloc-imran-7652')
+    expect(resolved?.is_notice_pending).toBe(true)
+    expect(resolved?.seat?.room?.flat?.name).toBe('ফ্ল্যাট ২০৬ (Flat-206)')
+
+    // Flat grouping helper simulation
+    const alImranBoarder = {
+      id: 'b-imran',
+      full_name: 'আল-ইমরান',
+      boarder_code: 'BDR-2026-7652',
+      status: 'ACTIVE',
+      leaving_date: '2026-11-30',
+      active_allocation: resolved,
+    }
+
+    const getBoarderFlatInfoActual = (boarder: any) => {
+      const today = '2026-11-24'
+      const hasFutureDeparture = Boolean(boarder.leaving_date && boarder.leaving_date >= today)
+      if (boarder.status === 'LEFT' && !hasFutureDeparture) return null
+
+      const alloc = Array.isArray(boarder.active_allocation)
+        ? boarder.active_allocation[0]
+        : boarder.active_allocation
+      if (!alloc) return null
+
+      const seat = Array.isArray(alloc.seat) ? alloc.seat[0] : alloc.seat
+      const room = Array.isArray(seat?.room) ? seat?.room[0] : seat?.room
+      const flat = Array.isArray(room?.flat) ? room?.flat[0] : room?.flat
+
+      if (flat) {
+        return {
+          id: flat.id || flat.flat_code,
+          code: flat.flat_code,
+          name: flat.name,
+        }
+      }
+      return null
+    }
+
+    const flatInfo = getBoarderFlatInfoActual(alImranBoarder)
+    expect(flatInfo).not.toBeNull()
+    expect(flatInfo?.id).toBe('flat-206')
+    expect(flatInfo?.name).toBe('ফ্ল্যাট ২০৬ (Flat-206)')
+  })
+
+  it('9. Hashem advance booking for 01/12/2026 resolves as upcoming allocation', () => {
+    const rawAllocList = [
+      {
+        id: 'alloc-hashem-advance',
+        boarder_id: 'b-hashem',
+        seat_id: 'seat-206-b1',
+        monthly_rent: 4200,
+        security_deposit: 3600,
+        start_date: '2026-12-01',
+        end_date: null,
+        status: 'ACTIVE',
+        seat: {
+          id: 'seat-206-b1',
+          seat_code: 'S-1',
+          room: {
+            id: 'room-b',
+            name: 'Room-B',
+            flat: {
+              id: 'flat-206',
+              flat_code: 'Flat-206',
+              name: 'ফ্ল্যাট ২০৬ (Flat-206)',
+            },
+          },
+        },
+      },
+    ]
+
+    const CURRENT_DATE = '2026-11-24'
+    const resolved = resolveBoarderActiveAllocation(rawAllocList, CURRENT_DATE)
+    expect(resolved).not.toBeNull()
+    expect(resolved?.id).toBe('alloc-hashem-advance')
+    expect(resolved?.is_upcoming).toBe(true)
+    expect(resolved?.seat?.room?.flat?.name).toBe('ফ্ল্যাট ২০৬ (Flat-206)')
+  })
 })

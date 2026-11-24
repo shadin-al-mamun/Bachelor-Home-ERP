@@ -63,6 +63,7 @@ export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
   const [selectedSeatId, setSelectedSeatId] = useState(preSelectedSeatId || '')
   const [monthlyRent, setMonthlyRent] = useState<number>(0)
   const [securityDeposit, setSecurityDeposit] = useState<number>(5000)
+  const [isOpeningDepositPaid, setIsOpeningDepositPaid] = useState<boolean>(false)
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
   const [remarks, setRemarks] = useState('')
   const [includeFreeMeal, setIncludeFreeMeal] = useState(true)
@@ -127,6 +128,7 @@ export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
       setStaffName('')
       setStaffPhone('')
       setIsNewStaffMode(false)
+      setIsOpeningDepositPaid(false)
     }
   }, [isOpen, preSelectedSeatId, preSelectedBoarderId])
 
@@ -197,6 +199,7 @@ export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
     if (type === 'STAFF') {
       setMonthlyRent(0)
       setSecurityDeposit(0)
+      setIsOpeningDepositPaid(false)
       setIncludeFreeMeal(true)
       setRemarks('হোস্টেল কর্মচারী আবাসন (ফ্রি সুবিধা ও ফ্রি মিল) [ফ্রি মিল সুবিধা অন্তর্ভুক্ত]')
       if (staffMembers.length > 0 && !selectedStaffId) {
@@ -243,6 +246,7 @@ export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
           securityDeposit,
           startDate,
           remarks: remarks.trim() || undefined,
+          isOpeningDepositPaid,
         })
       } else {
         // Staff Free Accommodation Mode
@@ -575,24 +579,48 @@ export const AllocateSeatModal: React.FC<AllocateSeatModalProps> = ({
 
         {/* Rent & Security Deposit */}
         {allocationType === 'BOARDER' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
-              type="number"
-              label="মাসিক চুক্তিকৃত ভাড়া (৳)"
-              value={monthlyRent || ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMonthlyRent(Number(e.target.value))}
-              placeholder="যেমন: ৪৫০০"
-              required
-              className="text-xs"
-            />
-            <Input
-              type="number"
-              label="সিকিউরিটি ডিপোজিট (৳)"
-              value={securityDeposit || ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSecurityDeposit(Number(e.target.value))}
-              placeholder="যেমন: ৫০০০"
-              className="text-xs"
-            />
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input
+                type="number"
+                label="মাসিক চুক্তিকৃত ভাড়া (৳)"
+                value={monthlyRent || ''}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMonthlyRent(Number(e.target.value))}
+                placeholder="যেমন: ৪৫০০"
+                required
+                className="text-xs"
+              />
+              <Input
+                type="number"
+                label="সিকিউরিটি ডিপোজিট (৳)"
+                value={securityDeposit || ''}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSecurityDeposit(Number(e.target.value))}
+                placeholder="যেমন: ৫০০০"
+                className="text-xs"
+              />
+            </div>
+
+            {/* Existing Offline Opening Deposit Checkbox */}
+            {securityDeposit > 0 && (
+              <div className="p-3 bg-slate-900/80 border border-slate-800 rounded-xl space-y-1.5 transition-all">
+                <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={isOpeningDepositPaid}
+                    onChange={(e) => setIsOpeningDepositPaid(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 text-emerald-500 bg-slate-950 border-slate-700 rounded focus:ring-emerald-500/20 cursor-pointer accent-emerald-500"
+                  />
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-semibold text-white flex items-center gap-1.5">
+                      বর্ডারের জামানত অতীতেই অফলাইনে পরিশোধিত (প্রারম্ভিক জামানত / Opening Deposit)
+                    </span>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      চলমান হোস্টেলের বর্তমান বর্ডারদের সফটওয়্যারে স্থানান্তরের জন্য এটি প্রযোজ্য। এটি নির্বাচন করলে আজকের ক্যাশ ড্রয়ারে কোনো অতিরিক্ত ভুয়া টাকা যোগ না হয়েই বর্ডারের জামানত তহবিলে সংরক্ষিত হবে।
+                    </p>
+                  </div>
+                </label>
+              </div>
+            )}
           </div>
         ) : (
           <div className="space-y-3">

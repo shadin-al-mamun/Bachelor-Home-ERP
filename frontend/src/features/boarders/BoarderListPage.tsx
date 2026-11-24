@@ -72,12 +72,22 @@ export const BoarderListPage: React.FC = () => {
   // Helper to extract flat identity cleanly from active seat allocation
   const getBoarderFlatInfo = (boarder: BoarderWithRelations) => {
     // If boarder has left or has no active allocation, they don't occupy a residential flat
-    if (boarder.status === 'LEFT') return null
+    // But if boarder has a scheduled departure date today or in future, they are still residing!
+    const today = new Date().toISOString().slice(0, 10)
+    const hasFutureDeparture = Boolean(boarder.leaving_date && boarder.leaving_date >= today)
+    if (boarder.status === 'LEFT' && !hasFutureDeparture) return null
 
-    const alloc = boarder.active_allocation
+    const alloc = Array.isArray(boarder.active_allocation)
+      ? boarder.active_allocation[0]
+      : boarder.active_allocation
+    if (!alloc) return null
+
+    // Unpack seat, room, flat safely whether they are objects or 1-element arrays
+    const seat = Array.isArray(alloc.seat) ? alloc.seat[0] : alloc.seat
+    const room = Array.isArray(seat?.room) ? seat?.room[0] : seat?.room
+    const flat = Array.isArray(room?.flat) ? room?.flat[0] : room?.flat
 
     // 1. Direct flat mapping via allocation seat
-    const flat = alloc?.seat?.room?.flat
     if (flat) {
       const flatCode = flat.flat_code || flat.name || 'ফ্ল্যাট'
       let displayName = flat.name || flatCode
@@ -95,9 +105,9 @@ export const BoarderListPage: React.FC = () => {
     }
 
     // 2. Room or seat code fallback
-    const roomName = alloc?.seat?.room?.name || ''
-    const roomCode = alloc?.seat?.room?.room_code || ''
-    const seatCode = alloc?.seat?.seat_code || ''
+    const roomName = room?.name || ''
+    const roomCode = room?.room_code || ''
+    const seatCode = seat?.seat_code || ''
 
     if (roomName.includes('206') || roomCode.includes('206') || seatCode.includes('206')) {
       return {
@@ -156,11 +166,13 @@ export const BoarderListPage: React.FC = () => {
     // Sort boarders inside each flat by room name, then seat code
     Object.values(groups).forEach((g) => {
       g.boarders.sort((a, b) => {
-        const roomA = a.active_allocation?.seat?.room?.name || ''
-        const roomB = b.active_allocation?.seat?.room?.name || ''
+        const allocA = Array.isArray(a.active_allocation) ? a.active_allocation[0] : a.active_allocation
+        const allocB = Array.isArray(b.active_allocation) ? b.active_allocation[0] : b.active_allocation
+        const roomA = allocA?.seat?.room?.name || ''
+        const roomB = allocB?.seat?.room?.name || ''
         if (roomA !== roomB) return roomA.localeCompare(roomB)
-        const seatA = a.active_allocation?.seat?.seat_code || ''
-        const seatB = b.active_allocation?.seat?.seat_code || ''
+        const seatA = allocA?.seat?.seat_code || ''
+        const seatB = allocB?.seat?.seat_code || ''
         return seatA.localeCompare(seatB)
       })
     })
@@ -213,7 +225,9 @@ export const BoarderListPage: React.FC = () => {
   )
 
   const renderBoarderRow = (boarder: BoarderWithRelations) => {
-    const alloc = boarder.active_allocation
+    const alloc = Array.isArray(boarder.active_allocation)
+      ? boarder.active_allocation[0]
+      : boarder.active_allocation
     const isStaff = Boolean(
       boarder.institution?.includes('কর্মচারী') ||
       boarder.institution?.includes('স্টাফ') ||
@@ -222,7 +236,9 @@ export const BoarderListPage: React.FC = () => {
       (alloc as any)?.remarks?.includes('স্টাফ') ||
       (alloc as any)?.remarks?.includes('কর্মচারী')
     )
-    const hasSeat = Boolean(alloc && alloc.seat && boarder.status !== 'LEFT')
+    const today = new Date().toISOString().slice(0, 10)
+    const hasFutureDeparture = Boolean(boarder.leaving_date && boarder.leaving_date >= today)
+    const hasSeat = Boolean(alloc && alloc.seat && (boarder.status !== 'LEFT' || hasFutureDeparture))
 
     return (
       <tr

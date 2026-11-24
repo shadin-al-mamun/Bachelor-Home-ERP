@@ -1153,7 +1153,7 @@ export function useReportsData(filters: ReportFilterState) {
           )
           .reduce((s, c) => s + (Number(c.amount) || 0), 0)
 
-        // Security Deposit collected from receipts
+        // Security Deposit collected from receipts (including offline opening migration receipts)
         const paidDepositReceipts = rawReceipts
           .filter(
             (r) =>
@@ -1161,6 +1161,9 @@ export function useReportsData(filters: ReportFilterState) {
               r.boarder_id === bId &&
               (r.remarks?.includes('[SECURITY_DEPOSIT]') ||
                 r.transaction_reference?.includes('[SECURITY_DEPOSIT]') ||
+                r.remarks?.includes('[OPENING_DEPOSIT]') ||
+                r.transaction_reference?.includes('[OPENING_DEPOSIT]') ||
+                r.remarks?.includes('প্রারম্ভিক জামানত') ||
                 r.remarks?.includes('জামানত সংগ্রহ') ||
                 r.transaction_reference?.includes('জামানত সংগ্রহ') ||
                 r.remarks?.includes('সিকিউরিটি জামানত') ||
@@ -1174,6 +1177,8 @@ export function useReportsData(filters: ReportFilterState) {
             (r) =>
               !r.is_void &&
               r.boarder_id === bId &&
+              !r.remarks?.includes('[OPENING_DEPOSIT]') &&
+              !r.transaction_reference?.includes('[OPENING_DEPOSIT]') &&
               (r.payment_method === 'ADJUSTMENT' ||
                 r.remarks?.includes('[DEPOSIT_ADJUSTMENT]') ||
                 r.transaction_reference?.includes('[DEPOSIT_ADJUSTMENT]') ||

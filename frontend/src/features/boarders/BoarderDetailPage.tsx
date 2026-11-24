@@ -500,8 +500,19 @@ export const BoarderDetailPage: React.FC = () => {
                   <span className="text-lg font-bold text-emerald-400 block">
                     {formatCurrencyBn(alloc.monthly_rent)}
                   </span>
-                  <span className="text-slate-400 text-[11px]">
+                  <span className="text-slate-400 text-[11px] flex items-center gap-1.5 flex-wrap">
                     সিকিউরিটি ডিপোজিট: {formatCurrencyBn(alloc.security_deposit)}
+                    {Number(alloc.security_deposit) > 0 && (
+                      ((boarder.deposit_held && boarder.deposit_held > 0) || (boarder.deposit_paid && boarder.deposit_paid > 0)) ? (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          পরিশোধিত (তহবিলে সংরক্ষিত)
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                          অনাদায়ী
+                        </span>
+                      )
+                    )}
                   </span>
                 </div>
 

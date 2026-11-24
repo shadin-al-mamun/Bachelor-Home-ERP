@@ -51,6 +51,8 @@ export interface BoarderWithRelations extends Boarder {
   total_due?: number
   total_paid?: number
   advance_balance?: number
+  deposit_paid?: number
+  deposit_held?: number
   meal_summary?: {
     total_meals: number
     estimated_meal_cost: number
@@ -191,15 +193,17 @@ export async function syncDepartureNoticeAllocations() {
 export function resolveBoarderActiveAllocation(rawAlloc: any, todayStr?: string) {
   if (!rawAlloc) return null
   const today = todayStr || new Date().toISOString().slice(0, 10)
-  const allocList: any[] = Array.isArray(rawAlloc) ? rawAlloc : [rawAlloc]
+  const allocList: any[] = Array.isArray(rawAlloc) ? rawAlloc.flat(Infinity) : [rawAlloc]
   if (allocList.length === 0) return null
 
   // 1. Current resident today:
   // Started on or before today, and hasn't ended yet (end_date IS NULL or end_date >= today)
   // If end_date < today, the allocation has EXPIRED and cannot be active today.
+  // If status is CANCELLED or ENDED with future end_date (>= today), it is an active departure notice!
   const current = allocList.find((a: any) => {
-    if (a.status === 'CANCELLED') return false
+    if (!a) return false
     if (a.end_date && a.end_date < today) return false
+    if (a.status === 'CANCELLED' && (!a.end_date || a.end_date < today)) return false
     if (a.status === 'ENDED' && (!a.end_date || a.end_date < today)) return false
     const started = !a.start_date || a.start_date <= today
     const notEnded = !a.end_date || a.end_date >= today
@@ -209,12 +213,35 @@ export function resolveBoarderActiveAllocation(rawAlloc: any, todayStr?: string)
   // 2. Upcoming advance booking:
   // Starts after today
   const upcoming = allocList
-    .filter((a: any) => a.start_date && a.start_date > today && a.status !== 'CANCELLED' && a.status !== 'ENDED')
+    .filter((a: any) => a && a.start_date && a.start_date > today && a.status !== 'CANCELLED' && a.status !== 'ENDED')
     .sort((a: any, b: any) => (a.start_date > b.start_date ? 1 : -1))[0]
 
   // If there is no active resident allocation today and no upcoming booking, this boarder has no active allocation!
   const chosen = current || upcoming
   if (!chosen) return null
+
+  // Safely unpack nested relation structures in case PostgREST returned single-relation arrays
+  const rawSeat = Array.isArray(chosen.seat) ? chosen.seat[0] : chosen.seat
+  const rawRoom = Array.isArray(rawSeat?.room) ? rawSeat?.room[0] : rawSeat?.room
+  const rawFlat = Array.isArray(rawRoom?.flat) ? rawRoom?.flat[0] : rawRoom?.flat
+  const rawBuilding = Array.isArray(rawFlat?.building) ? rawFlat?.building[0] : rawFlat?.building
+
+  const normalizedSeat = rawSeat
+    ? {
+        ...rawSeat,
+        room: rawRoom
+          ? {
+              ...rawRoom,
+              flat: rawFlat
+                ? {
+                    ...rawFlat,
+                    building: rawBuilding || null,
+                  }
+                : null,
+            }
+          : null,
+      }
+    : null
 
   const isNoticePending = Boolean(
     chosen.end_date &&
@@ -225,6 +252,7 @@ export function resolveBoarderActiveAllocation(rawAlloc: any, todayStr?: string)
 
   return {
     ...chosen,
+    seat: normalizedSeat,
     is_notice_pending: isNoticePending,
     is_upcoming: isUpcoming,
     vacate_date: chosen.end_date || null,
@@ -1191,19 +1219,25 @@ export function useBoarders(filters?: BoarderFilters) {
             .order('created_at', { ascending: false })
 
           if (directAllocs && directAllocs.length > 0) {
-            const allocsByBoarder = new Map<string, any>()
+            const allocsByBoarder = new Map<string, any[]>()
             directAllocs.forEach((a: any) => {
               if (!allocsByBoarder.has(a.boarder_id)) {
-                allocsByBoarder.set(a.boarder_id, a)
+                allocsByBoarder.set(a.boarder_id, [])
               }
+              allocsByBoarder.get(a.boarder_id)!.push(a)
             })
 
             data = (data || []).map((b: any) => {
               if (allocsByBoarder.has(b.id)) {
-                const found = allocsByBoarder.get(b.id)
+                const bAllocs = allocsByBoarder.get(b.id)!
+                const existing = b.active_allocation
+                  ? Array.isArray(b.active_allocation)
+                    ? b.active_allocation
+                    : [b.active_allocation]
+                  : []
                 return {
                   ...b,
-                  active_allocation: found,
+                  active_allocation: [...existing, ...bAllocs],
                 }
               }
               return b
@@ -1227,6 +1261,11 @@ export function useBoarders(filters?: BoarderFilters) {
         }
 
         const activeAlloc = resolvedStatus === 'LEFT' ? null : resolveBoarderActiveAllocation(b.active_allocation, today)
+
+        // If the boarder has an active allocation today (or scheduled future departure notice), ensure status is ACTIVE
+        if (activeAlloc && (!activeAlloc.end_date || activeAlloc.end_date >= today) && resolvedStatus !== 'ACTIVE') {
+          resolvedStatus = 'ACTIVE'
+        }
 
         return {
           ...b,
@@ -1366,12 +1405,12 @@ export function useBoarder(id?: string) {
 
       const activeAlloc = resolveBoarderActiveAllocation(data.active_allocation)
 
-      // Fetch non-void receipts to calculate accurate totalPaid and advance credit
+      // Fetch non-void receipts to calculate accurate totalPaid, advance credit, and security deposit
       let boarderReceipts: any[] = []
       try {
         const { data: recData } = await supabase
           .from('receipts')
-          .select('id, amount, is_void')
+          .select('id, amount, is_void, payment_method, remarks, transaction_reference')
           .eq('boarder_id', data.id)
           .eq('is_void', false)
         boarderReceipts = recData || []
@@ -1379,7 +1418,42 @@ export function useBoarder(id?: string) {
         console.warn('Error fetching boarder receipts in useBoarder:', err)
       }
 
-      const totalReceipts = boarderReceipts.reduce((acc: number, r: any) => acc + Number(r.amount || 0), 0)
+      // Filter operating receipts vs security deposit receipts
+      const operatingReceipts = boarderReceipts.filter(
+        (r: any) =>
+          !r.remarks?.includes('[SECURITY_DEPOSIT]') &&
+          !r.transaction_reference?.includes('[SECURITY_DEPOSIT]') &&
+          !r.remarks?.includes('[OPENING_DEPOSIT]') &&
+          !r.transaction_reference?.includes('[OPENING_DEPOSIT]') &&
+          !r.remarks?.includes('[OFFLINE_DEPOSIT]') &&
+          !r.transaction_reference?.includes('[OFFLINE_DEPOSIT]')
+      )
+      const totalReceipts = operatingReceipts.reduce((acc: number, r: any) => acc + Number(r.amount || 0), 0)
+
+      let depositPaid = 0
+      let depositAdjusted = 0
+      boarderReceipts.forEach((r: any) => {
+        const isDep =
+          r.remarks?.includes('[SECURITY_DEPOSIT]') ||
+          r.transaction_reference?.includes('[SECURITY_DEPOSIT]') ||
+          r.remarks?.includes('[OPENING_DEPOSIT]') ||
+          r.transaction_reference?.includes('[OPENING_DEPOSIT]') ||
+          r.remarks?.includes('জামানত সংগ্রহ') ||
+          r.transaction_reference?.includes('জামানত সংগ্রহ') ||
+          r.remarks?.includes('সিকিউরিটি জামানত')
+
+        const isAdj =
+          (r.payment_method === 'ADJUSTMENT' &&
+            !r.remarks?.includes('[OPENING_DEPOSIT]') &&
+            !r.transaction_reference?.includes('[OPENING_DEPOSIT]')) ||
+          r.remarks?.includes('[DEPOSIT_ADJUSTMENT]') ||
+          r.transaction_reference?.includes('[DEPOSIT_ADJUSTMENT]') ||
+          r.remarks?.includes('জামানত থেকে সমন্বয়')
+
+        if (isAdj) depositAdjusted += Number(r.amount || 0)
+        else if (isDep) depositPaid += Number(r.amount || 0)
+      })
+      const depositHeld = Math.max(0, depositPaid - depositAdjusted)
       const rawCharges = data.charges || []
       // Sanity guard: An unseated boarder cannot have legitimate resident mess meal charges
       // Also sanitize any legacy duplicate guest meal charge (1664 -> 1560)
@@ -1477,6 +1551,8 @@ export function useBoarder(id?: string) {
         total_due: totalDue,
         total_paid: totalPaid,
         advance_balance: advanceBalance,
+        deposit_paid: depositPaid,
+        deposit_held: depositHeld,
         meal_summary: mealSummary,
       }
     },
