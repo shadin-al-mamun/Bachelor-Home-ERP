@@ -542,10 +542,26 @@ export interface SeatFilterParams {
   status?: string
 }
 
+// Helper to safely extract boarder object whether Supabase PostgREST returned it as an object or array
+export function getBoarderObj(alloc: any) {
+  if (!alloc) return null
+  if (Array.isArray(alloc.boarder)) return alloc.boarder[0] || null
+  return alloc.boarder || null
+}
+
 // Helper to resolve current active occupant, departure notice, and upcoming future allocation
 export function enrichSeatAllocations(s: any, todayStr?: string) {
   const today = todayStr || new Date().toISOString().slice(0, 10)
-  const allAllocs: any[] = Array.isArray(s.allocations) ? s.allocations : []
+  const rawAllocs: any[] = Array.isArray(s.allocations) ? s.allocations : []
+
+  // Normalize all allocations so that .boarder is consistently an object (or null)
+  const allAllocs = rawAllocs.map((a: any) => {
+    const bObj = getBoarderObj(a)
+    return {
+      ...a,
+      boarder: bObj,
+    }
+  })
 
   // 1. Upcoming / advance booking: starts strictly in the future (after today)
   const upcomingAlloc = allAllocs
@@ -562,33 +578,38 @@ export function enrichSeatAllocations(s: any, todayStr?: string) {
   // Linked boarder must not have departed before today (leaving_date >= today if set, status !== 'LEFT')
   const currentAlloc =
     otherAllocs.find((a: any) => {
+      const b = a.boarder
       if (a.status === 'CANCELLED') return false
       if (a.end_date && a.end_date < today) return false
-      if (a.boarder?.leaving_date && a.boarder.leaving_date < today) return false
+      if (b?.leaving_date && b.leaving_date < today) return false
+      if (b?.status === 'LEFT' && (!b?.leaving_date || b.leaving_date < today)) return false
       const started = !a.start_date || a.start_date <= today
       const notEnded = !a.end_date || a.end_date >= today
-      const boarderNotLeft = !a.boarder?.leaving_date || a.boarder.leaving_date >= today
-      const boarderActive = !a.boarder?.status || a.boarder.status === 'ACTIVE'
+      const boarderNotLeft = !b?.leaving_date || b.leaving_date >= today
+      const boarderActive = !b?.status || b.status === 'ACTIVE' || (b.leaving_date && b.leaving_date >= today)
       return a.status === 'ACTIVE' && started && notEnded && boarderNotLeft && boarderActive
     }) ||
     otherAllocs.find((a: any) => {
+      const b = a.boarder
       if (a.status === 'CANCELLED') return false
       if (a.end_date && a.end_date < today) return false
-      if (a.boarder?.leaving_date && a.boarder.leaving_date < today) return false
+      if (b?.leaving_date && b.leaving_date < today) return false
+      if (b?.status === 'LEFT' && (!b?.leaving_date || b.leaving_date < today)) return false
       const started = !a.start_date || a.start_date <= today
       const notEnded = !a.end_date || a.end_date >= today
-      const boarderNotLeft = !a.boarder?.leaving_date || a.boarder.leaving_date >= today
+      const boarderNotLeft = !b?.leaving_date || b.leaving_date >= today
       return started && notEnded && boarderNotLeft
     }) ||
     null
 
   // Primary allocation is the current resident living in the seat today
   const primaryAlloc = currentAlloc
+  const currentBoarder = primaryAlloc?.boarder || null
 
   // Vacate date is ONLY valid if the resident is currently residing and scheduled to vacate today or in the future
   const rawVacateDate =
     primaryAlloc?.end_date ||
-    primaryAlloc?.boarder?.leaving_date ||
+    currentBoarder?.leaving_date ||
     (s.vacate_date && s.vacate_date >= today ? s.vacate_date : null) ||
     null
 
@@ -599,7 +620,7 @@ export function enrichSeatAllocations(s: any, todayStr?: string) {
     primaryAlloc &&
     vacateDate &&
     vacateDate >= today &&
-    (primaryAlloc.cancellation_reason || (primaryAlloc.end_date && primaryAlloc.end_date >= today) || (primaryAlloc.boarder?.leaving_date && primaryAlloc.boarder.leaving_date >= today) || Boolean(s.has_notice_to_vacate))
+    (primaryAlloc.cancellation_reason || (primaryAlloc.end_date && primaryAlloc.end_date >= today) || (currentBoarder?.leaving_date && currentBoarder.leaving_date >= today) || Boolean(s.has_notice_to_vacate))
   )
 
   let vacantFromDate: string | null = null
@@ -622,12 +643,14 @@ export function enrichSeatAllocations(s: any, todayStr?: string) {
   }
 
   // Extract occupant details (strictly null if no current resident living today)
-  const occupantName = primaryAlloc ? (primaryAlloc.boarder?.full_name || s.occupant_name || null) : null
-  const occupantCode = primaryAlloc ? (primaryAlloc.boarder?.boarder_code || s.occupant_code || null) : null
-  const occupantId = primaryAlloc ? (primaryAlloc.boarder?.id || primaryAlloc.boarder_id || s.occupant_id || null) : null
+  const occupantName = primaryAlloc ? (currentBoarder?.full_name || primaryAlloc.boarder_name || s.occupant_name || null) : null
+  const occupantCode = primaryAlloc ? (currentBoarder?.boarder_code || primaryAlloc.boarder_code || s.occupant_code || null) : null
+  const occupantId = primaryAlloc ? (currentBoarder?.id || primaryAlloc.boarder_id || s.occupant_id || null) : null
 
-  const upcomingOccupantName = upcomingAlloc?.boarder?.full_name || s.upcoming_occupant_name || null
-  const upcomingOccupantCode = upcomingAlloc?.boarder?.boarder_code || s.upcoming_occupant_code || null
+  const upcomingBoarder = upcomingAlloc?.boarder || null
+  const upcomingOccupantName = upcomingAlloc ? (upcomingBoarder?.full_name || upcomingAlloc.boarder_name || s.upcoming_occupant_name || null) : null
+  const upcomingOccupantCode = upcomingAlloc ? (upcomingBoarder?.boarder_code || upcomingAlloc.boarder_code || s.upcoming_occupant_code || null) : null
+  const upcomingOccupantId = upcomingAlloc ? (upcomingBoarder?.id || upcomingAlloc.boarder_id || s.upcoming_occupant_id || null) : null
   const upcomingStartDate = upcomingAlloc?.start_date || s.upcoming_start_date || null
 
   // Check if occupied by hostel staff (0 rent or staff designation)
@@ -637,8 +660,8 @@ export function enrichSeatAllocations(s: any, todayStr?: string) {
       primaryAlloc.remarks?.includes('স্টাফ') ||
       primaryAlloc.remarks?.includes('কর্মচারী') ||
       primaryAlloc.remarks?.toLowerCase().includes('staff') ||
-      primaryAlloc.boarder?.institution?.includes('স্টাফ') ||
-      primaryAlloc.boarder?.institution?.includes('কর্মচারী')
+      currentBoarder?.institution?.includes('স্টাফ') ||
+      currentBoarder?.institution?.includes('কর্মচারী')
     )) ||
     (occupantCode && occupantCode.startsWith('STF-')) ||
     (primaryAlloc && Number(primaryAlloc.monthly_rent) === 0)
@@ -671,7 +694,7 @@ export function enrichSeatAllocations(s: any, todayStr?: string) {
     upcoming_allocation: upcomingAlloc || s.upcoming_allocation || null,
     upcoming_occupant_name: upcomingOccupantName,
     upcoming_occupant_code: upcomingOccupantCode,
-    upcoming_occupant_id: upcomingAlloc?.boarder?.id || upcomingAlloc?.boarder_id || s.upcoming_occupant_id || null,
+    upcoming_occupant_id: upcomingOccupantId,
     upcoming_start_date: upcomingStartDate,
   }
 }

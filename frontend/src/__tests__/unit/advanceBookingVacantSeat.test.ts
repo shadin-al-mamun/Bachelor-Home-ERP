@@ -109,4 +109,118 @@ describe('Seat Allocation Enrichment - Vacant Advance Booking vs Handover', () =
     expect(enriched.upcoming_occupant_code).toBe('BDR-2026-9890')
     expect(enriched.upcoming_start_date).toBe('2026-12-01')
   })
+
+  it('correctly extracts boarder info when Supabase PostgREST returns boarder as an Array [ { ... } ]', () => {
+    const seatB1SupabasePostgrest = {
+      id: 'seat-b-1',
+      seat_code: 'Seat B-1',
+      seat_name: 'Seat B-1',
+      seat_type: 'SINGLE_BED',
+      default_rent: 2400,
+      status: 'OCCUPIED',
+      allocations: [
+        {
+          id: 'alloc-imran',
+          boarder_id: 'bdr-imran',
+          seat_id: 'seat-b-1',
+          status: 'ACTIVE',
+          monthly_rent: 2400,
+          start_date: '2026-10-20',
+          end_date: '2026-11-30', // scheduled to vacate on 30 Nov
+          cancellation_reason: 'সিট ছাড়ার নোটিশ',
+          // Supabase PostgREST 1-to-many joined array:
+          boarder: [
+            {
+              id: 'bdr-imran',
+              full_name: 'আল-ইমরান',
+              boarder_code: 'BDR-2026-7652',
+              phone_number: '01683877525',
+              status: 'ACTIVE',
+              leaving_date: '2026-11-30',
+            },
+          ],
+        },
+        {
+          id: 'alloc-hashem',
+          boarder_id: 'bdr-hashem',
+          seat_id: 'seat-b-1',
+          status: 'ACTIVE',
+          monthly_rent: 2400,
+          start_date: '2026-12-01', // starts 01 Dec 2026
+          end_date: null,
+          // Supabase PostgREST 1-to-many joined array:
+          boarder: [
+            {
+              id: 'bdr-hashem',
+              full_name: 'হাশেম',
+              boarder_code: 'BDR-2026-9890',
+              phone_number: '01712394768',
+              status: 'ACTIVE',
+              leaving_date: null,
+            },
+          ],
+        },
+      ],
+    }
+
+    const queryToday = '2026-11-24'
+    const enriched = enrichSeatAllocations(seatB1SupabasePostgrest, queryToday)
+
+    // Current occupant MUST be Al-Imran even when boarder is an array!
+    expect(enriched.occupant_name).toBe('আল-ইমরান')
+    expect(enriched.occupant_code).toBe('BDR-2026-7652')
+    expect(enriched.occupant_id).toBe('bdr-imran')
+    expect(enriched.has_notice_to_vacate).toBe(true)
+    expect(enriched.vacate_date).toBe('2026-11-30')
+    expect(enriched.vacant_from_date).toBe('2026-12-01')
+    expect(enriched.status).toBe('OCCUPIED')
+
+    // Upcoming occupant MUST be Hashem
+    expect(enriched.has_upcoming_allocation).toBe(true)
+    expect(enriched.upcoming_occupant_name).toBe('হাশেম')
+    expect(enriched.upcoming_occupant_code).toBe('BDR-2026-9890')
+    expect(enriched.upcoming_occupant_id).toBe('bdr-hashem')
+    expect(enriched.upcoming_start_date).toBe('2026-12-01')
+  })
+
+  it('correctly releases seat to AVAILABLE when departure date was in the past (e.g. Zahid Hasan 2026-11-23 on 2026-11-24)', () => {
+    const seatZahid = {
+      id: 'seat-d-1',
+      seat_code: 'Seat D-1',
+      seat_name: 'Seat D-1',
+      seat_type: 'SINGLE_BED',
+      default_rent: 3600,
+      status: 'OCCUPIED',
+      allocations: [
+        {
+          id: 'alloc-zahid',
+          boarder_id: 'bdr-zahid',
+          seat_id: 'seat-d-1',
+          status: 'ENDED',
+          monthly_rent: 3600,
+          start_date: '2026-10-21',
+          end_date: '2026-11-23', // Left yesterday
+          cancellation_reason: 'প্রস্থান সম্পন্ন',
+          boarder: [
+            {
+              id: 'bdr-zahid',
+              full_name: 'জাহিদ হাসান',
+              boarder_code: 'BDR-2026-3367',
+              phone_number: '01745603650',
+              status: 'LEFT',
+              leaving_date: '2026-11-23',
+            },
+          ],
+        },
+      ],
+    }
+
+    const queryToday = '2026-11-24'
+    const enriched = enrichSeatAllocations(seatZahid, queryToday)
+
+    expect(enriched.status).toBe('AVAILABLE')
+    expect(enriched.occupant_name).toBeNull()
+    expect(enriched.occupant_code).toBeNull()
+    expect(enriched.has_notice_to_vacate).toBe(false)
+  })
 })

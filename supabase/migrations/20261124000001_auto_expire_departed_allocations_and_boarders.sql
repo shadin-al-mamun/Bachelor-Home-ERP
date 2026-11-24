@@ -37,8 +37,37 @@ BEGIN
       AND leaving_date IS NOT NULL 
       AND leaving_date < v_today;
 
-    -- 3. Release any seats to AVAILABLE where there is no active occupant today
-    -- and the seat is not in MAINTENANCE or INACTIVE
+    -- 3. Ensure future departure notices (leaving_date >= v_today) remain ACTIVE
+    UPDATE public.boarders
+    SET status = 'ACTIVE',
+        updated_at = timezone('Asia/Dhaka', now())
+    WHERE leaving_date IS NOT NULL 
+      AND leaving_date >= v_today
+      AND status <> 'ACTIVE';
+
+    UPDATE public.allocations
+    SET status = 'ACTIVE',
+        updated_at = timezone('Asia/Dhaka', now())
+    WHERE end_date IS NOT NULL 
+      AND end_date >= v_today
+      AND status <> 'ACTIVE'
+      AND cancellation_reason IS NOT NULL;
+
+    -- 4. Ensure seats with current resident or future notice are OCCUPIED
+    UPDATE public.seats s
+    SET status = 'OCCUPIED',
+        updated_at = timezone('Asia/Dhaka', now())
+    WHERE s.status <> 'OCCUPIED'
+      AND EXISTS (
+          SELECT 1 
+          FROM public.allocations a
+          WHERE a.seat_id = s.id 
+            AND (a.start_date IS NULL OR a.start_date <= v_today)
+            AND (a.end_date IS NULL OR a.end_date >= v_today)
+      );
+
+    -- 5. Release any seats to AVAILABLE where there is no active occupant today
+    -- and no upcoming advance booking, and seat is not in MAINTENANCE or INACTIVE
     UPDATE public.seats s
     SET status = 'AVAILABLE',
         updated_at = timezone('Asia/Dhaka', now())
@@ -47,9 +76,15 @@ BEGIN
           SELECT 1 
           FROM public.allocations a
           WHERE a.seat_id = s.id 
-            AND a.status = 'ACTIVE'
             AND (a.start_date IS NULL OR a.start_date <= v_today)
             AND (a.end_date IS NULL OR a.end_date >= v_today)
+      )
+      AND NOT EXISTS (
+          SELECT 1 
+          FROM public.allocations a
+          WHERE a.seat_id = s.id 
+            AND a.start_date > v_today
+            AND a.status = 'ACTIVE'
       );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -491,11 +526,21 @@ BEGIN
                     JOIN public.flats fl ON r.flat_id = fl.id
                     LEFT JOIN public.buildings bld ON fl.building_id = bld.id
                     WHERE a.boarder_id = b.id
-                      AND a.status = 'ACTIVE'
-                      AND (a.start_date IS NULL OR a.start_date <= v_today)
-                      AND (a.end_date IS NULL OR a.end_date >= v_today)
+                      AND a.status <> 'CANCELLED'
+                      AND a.status <> 'ENDED'
+                      AND (
+                        ((a.start_date IS NULL OR a.start_date <= v_today) AND (a.end_date IS NULL OR a.end_date >= v_today))
+                        OR
+                        (a.start_date > v_today AND a.status = 'ACTIVE')
+                      )
                       AND fl.id IN (SELECT flat_id FROM public.user_flat_assignments WHERE user_id = v_user_id)
-                    ORDER BY a.created_at DESC
+                    ORDER BY 
+                      CASE 
+                        WHEN (a.start_date IS NULL OR a.start_date <= v_today) AND (a.end_date IS NULL OR a.end_date >= v_today) THEN 1
+                        WHEN a.start_date > v_today THEN 2
+                        ELSE 3
+                      END,
+                      a.created_at DESC
                     LIMIT 1
                 ) AS active_allocation
             FROM public.boarders b
@@ -552,10 +597,20 @@ BEGIN
                 JOIN public.flats fl ON r.flat_id = fl.id
                 LEFT JOIN public.buildings bld ON fl.building_id = bld.id
                 WHERE a.boarder_id = b.id
-                  AND a.status = 'ACTIVE'
-                  AND (a.start_date IS NULL OR a.start_date <= v_today)
-                  AND (a.end_date IS NULL OR a.end_date >= v_today)
-                ORDER BY a.created_at DESC
+                  AND a.status <> 'CANCELLED'
+                  AND a.status <> 'ENDED'
+                  AND (
+                    ((a.start_date IS NULL OR a.start_date <= v_today) AND (a.end_date IS NULL OR a.end_date >= v_today))
+                    OR
+                    (a.start_date > v_today AND a.status = 'ACTIVE')
+                  )
+                ORDER BY 
+                  CASE 
+                    WHEN (a.start_date IS NULL OR a.start_date <= v_today) AND (a.end_date IS NULL OR a.end_date >= v_today) THEN 1
+                    WHEN a.start_date > v_today THEN 2
+                    ELSE 3
+                  END,
+                  a.created_at DESC
                 LIMIT 1
             ) AS active_allocation
         FROM public.boarders b

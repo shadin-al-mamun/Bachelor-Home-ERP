@@ -73,10 +73,7 @@ export async function syncDepartureNoticeAllocations() {
 
     // 1. Try authoritative RPC fn_expire_past_departure_notices first
     try {
-      const { error: rpcErr } = await supabase.rpc('fn_expire_past_departure_notices')
-      if (!rpcErr) {
-        return
-      }
+      await supabase.rpc('fn_expire_past_departure_notices')
     } catch {
       // Fall through to client-side self-heal queries below
     }
