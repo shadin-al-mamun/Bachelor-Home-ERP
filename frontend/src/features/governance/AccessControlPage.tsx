@@ -108,11 +108,6 @@ export const AccessControlPage: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState('ALL')
   const [saveSuccessMessage, setSaveSuccessMessage] = useState(false)
 
-  // STRICT RBAC: Only SUPER_ADMIN can view and manipulate Access Control
-  if (currentUser && currentUser.role !== 'SUPER_ADMIN') {
-    return <Navigate to="/unauthorized" replace />
-  }
-
   // Active officer when in USER mode
   const currentOfficer = useMemo(() => {
     if (accessMode !== 'USER') return null
@@ -238,6 +233,11 @@ export const AccessControlPage: React.FC = () => {
     } else {
       toggleAllForRole(activeRole, enabled)
     }
+  }
+
+  // STRICT RBAC: Only SUPER_ADMIN can view and manipulate Access Control
+  if (currentUser && currentUser.role !== 'SUPER_ADMIN') {
+    return <Navigate to="/unauthorized" replace />
   }
 
   return (

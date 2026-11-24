@@ -579,7 +579,7 @@ export function enrichSeatAllocations(s: any, todayStr?: string) {
   const currentAlloc =
     otherAllocs.find((a: any) => {
       const b = a.boarder
-      if (a.status === 'CANCELLED') return false
+      if (a.status === 'CANCELLED' && (!a.end_date || a.end_date < today)) return false
       if (a.end_date && a.end_date < today) return false
       if (b?.leaving_date && b.leaving_date < today) return false
       if (b?.status === 'LEFT' && (!b?.leaving_date || b.leaving_date < today)) return false
@@ -591,7 +591,7 @@ export function enrichSeatAllocations(s: any, todayStr?: string) {
     }) ||
     otherAllocs.find((a: any) => {
       const b = a.boarder
-      if (a.status === 'CANCELLED') return false
+      if (a.status === 'CANCELLED' && (!a.end_date || a.end_date < today)) return false
       if (a.end_date && a.end_date < today) return false
       if (b?.leaving_date && b.leaving_date < today) return false
       if (b?.status === 'LEFT' && (!b?.leaving_date || b.leaving_date < today)) return false
@@ -599,6 +599,15 @@ export function enrichSeatAllocations(s: any, todayStr?: string) {
       const notEnded = !a.end_date || a.end_date >= today
       const boarderNotLeft = !b?.leaving_date || b.leaving_date >= today
       return started && notEnded && boarderNotLeft
+    }) ||
+    otherAllocs.find((a: any) => {
+      const b = a.boarder
+      if (a.end_date && a.end_date < today) return false
+      if (b?.leaving_date && b.leaving_date < today) return false
+      if (b?.status === 'LEFT' && (!b?.leaving_date || b.leaving_date < today)) return false
+      const notEnded = !a.end_date || a.end_date >= today
+      const boarderNotLeft = !b?.leaving_date || b.leaving_date >= today
+      return notEnded && boarderNotLeft
     }) ||
     null
 
