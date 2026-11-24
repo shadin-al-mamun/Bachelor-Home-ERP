@@ -62,7 +62,7 @@ export interface BoarderWithRelations extends Boarder {
   }
 }
 
-// Self-heal: Synchronize any active boarders who have departure notices so allocations are restored to ACTIVE
+// Self-heal: Synchronize departure notices and auto-expire departed boarders & allocations
 let isSyncingNotices = false
 export async function syncDepartureNoticeAllocations() {
   if (!isSupabaseConfigured || isSyncingNotices) return
@@ -71,118 +71,94 @@ export async function syncDepartureNoticeAllocations() {
   try {
     const today = new Date().toISOString().slice(0, 10)
 
-    // 1. Specifically heal Al-Imran (BDR-2026-7652) as requested
-    const { data: imranRows } = await supabase
-      .from('boarders')
-      .select('id, boarder_code, leaving_date, status')
-      .eq('boarder_code', 'BDR-2026-7652')
-
-    if (imranRows && imranRows.length > 0) {
-      const imran = imranRows[0]
-      const targetLeavingDate = imran.leaving_date || '2026-11-30'
-
-      // Keep Imran ACTIVE with scheduled leaving date
-      if (imran.status !== 'ACTIVE' || !imran.leaving_date) {
-        await supabase
-          .from('boarders')
-          .update({ status: 'ACTIVE', leaving_date: targetLeavingDate, updated_at: new Date().toISOString() })
-          .eq('id', imran.id)
+    // 1. Try authoritative RPC fn_expire_past_departure_notices first
+    try {
+      const { error: rpcErr } = await supabase.rpc('fn_expire_past_departure_notices')
+      if (!rpcErr) {
+        return
       }
+    } catch {
+      // Fall through to client-side self-heal queries below
+    }
 
-      // Find Imran's allocation and ensure it is ACTIVE with end_date
-      const { data: imranAllocs } = await supabase
-        .from('allocations')
-        .select('id, status, end_date, seat_id')
-        .eq('boarder_id', imran.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
+    // 2. Client-side self-heal: Expire any past departure notices (< today)
+    // Find all allocations that were ACTIVE but whose end_date has passed (< today)
+    const { data: expiredAllocs } = await supabase
+      .from('allocations')
+      .select('id, seat_id, boarder_id')
+      .eq('status', 'ACTIVE')
+      .lt('end_date', today)
 
-      if (imranAllocs && imranAllocs[0]) {
-        const a = imranAllocs[0]
-        if (a.status !== 'ACTIVE' || a.end_date !== targetLeavingDate) {
+    if (expiredAllocs && expiredAllocs.length > 0) {
+      for (const alloc of expiredAllocs) {
+        // Mark allocation as ENDED
+        await supabase
+          .from('allocations')
+          .update({ status: 'ENDED', updated_at: new Date().toISOString() })
+          .eq('id', alloc.id)
+
+        // Mark boarder as LEFT if leaving_date < today
+        if (alloc.boarder_id) {
           await supabase
-            .from('allocations')
-            .update({
-              status: 'ACTIVE',
-              end_date: targetLeavingDate,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', a.id)
+            .from('boarders')
+            .update({ status: 'LEFT', updated_at: new Date().toISOString() })
+            .eq('id', alloc.boarder_id)
         }
-        if (a.seat_id) {
-          await supabase
-            .from('seats')
-            .update({ status: 'OCCUPIED', updated_at: new Date().toISOString() })
-            .eq('id', a.seat_id)
+
+        // Release seat to AVAILABLE if no other active allocation exists today
+        if (alloc.seat_id) {
+          const { data: otherActive } = await supabase
+            .from('allocations')
+            .select('id')
+            .eq('seat_id', alloc.seat_id)
+            .eq('status', 'ACTIVE')
+            .or(`end_date.is.null,end_date.gte.${today}`)
+
+          if (!otherActive || otherActive.length === 0) {
+            await supabase
+              .from('seats')
+              .update({ status: 'AVAILABLE', updated_at: new Date().toISOString() })
+              .eq('id', alloc.seat_id)
+          }
         }
       }
     }
 
-    // 2. Specifically heal Zahid Hasan (Flat 206) with departure scheduled 2026-11-23
-    const { data: zahidRows } = await supabase
+    // 3. Find any boarders with leaving_date < today still marked ACTIVE
+    const { data: expiredBoarders } = await supabase
       .from('boarders')
-      .select('id, boarder_code, full_name, leaving_date, status')
-      .or('full_name.ilike.%জাহিদ%,full_name.ilike.%Zahid%')
-      .limit(1)
+      .select('id')
+      .eq('status', 'ACTIVE')
+      .lt('leaving_date', today)
 
-    if (zahidRows && zahidRows.length > 0) {
-      const zahid = zahidRows[0]
-      const targetLeavingDate = zahid.leaving_date || '2026-11-23'
-
-      if (zahid.status !== 'ACTIVE' || !zahid.leaving_date) {
+    if (expiredBoarders && expiredBoarders.length > 0) {
+      for (const b of expiredBoarders) {
         await supabase
           .from('boarders')
-          .update({ status: 'ACTIVE', leaving_date: targetLeavingDate, updated_at: new Date().toISOString() })
-          .eq('id', zahid.id)
-      }
-
-      const { data: zahidAllocs } = await supabase
-        .from('allocations')
-        .select('id, status, end_date, seat_id')
-        .eq('boarder_id', zahid.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-
-      if (zahidAllocs && zahidAllocs[0]) {
-        const a = zahidAllocs[0]
-        if (a.status !== 'ACTIVE' || a.end_date !== targetLeavingDate) {
-          await supabase
-            .from('allocations')
-            .update({
-              status: 'ACTIVE',
-              end_date: targetLeavingDate,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', a.id)
-        }
-        if (a.seat_id) {
-          await supabase
-            .from('seats')
-            .update({ status: 'OCCUPIED', updated_at: new Date().toISOString() })
-            .eq('id', a.seat_id)
-        }
+          .update({ status: 'LEFT', updated_at: new Date().toISOString() })
+          .eq('id', b.id)
       }
     }
 
-    // 3. Heal any other active boarders with future leaving_date (regardless of status)
-    const { data: noticeBoarders } = await supabase
+    // 4. Ensure future departure notices (leaving_date >= today) remain ACTIVE
+    const { data: futureBoarders } = await supabase
       .from('boarders')
       .select('id, leaving_date, status')
       .gte('leaving_date', today)
 
-    if (noticeBoarders && noticeBoarders.length > 0) {
-      for (const nb of noticeBoarders) {
-        if (nb.status !== 'ACTIVE') {
+    if (futureBoarders && futureBoarders.length > 0) {
+      for (const fb of futureBoarders) {
+        if (fb.status !== 'ACTIVE') {
           await supabase
             .from('boarders')
             .update({ status: 'ACTIVE', updated_at: new Date().toISOString() })
-            .eq('id', nb.id)
+            .eq('id', fb.id)
         }
 
         const { data: allocs } = await supabase
           .from('allocations')
           .select('id, status, end_date, seat_id')
-          .eq('boarder_id', nb.id)
+          .eq('boarder_id', fb.id)
           .order('created_at', { ascending: false })
           .limit(1)
 
@@ -193,7 +169,7 @@ export async function syncDepartureNoticeAllocations() {
               .from('allocations')
               .update({
                 status: 'ACTIVE',
-                end_date: nb.leaving_date,
+                end_date: fb.leaving_date,
                 updated_at: new Date().toISOString(),
               })
               .eq('id', a.id)
@@ -223,7 +199,11 @@ export function resolveBoarderActiveAllocation(rawAlloc: any, todayStr?: string)
 
   // 1. Current resident today:
   // Started on or before today, and hasn't ended yet (end_date IS NULL or end_date >= today)
+  // If end_date < today, the allocation has EXPIRED and cannot be active today.
   const current = allocList.find((a: any) => {
+    if (a.status === 'CANCELLED') return false
+    if (a.end_date && a.end_date < today) return false
+    if (a.status === 'ENDED' && (!a.end_date || a.end_date < today)) return false
     const started = !a.start_date || a.start_date <= today
     const notEnded = !a.end_date || a.end_date >= today
     return started && notEnded
@@ -232,19 +212,17 @@ export function resolveBoarderActiveAllocation(rawAlloc: any, todayStr?: string)
   // 2. Upcoming advance booking:
   // Starts after today
   const upcoming = allocList
-    .filter((a: any) => a.start_date && a.start_date > today)
+    .filter((a: any) => a.start_date && a.start_date > today && a.status !== 'CANCELLED' && a.status !== 'ENDED')
     .sort((a: any, b: any) => (a.start_date > b.start_date ? 1 : -1))[0]
 
-  // 3. Fallback active allocation
-  const fallbackActive = allocList.find((a: any) => a.status === 'ACTIVE')
-
-  const chosen = current || upcoming || fallbackActive || allocList[0]
+  // If there is no active resident allocation today and no upcoming booking, this boarder has no active allocation!
+  const chosen = current || upcoming
   if (!chosen) return null
 
   const isNoticePending = Boolean(
-    (chosen.end_date && chosen.end_date >= today) ||
-    chosen.cancellation_reason ||
-    chosen.status === 'ENDED'
+    chosen.end_date &&
+    chosen.end_date >= today &&
+    (chosen.cancellation_reason || chosen.end_date >= today)
   )
   const isUpcoming = Boolean(chosen.start_date && chosen.start_date > today)
 
@@ -252,7 +230,7 @@ export function resolveBoarderActiveAllocation(rawAlloc: any, todayStr?: string)
     ...chosen,
     is_notice_pending: isNoticePending,
     is_upcoming: isUpcoming,
-    vacate_date: chosen.end_date || '2026-11-30',
+    vacate_date: chosen.end_date || null,
   }
 }
 
@@ -1241,14 +1219,22 @@ export function useBoarders(filters?: BoarderFilters) {
 
       // Merge genuine boarders with any pending applicant profiles
       const rawList = [...(data || []), ...pendingFromProfiles].map((b: any) => {
-        // Auto-heal: If boarder has scheduled departure today or in future, they are an ACTIVE resident!
-        const isResidentToday = b.status === 'ACTIVE' || (b.leaving_date && b.leaving_date >= today)
-        const resolvedStatus = isResidentToday && b.status === 'LEFT' ? 'ACTIVE' : b.status
+        // Resolve boarder status based on scheduled departure date:
+        // If leaving_date has passed (< today), boarder status is strictly 'LEFT'!
+        // If leaving_date is today or in future (>= today) and status was 'LEFT', restore to 'ACTIVE'.
+        let resolvedStatus = b.status
+        if (b.leaving_date && b.leaving_date < today) {
+          resolvedStatus = 'LEFT'
+        } else if (b.leaving_date && b.leaving_date >= today && b.status === 'LEFT') {
+          resolvedStatus = 'ACTIVE'
+        }
+
+        const activeAlloc = resolvedStatus === 'LEFT' ? null : resolveBoarderActiveAllocation(b.active_allocation, today)
 
         return {
           ...b,
           status: resolvedStatus,
-          active_allocation: resolveBoarderActiveAllocation(b.active_allocation, today),
+          active_allocation: activeAlloc,
         }
       })
 

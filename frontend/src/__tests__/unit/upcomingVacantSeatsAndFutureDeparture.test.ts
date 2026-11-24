@@ -68,7 +68,7 @@ describe('Future Departure & Upcoming Vacant Seat (আসন্ন খালি 
       ],
     }
 
-    const enriched = enrichSeatAllocations(mockSeat)
+    const enriched = enrichSeatAllocations(mockSeat, TODAY)
     expect(enriched.status).toBe('OCCUPIED') // Must still be OCCUPIED today!
     expect(enriched.has_notice_to_vacate).toBe(true)
     expect(enriched.occupant_name).toBe('জাহিদ হাসান')
@@ -141,5 +141,91 @@ describe('Future Departure & Upcoming Vacant Seat (আসন্ন খালি 
     const flatInfo = getBoarderFlatInfoMock(zahidBoarder)
     expect(flatInfo).not.toBeNull()
     expect(flatInfo?.code).toBe('Flat-206')
+  })
+
+  it('5. When departure date has passed (e.g. today 2026-11-24, departure was 2026-11-23), seat is immediately AVAILABLE and occupant is cleared', () => {
+    const mockSeat = {
+      id: 'seat-206-a',
+      seat_code: '206-A',
+      seat_name: 'Single Bed A',
+      status: 'OCCUPIED',
+      default_rent: 4500,
+      allocations: [
+        {
+          id: 'alloc-zahid-1',
+          status: 'ACTIVE',
+          monthly_rent: 4500,
+          start_date: '2026-10-01',
+          end_date: '2026-11-23', // Yesterday! Departure already passed
+          cancellation_reason: 'প্রস্থান নোটিশ',
+          boarder: {
+            id: 'b-zahid',
+            full_name: 'জাহিদ হাসান',
+            boarder_code: 'BDR-2026-3367',
+            status: 'ACTIVE',
+            leaving_date: '2026-11-23',
+          },
+        },
+      ],
+    }
+
+    const TODAY_AFTER_DEPARTURE = '2026-11-24'
+    const enriched = enrichSeatAllocations(mockSeat, TODAY_AFTER_DEPARTURE)
+
+    // Seat MUST now be AVAILABLE, notice must be FALSE, and occupant must be null
+    expect(enriched.status).toBe('AVAILABLE')
+    expect(enriched.has_notice_to_vacate).toBe(false)
+    expect(enriched.occupant_name).toBeNull()
+    expect(enriched.occupant_code).toBeNull()
+    expect(enriched.vacate_date).toBeNull()
+    expect(enriched.vacant_from_date).toBeNull()
+  })
+
+  it('6. When departure date has passed, resolveBoarderActiveAllocation returns null (no active seat)', () => {
+    const rawAlloc = {
+      id: 'alloc-zahid-1',
+      boarder_id: 'b-zahid',
+      seat_id: 'seat-206-a',
+      monthly_rent: 4500,
+      security_deposit: 3000,
+      start_date: '2026-10-01',
+      end_date: '2026-11-23', // Yesterday
+      status: 'ACTIVE',
+      cancellation_reason: 'প্রস্থান সম্পন্ন',
+    }
+
+    const TODAY_AFTER_DEPARTURE = '2026-11-24'
+    const resolved = resolveBoarderActiveAllocation(rawAlloc, TODAY_AFTER_DEPARTURE)
+
+    // Since departure date 2026-11-23 is before 2026-11-24, boarder has NO active allocation
+    expect(resolved).toBeNull()
+  })
+
+  it('7. Boarder with status LEFT or expired departure date has getBoarderFlatInfo return null', () => {
+    const getBoarderFlatInfoMock = (boarder: any) => {
+      if (boarder.status === 'LEFT') return null
+      const alloc = boarder.active_allocation
+      const flat = alloc?.seat?.room?.flat
+      if (flat) {
+        return {
+          id: flat.id || flat.flat_code,
+          code: flat.flat_code,
+          name: flat.name,
+        }
+      }
+      return null
+    }
+
+    const departedBoarder = {
+      id: 'b-zahid',
+      full_name: 'জাহিদ হাসান',
+      boarder_code: 'BDR-2026-3367',
+      status: 'LEFT',
+      leaving_date: '2026-11-23',
+      active_allocation: null,
+    }
+
+    const flatInfo = getBoarderFlatInfoMock(departedBoarder)
+    expect(flatInfo).toBeNull()
   })
 })

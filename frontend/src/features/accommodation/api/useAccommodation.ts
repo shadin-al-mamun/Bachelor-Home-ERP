@@ -543,54 +543,67 @@ export interface SeatFilterParams {
 }
 
 // Helper to resolve current active occupant, departure notice, and upcoming future allocation
-export function enrichSeatAllocations(s: any) {
-  const today = new Date().toISOString().slice(0, 10)
+export function enrichSeatAllocations(s: any, todayStr?: string) {
+  const today = todayStr || new Date().toISOString().slice(0, 10)
   const allAllocs: any[] = Array.isArray(s.allocations) ? s.allocations : []
 
-  // 1. Upcoming / advance booking: starts in the future after today
+  // 1. Upcoming / advance booking: starts strictly in the future (after today)
   const upcomingAlloc = allAllocs
-    .filter((a: any) => a.start_date && a.start_date > today && a.status !== 'CANCELLED')
+    .filter((a: any) => a.start_date && a.start_date > today && a.status !== 'CANCELLED' && a.status !== 'ENDED')
     .sort((a: any, b: any) => (a.start_date > b.start_date ? 1 : -1))[0] || null
 
   // 2. Remaining allocations on this seat (excluding the upcoming booking):
   const otherAllocs = allAllocs.filter((a: any) => a.id !== upcomingAlloc?.id)
 
   // Current resident today:
-  // Match any started allocation where status is ACTIVE, end_date >= today,
-  // or whose linked boarder is ACTIVE or has leaving_date >= today
+  // Must have started on or before today, and must NOT have ended before today!
+  // (i.e. end_date is null or end_date >= today).
+  // Status must be ACTIVE (or future notice where end_date >= today).
+  // Linked boarder must not have departed before today (leaving_date >= today if set, status !== 'LEFT')
   const currentAlloc =
-    otherAllocs.find((a: any) => a.status === 'ACTIVE' && (!a.start_date || a.start_date <= today)) ||
-    otherAllocs.find((a: any) => a.end_date && a.end_date >= today && (!a.start_date || a.start_date <= today)) ||
-    otherAllocs.find(
-      (a: any) =>
-        (!a.start_date || a.start_date <= today) &&
-        (a.boarder?.status === 'ACTIVE' || (a.boarder?.leaving_date && a.boarder.leaving_date >= today))
-    ) ||
-    otherAllocs.find((a: any) => !a.start_date || a.start_date <= today) ||
+    otherAllocs.find((a: any) => {
+      if (a.status === 'CANCELLED') return false
+      if (a.end_date && a.end_date < today) return false
+      if (a.boarder?.leaving_date && a.boarder.leaving_date < today) return false
+      const started = !a.start_date || a.start_date <= today
+      const notEnded = !a.end_date || a.end_date >= today
+      const boarderNotLeft = !a.boarder?.leaving_date || a.boarder.leaving_date >= today
+      const boarderActive = !a.boarder?.status || a.boarder.status === 'ACTIVE'
+      return a.status === 'ACTIVE' && started && notEnded && boarderNotLeft && boarderActive
+    }) ||
+    otherAllocs.find((a: any) => {
+      if (a.status === 'CANCELLED') return false
+      if (a.end_date && a.end_date < today) return false
+      if (a.boarder?.leaving_date && a.boarder.leaving_date < today) return false
+      const started = !a.start_date || a.start_date <= today
+      const notEnded = !a.end_date || a.end_date >= today
+      const boarderNotLeft = !a.boarder?.leaving_date || a.boarder.leaving_date >= today
+      return started && notEnded && boarderNotLeft
+    }) ||
     null
 
-  // Fallback active allocation (only if there are no upcomingAlloc can fallbackAlloc be used)
-  const fallbackAlloc = allAllocs.find((a: any) => a.status === 'ACTIVE') || null
+  // Primary allocation is the current resident living in the seat today
+  const primaryAlloc = currentAlloc
 
-  const primaryAlloc = currentAlloc || (!upcomingAlloc ? fallbackAlloc : null)
-
-  const vacateDate =
+  // Vacate date is ONLY valid if the resident is currently residing and scheduled to vacate today or in the future
+  const rawVacateDate =
     primaryAlloc?.end_date ||
     primaryAlloc?.boarder?.leaving_date ||
-    s.vacate_date ||
+    (s.vacate_date && s.vacate_date >= today ? s.vacate_date : null) ||
     null
 
+  const vacateDate = rawVacateDate && rawVacateDate >= today ? rawVacateDate : null
+
+  // Has notice to vacate: ONLY true if there IS a current occupant and their vacate date is today or future!
   const hasNotice = Boolean(
     primaryAlloc &&
-      ((vacateDate && vacateDate >= today) ||
-        primaryAlloc.cancellation_reason ||
-        primaryAlloc.status === 'ENDED' ||
-        primaryAlloc.boarder?.leaving_date ||
-        Boolean(s.has_notice_to_vacate))
+    vacateDate &&
+    vacateDate >= today &&
+    (primaryAlloc.cancellation_reason || (primaryAlloc.end_date && primaryAlloc.end_date >= today) || (primaryAlloc.boarder?.leaving_date && primaryAlloc.boarder.leaving_date >= today) || Boolean(s.has_notice_to_vacate))
   )
 
-  let vacantFromDate: string | null = s.vacant_from_date || null
-  if (vacateDate) {
+  let vacantFromDate: string | null = null
+  if (hasNotice && vacateDate) {
     const d = new Date(vacateDate)
     d.setDate(d.getDate() + 1)
     vacantFromDate = d.toISOString().slice(0, 10)
@@ -599,38 +612,23 @@ export function enrichSeatAllocations(s: any) {
   // Determine effective seat status
   let effectiveStatus = s.status
   if (s.status !== 'MAINTENANCE' && s.status !== 'INACTIVE') {
-    if (primaryAlloc || upcomingAlloc) {
+    if (primaryAlloc) {
       effectiveStatus = 'OCCUPIED'
+    } else if (upcomingAlloc) {
+      effectiveStatus = s.status === 'AVAILABLE' ? 'AVAILABLE' : 'OCCUPIED'
     } else {
       effectiveStatus = 'AVAILABLE'
     }
   }
 
-  // Extract occupant details
-  const occupantName =
-    primaryAlloc?.boarder?.full_name ||
-    s.occupant_name ||
-    null
+  // Extract occupant details (strictly null if no current resident living today)
+  const occupantName = primaryAlloc ? (primaryAlloc.boarder?.full_name || s.occupant_name || null) : null
+  const occupantCode = primaryAlloc ? (primaryAlloc.boarder?.boarder_code || s.occupant_code || null) : null
+  const occupantId = primaryAlloc ? (primaryAlloc.boarder?.id || primaryAlloc.boarder_id || s.occupant_id || null) : null
 
-  const occupantCode =
-    primaryAlloc?.boarder?.boarder_code ||
-    s.occupant_code ||
-    null
-
-  const upcomingOccupantName =
-    upcomingAlloc?.boarder?.full_name ||
-    s.upcoming_occupant_name ||
-    null
-
-  const upcomingOccupantCode =
-    upcomingAlloc?.boarder?.boarder_code ||
-    s.upcoming_occupant_code ||
-    null
-
-  const upcomingStartDate =
-    upcomingAlloc?.start_date ||
-    s.upcoming_start_date ||
-    null
+  const upcomingOccupantName = upcomingAlloc?.boarder?.full_name || s.upcoming_occupant_name || null
+  const upcomingOccupantCode = upcomingAlloc?.boarder?.boarder_code || s.upcoming_occupant_code || null
+  const upcomingStartDate = upcomingAlloc?.start_date || s.upcoming_start_date || null
 
   // Check if occupied by hostel staff (0 rent or staff designation)
   const isStaffOccupant = Boolean(
@@ -642,9 +640,8 @@ export function enrichSeatAllocations(s: any) {
       primaryAlloc.boarder?.institution?.includes('স্টাফ') ||
       primaryAlloc.boarder?.institution?.includes('কর্মচারী')
     )) ||
-    (s.occupant_code && s.occupant_code.startsWith('STF-')) ||
-    s.occupant_rent === 0 ||
-    (s.description && (s.description.includes('স্টাফ') || s.description.includes('কর্মচারী')))
+    (occupantCode && occupantCode.startsWith('STF-')) ||
+    (primaryAlloc && Number(primaryAlloc.monthly_rent) === 0)
   )
 
   const resolvedRent = primaryAlloc !== null && primaryAlloc !== undefined
@@ -658,7 +655,7 @@ export function enrichSeatAllocations(s: any) {
     allocation_id: primaryAlloc?.id || upcomingAlloc?.id || null,
     occupant_name: occupantName,
     occupant_code: occupantCode,
-    occupant_id: primaryAlloc?.boarder?.id || primaryAlloc?.boarder_id || s.occupant_id || null,
+    occupant_id: occupantId,
     occupant_rent: resolvedRent,
     occupant_start_date: primaryAlloc?.start_date || null,
     is_staff: isStaffOccupant,
@@ -667,7 +664,7 @@ export function enrichSeatAllocations(s: any) {
     has_notice_to_vacate: hasNotice,
     vacate_date: vacateDate,
     vacant_from_date: vacantFromDate,
-    cancellation_reason: primaryAlloc?.cancellation_reason || s.cancellation_reason || null,
+    cancellation_reason: hasNotice ? (primaryAlloc?.cancellation_reason || s.cancellation_reason || null) : null,
 
     // Upcoming allocation details
     has_upcoming_allocation: Boolean(upcomingAlloc) || Boolean(s.has_upcoming_allocation),

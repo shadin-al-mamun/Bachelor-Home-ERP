@@ -71,6 +71,9 @@ export const BoarderListPage: React.FC = () => {
 
   // Helper to extract flat identity cleanly from active seat allocation
   const getBoarderFlatInfo = (boarder: BoarderWithRelations) => {
+    // If boarder has left or has no active allocation, they don't occupy a residential flat
+    if (boarder.status === 'LEFT') return null
+
     const alloc = boarder.active_allocation
 
     // 1. Direct flat mapping via allocation seat
@@ -109,24 +112,6 @@ export const BoarderListPage: React.FC = () => {
         id: 'flat-207',
         code: 'Flat-207',
         name: 'ফ্ল্যাট ২০৭ (Flat-207)',
-        floor: 2,
-      }
-    }
-
-    // 3. Fallback for residents with scheduled departure (e.g. Zahid Hasan, Imran in Flat 206)
-    const name = boarder.full_name?.toLowerCase() || ''
-    const code = boarder.boarder_code || ''
-    if (
-      name.includes('জাহিদ') ||
-      name.includes('zahid') ||
-      code === 'BDR-2026-7652' ||
-      name.includes('ইমরান') ||
-      name.includes('imran')
-    ) {
-      return {
-        id: 'flat-206',
-        code: 'Flat-206',
-        name: 'ফ্ল্যাট ২০৬ (Flat-206)',
         floor: 2,
       }
     }
@@ -229,8 +214,6 @@ export const BoarderListPage: React.FC = () => {
 
   const renderBoarderRow = (boarder: BoarderWithRelations) => {
     const alloc = boarder.active_allocation
-    const isImran = boarder.boarder_code === 'BDR-2026-7652' || boarder.full_name?.includes('ইমরান')
-    const isZahid = Boolean(boarder.full_name?.includes('জাহিদ') || boarder.full_name?.toLowerCase().includes('zahid'))
     const isStaff = Boolean(
       boarder.institution?.includes('কর্মচারী') ||
       boarder.institution?.includes('স্টাফ') ||
@@ -239,7 +222,7 @@ export const BoarderListPage: React.FC = () => {
       (alloc as any)?.remarks?.includes('স্টাফ') ||
       (alloc as any)?.remarks?.includes('কর্মচারী')
     )
-    const hasSeat = Boolean((alloc && alloc.seat) || isImran || isZahid)
+    const hasSeat = Boolean(alloc && alloc.seat && boarder.status !== 'LEFT')
 
     return (
       <tr
@@ -307,10 +290,7 @@ export const BoarderListPage: React.FC = () => {
             <div className="flex items-center gap-2">
               <div
                 className={`p-1.5 rounded-lg border ${
-                  alloc?.is_notice_pending ||
-                  (boarder.leaving_date &&
-                    boarder.leaving_date >= new Date().toISOString().slice(0, 10)) ||
-                  isImran
+                  alloc?.is_notice_pending
                     ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
                     : alloc?.is_upcoming
                     ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
@@ -322,29 +302,26 @@ export const BoarderListPage: React.FC = () => {
               <div>
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="font-semibold text-indigo-300 block">
-                    {alloc?.seat?.seat_code || (isImran ? 'Seat B-1' : isZahid ? 'Seat-206-A' : 'সিট বরাদ্দ')}
+                    {alloc?.seat?.seat_code || 'সিট বরাদ্দ'}
                   </span>
                   {isStaff && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-purple-500/20 text-purple-300 border border-purple-500/30 whitespace-nowrap">
                       ৳০ (স্টাফ ফ্রি)
                     </span>
                   )}
-                  {(alloc?.is_notice_pending ||
-                    (boarder.leaving_date &&
-                      boarder.leaving_date >= new Date().toISOString().slice(0, 10)) ||
-                    isImran || isZahid) && (
+                  {alloc?.is_notice_pending && alloc?.end_date && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30 whitespace-nowrap">
-                      {formatDateBn(alloc?.end_date || boarder.leaving_date || (isZahid ? '2026-11-23' : '2026-11-30'))} প্রস্থান নোটিশ
+                      {formatDateBn(alloc.end_date)} প্রস্থান নোটিশ
                     </span>
                   )}
-                  {alloc?.is_upcoming && (
+                  {alloc?.is_upcoming && alloc?.start_date && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 whitespace-nowrap">
                       {formatDateBn(alloc.start_date)} থেকে
                     </span>
                   )}
                 </div>
                 <span className="text-[11px] text-slate-400">
-                  {alloc?.seat?.room?.name || 'Room-206'}, {alloc?.seat?.room?.flat?.name || 'ফ্ল্যাট ২০৬ (Flat-206)'}
+                  {alloc?.seat?.room?.name || 'Room'}, {alloc?.seat?.room?.flat?.name || 'Flat'}
                 </span>
               </div>
             </div>
