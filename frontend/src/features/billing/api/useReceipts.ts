@@ -76,7 +76,7 @@ export const MOCK_ACCOUNTS: FinancialAccount[] = [
     account_number: 'MGR-CASH-01',
     bank_name: 'Manager Shift Cash Drawer',
     opening_balance: 0,
-    current_balance: 12404,
+    current_balance: 0,
     is_active: true,
     assigned_manager_id: 'p-manager-1',
     created_at: '2026-01-01T00:00:00Z',
@@ -101,8 +101,8 @@ export const MOCK_ACCOUNTS: FinancialAccount[] = [
     account_type: 'CASH_OWNER',
     account_number: 'MAIN-VAULT-01',
     bank_name: 'Hostel Central Safe / Vault',
-    opening_balance: 2000,
-    current_balance: 24050,
+    opening_balance: 0,
+    current_balance: 0,
     is_active: true,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-10-15T00:00:00Z',
@@ -113,8 +113,8 @@ export const MOCK_ACCOUNTS: FinancialAccount[] = [
     account_type: 'BANK',
     account_number: 'ADM-BANK-01',
     bank_name: 'Hostel Operating Bank Account',
-    opening_balance: 5000,
-    current_balance: 10000,
+    opening_balance: 0,
+    current_balance: 0,
     is_active: true,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-10-15T00:00:00Z',
@@ -128,7 +128,20 @@ export function getStoredFinancialAccounts(): FinancialAccount[] {
     if (raw) {
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed
+        // Automatically sanitize legacy test balances so live launch starts clean
+        const sanitized = parsed.map((acc: FinancialAccount) => {
+          if (
+            acc.current_balance === 24050 ||
+            acc.current_balance === 10000 ||
+            acc.current_balance === 12404 ||
+            acc.opening_balance === 2000 ||
+            acc.opening_balance === 5000
+          ) {
+            return { ...acc, current_balance: 0, opening_balance: 0 }
+          }
+          return acc
+        })
+        return sanitized
       }
     }
   } catch (e) {

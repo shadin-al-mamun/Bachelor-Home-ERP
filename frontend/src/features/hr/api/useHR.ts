@@ -58,77 +58,9 @@ export const INITIAL_STAFF_BASELINE: StaffMember[] = [
   },
 ]
 
-export const INITIAL_ADVANCES_BASELINE: StaffAdvance[] = [
-  {
-    id: 'adv-202611-5363',
-    voucher_no: 'ADV-202611-5363',
-    staff_id: 'stf-2026-416',
-    staff: INITIAL_STAFF_BASELINE[0],
-    amount: 3000,
-    advance_date: '2026-11-10',
-    disbursed_from_account_id: 'a0000000-0000-4000-8000-000000000001',
-    status: 'PENDING',
-    deducted_amount: 0,
-    remarks: 'জরুরী প্রয়োজনে অগ্রিম বেতন প্রদান',
-    created_at: '2026-11-10T08:15:00.000Z',
-  },
-]
+export const INITIAL_ADVANCES_BASELINE: StaffAdvance[] = []
 
-export const INITIAL_PAYROLL_BASELINE: PayrollSheet[] = [
-  {
-    id: 'pay-2026-11',
-    payroll_month: '2026-11',
-    payroll_batch_no: 'PAY-2026-11',
-    total_basic_salary: 12000,
-    total_bonuses: 0,
-    total_deductions: 3000,
-    total_net_payable: 9000,
-    total_paid_amount: 0,
-    status: 'DRAFT',
-    remarks: '2026-11 মাসের নিয়মিত বেতন শিট',
-    created_at: '2026-11-10T08:30:00.000Z',
-    items: [
-      {
-        id: 'item-stf-2026-416',
-        payroll_sheet_id: 'pay-2026-11',
-        staff_id: 'stf-2026-416',
-        staff: INITIAL_STAFF_BASELINE[0],
-        basic_salary: 10000,
-        allowances: [],
-        allowances_total: 0,
-        deductions: [],
-        deductions_total: 0,
-        bonus_overtime: 0,
-        advance_deduction: 3000,
-        absence_deduction: 0,
-        other_deduction: 0,
-        net_payable: 7000,
-        paid_amount: 0,
-        payment_status: 'UNPAID',
-        created_at: '2026-11-10T08:30:00.000Z',
-      },
-      {
-        id: 'item-stf-2026-790',
-        payroll_sheet_id: 'pay-2026-11',
-        staff_id: 'stf-2026-790',
-        staff: INITIAL_STAFF_BASELINE[1],
-        basic_salary: 2000,
-        allowances: [],
-        allowances_total: 0,
-        deductions: [],
-        deductions_total: 0,
-        bonus_overtime: 0,
-        advance_deduction: 0,
-        absence_deduction: 0,
-        other_deduction: 0,
-        net_payable: 2000,
-        paid_amount: 0,
-        payment_status: 'UNPAID',
-        created_at: '2026-11-10T08:30:00.000Z',
-      },
-    ],
-  },
-]
+export const INITIAL_PAYROLL_BASELINE: PayrollSheet[] = []
 
 export interface HRCloudPayload {
   staff: StaffMember[]
@@ -328,17 +260,22 @@ export function getStoredAdvances(): StaffAdvance[] {
   try {
     const raw = localStorage.getItem(LOCAL_ADVANCES_KEY)
     if (!raw) {
-      localStorage.setItem(LOCAL_ADVANCES_KEY, JSON.stringify(INITIAL_ADVANCES_BASELINE))
-      return INITIAL_ADVANCES_BASELINE
+      return []
     }
     const parsed: StaffAdvance[] = JSON.parse(raw)
-    if (!parsed || parsed.length === 0) {
-      localStorage.setItem(LOCAL_ADVANCES_KEY, JSON.stringify(INITIAL_ADVANCES_BASELINE))
-      return INITIAL_ADVANCES_BASELINE
+    if (!parsed || !Array.isArray(parsed)) {
+      return []
     }
-    return parsed
+    // Filter out old test advances
+    const sanitized = parsed.filter(
+      (a) => a.voucher_no !== 'ADV-202611-5363' && a.id !== 'adv-202611-5363'
+    )
+    if (sanitized.length !== parsed.length) {
+      localStorage.setItem(LOCAL_ADVANCES_KEY, JSON.stringify(sanitized))
+    }
+    return sanitized
   } catch {
-    return INITIAL_ADVANCES_BASELINE
+    return []
   }
 }
 
@@ -353,17 +290,22 @@ export function getStoredPayroll(): PayrollSheet[] {
   try {
     const raw = localStorage.getItem(LOCAL_PAYROLL_KEY)
     if (!raw) {
-      localStorage.setItem(LOCAL_PAYROLL_KEY, JSON.stringify(INITIAL_PAYROLL_BASELINE))
-      return INITIAL_PAYROLL_BASELINE
+      return []
     }
     const parsed: PayrollSheet[] = JSON.parse(raw)
-    if (!parsed || parsed.length === 0) {
-      localStorage.setItem(LOCAL_PAYROLL_KEY, JSON.stringify(INITIAL_PAYROLL_BASELINE))
-      return INITIAL_PAYROLL_BASELINE
+    if (!parsed || !Array.isArray(parsed)) {
+      return []
     }
-    return parsed
+    // Filter out old test payroll
+    const sanitized = parsed.filter(
+      (p) => p.payroll_batch_no !== 'PAY-2026-11' && p.id !== 'pay-2026-11'
+    )
+    if (sanitized.length !== parsed.length) {
+      localStorage.setItem(LOCAL_PAYROLL_KEY, JSON.stringify(sanitized))
+    }
+    return sanitized
   } catch {
-    return INITIAL_PAYROLL_BASELINE
+    return []
   }
 }
 

@@ -84,18 +84,25 @@ describe('Two Managers Position & Account Isolation', () => {
   })
 
   it('Total active funds calculation is properly isolated per user role', () => {
+    const testAccountsWithBalances: FinancialAccount[] = [
+      { ...MOCK_ACCOUNTS[0], current_balance: 12404 },
+      { ...MOCK_ACCOUNTS[1], current_balance: 0 },
+      { ...MOCK_ACCOUNTS[2], current_balance: 24050 },
+      { ...MOCK_ACCOUNTS[3], current_balance: 10000 },
+    ]
+
     // Admin calculates total active funds across all 4 accounts
-    const adminAccounts = getVisibleFinancialAccounts(MOCK_ACCOUNTS, adminUser)
+    const adminAccounts = getVisibleFinancialAccounts(testAccountsWithBalances, adminUser)
     const adminTotal = adminAccounts.reduce((sum, a) => sum + (Number(a.current_balance) || 0), 0)
     expect(adminTotal).toBe(46454) // 12404 + 0 + 24050 + 10000
 
     // Manager 1 calculates active funds only for their drawer
-    const mgr1Accounts = getVisibleFinancialAccounts(MOCK_ACCOUNTS, manager1)
+    const mgr1Accounts = getVisibleFinancialAccounts(testAccountsWithBalances, manager1)
     const mgr1Total = mgr1Accounts.reduce((sum, a) => sum + (Number(a.current_balance) || 0), 0)
     expect(mgr1Total).toBe(12404)
 
     // Manager 2 calculates active funds only for their drawer
-    const mgr2Accounts = getVisibleFinancialAccounts(MOCK_ACCOUNTS, manager2)
+    const mgr2Accounts = getVisibleFinancialAccounts(testAccountsWithBalances, manager2)
     const mgr2Total = mgr2Accounts.reduce((sum, a) => sum + (Number(a.current_balance) || 0), 0)
     expect(mgr2Total).toBe(0)
   })
